@@ -1,4 +1,4 @@
-import { createSystem, Group, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { HandInput, HandState, Side } from './hands.js';
 import { Arena, ARENA_RADIUS, LAUNCH_SPEED, NARROW, step, STEP, Top, verdict, WIDE } from './sim.js';
 import { ArenaView, Label, LauncherView, NARROW_LOOK, Sparks, TopView, WIDE_LOOK } from './visuals.js';
@@ -79,9 +79,20 @@ export class MatchSystem extends createSystem({
   private local = new Vector3();
   private handleWorld = new Vector3();
   private pullEnd = new Vector3();
+  /** Dev-only keyboard + gaze controls so the prototype can be played in the emulator without pinching. */
+  private keys = new Set<string>();
+  private charge = 0;
+  private gazeHit = { ok: false, x: 0, z: 0 };
+  private gazeDir = new Vector3();
+  private rootInverse = new Matrix4();
+  private reticle = new Mesh(
+    new CircleGeometry(0.006, 20).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.85, depthTest: false }),
+  );
 
   init() {
     this.root.name = 'spinsmith-arena';
+    this.reticle.visible = false;
     this.root.visible = false;
     this.wideView.root.name = 'top-wide';
     this.narrowView.root.name = 'top-narrow';
@@ -103,12 +114,29 @@ export class MatchSystem extends createSystem({
 
     if (import.meta.env.DEV) {
       const onKey = (e: KeyboardEvent) => {
+        if (e.repeat) return;
+        this.keys.add(e.code);
         if (e.code === 'KeyR') this.toReady();
         if (e.code === 'KeyP') this.phase = 'placing';
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
       };
+      const onKeyUp = (e: KeyboardEvent) => {
+        this.keys.delete(e.code);
+        if (e.code === 'Space' && this.charge > 0 && (this.phase === 'ready' || this.phase === 'result')) {
+          // Aim toward where the player is looking, like the slingshot aim.
+          const aim = this.gazeHit.ok ? Math.max(-MAX_AIM, Math.min(MAX_AIM, Math.atan2(this.gazeHit.x, SPAWN - this.gazeHit.z))) : 0;
+          this.launch(this.charge, aim);
+        }
+        if (e.code === 'Space') this.charge = 0;
+      };
       window.addEventListener('keydown', onKey);
-      this.cleanupFuncs.push(() => window.removeEventListener('keydown', onKey));
+      window.addEventListener('keyup', onKeyUp);
+      this.cleanupFuncs.push(
+        () => window.removeEventListener('keydown', onKey),
+        () => window.removeEventListener('keyup', onKeyUp),
+      );
+      this.reticle.renderOrder = 10;
+      this.root.add(this.reticle);
     }
   }
 
@@ -143,6 +171,7 @@ export class MatchSystem extends createSystem({
         this.updateFight(dt);
         break;
     }
+    if (import.meta.env.DEV) this.devControls(dt);
     this.arenaView.sync(this.arena);
     this.wideView.sync(this.wide, this.arena, this.time);
     this.narrowView.sync(this.narrow, this.arena, this.time);
@@ -354,5 +383,42 @@ export class MatchSystem extends createSystem({
     this.label.set(text);
     console.log(`[MATCH] ${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
     if (v !== 2) this.round++;
+  }
+
+  /**
+   * Dev only: Space charges and launches toward the gaze, B raises a bump and N presses a dent
+   * where the head is looking. Lets the prototype be played in the emulator's mouse-look mode.
+   */
+  private devControls(dt: number) {
+    this.gaze();
+    this.reticle.visible = this.gazeHit.ok;
+    if (this.gazeHit.ok) this.reticle.position.set(this.gazeHit.x, this.arena.height(this.gazeHit.x, this.gazeHit.z) + 0.002, this.gazeHit.z);
+    if (this.keys.has('Space') && (this.phase === 'ready' || this.phase === 'result')) {
+      this.charge = Math.min(1, this.charge + dt / 1.2);
+      this.label.set(`Power ${Math.round(this.charge * 100)}%\nRelease Space to launch`);
+    }
+    if (this.phase !== 'fight' || !this.gazeHit.ok) return;
+    const { x, z } = this.gazeHit;
+    if (this.keys.has('KeyB')) this.arena.stamp(x, z, 0.03);
+    if (this.keys.has('KeyN')) this.arena.stamp(x, z, -0.025);
+  }
+
+  /** Intersects the head's view ray with the arena floor (arena-local), by marching along the ray. */
+  private gaze() {
+    this.gazeHit.ok = false;
+    const head = this.player.head;
+    head.getWorldPosition(this.p);
+    head.getWorldDirection(this.gazeDir).negate();
+    const origin = this.root.worldToLocal(this.p);
+    this.gazeDir.transformDirection(this.rootInverse.copy(this.root.matrixWorld).invert());
+    for (let t = 0.05; t < 1.5; t += 0.005) {
+      const x = origin.x + this.gazeDir.x * t;
+      const y = origin.y + this.gazeDir.y * t;
+      const z = origin.z + this.gazeDir.z * t;
+      if (y <= this.arena.height(x, z)) {
+        if (Math.hypot(x, z) <= ARENA_RADIUS) Object.assign(this.gazeHit, { ok: true, x, z });
+        return;
+      }
+    }
   }
 }

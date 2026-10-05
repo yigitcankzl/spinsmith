@@ -43,8 +43,15 @@ On a headset on the same network, open the network URL printed by
 
 ### Dev keys (only in `npm run dev`)
 
+Pinching in the emulator is awkward, so the prototype can also be played with the
+keyboard and the head's gaze. Enter play mode in the emulator toolbar to look around
+with the mouse; a small blue reticle marks where you look on the arena floor.
+
 | Key | Action |
 |---|---|
+| `Space` | Hold to charge, release to launch toward where you are looking |
+| `B` | Hold to raise a bump where you are looking (during a fight) |
+| `N` | Hold to press a dent where you are looking (during a fight) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `R` | Reset to the ready screen |
 | `P` | Re-place the arena in front of the current head pose |
