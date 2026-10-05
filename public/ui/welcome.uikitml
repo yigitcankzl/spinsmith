@@ -57,11 +57,11 @@
 </style>
 <Panel class="panel-root">
   <div class="panel-content">
-    <div class="heading">Hello, Immersive Web!</div>
+    <div class="heading">SpinSmith</div>
     <Divider></Divider>
     <div class="sub-heading">
-      Build interactive browser, mixed-reality, and virtual-reality experiences
-      with Immersive Web SDK.
+      Sit at a table, enter mixed reality, and rip your spinning top into the
+      arena. Pinch the floor and lift to raise bumps that steer the fight.
     </div>
   </div>
   <Button id="xr-button" class="button">

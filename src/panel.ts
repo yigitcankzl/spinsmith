@@ -30,6 +30,8 @@ export class PanelSystem extends createSystem({}) {
       () => exitButton.removeEventListener('click', exitXR),
       this.world.visibilityState.subscribe((visibilityState) => {
         const is2D = visibilityState === VisibilityState.NonImmersive;
+        // In XR the game lives on the table; the panel would only block the view.
+        if (panel) panel.visible = is2D;
         xrButton.setProperties({ display: is2D ? 'flex' : 'none' });
         exitButton.setProperties({ display: is2D ? 'none' : 'flex' });
       }),
