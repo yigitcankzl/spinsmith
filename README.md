@@ -15,7 +15,8 @@ What works:
   8 cm above the nearest detected table (or on a floating tray when no table is found).
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Pull back to rip (pull length and speed set the power) or simply hold the
-  pinch to charge; let go to launch with whichever is stronger. A sideways pull aims like
+  pinch: a power meter rises to full and falls back, so you let go at the top; a release
+  at 92% or more is a perfect launch with extra spin. The stronger of rip and meter wins. A sideways pull aims like
   a slingshot; otherwise the top goes where your hand points on the floor. A quick tap
   does nothing.
 - An AI top launches from the far side at the same time.

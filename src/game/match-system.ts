@@ -32,8 +32,14 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
-/** Holding the pinch charges to full power in this many seconds (works without pulling). */
-const CHARGE_TIME = 1.2;
+/**
+ * Holding the pinch (without pulling) runs a power meter that rises to full in this many
+ * seconds and falls back again, so a hold launch is a timing skill rather than always 100%.
+ */
+const CHARGE_TIME = 0.9;
+/** Releasing at or above this power is a perfect launch: extra starting spin. */
+const PERFECT = 0.92;
+const PERFECT_SPIN = 1.1;
 /** Far bumps grow at this rate (m/s) while the pinch is held. */
 const RAY_BUMP_RATE = 0.05;
 
@@ -84,6 +90,8 @@ export class MatchSystem extends createSystem({
   private pullStart = new Vector3();
   private cordStart = new Vector3();
   private holdTime = 0;
+  /** Seconds left before a transient fight message clears. */
+  private labelTimer = 0;
   private pullEnd = new Vector3();
   /** Dev-only keyboard + gaze controls so the prototype can be played in the emulator without pinching. */
   private keys = new Set<string>();
@@ -176,6 +184,7 @@ export class MatchSystem extends createSystem({
         this.updatePull(dt);
         break;
       case 'fight':
+        if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
         this.updateShaping();
         this.updateFight(dt);
         break;
@@ -288,7 +297,7 @@ export class MatchSystem extends createSystem({
       this.pullEnd.copy(h.pinch);
       this.holdTime += dt;
       const power = this.pullPower();
-      this.label.set(`Power ${Math.round(power * 100)}%\nLet go to launch`);
+      this.label.set(power >= PERFECT ? `PERFECT ${Math.round(power * 100)}%\nLet go now!` : `Power ${Math.round(power * 100)}%\nLet go at the top`);
       if (dist < MAX_PULL) return;
     }
 
@@ -310,14 +319,19 @@ export class MatchSystem extends createSystem({
   /** Stronger of the rip (pull length and speed) and the hold charge. */
   private pullPower() {
     const rip = this.maxPull < MIN_PULL ? 0 : 0.55 * Math.min(1, this.maxPull / FULL_PULL) + 0.45 * Math.min(1, this.peakSpeed / FULL_SPEED);
-    return Math.min(1, Math.max(rip, this.holdTime / CHARGE_TIME));
+    // Triangle wave: 0 -> 1 -> 0 -> 1 ... while held.
+    const phase = (this.holdTime / CHARGE_TIME) % 2;
+    const meter = phase <= 1 ? phase : 2 - phase;
+    return Math.min(1, Math.max(rip, meter));
   }
 
   /** Launches both tops. aim: radians off straight-at-center for the player's top. */
   private launch(power: number, aim: number) {
     if (this.phase === 'result') this.toReady();
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
-    this.mine.launch(0, SPAWN, Math.sin(aim) * speed, -Math.cos(aim) * speed, 0.55 + 0.45 * power, 1);
+    const perfect = power >= PERFECT;
+    this.mine.launch(0, SPAWN, Math.sin(aim) * speed, -Math.cos(aim) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, 1);
+    if (perfect) this.sparks.burst(0, this.arena.height(0, SPAWN), SPAWN, 1);
     const aiPower = 0.6 + Math.random() * 0.35;
     const aiAim = (Math.random() - 0.5) * 1.0;
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
@@ -326,8 +340,9 @@ export class MatchSystem extends createSystem({
     this.elapsed = 0;
     this.accumulator = 0;
     this.clashes = 0;
-    this.label.set('');
-    console.log(`[MATCH] launch power ${power.toFixed(2)} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)}`);
+    this.label.set(perfect ? 'Perfect launch!\nExtra spin' : '');
+    this.labelTimer = perfect ? 1.5 : 0;
+    console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)}`);
   }
 
   /** Pinch near the floor and lift to raise a bump; press a fingertip into the floor to dent it. */
