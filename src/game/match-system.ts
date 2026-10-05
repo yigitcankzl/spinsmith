@@ -194,8 +194,8 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) this.devControls(dt);
     this.updateReticle();
     this.arenaView.sync(this.arena);
-    this.wideView.sync(this.wide, this.arena, this.time);
-    this.narrowView.sync(this.narrow, this.arena, this.time);
+    this.wideView.sync(this.wide, this.arena, this.time, dt);
+    this.narrowView.sync(this.narrow, this.arena, this.time, dt);
     this.sparks.update(dt);
   }
 

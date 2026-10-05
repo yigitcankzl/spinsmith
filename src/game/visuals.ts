@@ -149,6 +149,9 @@ export class TopView {
   private shadow: Mesh;
   private readonly hot = new Color(0xff5a14);
   private readonly cool = new Color(0xffb347);
+  private fall = 0;
+  private fallX = 1;
+  private fallZ = 0;
 
   constructor(look: TopLook, spec: TopSpec) {
     const tipHeight = look.profile[0][1];
@@ -180,7 +183,7 @@ export class TopView {
     return this.shadow;
   }
 
-  sync(top: Top, arena: Arena, time: number) {
+  sync(top: Top, arena: Arena, time: number, dt: number) {
     const visible = top.state !== 'out';
     this.root.visible = visible;
     this.shadow.visible = visible && top.state === 'spinning';
@@ -190,11 +193,21 @@ export class TopView {
     this.shadow.position.set(top.x, y + 0.0008, top.z);
     this.spinner.rotation.y = top.angle;
     if (top.state === 'toppled') {
-      this.root.rotation.set(1.25, 0, 0);
+      // Falls over in about half a second instead of snapping flat.
+      this.fall = Math.min(1, this.fall + dt * 2.2);
+      const f = this.fall * this.fall;
+      this.root.rotation.set(1.25 * f * this.fallZ, 0, -1.25 * f * this.fallX);
     } else {
-      // Wobble: the spin axis leans and precesses around.
+      this.fall = 0;
+      // Lean: into the direction of travel, away from the last hit, plus the precessing wobble.
       const lean = 0.03 + 0.4 * top.wobble * top.wobble;
-      this.root.rotation.set(Math.sin(time * 9) * lean, 0, Math.cos(time * 9) * lean);
+      const ax = top.vz * 1.2 + top.kickZ * top.kick * 0.35 + Math.cos(time * 9) * lean;
+      const az = -(top.vx * 1.2 + top.kickX * top.kick * 0.35) + Math.sin(time * 9) * lean;
+      this.root.rotation.set(ax, 0, az);
+      // Remember which way it was leaning, to fall that way.
+      const l = Math.hypot(ax, az) || 1;
+      this.fallZ = ax / l;
+      this.fallX = -az / l;
     }
     this.core.color.copy(this.cool).lerp(this.hot, top.wobble);
   }
