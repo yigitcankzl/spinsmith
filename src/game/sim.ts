@@ -33,7 +33,7 @@ export class Arena {
   /** Height of the arena surface at (x, z). */
   height(x: number, z: number): number {
     const r2 = (x * x + z * z) / (ARENA_RADIUS * ARENA_RADIUS);
-    return TUNING.bowl * r2 + this.shapeAt(x, z);
+    return TUNING.bowl * r2 + this.shapeHeight(x, z);
   }
 
   /** Surface slope (dh/dx, dh/dz) written into out. */
@@ -71,8 +71,8 @@ export class Arena {
     this.shape.fill(0);
   }
 
-  /** Bilinear sample of the shape layer. */
-  private shapeAt(x: number, z: number): number {
+  /** Bilinear sample of the player-made shape layer (bump > 0, dent < 0). */
+  shapeHeight(x: number, z: number): number {
     const fx = Math.min(GRID - 1.001, Math.max(0, (x + ARENA_RADIUS) / CELL));
     const fz = Math.min(GRID - 1.001, Math.max(0, (z + ARENA_RADIUS) / CELL));
     const i = Math.floor(fx);

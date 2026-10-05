@@ -1,0 +1,398 @@
+import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
+  CanvasTexture,
+  CircleGeometry,
+  Color,
+  ConeGeometry,
+  CylinderGeometry,
+  DataTexture,
+  DoubleSide,
+  Group,
+  LatheGeometry,
+  Line,
+  LineBasicMaterial,
+  Mesh,
+  MeshBasicMaterial,
+  MeshMatcapMaterial,
+  PlaneGeometry,
+  Points,
+  PointsMaterial,
+  RepeatWrapping,
+  SRGBColorSpace,
+  TorusGeometry,
+  Vector2,
+  Vector3,
+} from '@iwsdk/core';
+import { Arena, ARENA_RADIUS, Top, TopSpec } from './sim.js';
+
+/**
+ * Visual style: matte clay bodies, light metal parts, a glowing core.
+ * All shading uses matcaps we generate here: cheap on Quest, no licensing,
+ * and no dependency on real-room reflections we cannot capture.
+ */
+
+type MatcapKind = 'clay' | 'metal';
+
+/** Builds a 128x128 matcap: soft diffuse clay, or bright studio-strip metal. */
+export function makeMatcap(kind: MatcapKind, hex: number): DataTexture {
+  const size = 128;
+  const data = new Uint8Array(size * size * 4);
+  const base = new Color(hex);
+  const light = new Vector3(-0.5, 0.7, 0.6).normalize();
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const x = (px / (size - 1)) * 2 - 1;
+      // DataTexture rows start at the bottom, so py grows upward.
+      const y = (py / (size - 1)) * 2 - 1;
+      const r2 = Math.min(1, x * x + y * y);
+      const z = Math.sqrt(1 - r2);
+      const diffuse = Math.max(0, x * light.x + y * light.y + z * light.z);
+      let r: number, g: number, b: number;
+      if (kind === 'clay') {
+        const k = 0.42 + 0.7 * Math.pow(diffuse, 0.8);
+        const rim = 0.1 * Math.pow(1 - z, 3);
+        r = base.r * k + rim;
+        g = base.g * k + rim;
+        b = base.b * k + rim;
+      } else {
+        // Reflection direction's vertical component picks a bright studio strip.
+        const ry = 2 * z * y;
+        const env =
+          0.35 +
+          0.75 * Math.exp(-(((ry - 0.55) / 0.14) ** 2)) +
+          0.35 * Math.exp(-(((ry + 0.2) / 0.06) ** 2)) +
+          0.2 * Math.exp(-(((2 * z * x + 0.6) / 0.16) ** 2));
+        r = base.r * env + 0.18 * env ** 3;
+        g = base.g * env + 0.18 * env ** 3;
+        b = base.b * env + 0.18 * env ** 3;
+      }
+      const i = (py * size + px) * 4;
+      data[i] = Math.min(255, r * 255);
+      data[i + 1] = Math.min(255, g * 255);
+      data[i + 2] = Math.min(255, b * 255);
+      data[i + 3] = 255;
+    }
+  }
+  const tex = new DataTexture(data, size, size);
+  tex.colorSpace = SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Vertical stripes around the body so spin speed is readable at a glance. */
+function stripeTexture(): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 4;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, 64, 4);
+  g.fillStyle = '#c9c0b6';
+  for (let i = 0; i < 4; i++) g.fillRect(i * 16, 0, 5, 4);
+  const t = new CanvasTexture(c);
+  t.wrapS = RepeatWrapping;
+  t.colorSpace = SRGBColorSpace;
+  return t;
+}
+
+const LIGHT_STEEL = makeMatcap('metal', 0xc8ccd6);
+const BRASS = makeMatcap('metal', 0xe2b866);
+const STRIPES = stripeTexture();
+
+export interface TopLook {
+  body: number;
+  /** Body silhouette as (radius, height) pairs from the tip up, before the tip cone. */
+  profile: [number, number][];
+  tipMetal: DataTexture;
+  ringMetal: DataTexture;
+}
+
+export const WIDE_LOOK: TopLook = {
+  body: 0xd6784f,
+  profile: [
+    [0.006, 0.008],
+    [0.022, 0.012],
+    [0.03, 0.016],
+    [0.029, 0.021],
+    [0.016, 0.024],
+    [0.015, 0.03],
+    [0, 0.03],
+  ],
+  tipMetal: LIGHT_STEEL,
+  ringMetal: BRASS,
+};
+
+export const NARROW_LOOK: TopLook = {
+  body: 0x5aaaa0,
+  profile: [
+    [0.004, 0.01],
+    [0.014, 0.016],
+    [0.021, 0.024],
+    [0.02, 0.031],
+    [0.012, 0.036],
+    [0.011, 0.042],
+    [0, 0.042],
+  ],
+  tipMetal: BRASS,
+  ringMetal: LIGHT_STEEL,
+};
+
+/** A spinning top: tilts with wobble, spins its body, heats its core as spin drains. */
+export class TopView {
+  readonly root = new Group();
+  private spinner = new Group();
+  private core: MeshBasicMaterial;
+  private shadow: Mesh;
+  private readonly hot = new Color(0xff5a14);
+  private readonly cool = new Color(0xffb347);
+
+  constructor(look: TopLook, spec: TopSpec) {
+    const tipHeight = look.profile[0][1];
+    const body = new LatheGeometry(
+      look.profile.map(([r, h]) => new Vector2(r, h)),
+      40,
+    );
+    const bodyMat = new MeshMatcapMaterial({ matcap: makeMatcap('clay', look.body), map: STRIPES });
+    const tip = new Mesh(new ConeGeometry(look.profile[0][0] + 0.002, tipHeight, 20).rotateX(Math.PI), new MeshMatcapMaterial({ matcap: look.tipMetal }));
+    tip.position.y = tipHeight / 2;
+    // Metal ring around the widest part of the body.
+    const widest = look.profile.reduce((a, b) => (b[0] > a[0] ? b : a));
+    const ring = new Mesh(new TorusGeometry(widest[0], 0.0028, 8, 40).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: look.ringMetal }));
+    ring.position.y = widest[1];
+    this.core = new MeshBasicMaterial({ color: this.cool.clone() });
+    const top = look.profile[look.profile.length - 1][1];
+    const core = new Mesh(new CircleGeometry(look.profile[look.profile.length - 2][0] * 0.55, 24).rotateX(-Math.PI / 2), this.core);
+    core.position.y = top + 0.0005;
+    this.spinner.add(new Mesh(body, bodyMat), tip, ring, core);
+    this.root.add(this.spinner);
+    this.shadow = new Mesh(
+      new CircleGeometry(spec.radius * 1.15, 24).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false }),
+    );
+  }
+
+  /** The shadow lives on the arena floor, not on the tilting top. */
+  get shadowMesh() {
+    return this.shadow;
+  }
+
+  sync(top: Top, arena: Arena, time: number) {
+    const visible = top.state !== 'out';
+    this.root.visible = visible;
+    this.shadow.visible = visible && top.state === 'spinning';
+    if (!visible) return;
+    const y = arena.height(top.x, top.z);
+    this.root.position.set(top.x, y, top.z);
+    this.shadow.position.set(top.x, y + 0.0008, top.z);
+    this.spinner.rotation.y = top.angle;
+    if (top.state === 'toppled') {
+      this.root.rotation.set(1.25, 0, 0);
+    } else {
+      // Wobble: the spin axis leans and precesses around.
+      const lean = 0.03 + 0.4 * top.wobble * top.wobble;
+      this.root.rotation.set(Math.sin(time * 9) * lean, 0, Math.cos(time * 9) * lean);
+    }
+    this.core.color.copy(this.cool).lerp(this.hot, top.wobble);
+  }
+}
+
+/** Arena: a polar mesh following the heightmap, a metal rim and a pedestal underneath. */
+export class ArenaView {
+  readonly root = new Group();
+  private geo: BufferGeometry;
+  private rings = 18;
+  private segs = 56;
+  private colors: Float32Array;
+  private readonly base = new Color(0xe9dfd0);
+  private readonly warm = new Color(0xffa155);
+  private readonly cold = new Color(0x8f8576);
+  private readonly tmp = new Color();
+
+  constructor(pedestalHeight: number) {
+    const count = 1 + this.rings * this.segs;
+    const pos = new Float32Array(count * 3);
+    this.colors = new Float32Array(count * 3);
+    const idx: number[] = [];
+    for (let r = 1; r <= this.rings; r++) {
+      for (let s = 0; s < this.segs; s++) {
+        const a = this.vi(r, s);
+        const b = this.vi(r, (s + 1) % this.segs);
+        if (r === 1) idx.push(0, b, a);
+        else {
+          const c = this.vi(r - 1, s);
+          const d = this.vi(r - 1, (s + 1) % this.segs);
+          idx.push(c, d, a, d, b, a);
+        }
+      }
+    }
+    this.geo = new BufferGeometry();
+    this.geo.setAttribute('position', new BufferAttribute(pos, 3));
+    this.geo.setAttribute('color', new BufferAttribute(this.colors, 3));
+    this.geo.setIndex(idx);
+    const floor = new Mesh(this.geo, new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0xffffff), vertexColors: true }));
+    floor.frustumCulled = false;
+    const rim = new Mesh(new TorusGeometry(ARENA_RADIUS + 0.006, 0.006, 10, 72).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: LIGHT_STEEL }));
+    rim.position.y = 0.011;
+    const pedestal = new Mesh(
+      new CylinderGeometry(ARENA_RADIUS + 0.012, ARENA_RADIUS + 0.03, pedestalHeight, 48, 1, true),
+      new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x6f5a4c), side: DoubleSide }),
+    );
+    pedestal.position.y = -pedestalHeight / 2;
+    this.root.add(floor, rim, pedestal);
+  }
+
+  private vi(ring: number, seg: number) {
+    return 1 + (ring - 1) * this.segs + seg;
+  }
+
+  /** Re-samples heights and tints raised shapes warm, dents cool. */
+  sync(arena: Arena) {
+    const pos = this.geo.attributes.position as BufferAttribute;
+    for (let r = 0; r <= this.rings; r++) {
+      const radius = (r / this.rings) * ARENA_RADIUS;
+      const n = r === 0 ? 1 : this.segs;
+      for (let s = 0; s < n; s++) {
+        const a = (s / this.segs) * Math.PI * 2;
+        const x = Math.cos(a) * radius;
+        const z = Math.sin(a) * radius;
+        const i = r === 0 ? 0 : this.vi(r, s);
+        const h = arena.height(x, z);
+        pos.setXYZ(i, x, h, z);
+        const shape = arena.shapeHeight(x, z);
+        if (shape > 0) this.tmp.copy(this.base).lerp(this.warm, Math.min(1, shape / 0.02));
+        else this.tmp.copy(this.base).lerp(this.cold, Math.min(1, -shape / 0.02));
+        this.colors[i * 3] = this.tmp.r;
+        this.colors[i * 3 + 1] = this.tmp.g;
+        this.colors[i * 3 + 2] = this.tmp.b;
+      }
+    }
+    pos.needsUpdate = true;
+    (this.geo.attributes.color as BufferAttribute).needsUpdate = true;
+    this.geo.computeVertexNormals();
+  }
+}
+
+/** Pooled additive sparks for clashes. */
+export class Sparks {
+  readonly points: Points;
+  private pos: Float32Array;
+  private vel: Float32Array;
+  private life: Float32Array;
+  private next = 0;
+
+  constructor(private count = 96) {
+    this.pos = new Float32Array(count * 3);
+    this.vel = new Float32Array(count * 3);
+    this.life = new Float32Array(count);
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(this.pos, 3));
+    this.points = new Points(
+      geo,
+      new PointsMaterial({ color: 0xffb04a, size: 0.004, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+    );
+    this.points.frustumCulled = false;
+  }
+
+  burst(x: number, y: number, z: number, strength: number) {
+    const n = 4 + Math.round(strength * 14);
+    for (let k = 0; k < n; k++) {
+      const i = this.next;
+      this.next = (this.next + 1) % this.count;
+      const a = Math.random() * Math.PI * 2;
+      const sp = 0.15 + Math.random() * 0.45 * (0.5 + strength);
+      this.pos.set([x, y + 0.012, z], i * 3);
+      this.vel.set([Math.cos(a) * sp, 0.2 + Math.random() * 0.35, Math.sin(a) * sp], i * 3);
+      this.life[i] = 0.25 + Math.random() * 0.25;
+    }
+  }
+
+  update(dt: number) {
+    for (let i = 0; i < this.count; i++) {
+      if (this.life[i] <= 0) {
+        this.pos[i * 3 + 1] = -10; // parked out of sight
+        continue;
+      }
+      this.life[i] -= dt;
+      this.vel[i * 3 + 1] -= 1.6 * dt;
+      this.pos[i * 3] += this.vel[i * 3] * dt;
+      this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt;
+      this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt;
+    }
+    (this.points.geometry.attributes.position as BufferAttribute).needsUpdate = true;
+  }
+}
+
+/** The rip-cord launcher handle and its cord to the hand. */
+export class LauncherView {
+  readonly root = new Group();
+  readonly cord: Line;
+  private handleMat: MeshMatcapMaterial;
+  private cordPos = new Float32Array(6);
+
+  constructor() {
+    this.handleMat = new MeshMatcapMaterial({ matcap: BRASS });
+    const handle = new Mesh(new TorusGeometry(0.012, 0.004, 10, 28), this.handleMat);
+    this.root.add(handle);
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(this.cordPos, 3));
+    this.cord = new Line(geo, new LineBasicMaterial({ color: 0xfff1d6 }));
+    this.cord.frustumCulled = false;
+    this.cord.visible = false;
+  }
+
+  /** Glows warm when the hand is close enough to grab. */
+  highlight(on: boolean) {
+    this.handleMat.color.set(on ? 0xffd27a : 0xffffff);
+    this.root.scale.setScalar(on ? 1.25 : 1);
+  }
+
+  setCord(from: Vector3 | null, to?: Vector3) {
+    this.cord.visible = from !== null;
+    if (!from || !to) return;
+    this.cordPos.set([from.x, from.y, from.z, to.x, to.y, to.z]);
+    (this.cord.geometry.attributes.position as BufferAttribute).needsUpdate = true;
+  }
+}
+
+/** A floating text card; redraws only when the text changes. */
+export class Label {
+  readonly mesh: Mesh;
+  private canvas = document.createElement('canvas');
+  private tex: CanvasTexture;
+  private text = '';
+
+  constructor(width = 0.22) {
+    this.canvas.width = 512;
+    this.canvas.height = 160;
+    this.tex = new CanvasTexture(this.canvas);
+    this.tex.colorSpace = SRGBColorSpace;
+    this.mesh = new Mesh(
+      new PlaneGeometry(width, (width * 160) / 512),
+      new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }),
+    );
+  }
+
+  set(text: string) {
+    if (text === this.text) return;
+    this.text = text;
+    this.mesh.visible = text.length > 0;
+    const g = this.canvas.getContext('2d')!;
+    g.clearRect(0, 0, 512, 160);
+    if (!text) return;
+    g.fillStyle = 'rgba(30, 24, 20, 0.78)';
+    g.beginPath();
+    g.roundRect(4, 4, 504, 152, 36);
+    g.fill();
+    g.fillStyle = '#fff4e2';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const lines = text.split('\n');
+    lines.forEach((line, i) => {
+      g.font = i === 0 ? 'bold 56px system-ui, sans-serif' : '34px system-ui, sans-serif';
+      g.fillText(line, 256, 80 + (i - (lines.length - 1) / 2) * 58);
+    });
+    this.tex.needsUpdate = true;
+  }
+}
