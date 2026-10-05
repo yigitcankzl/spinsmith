@@ -21,6 +21,8 @@ const FULL_SPEED = 1.0;
 const MIN_PULL = 0.05;
 /** Below this power nothing launches (a quick tap). */
 const MIN_POWER = 0.15;
+/** Pinches farther than this from the arena are ignored (a hand outside the play space). */
+const LAUNCH_REACH = 1.0;
 /** Pulling farther than this releases automatically. */
 const MAX_PULL = 0.32;
 /** Launch direction is clamped to this many radians off straight-at-center. */
@@ -271,7 +273,7 @@ export class MatchSystem extends createSystem({
       const h = this.hands[side];
       if (!h.tracked || !h.justPinched) continue;
       const d = h.pinch.distanceTo(this.root.position);
-      if (d < best) {
+      if (d < best && d < LAUNCH_REACH) {
         best = d;
         pick = side;
       }
