@@ -10,16 +10,18 @@ import {
   DataTexture,
   DoubleSide,
   Group,
+  InstancedMesh,
   LatheGeometry,
-  Line,
-  LineBasicMaterial,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshMatcapMaterial,
   PlaneGeometry,
   Points,
   PointsMaterial,
+  Quaternion,
   RepeatWrapping,
+  SphereGeometry,
   SRGBColorSpace,
   TorusGeometry,
   Vector2,
@@ -324,29 +326,80 @@ export class Sparks {
   }
 }
 
-/** The rip cord from the player's top to the pinching hand. */
+/**
+ * The rip cord as a molten-metal tether: glowing beads along a sagging curve from the top to the
+ * hand. Slack sags, a taut cord straightens and trembles, and pulses flow toward the top as power
+ * builds. Instanced, so the whole cord is one draw call and nothing is allocated per frame.
+ */
 export class Cord {
-  readonly line: Line;
-  private pos = new Float32Array(6);
+  readonly line: InstancedMesh;
+  private readonly beads = 40;
+  private readonly cool = new Color(0xfff1d6);
+  private readonly warm = new Color(0xff6a1a);
+  private readonly hot = new Color(0xffd23a);
+  private readonly col = new Color();
+  private readonly m = new Matrix4();
+  private readonly q = new Quaternion();
+  private readonly v = new Vector3();
+  private readonly sc = new Vector3();
+  private readonly mid = new Vector3();
+  private readonly tan = new Vector3();
+  private readonly zAxis = new Vector3(0, 0, 1);
+  private time = 0;
 
   constructor() {
-    const geo = new BufferGeometry();
-    geo.setAttribute('position', new BufferAttribute(this.pos, 3));
-    this.line = new Line(geo, new LineBasicMaterial({ color: 0xfff1d6 }));
+    this.line = new InstancedMesh(
+      new SphereGeometry(1, 8, 6),
+      new MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+      this.beads,
+    );
     this.line.frustumCulled = false;
     this.line.visible = false;
+    for (let i = 0; i < this.beads; i++) this.line.setColorAt(i, this.cool);
   }
 
-  private readonly cool = new Color(0xfff1d6);
-  private readonly hot = new Color(0xff6a1a);
-
-  /** heat 0..1 tints the cord from white to glowing orange. */
-  set(from: Vector3 | null, to?: Vector3, heat = 0) {
+  /** heat 0..1: slack white cord -> taut, trembling, orange-to-yellow with pulses flowing to the top. */
+  set(from: Vector3 | null, to?: Vector3, heat = 0, dt = 1 / 72) {
     this.line.visible = from !== null;
     if (!from || !to) return;
-    (this.line.material as LineBasicMaterial).color.copy(this.cool).lerp(this.hot, heat);
-    this.pos.set([from.x, from.y, from.z, to.x, to.y, to.z]);
-    (this.line.geometry.attributes.position as BufferAttribute).needsUpdate = true;
+    this.time += dt;
+    const length = from.distanceTo(to);
+    // Sag midpoint below the straight line; tension removes it.
+    const sag = Math.max(0, 0.05 - length * 0.15) * (1 - heat);
+    this.mid.copy(from).add(to).multiplyScalar(0.5);
+    this.mid.y -= sag;
+    const tremble = heat * heat * 0.004;
+    for (let i = 0; i < this.beads; i++) {
+      const t = i / (this.beads - 1);
+      // Quadratic Bezier from -> mid control -> to.
+      const a = (1 - t) * (1 - t);
+      const b = 2 * (1 - t) * t;
+      const c = t * t;
+      this.v.set(
+        from.x * a + this.mid.x * b + to.x * c,
+        from.y * a + this.mid.y * b + to.y * c + Math.sin(this.time * 70 + i * 1.7) * tremble * Math.sin(Math.PI * t),
+        from.z * a + this.mid.z * b + to.z * c,
+      );
+      // Pulses travel from the hand (t = 1) toward the top (t = 0).
+      const pulse = 0.5 + 0.5 * Math.sin((t + this.time * (1.5 + 4 * heat)) * Math.PI * 6);
+      const r = 0.0016 + 0.0016 * heat + 0.0014 * pulse * heat;
+      // Stretch each bead along the curve so neighbours overlap into one continuous strand.
+      this.tan.set(
+        2 * (1 - t) * (this.mid.x - from.x) + 2 * t * (to.x - this.mid.x),
+        2 * (1 - t) * (this.mid.y - from.y) + 2 * t * (to.y - this.mid.y),
+        2 * (1 - t) * (this.mid.z - from.z) + 2 * t * (to.z - this.mid.z),
+      );
+      const segment = this.tan.length() / (this.beads - 1);
+      this.q.setFromUnitVectors(this.zAxis, this.tan.normalize());
+      this.m.compose(this.v, this.q, this.sc.set(r, r, Math.max(r, segment * 0.75)));
+      this.line.setMatrixAt(i, this.m);
+      if (heat < 0.6) this.col.copy(this.cool).lerp(this.warm, heat / 0.6);
+      else this.col.copy(this.warm).lerp(this.hot, (heat - 0.6) / 0.4);
+      this.col.multiplyScalar(0.7 + 0.5 * pulse);
+      this.line.setColorAt(i, this.col);
+    }
+    this.line.instanceMatrix.needsUpdate = true;
+    if (this.line.instanceColor) this.line.instanceColor.needsUpdate = true;
   }
 }
 

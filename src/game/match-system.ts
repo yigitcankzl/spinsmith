@@ -325,7 +325,7 @@ export class MatchSystem extends createSystem({
   private showCharge(power: number, dt: number) {
     const y = this.arena.height(this.mine.x, this.mine.z);
     this.root.localToWorld(this.cordStart.set(this.mine.x, y + 0.03, this.mine.z));
-    this.cord.set(this.cordStart, this.hands[this.puller!].pinch, power);
+    this.cord.set(this.cordStart, this.hands[this.puller!].pinch, power, dt);
     this.mine.angle += (6 + 70 * power) * dt;
     this.chargeRing.visible = power > 0;
     this.chargeRing.position.set(this.mine.x, y + 0.001, this.mine.z);

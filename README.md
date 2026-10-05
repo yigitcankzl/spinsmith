@@ -17,7 +17,8 @@ What works:
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
   travelled and how fast it was still moving at release, so a rip that stops before letting
   go loses power and a hold without a pull does nothing. While ripping, the top spins up,
-  the cord heats from white to orange and a glow ring grows under the top. 92% or more is a
+  the molten cord heats from white to orange to yellow, straightens, trembles and pulses
+  toward the top, and a glow ring grows under the top. 92% or more is a
   perfect rip with extra spin. A sideways rip aims like a slingshot; otherwise the top goes
   where your hand points on the floor. In the emulator's play mode, click and flick the
   mouse: the hands move with the view.
