@@ -1,4 +1,4 @@
-import { Object3D, Vector3 } from '@iwsdk/core';
+import { Matrix4, Object3D, Quaternion, Vector3 } from '@iwsdk/core';
 
 /** Thumb-to-index distance hysteresis (m): close below ON, open above OFF. */
 const PINCH_ON = 0.02;
@@ -16,6 +16,10 @@ export interface HandState {
   pinch: Vector3;
   /** Index fingertip, world space (grip position for controllers). */
   index: Vector3;
+  /** Pointing ray (the system target ray), world space. */
+  rayOrigin: Vector3;
+  rayDir: Vector3;
+  hasRay: boolean;
 }
 
 const newHand = (): HandState => ({
@@ -25,6 +29,9 @@ const newHand = (): HandState => ({
   justReleased: false,
   pinch: new Vector3(),
   index: new Vector3(),
+  rayOrigin: new Vector3(),
+  rayDir: new Vector3(),
+  hasRay: false,
 });
 
 /**
@@ -35,6 +42,8 @@ export class HandInput {
   readonly left = newHand();
   readonly right = newHand();
   private seen = { left: false, right: false };
+  private mat = new Matrix4();
+  private quat = new Quaternion();
 
   update(frame: XRFrame, ref: XRReferenceSpace, session: XRSession, player: Object3D) {
     this.seen.left = false;
@@ -46,6 +55,7 @@ export class HandInput {
       const was = h.pinching;
       const pinching = this.read(frame, ref, source, h, player);
       if (pinching === null) continue;
+      this.readRay(frame, ref, source, h, player);
       this.seen[side] = true;
       h.tracked = true;
       h.pinching = pinching;
@@ -86,5 +96,15 @@ export class HandInput {
     player.localToWorld(h.pinch.set(p.x, p.y, p.z));
     h.index.copy(h.pinch);
     return pressed;
+  }
+
+  private readRay(frame: XRFrame, ref: XRReferenceSpace, source: XRInputSource, h: HandState, player: Object3D) {
+    const pose = frame.getPose(source.targetRaySpace, ref);
+    h.hasRay = !!pose;
+    if (!pose) return;
+    this.mat.fromArray(pose.transform.matrix).premultiply(player.matrixWorld);
+    h.rayOrigin.setFromMatrixPosition(this.mat);
+    this.quat.setFromRotationMatrix(this.mat);
+    h.rayDir.set(0, 0, -1).applyQuaternion(this.quat);
   }
 }

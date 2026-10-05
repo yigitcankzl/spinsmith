@@ -22,6 +22,12 @@ What works:
   back to flat in 2–3 seconds and affect both tops.
 - Tops slide down slopes, curve with their spin, grind and spark on contact,
   wobble as spin drains, then topple. A top that leaves the rim loses.
+- **Far interaction** (point and pinch, the same as pressing distant buttons on Quest):
+  point the hand ray at the ring and hold the pinch to charge, let go to launch toward
+  where the ray points; point at the floor during a fight and hold the pinch to raise a
+  bump there. A small blue dot marks where the ray meets the arena floor. In the
+  emulator's play mode a left click is a pinch, so the game is fully playable by
+  looking around with the mouse and clicking.
 - Result card, then pinch the ring again for the next round. Your top alternates
   between the wide (orange) and the narrow (teal) shape each round.
 

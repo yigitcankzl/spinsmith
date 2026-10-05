@@ -33,8 +33,14 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
+/** Far interaction: a pointing ray this close to the launcher grabs it. */
+const RAY_GRAB = 0.04;
+/** Far launch charges to full power in this many seconds of holding the pinch. */
+const CHARGE_TIME = 1.2;
+/** Far bumps grow at this rate (m/s) while the pinch is held. */
+const RAY_BUMP_RATE = 0.05;
 
-type Phase = 'placing' | 'ready' | 'pulling' | 'fight' | 'result';
+type Phase = 'placing' | 'ready' | 'pulling' | 'charging' | 'fight' | 'result';
 
 type RawPlane = { orientation?: string; semanticLabel?: string };
 
@@ -65,13 +71,14 @@ export class MatchSystem extends createSystem({
   private accumulator = 0;
   private resultTimer = 0;
   private time = 0;
+  private frameDt = 0;
   /** Which hand holds the cord, and pull bookkeeping. */
   private puller: Side | null = null;
   private maxPull = 0;
   private peakSpeed = 0;
   private lastPull = 0;
   /** Per-hand bump being held: arena-local anchor and the pinch height when grabbed. */
-  private shaping: Record<Side, { x: number; z: number; y0: number } | null> = { left: null, right: null };
+  private shaping: Record<Side, { x: number; z: number; y0: number; t: number; far: boolean } | null> = { left: null, right: null };
   private clashes = 0;
   private head = new Vector3();
   private fwd = new Vector3();
@@ -85,6 +92,9 @@ export class MatchSystem extends createSystem({
   private gazeHit = { ok: false, x: 0, z: 0 };
   private gazeDir = new Vector3();
   private rootInverse = new Matrix4();
+  private rayHit = { ok: false, x: 0, z: 0 };
+  private rayLocalO = new Vector3();
+  private rayLocalD = new Vector3();
   private reticle = new Mesh(
     new CircleGeometry(0.006, 20).rotateX(-Math.PI / 2),
     new MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.85, depthTest: false }),
@@ -98,7 +108,9 @@ export class MatchSystem extends createSystem({
     this.narrowView.root.name = 'top-narrow';
     this.label.mesh.position.set(0, 0.17, -0.03);
     this.launcher.root.position.copy(LAUNCHER);
+    this.reticle.renderOrder = 10;
     this.root.add(
+      this.reticle,
       this.arenaView.root,
       this.wideView.root,
       this.narrowView.root,
@@ -135,8 +147,7 @@ export class MatchSystem extends createSystem({
         () => window.removeEventListener('keydown', onKey),
         () => window.removeEventListener('keyup', onKeyUp),
       );
-      this.reticle.renderOrder = 10;
-      this.root.add(this.reticle);
+
     }
   }
 
@@ -147,6 +158,7 @@ export class MatchSystem extends createSystem({
     const session = xr.getSession();
     if (!frame || !ref || !session || this.world.visibilityState.peek() === VisibilityState.NonImmersive) return;
     const dt = Math.min(delta, 0.05);
+    this.frameDt = dt;
     this.time += dt;
     this.hands.update(frame, ref, session, this.player);
 
@@ -166,12 +178,16 @@ export class MatchSystem extends createSystem({
       case 'pulling':
         this.updatePull(dt);
         break;
+      case 'charging':
+        this.updateCharge(dt);
+        break;
       case 'fight':
         this.updateShaping();
         this.updateFight(dt);
         break;
     }
     if (import.meta.env.DEV) this.devControls(dt);
+    this.updateReticle();
     this.arenaView.sync(this.arena);
     this.wideView.sync(this.wide, this.arena, this.time);
     this.narrowView.sync(this.narrow, this.arena, this.time);
@@ -249,9 +265,17 @@ export class MatchSystem extends createSystem({
       const h = this.hands[side];
       if (!h.tracked) continue;
       const d = h.pinch.distanceTo(this.handleWorld);
-      if (d < GRAB_RADIUS) near = true;
+      if (d < GRAB_RADIUS || this.rayNear(h, this.handleWorld, RAY_GRAB)) near = true;
       if (import.meta.env.DEV && h.justPinched) {
         console.log(`[MATCH] ${side} pinch at ${h.pinch.toArray().map((v) => v.toFixed(3)).join(',')}, ${d.toFixed(3)} m from launcher`);
+      }
+      if (h.justPinched && d >= GRAB_RADIUS && this.rayNear(h, this.handleWorld, RAY_GRAB)) {
+        // Far grab: hold the pinch to charge, aim with the ray, release to launch.
+        if (this.phase === 'result') this.toReady();
+        this.phase = 'charging';
+        this.puller = side;
+        this.charge = 0;
+        return;
       }
       if (h.justPinched && d < GRAB_RADIUS) {
         if (this.phase === 'result') this.toReady();
@@ -324,11 +348,18 @@ export class MatchSystem extends createSystem({
       if (h.pinching) {
         const l = this.toLocal(h.pinch);
         let held = this.shaping[side];
-        if (!held && h.justPinched && Math.hypot(l.x, l.z) < ARENA_RADIUS && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
-          held = this.shaping[side] = { x: l.x, z: l.z, y0: l.y };
+        if (!held && h.justPinched) {
+          if (Math.hypot(l.x, l.z) < ARENA_RADIUS && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
+            held = this.shaping[side] = { x: l.x, z: l.z, y0: l.y, t: 0, far: false };
+          } else if (this.rayFloor(h)) {
+            // Far bump: point at the floor and pinch; it rises while the pinch is held.
+            held = this.shaping[side] = { x: this.rayHit.x, z: this.rayHit.z, y0: l.y, t: 0, far: true };
+          }
         }
         if (held) {
-          const amplitude = Math.min(BUMP_MAX, Math.max(BUMP_MIN, 0.012 + (l.y - held.y0)));
+          held.t += this.frameDt;
+          const lift = held.far ? held.t * RAY_BUMP_RATE : l.y - held.y0;
+          const amplitude = Math.min(BUMP_MAX, Math.max(BUMP_MIN, 0.012 + lift));
           this.arena.stamp(held.x, held.z, amplitude);
         }
         continue;
@@ -385,14 +416,20 @@ export class MatchSystem extends createSystem({
     if (v !== 2) this.round++;
   }
 
+  /** A small dot where the pointing hand's ray (or, in dev, the gaze) meets the floor. */
+  private updateReticle() {
+    const h = this.hands.right.hasRay ? this.hands.right : this.hands.left;
+    const hit = this.rayFloor(h) ? this.rayHit : this.gazeHit;
+    this.reticle.visible = hit.ok;
+    if (hit.ok) this.reticle.position.set(hit.x, this.arena.height(hit.x, hit.z) + 0.002, hit.z);
+  }
+
   /**
    * Dev only: Space charges and launches toward the gaze, B raises a bump and N presses a dent
    * where the head is looking. Lets the prototype be played in the emulator's mouse-look mode.
    */
   private devControls(dt: number) {
     this.gaze();
-    this.reticle.visible = this.gazeHit.ok;
-    if (this.gazeHit.ok) this.reticle.position.set(this.gazeHit.x, this.arena.height(this.gazeHit.x, this.gazeHit.z) + 0.002, this.gazeHit.z);
     if (this.keys.has('Space') && (this.phase === 'ready' || this.phase === 'result')) {
       this.charge = Math.min(1, this.charge + dt / 1.2);
       this.label.set(`Power ${Math.round(this.charge * 100)}%\nRelease Space to launch`);
@@ -403,22 +440,56 @@ export class MatchSystem extends createSystem({
     if (this.keys.has('KeyN')) this.arena.stamp(x, z, -0.025);
   }
 
-  /** Intersects the head's view ray with the arena floor (arena-local), by marching along the ray. */
+  /** Intersects the head's view ray with the arena floor (arena-local). */
   private gaze() {
-    this.gazeHit.ok = false;
     const head = this.player.head;
     head.getWorldPosition(this.p);
     head.getWorldDirection(this.gazeDir).negate();
-    const origin = this.root.worldToLocal(this.p);
-    this.gazeDir.transformDirection(this.rootInverse.copy(this.root.matrixWorld).invert());
-    for (let t = 0.05; t < 1.5; t += 0.005) {
-      const x = origin.x + this.gazeDir.x * t;
-      const y = origin.y + this.gazeDir.y * t;
-      const z = origin.z + this.gazeDir.z * t;
+    this.floorHit(this.p, this.gazeDir, this.gazeHit);
+  }
+
+  /** Far launch: charge while pinched, release to launch toward the ray's floor point. */
+  private updateCharge(dt: number) {
+    const h = this.hands[this.puller!];
+    if (h.pinching && h.tracked) {
+      this.charge = Math.min(1, this.charge + dt / CHARGE_TIME);
+      this.label.set(`Power ${Math.round(this.charge * 100)}%\nLet go to launch`);
+      return;
+    }
+    const aim = this.rayFloor(h) ? Math.max(-MAX_AIM, Math.min(MAX_AIM, Math.atan2(this.rayHit.x, SPAWN - this.rayHit.z))) : 0;
+    const power = Math.max(0.3, this.charge);
+    this.charge = 0;
+    this.launch(power, aim);
+  }
+
+  /** True when the hand's pointing ray passes within `radius` of a world point. */
+  private rayNear(h: HandState, point: Vector3, radius: number): boolean {
+    if (!h.hasRay) return false;
+    const t = this.local.copy(point).sub(h.rayOrigin).dot(h.rayDir);
+    if (t < 0) return false;
+    return this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(point) < radius;
+  }
+
+  /** Where the hand's pointing ray meets the arena floor (into this.rayHit). */
+  private rayFloor(h: HandState): boolean {
+    if (!h.hasRay) return (this.rayHit.ok = false);
+    return this.floorHit(h.rayOrigin, h.rayDir, this.rayHit);
+  }
+
+  /** Marches a world-space ray to the arena floor; writes an arena-local hit inside the rim. */
+  private floorHit(origin: Vector3, dir: Vector3, out: { ok: boolean; x: number; z: number }): boolean {
+    out.ok = false;
+    const o = this.root.worldToLocal(this.rayLocalO.copy(origin));
+    const d = this.rayLocalD.copy(dir).transformDirection(this.rootInverse.copy(this.root.matrixWorld).invert());
+    for (let t = 0.02; t < 2; t += 0.004) {
+      const x = o.x + d.x * t;
+      const y = o.y + d.y * t;
+      const z = o.z + d.z * t;
       if (y <= this.arena.height(x, z)) {
-        if (Math.hypot(x, z) <= ARENA_RADIUS) Object.assign(this.gazeHit, { ok: true, x, z });
-        return;
+        if (Math.hypot(x, z) <= ARENA_RADIUS) Object.assign(out, { ok: true, x, z });
+        return out.ok;
       }
     }
+    return false;
   }
 }
