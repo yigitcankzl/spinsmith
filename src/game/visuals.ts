@@ -6,7 +6,6 @@ import {
   CircleGeometry,
   Color,
   ConeGeometry,
-  CylinderGeometry,
   DataTexture,
   DoubleSide,
   Group,
@@ -28,6 +27,7 @@ import {
   Vector2,
   Vector3,
 } from '@iwsdk/core';
+import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena-shell.scene-asset.js';
 import { Arena, ARENA_RADIUS, POCKET_HALF, POCKETS, RAIL_HALF, RAILS, Top, TopSpec } from './sim.js';
 
 /**
@@ -394,12 +394,9 @@ export class ArenaView {
       this.railMats.push(mat);
       rim.add(arc(ARENA_RADIUS - 0.004, 0.0025, r - RAIL_HALF, r + RAIL_HALF, mat, 0.012));
     }
-    const pedestal = new Mesh(
-      new CylinderGeometry(ARENA_RADIUS + 0.012, ARENA_RADIUS + 0.03, pedestalHeight, 48, 1, true),
-      new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x6f5a4c), side: DoubleSide }),
-    );
-    pedestal.position.y = -pedestalHeight / 2;
-    this.root.add(floor, rim, pedestal);
+    const shell = forgeArenaShell.clone(true);
+    shell.scale.y = pedestalHeight / FORGE_SHELL_HEIGHT;
+    this.root.add(shell, floor, rim);
   }
 
   /** Lights up the rail nearest to an arena-local point (a top just dashed there). */

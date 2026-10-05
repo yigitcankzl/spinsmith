@@ -6,11 +6,13 @@
  */
 
 import { AssetType, defineAssets } from '@iwsdk/core';
+import forgeArenaShell from './scene-assets/forge-arena-shell.scene-asset.js';
 
 const publicAssetUrl = (filePath: string): string =>
   `${import.meta.env.BASE_URL}${filePath.replace(/^\/+/u, '')}`;
 
 export default defineAssets({
+  'forge-arena-shell': forgeArenaShell,
   'welcome-panel': {
     url: publicAssetUrl('ui/welcome.uikitml'),
     type: AssetType.UIKitML,
