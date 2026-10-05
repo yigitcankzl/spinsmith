@@ -60,8 +60,8 @@
     <div class="heading">SpinSmith</div>
     <Divider></Divider>
     <div class="sub-heading">
-      Sit at a table, enter mixed reality, and rip your spinning top into the
-      arena. Pinch the floor and lift to raise bumps that steer the fight.
+      Sit at a table, enter mixed reality, and rip your spinning top into a
+      living forge arena. Pinch the floor and lift to reshape the fight.
     </div>
   </div>
   <Button id="xr-button" class="button">
