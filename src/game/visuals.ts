@@ -337,9 +337,14 @@ export class Cord {
     this.line.visible = false;
   }
 
-  set(from: Vector3 | null, to?: Vector3) {
+  private readonly cool = new Color(0xfff1d6);
+  private readonly hot = new Color(0xff6a1a);
+
+  /** heat 0..1 tints the cord from white to glowing orange. */
+  set(from: Vector3 | null, to?: Vector3, heat = 0) {
     this.line.visible = from !== null;
     if (!from || !to) return;
+    (this.line.material as LineBasicMaterial).color.copy(this.cool).lerp(this.hot, heat);
     this.pos.set([from.x, from.y, from.z, to.x, to.y, to.z]);
     (this.line.geometry.attributes.position as BufferAttribute).needsUpdate = true;
   }

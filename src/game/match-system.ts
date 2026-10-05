@@ -1,4 +1,4 @@
-import { CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { HandInput, HandState, Side } from './hands.js';
 import { Arena, ARENA_RADIUS, LAUNCH_SPEED, NARROW, step, STEP, Top, verdict, WIDE } from './sim.js';
 import { ArenaView, Label, Cord, NARROW_LOOK, Sparks, TopView, WIDE_LOOK } from './visuals.js';
@@ -32,12 +32,7 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
-/**
- * Holding the pinch (without pulling) runs a power meter that rises to full in this many
- * seconds and falls back again, so a hold launch is a timing skill rather than always 100%.
- */
-const CHARGE_TIME = 0.9;
-/** Releasing at or above this power is a perfect launch: extra starting spin. */
+/** Launch power at or above this is a perfect rip: extra starting spin. */
 const PERFECT = 0.92;
 const PERFECT_SPIN = 1.1;
 /** Far bumps grow at this rate (m/s) while the pinch is held. */
@@ -89,7 +84,6 @@ export class MatchSystem extends createSystem({
   private local = new Vector3();
   private pullStart = new Vector3();
   private cordStart = new Vector3();
-  private holdTime = 0;
   /** Seconds left before a transient fight message clears. */
   private labelTimer = 0;
   private pullEnd = new Vector3();
@@ -102,6 +96,10 @@ export class MatchSystem extends createSystem({
   private rayHit = { ok: false, x: 0, z: 0 };
   private rayLocalO = new Vector3();
   private rayLocalD = new Vector3();
+  private chargeRing = new Mesh(
+    new TorusGeometry(0.036, 0.003, 8, 48).rotateX(Math.PI / 2),
+    new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+  );
   private reticle = new Mesh(
     new CircleGeometry(0.006, 20).rotateX(-Math.PI / 2),
     new MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.85, depthTest: false }),
@@ -115,7 +113,9 @@ export class MatchSystem extends createSystem({
     this.narrowView.root.name = 'top-narrow';
     this.label.mesh.position.set(0, 0.17, -0.03);
     this.reticle.renderOrder = 10;
+    this.chargeRing.visible = false;
     this.root.add(
+      this.chargeRing,
       this.reticle,
       this.arenaView.root,
       this.wideView.root,
@@ -272,39 +272,38 @@ export class MatchSystem extends createSystem({
       this.maxPull = 0;
       this.peakSpeed = 0;
       this.lastPull = 0;
-      this.holdTime = 0;
       return;
     }
   }
 
   /**
-   * The cord runs from your top to your pinch. Pull back to rip (length + speed), or just hold to
-   * charge; release launches with whichever is stronger. A sideways pull aims like a slingshot,
-   * otherwise the launch goes where the hand points on the floor.
+   * The cord runs from your top to your pinch; rip it back and let go. Power comes only from the
+   * motion: how far the hand travelled and how fast it was still moving at release, so a rip that
+   * stops before letting go loses power. A sideways rip aims like a slingshot, otherwise the launch
+   * goes where the hand points on the floor.
    */
   private updatePull(dt: number) {
     const h = this.hands[this.puller!];
     // Measure only while the pinch holds: opening the fingers moves the pinch point and would fake a pull.
     if (h.pinching && h.tracked) {
       const dist = h.pinch.distanceTo(this.pullStart);
-      this.root.localToWorld(this.cordStart.set(this.mine.x, this.arena.height(this.mine.x, this.mine.z) + 0.03, this.mine.z));
-      this.cord.set(this.cordStart, h.pinch);
       this.maxPull = Math.max(this.maxPull, dist);
-      // Decaying peak so one jittery frame cannot fake a strong rip.
+      // Decays within ~0.1 s, so only a rip that is still moving at release keeps its speed.
       const speed = (dist - this.lastPull) / Math.max(dt, 1e-3);
       this.peakSpeed = Math.max(this.peakSpeed * 0.9, speed);
       this.lastPull = dist;
       this.pullEnd.copy(h.pinch);
-      this.holdTime += dt;
       const power = this.pullPower();
-      this.label.set(power >= PERFECT ? `PERFECT ${Math.round(power * 100)}%\nLet go now!` : `Power ${Math.round(power * 100)}%\nLet go at the top`);
+      this.showCharge(power, dt);
+      this.label.set(power >= PERFECT ? `RIP IT! ${Math.round(power * 100)}%` : power > 0 ? `${Math.round(power * 100)}%` : 'Pull back and let go');
       if (dist < MAX_PULL) return;
     }
 
     this.cord.set(null);
+    this.chargeRing.visible = false;
     const power = this.pullPower();
     if (power < MIN_POWER) {
-      // A quick tap does nothing; the top is ready again.
+      // A tap or a hold without a pull does nothing; the top is ready again.
       this.toReady();
       return;
     }
@@ -316,13 +315,22 @@ export class MatchSystem extends createSystem({
     this.launch(power, Math.max(-MAX_AIM, Math.min(MAX_AIM, aim)));
   }
 
-  /** Stronger of the rip (pull length and speed) and the hold charge. */
+  /** Rip power from the motion alone: distance travelled and speed at the moment of release. */
   private pullPower() {
-    const rip = this.maxPull < MIN_PULL ? 0 : 0.55 * Math.min(1, this.maxPull / FULL_PULL) + 0.45 * Math.min(1, this.peakSpeed / FULL_SPEED);
-    // Triangle wave: 0 -> 1 -> 0 -> 1 ... while held.
-    const phase = (this.holdTime / CHARGE_TIME) % 2;
-    const meter = phase <= 1 ? phase : 2 - phase;
-    return Math.min(1, Math.max(rip, meter));
+    if (this.maxPull < MIN_PULL) return 0;
+    return Math.min(1, 0.4 * Math.min(1, this.maxPull / FULL_PULL) + 0.6 * Math.min(1, this.peakSpeed / FULL_SPEED));
+  }
+
+  /** While ripping: the top spins up, the cord heats from white to orange, a glow ring grows under it. */
+  private showCharge(power: number, dt: number) {
+    const y = this.arena.height(this.mine.x, this.mine.z);
+    this.root.localToWorld(this.cordStart.set(this.mine.x, y + 0.03, this.mine.z));
+    this.cord.set(this.cordStart, this.hands[this.puller!].pinch, power);
+    this.mine.angle += (6 + 70 * power) * dt;
+    this.chargeRing.visible = power > 0;
+    this.chargeRing.position.set(this.mine.x, y + 0.001, this.mine.z);
+    this.chargeRing.scale.setScalar(0.7 + 0.9 * power);
+    (this.chargeRing.material as MeshBasicMaterial).opacity = 0.25 + 0.75 * power;
   }
 
   /** Launches both tops. aim: radians off straight-at-center for the player's top. */
@@ -331,7 +339,7 @@ export class MatchSystem extends createSystem({
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
     this.mine.launch(0, SPAWN, Math.sin(aim) * speed, -Math.cos(aim) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, 1);
-    if (perfect) this.sparks.burst(0, this.arena.height(0, SPAWN), SPAWN, 1);
+    this.sparks.burst(0, this.arena.height(0, SPAWN), SPAWN, perfect ? 1 : power * 0.6);
     const aiPower = 0.6 + Math.random() * 0.35;
     const aiAim = (Math.random() - 0.5) * 1.0;
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
@@ -340,7 +348,7 @@ export class MatchSystem extends createSystem({
     this.elapsed = 0;
     this.accumulator = 0;
     this.clashes = 0;
-    this.label.set(perfect ? 'Perfect launch!\nExtra spin' : '');
+    this.label.set(perfect ? 'Perfect rip!\nExtra spin' : '');
     this.labelTimer = perfect ? 1.5 : 0;
     console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)}`);
   }
