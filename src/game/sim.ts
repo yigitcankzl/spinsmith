@@ -24,13 +24,13 @@ const POCKET_DEPTH = 0.003;
  * A top only drops into a pocket when it is driven outward at least this fast (m/s): cruising
  * along the rim passes over the mouth, a hit or a bump sends it in.
  */
-export const POCKET_SPEED = 0.06;
+export const POCKET_SPEED = 0.2;
 /** Hitting the wall faster than this (m/s, outward) sends a top over it. */
-const WALL_ESCAPE = 0.42;
+const WALL_ESCAPE = 1.1;
 const WALL_BOUNCE = 0.55;
 /** Rail dash: speed and the cooldown before the same top can dash again. */
-const DASH_SPEED = 0.42;
-const DASH_COOLDOWN = 1.2;
+const DASH_SPEED = 1.1;
+const DASH_COOLDOWN = 1.0;
 
 /** Smallest angle between two angles (radians). */
 function angleGap(a: number, b: number) {
@@ -53,15 +53,17 @@ const GRAVITY = 9.81;
 /** Global feel knobs (tuned with scripts/sim-check.ts and on device). */
 export const TUNING = {
   /** Bounciness of the bodies (0..1). */
-  restitution: 0.73,
+  restitution: 0.53,
   /** Spinning rims kick each other apart on contact (m/s at full spin). */
-  recoil: 0.14,
+  recoil: 0.19,
   /** Spin lost per unit of impulse. */
-  spinHit: 0.041,
+  spinHit: 0.036,
+  /** Burst damage per unit of impulse (before the top's burst resistance). */
+  burst: 0.29,
   /** Bowl rise at the rim (m): tops roll toward the center, so they meet. */
-  bowl: 0.007,
+  bowl: 0.019,
   /** How strongly a spinning tip turns radial motion into an orbit around the center (1/s). */
-  orbit: 2.08,
+  orbit: 2.24,
 };
 /** Fixed simulation step. */
 export const STEP = 1 / 120;
@@ -69,8 +71,8 @@ export const STEP = 1 / 120;
 const TOPPLE_SPIN = 0.06;
 /** A fight that lasts longer than this is decided on remaining spin. */
 export const TIME_LIMIT = 45;
-/** Launch speed (m/s) at full power. Higher makes head-on launches end in one hit. */
-export const LAUNCH_SPEED = 0.15;
+/** Launch speed (m/s) at full power. */
+export const LAUNCH_SPEED = 0.5;
 
 export class Arena {
   /** Player-made shape layer, added on top of the bowl. */
@@ -145,54 +147,88 @@ export class Arena {
   }
 }
 
-/** How a top's shape translates into behavior. Mass is the same for every top. */
+/** How a top's type and shape translate into behavior. */
 export interface TopSpec {
-  /** Collision radius (m). Wider tops carry mass outward. */
+  name: string;
+  /** Collision radius (m). */
   radius: number;
-  /** How hard it hits: wider body = more momentum at the rim. */
+  /** How hard it hits. */
   punch: number;
-  /** How much a hit moves it: narrow tops get knocked around more. */
+  /** How much a hit moves it. */
   knockback: number;
   /** Spin lost per second while just spinning. */
   spinDrain: number;
-  /** Sideways curving from the tip (round tips roam). */
+  /** Sideways curving from the tip. */
   roam: number;
-  /**
-   * Cruise speed (m/s) at full spin: a spinning tip scrubbing the floor keeps the top travelling,
-   * so with the bowl pulling inward the tops orbit instead of settling in the middle.
-   */
+  /** Cruise speed (m/s) at full spin: the tip scrubbing the floor keeps the top travelling. */
   cruise: number;
   /** How quickly the tip drive pulls the speed back toward cruise (1/s). */
   drive: number;
   /** Max sliding speed (m/s). */
   maxSpeed: number;
+  /** Attack: steers toward the opponent (1/s). */
+  seek: number;
+  /** Defense: extra pull toward the center (1/s^2). */
+  center: number;
+  /** Divides burst damage taken. */
+  burstResist: number;
 }
 
-export const WIDE: TopSpec = {
-  radius: 0.03,
+/**
+ * Three types in a rock-paper-scissors loop, after real top battling:
+ * attack beats stamina (hunts it down and smashes it out), defense beats attack (holds the
+ * middle and lets the attacker burn itself out), stamina beats defense (simply outspins it).
+ */
+export const ATTACK: TopSpec = {
+  name: 'Striker',
+  radius: 0.024,
   punch: 1.33,
-  knockback: 0.94,
-  spinDrain: 0.026,
-  roam: 0.12,
-  cruise: 0.11,
-  drive: 1.3,
-  maxSpeed: 0.9,
+  knockback: 1.02,
+  spinDrain: 0.062,
+  roam: 0.6,
+  cruise: 0.55,
+  drive: 3,
+  maxSpeed: 2,
+  seek: 0.84,
+  center: 0,
+  burstResist: 1,
 };
 
-export const NARROW: TopSpec = {
-  radius: 0.021,
-  punch: 0.97,
-  knockback: 1.27,
-  spinDrain: 0.02,
-  roam: 0.3,
-  cruise: 0.155,
-  drive: 2.4,
-  maxSpeed: 1.1,
+export const DEFENSE: TopSpec = {
+  name: 'Anvil',
+  radius: 0.03,
+  punch: 1.2,
+  knockback: 0.75,
+  spinDrain: 0.06,
+  roam: 0.1,
+  cruise: 0.23,
+  drive: 1.5,
+  maxSpeed: 1.6,
+  seek: 0,
+  center: 4.3,
+  burstResist: 1.41,
 };
+
+export const STAMINA: TopSpec = {
+  name: 'Needle',
+  radius: 0.027,
+  punch: 0.9,
+  knockback: 1.07,
+  spinDrain: 0.036,
+  roam: 0.2,
+  cruise: 0.19,
+  drive: 1.5,
+  maxSpeed: 1.8,
+  seek: 0,
+  center: 0,
+  burstResist: 1.17,
+};
+
+export const TYPES = [ATTACK, DEFENSE, STAMINA];
 
 export type Outcome = 'spinning' | 'out' | 'toppled';
-/** How a round was lost: into a pocket, over the wall, or out of spin. */
-export type Finish = 'pocket' | 'over' | 'spin' | null;
+/** How a round was lost: into a pocket, over the wall, burst apart by a hit, or out of spin. */
+export type Finish = 'pocket' | 'over' | 'burst' | 'spin' | null;
 
 export class Top {
   x = 0;
@@ -213,17 +249,19 @@ export class Top {
   finish: Finish = null;
   /** Seconds since the last rail dash (large = none recently). */
   sinceDash = 99;
+  /** Accumulated hit damage; at 1 the top bursts apart. */
+  damage = 0;
   /** Sign of the curving direction (tops spin opposite ways). */
   hand = 1;
 
-  readonly spec: TopSpec;
+  spec: TopSpec;
 
   constructor(spec: TopSpec) {
     this.spec = spec;
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, sinceDash: 99, finish: null, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, sinceDash: 99, damage: 0, finish: null, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -242,12 +280,12 @@ const slopeTmp = { x: 0, z: 0 };
 
 /** Advances one fixed step. Returns a clash event when the two tops collided this step. */
 export function step(arena: Arena, a: Top, b: Top, dt = STEP): Clash | null {
-  advance(arena, a, dt);
-  advance(arena, b, dt);
+  advance(arena, a, b, dt);
+  advance(arena, b, a, dt);
   return a.alive && b.alive ? collide(a, b) : null;
 }
 
-function advance(arena: Arena, t: Top, dt: number) {
+function advance(arena: Arena, t: Top, other: Top, dt: number) {
   if (!t.alive) return;
   const s = t.spec;
   arena.slope(t.x, t.z, slopeTmp);
@@ -279,6 +317,21 @@ function advance(arena: Arena, t: Top, dt: number) {
     t.vx += (tx - t.vx) * k;
     t.vz += (tz - t.vz) * k;
   }
+  // Attack types hunt the opponent: their heading turns toward it.
+  if (s.seek > 0 && other.alive) {
+    const dx = other.x - t.x;
+    const dz = other.z - t.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const sp = Math.hypot(t.vx, t.vz);
+    const k = Math.min(1, s.seek * Math.max(0, t.spin) * (1 - t.kick) * dt);
+    t.vx += ((dx / d) * sp - t.vx) * k;
+    t.vz += ((dz / d) * sp - t.vz) * k;
+  }
+  // Defense types hold the middle.
+  if (s.center > 0) {
+    t.vx -= t.x * s.center * dt;
+    t.vz -= t.z * s.center * dt;
+  }
   // Tip drive: speed eases toward the cruise speed for the current spin.
   const target = s.cruise * Math.max(0, t.spin);
   const k = 1 + ((target - speed) / speed) * Math.min(1, s.drive * dt);
@@ -292,7 +345,7 @@ function advance(arena: Arena, t: Top, dt: number) {
   t.x += t.vx * dt;
   t.z += t.vz * dt;
   // Spin drains on its own and faster while scraping across the floor.
-  t.spin -= (s.spinDrain + v * 0.05) * dt;
+  t.spin -= (s.spinDrain + v * 0.02) * dt;
   // Visual spin, capped so the body stripes never alias into spinning backwards on screen.
   t.angle += (6 + 22 * Math.max(0, t.spin)) * dt * t.hand;
   t.kick *= Math.exp(-6 * dt);
@@ -344,6 +397,11 @@ function wall(t: Top) {
   }
 }
 
+function burstApart(t: Top) {
+  t.state = 'out';
+  t.finish = 'burst';
+}
+
 function collide(a: Top, b: Top): Clash | null {
   let nx = b.x - a.x;
   let nz = b.z - a.z;
@@ -370,21 +428,26 @@ function collide(a: Top, b: Top): Clash | null {
   b.vx += nx * jb;
   b.vz += nz * jb;
   // The hit knocks each top's axis away from the other.
-  a.kick = Math.min(1, a.kick + ja * 6);
+  a.kick = Math.min(1, a.kick + ja * 2);
   a.kickX = -nx;
   a.kickZ = -nz;
-  b.kick = Math.min(1, b.kick + jb * 6);
+  b.kick = Math.min(1, b.kick + jb * 2);
   b.kickX = nx;
   b.kickZ = nz;
   // Hits cost spin, the weaker puncher loses more.
   a.spin -= TUNING.spinHit * impulse * b.spec.punch;
   b.spin -= TUNING.spinHit * impulse * a.spec.punch;
-  return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 5) };
+  // Hard hits crack the top; enough damage bursts it apart.
+  a.damage += (TUNING.burst * impulse * impulse * b.spec.punch) / a.spec.burstResist;
+  b.damage += (TUNING.burst * impulse * impulse * a.spec.punch) / b.spec.burstResist;
+  if (a.damage >= 1) burstApart(a);
+  if (b.damage >= 1) burstApart(b);
+  return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 1.6) };
 }
 
-/** Points the winner scores for a finish: pocket or over the wall 2, out of spin 1. */
+/** Points the winner scores for a finish: pocket, over the wall or burst 2, out of spin 1. */
 export function finishPoints(loser: Top): number {
-  return loser.finish === 'pocket' || loser.finish === 'over' ? 2 : 1;
+  return loser.finish === 'spin' || loser.finish === null ? 1 : 2;
 }
 
 /**
