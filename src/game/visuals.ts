@@ -324,35 +324,24 @@ export class Sparks {
   }
 }
 
-/** The rip-cord launcher handle and its cord to the hand. */
-export class LauncherView {
-  readonly root = new Group();
-  readonly cord: Line;
-  private handleMat: MeshMatcapMaterial;
-  private cordPos = new Float32Array(6);
+/** The rip cord from the player's top to the pinching hand. */
+export class Cord {
+  readonly line: Line;
+  private pos = new Float32Array(6);
 
   constructor() {
-    this.handleMat = new MeshMatcapMaterial({ matcap: BRASS });
-    const handle = new Mesh(new TorusGeometry(0.012, 0.004, 10, 28), this.handleMat);
-    this.root.add(handle);
     const geo = new BufferGeometry();
-    geo.setAttribute('position', new BufferAttribute(this.cordPos, 3));
-    this.cord = new Line(geo, new LineBasicMaterial({ color: 0xfff1d6 }));
-    this.cord.frustumCulled = false;
-    this.cord.visible = false;
+    geo.setAttribute('position', new BufferAttribute(this.pos, 3));
+    this.line = new Line(geo, new LineBasicMaterial({ color: 0xfff1d6 }));
+    this.line.frustumCulled = false;
+    this.line.visible = false;
   }
 
-  /** Glows warm when the hand is close enough to grab. */
-  highlight(on: boolean) {
-    this.handleMat.color.set(on ? 0xffd27a : 0xffffff);
-    this.root.scale.setScalar(on ? 1.25 : 1);
-  }
-
-  setCord(from: Vector3 | null, to?: Vector3) {
-    this.cord.visible = from !== null;
+  set(from: Vector3 | null, to?: Vector3) {
+    this.line.visible = from !== null;
     if (!from || !to) return;
-    this.cordPos.set([from.x, from.y, from.z, to.x, to.y, to.z]);
-    (this.cord.geometry.attributes.position as BufferAttribute).needsUpdate = true;
+    this.pos.set([from.x, from.y, from.z, to.x, to.y, to.z]);
+    (this.line.geometry.attributes.position as BufferAttribute).needsUpdate = true;
   }
 }
 

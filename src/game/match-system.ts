@@ -1,7 +1,7 @@
 import { CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { HandInput, HandState, Side } from './hands.js';
 import { Arena, ARENA_RADIUS, LAUNCH_SPEED, NARROW, step, STEP, Top, verdict, WIDE } from './sim.js';
-import { ArenaView, Label, LauncherView, NARROW_LOOK, Sparks, TopView, WIDE_LOOK } from './visuals.js';
+import { ArenaView, Label, Cord, NARROW_LOOK, Sparks, TopView, WIDE_LOOK } from './visuals.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
 const PEDESTAL = 0.08;
@@ -14,14 +14,13 @@ const TABLE_MAX_H = 1.15;
 const TABLE_MAX_DIST = 1.6;
 /** Wait for planes to arrive before placing. */
 const SETTLE = 2;
-/** Launcher handle, arena-local (+Z faces the player). */
-const LAUNCHER = new Vector3(0, 0.05, ARENA_RADIUS + 0.06);
-const GRAB_RADIUS = 0.07;
 /** Cord pull that counts as a full-power rip (m) and full-power pull speed (m/s). */
 const FULL_PULL = 0.22;
 const FULL_SPEED = 1.0;
-/** Pulls shorter than this do not launch; the launcher just returns. */
+/** Pulls shorter than this count as no pull (hand jitter). */
 const MIN_PULL = 0.05;
+/** Below this power nothing launches (a quick tap). */
+const MIN_POWER = 0.15;
 /** Pulling farther than this releases automatically. */
 const MAX_PULL = 0.32;
 /** Launch direction is clamped to this many radians off straight-at-center. */
@@ -33,14 +32,12 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
-/** Far interaction: a pointing ray this close to the launcher grabs it. */
-const RAY_GRAB = 0.04;
-/** Far launch charges to full power in this many seconds of holding the pinch. */
+/** Holding the pinch charges to full power in this many seconds (works without pulling). */
 const CHARGE_TIME = 1.2;
 /** Far bumps grow at this rate (m/s) while the pinch is held. */
 const RAY_BUMP_RATE = 0.05;
 
-type Phase = 'placing' | 'ready' | 'pulling' | 'charging' | 'fight' | 'result';
+type Phase = 'placing' | 'ready' | 'pulling' | 'fight' | 'result';
 
 type RawPlane = { orientation?: string; semanticLabel?: string };
 
@@ -61,7 +58,7 @@ export class MatchSystem extends createSystem({
   private narrow = new Top(NARROW);
   private wideView = new TopView(WIDE_LOOK, WIDE);
   private narrowView = new TopView(NARROW_LOOK, NARROW);
-  private launcher = new LauncherView();
+  private cord = new Cord();
   private sparks = new Sparks();
   private label = new Label();
   private round = 0;
@@ -84,7 +81,9 @@ export class MatchSystem extends createSystem({
   private fwd = new Vector3();
   private p = new Vector3();
   private local = new Vector3();
-  private handleWorld = new Vector3();
+  private pullStart = new Vector3();
+  private cordStart = new Vector3();
+  private holdTime = 0;
   private pullEnd = new Vector3();
   /** Dev-only keyboard + gaze controls so the prototype can be played in the emulator without pinching. */
   private keys = new Set<string>();
@@ -107,7 +106,6 @@ export class MatchSystem extends createSystem({
     this.wideView.root.name = 'top-wide';
     this.narrowView.root.name = 'top-narrow';
     this.label.mesh.position.set(0, 0.17, -0.03);
-    this.launcher.root.position.copy(LAUNCHER);
     this.reticle.renderOrder = 10;
     this.root.add(
       this.reticle,
@@ -116,13 +114,12 @@ export class MatchSystem extends createSystem({
       this.narrowView.root,
       this.wideView.shadowMesh,
       this.narrowView.shadowMesh,
-      this.launcher.root,
       this.sparks.points,
       this.label.mesh,
     );
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
-    this.world.createTransformEntity(this.launcher.cord);
+    this.world.createTransformEntity(this.cord.line);
 
     if (import.meta.env.DEV) {
       const onKey = (e: KeyboardEvent) => {
@@ -173,13 +170,10 @@ export class MatchSystem extends createSystem({
           this.resultTimer -= dt;
           if (this.resultTimer <= 0) this.toReady();
         }
-        this.updateLauncherGrab();
+        this.updateReadyPinch();
         break;
       case 'pulling':
         this.updatePull(dt);
-        break;
-      case 'charging':
-        this.updateCharge(dt);
         break;
       case 'fight':
         this.updateShaping();
@@ -249,75 +243,74 @@ export class MatchSystem extends createSystem({
     this.mine.launch(0, SPAWN, 0, 0, 1, 1);
     this.theirs.launch(0, -SPAWN, 0, 0, 1, -1);
     this.puller = null;
-    this.launcher.setCord(null);
-    this.label.set(`Round ${this.round + 1}  ·  ${this.wins} - ${this.losses}\nPinch the gold ring, pull back, let go`);
+    this.cord.set(null);
+    this.label.set(`Round ${this.round + 1}  ·  ${this.wins} - ${this.losses}\nPinch anywhere, pull back, let go`);
   }
 
   private toLocal(world: Vector3) {
     return this.root.worldToLocal(this.local.copy(world));
   }
 
-  /** In ready/result: a pinch near the handle starts pulling the cord. */
-  private updateLauncherGrab() {
-    this.root.localToWorld(this.handleWorld.copy(LAUNCHER));
-    let near = false;
+  /** In ready/result: a pinch anywhere starts the pull. No target to hit. */
+  private updateReadyPinch() {
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      if (!h.tracked) continue;
-      const d = h.pinch.distanceTo(this.handleWorld);
-      if (d < GRAB_RADIUS || this.rayNear(h, this.handleWorld, RAY_GRAB)) near = true;
-      if (import.meta.env.DEV && h.justPinched) {
-        console.log(`[MATCH] ${side} pinch at ${h.pinch.toArray().map((v) => v.toFixed(3)).join(',')}, ${d.toFixed(3)} m from launcher`);
-      }
-      if (h.justPinched && d >= GRAB_RADIUS && this.rayNear(h, this.handleWorld, RAY_GRAB)) {
-        // Far grab: hold the pinch to charge, aim with the ray, release to launch.
-        if (this.phase === 'result') this.toReady();
-        this.phase = 'charging';
-        this.puller = side;
-        this.charge = 0;
-        return;
-      }
-      if (h.justPinched && d < GRAB_RADIUS) {
-        if (this.phase === 'result') this.toReady();
-        this.phase = 'pulling';
-        this.puller = side;
-        this.maxPull = 0;
-        this.peakSpeed = 0;
-        this.lastPull = 0;
-        this.label.set('');
-        return;
-      }
+      if (!h.tracked || !h.justPinched) continue;
+      if (this.phase === 'result') this.toReady();
+      this.phase = 'pulling';
+      this.puller = side;
+      this.pullStart.copy(h.pinch);
+      this.maxPull = 0;
+      this.peakSpeed = 0;
+      this.lastPull = 0;
+      this.holdTime = 0;
+      return;
     }
-    this.launcher.highlight(near);
   }
 
+  /**
+   * The cord runs from your top to your pinch. Pull back to rip (length + speed), or just hold to
+   * charge; release launches with whichever is stronger. A sideways pull aims like a slingshot,
+   * otherwise the launch goes where the hand points on the floor.
+   */
   private updatePull(dt: number) {
     const h = this.hands[this.puller!];
-    this.root.localToWorld(this.handleWorld.copy(LAUNCHER));
     // Measure only while the pinch holds: opening the fingers moves the pinch point and would fake a pull.
-    if (h.pinching) {
-      const dist = h.pinch.distanceTo(this.handleWorld);
-      this.launcher.setCord(this.handleWorld, h.pinch);
+    if (h.pinching && h.tracked) {
+      const dist = h.pinch.distanceTo(this.pullStart);
+      this.root.localToWorld(this.cordStart.set(this.mine.x, this.arena.height(this.mine.x, this.mine.z) + 0.03, this.mine.z));
+      this.cord.set(this.cordStart, h.pinch);
       this.maxPull = Math.max(this.maxPull, dist);
       // Decaying peak so one jittery frame cannot fake a strong rip.
       const speed = (dist - this.lastPull) / Math.max(dt, 1e-3);
       this.peakSpeed = Math.max(this.peakSpeed * 0.9, speed);
       this.lastPull = dist;
       this.pullEnd.copy(h.pinch);
-      if (h.tracked && dist < MAX_PULL) return;
+      this.holdTime += dt;
+      const power = this.pullPower();
+      this.label.set(`Power ${Math.round(power * 100)}%\nLet go to launch`);
+      if (dist < MAX_PULL) return;
     }
 
-    this.launcher.setCord(null);
-    if (this.maxPull < MIN_PULL) {
-      // Too weak: nothing happens, the launcher is ready again.
+    this.cord.set(null);
+    const power = this.pullPower();
+    if (power < MIN_POWER) {
+      // A quick tap does nothing; the top is ready again.
       this.toReady();
       return;
     }
-    const power = Math.min(1, 0.55 * Math.min(1, this.maxPull / FULL_PULL) + 0.45 * Math.min(1, this.peakSpeed / FULL_SPEED));
-    // Slingshot: the top flies opposite to the horizontal pull, aimed into the arena.
-    const pull = this.toLocal(this.pullEnd).sub(LAUNCHER);
-    const aim = Math.hypot(pull.x, pull.z) < 0.02 ? 0 : Math.max(-MAX_AIM, Math.min(MAX_AIM, Math.atan2(-pull.x, pull.z)));
-    this.launch(power, aim);
+    const end = this.p.copy(this.toLocal(this.pullEnd));
+    const pull = end.sub(this.toLocal(this.pullStart));
+    let aim = 0;
+    if (Math.hypot(pull.x, pull.z) >= 0.03) aim = Math.atan2(-pull.x, pull.z);
+    else if (this.rayFloor(h)) aim = Math.atan2(this.rayHit.x, SPAWN - this.rayHit.z);
+    this.launch(power, Math.max(-MAX_AIM, Math.min(MAX_AIM, aim)));
+  }
+
+  /** Stronger of the rip (pull length and speed) and the hold charge. */
+  private pullPower() {
+    const rip = this.maxPull < MIN_PULL ? 0 : 0.55 * Math.min(1, this.maxPull / FULL_PULL) + 0.45 * Math.min(1, this.peakSpeed / FULL_SPEED);
+    return Math.min(1, Math.max(rip, this.holdTime / CHARGE_TIME));
   }
 
   /** Launches both tops. aim: radians off straight-at-center for the player's top. */
@@ -446,28 +439,6 @@ export class MatchSystem extends createSystem({
     head.getWorldPosition(this.p);
     head.getWorldDirection(this.gazeDir).negate();
     this.floorHit(this.p, this.gazeDir, this.gazeHit);
-  }
-
-  /** Far launch: charge while pinched, release to launch toward the ray's floor point. */
-  private updateCharge(dt: number) {
-    const h = this.hands[this.puller!];
-    if (h.pinching && h.tracked) {
-      this.charge = Math.min(1, this.charge + dt / CHARGE_TIME);
-      this.label.set(`Power ${Math.round(this.charge * 100)}%\nLet go to launch`);
-      return;
-    }
-    const aim = this.rayFloor(h) ? Math.max(-MAX_AIM, Math.min(MAX_AIM, Math.atan2(this.rayHit.x, SPAWN - this.rayHit.z))) : 0;
-    const power = Math.max(0.3, this.charge);
-    this.charge = 0;
-    this.launch(power, aim);
-  }
-
-  /** True when the hand's pointing ray passes within `radius` of a world point. */
-  private rayNear(h: HandState, point: Vector3, radius: number): boolean {
-    if (!h.hasRay) return false;
-    const t = this.local.copy(point).sub(h.rayOrigin).dot(h.rayDir);
-    if (t < 0) return false;
-    return this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(point) < radius;
   }
 
   /** Where the hand's pointing ray meets the arena floor (into this.rayHit). */

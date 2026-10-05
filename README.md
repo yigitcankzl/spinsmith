@@ -13,22 +13,22 @@ What works:
 
 - The arena is placed about 40 cm in front of the seated player, on a pedestal
   8 cm above the nearest detected table (or on a floating tray when no table is found).
-- **Rip-cord launch:** pinch the gold ring at the near side of the arena, pull back,
-  let go. Pull length and speed set the power; pulling sideways aims the launch
-  (slingshot style). A pull shorter than 5 cm does nothing.
+- **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
+  your hand. Pull back to rip (pull length and speed set the power) or simply hold the
+  pinch to charge; let go to launch with whichever is stronger. A sideways pull aims like
+  a slingshot; otherwise the top goes where your hand points on the floor. A quick tap
+  does nothing.
 - An AI top launches from the far side at the same time.
 - **Arena moves during the fight:** pinch the floor and lift to raise a bump
   (it glows warm); press a fingertip into the floor to make a dent. Shapes relax
   back to flat in 2–3 seconds and affect both tops.
 - Tops slide down slopes, curve with their spin, grind and spark on contact,
   wobble as spin drains, then topple. A top that leaves the rim loses.
-- **Far interaction** (point and pinch, the same as pressing distant buttons on Quest):
-  point the hand ray at the ring and hold the pinch to charge, let go to launch toward
-  where the ray points; point at the floor during a fight and hold the pinch to raise a
-  bump there. A small blue dot marks where the ray meets the arena floor. In the
-  emulator's play mode a left click is a pinch, so the game is fully playable by
-  looking around with the mouse and clicking.
-- Result card, then pinch the ring again for the next round. Your top alternates
+- **Far bumps:** point the hand ray at the floor during a fight and hold the pinch to
+  raise a bump there. A small blue dot marks where the ray meets the arena floor. In the
+  emulator's play mode a left click is a pinch, so the game is playable by looking
+  around with the mouse and click-holding.
+- Result card, then pinch again for the next round. Your top alternates
   between the wide (orange) and the narrow (teal) shape each round.
 
 Not in the prototype yet: top shaping, parts, energy, table-tap waves, sound,
