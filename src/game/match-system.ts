@@ -260,20 +260,31 @@ export class MatchSystem extends createSystem({
     return this.root.worldToLocal(this.local.copy(world));
   }
 
-  /** In ready/result: a pinch anywhere starts the pull. No target to hit. */
+  /**
+   * In ready/result: a pinch anywhere starts the pull. No target to hit. If both hands pinch in
+   * the same frame (the emulator's click does), the hand closer to the arena wins.
+   */
   private updateReadyPinch() {
+    let pick: Side | null = null;
+    let best = Infinity;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
       if (!h.tracked || !h.justPinched) continue;
-      if (this.phase === 'result') this.toReady();
-      this.phase = 'pulling';
-      this.puller = side;
-      this.pullStart.copy(h.pinch);
-      this.maxPull = 0;
-      this.peakSpeed = 0;
-      this.lastPull = 0;
-      return;
+      const d = h.pinch.distanceTo(this.root.position);
+      if (d < best) {
+        best = d;
+        pick = side;
+      }
     }
+    if (!pick) return;
+    const h = this.hands[pick];
+    if (this.phase === 'result') this.toReady();
+    this.phase = 'pulling';
+    this.puller = pick;
+    this.pullStart.copy(h.pinch);
+    this.maxPull = 0;
+    this.peakSpeed = 0;
+    this.lastPull = 0;
   }
 
   /**
