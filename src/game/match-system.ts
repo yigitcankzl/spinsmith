@@ -1,6 +1,6 @@
 import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { HandInput, HandState, Side } from './hands.js';
-import { Arena, ARENA_RADIUS, LAUNCH_SPEED, NARROW, step, STEP, Top, verdict, WIDE } from './sim.js';
+import { Arena, ARENA_RADIUS, finishPoints, LAUNCH_SPEED, NARROW, step, STEP, Top, verdict, WIDE } from './sim.js';
 import { ArenaView, Label, Cord, NARROW_LOOK, Sparks, TopView, WIDE_LOOK } from './visuals.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
@@ -34,6 +34,8 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
+/** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
+const MATCH_POINTS = 4;
 /** Launch power at or above this is a perfect rip: extra starting spin. */
 const PERFECT = 0.92;
 const PERFECT_SPIN = 1.1;
@@ -59,14 +61,16 @@ export class MatchSystem extends createSystem({
   private arenaView = new ArenaView(PEDESTAL);
   private wide = new Top(WIDE);
   private narrow = new Top(NARROW);
+  private tops = [this.wide, this.narrow];
   private wideView = new TopView(WIDE_LOOK, WIDE);
   private narrowView = new TopView(NARROW_LOOK, NARROW);
   private cord = new Cord();
   private sparks = new Sparks();
   private label = new Label();
   private round = 0;
-  private wins = 0;
-  private losses = 0;
+  /** Match score: first to MATCH_POINTS wins the match. */
+  private myPoints = 0;
+  private theirPoints = 0;
   private elapsed = 0;
   private accumulator = 0;
   private resultTimer = 0;
@@ -197,6 +201,7 @@ export class MatchSystem extends createSystem({
     this.wideView.sync(this.wide, this.arena, this.time, dt);
     this.narrowView.sync(this.narrow, this.arena, this.time, dt);
     this.sparks.update(dt);
+    this.arenaView.update(dt);
   }
 
   /** Player's top this round (alternates so both shapes get played). */
@@ -255,7 +260,7 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(0, -SPAWN, 0, 0, 1, -1);
     this.puller = null;
     this.cord.set(null);
-    this.label.set(`Round ${this.round + 1}  ·  ${this.wins} - ${this.losses}\nPinch anywhere, pull back, let go`);
+    this.label.set(`You ${this.myPoints} - ${this.theirPoints}  ·  first to ${MATCH_POINTS}\nPinch anywhere, pull back, let go`);
   }
 
   private toLocal(world: Vector3) {
@@ -418,6 +423,11 @@ export class MatchSystem extends createSystem({
         this.clashes++;
         this.sparks.burst(clash.x, this.arena.height(clash.x, clash.z), clash.z, clash.strength);
       }
+      for (const t of this.tops) {
+        if (t.sinceDash !== 0) continue;
+        this.arenaView.flashRail(t.x, t.z);
+        this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.8);
+      }
       const v = verdict(this.mine, this.theirs, this.elapsed);
       if (v !== 0) {
         this.finish(v);
@@ -429,16 +439,23 @@ export class MatchSystem extends createSystem({
   private finish(v: -1 | 1 | 2) {
     this.phase = 'result';
     this.resultTimer = RESULT_TIME;
-    const how = (t: Top) => (t.state === 'out' ? 'knocked out' : t.state === 'toppled' ? 'toppled' : 'outspun');
+    const name = (t: Top) => (t.finish === 'pocket' ? 'Pocket finish' : t.finish === 'over' ? 'Over finish' : 'Spin finish');
     let text: string;
-    if (v === 1) {
-      this.wins++;
-      text = `You win!\nTheir top ${how(this.theirs)}`;
-    } else if (v === -1) {
-      this.losses++;
-      text = `You lose\nYour top ${how(this.mine)}`;
+    if (v === 2) {
+      text = 'Draw\nReplay the round';
     } else {
-      text = 'Draw\nReplay';
+      const loser = v === 1 ? this.theirs : this.mine;
+      const points = finishPoints(loser);
+      if (v === 1) this.myPoints += points;
+      else this.theirPoints += points;
+      const score = `You ${this.myPoints} - ${this.theirPoints}`;
+      if (this.myPoints >= MATCH_POINTS || this.theirPoints >= MATCH_POINTS) {
+        text = `${this.myPoints > this.theirPoints ? 'You win the match!' : 'You lose the match'}\n${score}`;
+        this.myPoints = 0;
+        this.theirPoints = 0;
+      } else {
+        text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points}\n${score}`;
+      }
     }
     this.label.set(text);
     console.log(`[MATCH] ${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);

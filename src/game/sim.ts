@@ -5,6 +5,46 @@
  */
 
 export const ARENA_RADIUS = 0.15;
+
+/**
+ * Stadium layout, symmetric for both players (player at +Z, opponent at -Z):
+ * a wall around the rim with four pockets on the diagonals and dash rails on the rim between them.
+ * Angles are atan2(z, x) in radians.
+ */
+export const POCKETS = [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4];
+/** Half-angle of a pocket opening (~6 cm wide at the rim). */
+export const POCKET_HALF = 0.2;
+/** Dash rails between the pockets (sides, and the rim behind each launch spot): center angle and half-angle. */
+export const RAILS = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+export const RAIL_HALF = 0.45;
+/** Floor dips toward a pocket over this outer band of the radius. */
+const POCKET_BAND = 0.25;
+const POCKET_DEPTH = 0.003;
+/**
+ * A top only drops into a pocket when it is driven outward at least this fast (m/s): cruising
+ * along the rim passes over the mouth, a hit or a bump sends it in.
+ */
+export const POCKET_SPEED = 0.06;
+/** Hitting the wall faster than this (m/s, outward) sends a top over it. */
+const WALL_ESCAPE = 0.42;
+const WALL_BOUNCE = 0.55;
+/** Rail dash: speed and the cooldown before the same top can dash again. */
+const DASH_SPEED = 0.42;
+const DASH_COOLDOWN = 1.2;
+
+/** Smallest angle between two angles (radians). */
+function angleGap(a: number, b: number) {
+  const d = Math.abs(a - b) % (Math.PI * 2);
+  return d > Math.PI ? Math.PI * 2 - d : d;
+}
+
+export function inPocket(angle: number) {
+  return POCKETS.some((p) => angleGap(angle, p) < POCKET_HALF);
+}
+
+export function onRail(angle: number) {
+  return RAILS.some((r) => angleGap(angle, r) < RAIL_HALF);
+}
 const GRID = 32;
 const CELL = (2 * ARENA_RADIUS) / (GRID - 1);
 /** Shapes the player makes flatten back with this time constant (~2-3 s to vanish). */
@@ -13,13 +53,15 @@ const GRAVITY = 9.81;
 /** Global feel knobs (tuned with scripts/sim-check.ts and on device). */
 export const TUNING = {
   /** Bounciness of the bodies (0..1). */
-  restitution: 0.85,
+  restitution: 0.73,
   /** Spinning rims kick each other apart on contact (m/s at full spin). */
-  recoil: 0.06,
+  recoil: 0.14,
   /** Spin lost per unit of impulse. */
-  spinHit: 0.06,
+  spinHit: 0.041,
   /** Bowl rise at the rim (m): tops roll toward the center, so they meet. */
-  bowl: 0.008,
+  bowl: 0.007,
+  /** How strongly a spinning tip turns radial motion into an orbit around the center (1/s). */
+  orbit: 2.08,
 };
 /** Fixed simulation step. */
 export const STEP = 1 / 120;
@@ -37,7 +79,20 @@ export class Arena {
   /** Height of the arena surface at (x, z). */
   height(x: number, z: number): number {
     const r2 = (x * x + z * z) / (ARENA_RADIUS * ARENA_RADIUS);
-    return TUNING.bowl * r2 + this.shapeHeight(x, z);
+    return TUNING.bowl * r2 + this.pocketDip(x, z) + this.shapeHeight(x, z);
+  }
+
+  /** The floor slopes down into each pocket near the rim, so a top close to a pocket drifts in. */
+  pocketDip(x: number, z: number): number {
+    const r = Math.hypot(x, z) / ARENA_RADIUS;
+    if (r < 1 - POCKET_BAND) return 0;
+    const angle = Math.atan2(z, x);
+    let dip = 0;
+    for (const p of POCKETS) {
+      const g = angleGap(angle, p) / (POCKET_HALF * 1.6);
+      if (g < 1) dip = Math.max(dip, (1 - g * g) * ((r - (1 - POCKET_BAND)) / POCKET_BAND));
+    }
+    return -POCKET_DEPTH * dip;
   }
 
   /** Surface slope (dh/dx, dh/dz) written into out. */
@@ -115,27 +170,29 @@ export interface TopSpec {
 
 export const WIDE: TopSpec = {
   radius: 0.03,
-  punch: 1.15,
-  knockback: 0.85,
+  punch: 1.33,
+  knockback: 0.94,
   spinDrain: 0.026,
   roam: 0.12,
-  cruise: 0.08,
+  cruise: 0.11,
   drive: 1.3,
   maxSpeed: 0.9,
 };
 
 export const NARROW: TopSpec = {
   radius: 0.021,
-  punch: 0.95,
-  knockback: 1.25,
-  spinDrain: 0.022,
+  punch: 0.97,
+  knockback: 1.27,
+  spinDrain: 0.02,
   roam: 0.3,
-  cruise: 0.12,
+  cruise: 0.155,
   drive: 2.4,
   maxSpeed: 1.1,
 };
 
 export type Outcome = 'spinning' | 'out' | 'toppled';
+/** How a round was lost: into a pocket, over the wall, or out of spin. */
+export type Finish = 'pocket' | 'over' | 'spin' | null;
 
 export class Top {
   x = 0;
@@ -153,6 +210,9 @@ export class Top {
   kickX = 0;
   kickZ = 0;
   state: Outcome = 'spinning';
+  finish: Finish = null;
+  /** Seconds since the last rail dash (large = none recently). */
+  sinceDash = 99;
   /** Sign of the curving direction (tops spin opposite ways). */
   hand = 1;
 
@@ -163,7 +223,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, sinceDash: 99, finish: null, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -207,6 +267,18 @@ function advance(arena: Arena, t: Top, dt: number) {
   const cvx = t.vx;
   t.vx -= t.vz * curve;
   t.vz += cvx * curve;
+  // Spinning tops precess around the stadium: the tip turns radial motion into an orbit
+  // in the spin direction, so tops circle instead of swinging through the middle like a pendulum.
+  const r = Math.hypot(t.x, t.z);
+  if (r > 1e-3) {
+    const sp = Math.hypot(t.vx, t.vz);
+    const tx = (-t.z / r) * t.hand * sp;
+    const tz = (t.x / r) * t.hand * sp;
+    // Right after a hit the top flies free; the orbit only takes over again as the kick fades.
+    const k = Math.min(1, TUNING.orbit * Math.max(0, t.spin) * (1 - t.kick) * dt);
+    t.vx += (tx - t.vx) * k;
+    t.vz += (tz - t.vz) * k;
+  }
   // Tip drive: speed eases toward the cruise speed for the current spin.
   const target = s.cruise * Math.max(0, t.spin);
   const k = 1 + ((target - speed) / speed) * Math.min(1, s.drive * dt);
@@ -225,10 +297,50 @@ function advance(arena: Arena, t: Top, dt: number) {
   t.angle += (6 + 22 * Math.max(0, t.spin)) * dt * t.hand;
   t.kick *= Math.exp(-6 * dt);
   t.wobble = Math.min(1, Math.max(0, (0.35 - t.spin) / (0.35 - TOPPLE_SPIN)));
-  if (Math.hypot(t.x, t.z) > ARENA_RADIUS + s.radius * 0.3) t.state = 'out';
-  else if (t.spin <= TOPPLE_SPIN) {
+  t.sinceDash += dt;
+  wall(t);
+  if (t.alive && t.spin <= TOPPLE_SPIN) {
     t.spin = 0;
     t.state = 'toppled';
+    t.finish = 'spin';
+  }
+}
+
+/** Rim: pockets swallow, rails dash, a hard enough hit flies over, everything else bounces. */
+function wall(t: Top) {
+  const r = Math.hypot(t.x, t.z);
+  const limit = ARENA_RADIUS - t.spec.radius;
+  if (r < limit) return;
+  const angle = Math.atan2(t.z, t.x);
+  const nx = t.x / r;
+  const nz = t.z / r;
+  const outward = t.vx * nx + t.vz * nz;
+  if (inPocket(angle) && outward > POCKET_SPEED) {
+    t.state = 'out';
+    t.finish = 'pocket';
+    return;
+  }
+  if (outward > WALL_ESCAPE) {
+    t.state = 'out';
+    t.finish = 'over';
+    return;
+  }
+  // Keep it inside.
+  t.x = nx * limit;
+  t.z = nz * limit;
+  if (onRail(angle) && t.sinceDash > DASH_COOLDOWN && t.spin > 0.2) {
+    // Rail dash: the tip catches the rail and the top shoots along it and into the middle.
+    const tx = -nz * t.hand;
+    const tz = nx * t.hand;
+    const k = DASH_SPEED * Math.min(1, t.spin + 0.2);
+    t.vx = (tx * 0.55 - nx * 0.85) * k;
+    t.vz = (tz * 0.55 - nz * 0.85) * k;
+    t.sinceDash = 0;
+    return;
+  }
+  if (outward > 0) {
+    t.vx -= (1 + WALL_BOUNCE) * outward * nx;
+    t.vz -= (1 + WALL_BOUNCE) * outward * nz;
   }
 }
 
@@ -268,6 +380,11 @@ function collide(a: Top, b: Top): Clash | null {
   a.spin -= TUNING.spinHit * impulse * b.spec.punch;
   b.spin -= TUNING.spinHit * impulse * a.spec.punch;
   return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 5) };
+}
+
+/** Points the winner scores for a finish: pocket or over the wall 2, out of spin 1. */
+export function finishPoints(loser: Top): number {
+  return loser.finish === 'pocket' || loser.finish === 'over' ? 2 : 1;
 }
 
 /**

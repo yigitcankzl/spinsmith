@@ -23,16 +23,22 @@ What works:
   where your hand points on the floor. In the emulator's play mode, click and flick the
   mouse: the hands move with the view.
 - An AI top launches from the far side at the same time.
+- **Stadium:** a steel wall around the rim with four pockets on the diagonals (the floor
+  dips toward them) and glowing brass dash rails on the rim between them. A top touching a
+  rail shoots along it and back into the middle; a top driven outward into a pocket drops
+  in; a very hard hit sends a top over the wall; anything else bounces off the wall.
+- **Points, first to 4:** pocket finish or over finish +2, spin finish (the other top
+  stops first, or has less spin at the 45 s limit) +1. The score shows on the card.
 - **Arena moves during the fight:** pinch the floor and lift to raise a bump
   (it glows warm); press a fingertip into the floor to make a dent. Shapes relax
   back to flat in 2–3 seconds and affect both tops.
-- Tops slide down slopes, curve with their spin, grind and spark on contact,
-  wobble as spin drains, then topple. A top that leaves the rim loses.
+- Tops orbit the bowl in their spin direction, bounce off each other and spark on
+  contact, lean into hits, wobble as spin drains, then topple.
 - **Far bumps:** point the hand ray at the floor during a fight and hold the pinch to
   raise a bump there. A small blue dot marks where the ray meets the arena floor. In the
   emulator's play mode a left click is a pinch, so the game is playable by looking
   around with the mouse and click-holding.
-- Result card, then pinch again for the next round. Your top alternates
+- Result card with the finish and score, then pinch again for the next round. Your top alternates
   between the wide (orange) and the narrow (teal) shape each round.
 
 Not in the prototype yet: top shaping, parts, energy, table-tap waves, sound,

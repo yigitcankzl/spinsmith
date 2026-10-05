@@ -21,13 +21,14 @@ import {
   PointsMaterial,
   Quaternion,
   RepeatWrapping,
+  RingGeometry,
   SphereGeometry,
   SRGBColorSpace,
   TorusGeometry,
   Vector2,
   Vector3,
 } from '@iwsdk/core';
-import { Arena, ARENA_RADIUS, Top, TopSpec } from './sim.js';
+import { Arena, ARENA_RADIUS, POCKET_HALF, POCKETS, RAIL_HALF, RAILS, Top, TopSpec } from './sim.js';
 
 /**
  * Visual style: matte clay bodies, light metal parts, a glowing core.
@@ -213,6 +214,15 @@ export class TopView {
   }
 }
 
+/** A torus arc lying in the floor plane from angle a0 to a1 (atan2(z, x) convention). */
+function arc(radius: number, tube: number, a0: number, a1: number, mat: MeshBasicMaterial | MeshMatcapMaterial, y: number) {
+  const m = new Mesh(new TorusGeometry(radius, tube, 8, Math.max(6, Math.round((a1 - a0) * 30)), a1 - a0).rotateX(Math.PI / 2), mat);
+  // rotateX maps the torus start (+X) to angle 0 and sweeps toward +Z; rotating by -a0 starts it at a0.
+  m.rotation.y = -a0;
+  m.position.y = y;
+  return m;
+}
+
 /** Arena: a polar mesh following the heightmap, a metal rim and a pedestal underneath. */
 export class ArenaView {
   readonly root = new Group();
@@ -224,6 +234,11 @@ export class ArenaView {
   private readonly warm = new Color(0xffa155);
   private readonly cold = new Color(0x8f8576);
   private readonly tmp = new Color();
+  private readonly pit = new Color(0x4a3a33);
+  private readonly railIdle = new Color(0xd9a441);
+  private readonly railHot = new Color(0xfff0b0);
+  private railMats: MeshBasicMaterial[] = [];
+  private railFlash: number[] = RAILS.map(() => 0);
 
   constructor(pedestalHeight: number) {
     const count = 1 + this.rings * this.segs;
@@ -248,14 +263,56 @@ export class ArenaView {
     this.geo.setIndex(idx);
     const floor = new Mesh(this.geo, new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0xffffff), vertexColors: true }));
     floor.frustumCulled = false;
-    const rim = new Mesh(new TorusGeometry(ARENA_RADIUS + 0.006, 0.006, 10, 72).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: LIGHT_STEEL }));
-    rim.position.y = 0.011;
+    // Steel wall in arcs between the pockets.
+    const rim = new Group();
+    const steel = new MeshMatcapMaterial({ matcap: LIGHT_STEEL });
+    POCKETS.forEach((p, i) => {
+      const next = POCKETS[(i + 1) % POCKETS.length] + (i === POCKETS.length - 1 ? Math.PI * 2 : 0);
+      rim.add(arc(ARENA_RADIUS + 0.006, 0.006, p + POCKET_HALF, next - POCKET_HALF, steel, 0.011));
+    });
+    // Pockets: a dark trough outside each opening with a hot glowing lip.
+    const trough = new MeshBasicMaterial({ color: 0x1b1412, side: DoubleSide });
+    const lip = new MeshBasicMaterial({ color: 0xff5a28, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false });
+    for (const p of POCKETS) {
+      const hole = new Mesh(new RingGeometry(ARENA_RADIUS - 0.004, ARENA_RADIUS + 0.03, 16, 1, p - POCKET_HALF, POCKET_HALF * 2).rotateX(Math.PI / 2), trough);
+      hole.position.y = -0.002;
+      rim.add(hole, arc(ARENA_RADIUS - 0.003, 0.0018, p - POCKET_HALF, p + POCKET_HALF, lip, 0.003));
+    }
+    // Dash rails: glowing brass strips just inside the wall; they flash when a top dashes.
+    for (const r of RAILS) {
+      const mat = new MeshBasicMaterial({ color: 0xd9a441 });
+      this.railMats.push(mat);
+      rim.add(arc(ARENA_RADIUS - 0.004, 0.0025, r - RAIL_HALF, r + RAIL_HALF, mat, 0.012));
+    }
     const pedestal = new Mesh(
       new CylinderGeometry(ARENA_RADIUS + 0.012, ARENA_RADIUS + 0.03, pedestalHeight, 48, 1, true),
       new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x6f5a4c), side: DoubleSide }),
     );
     pedestal.position.y = -pedestalHeight / 2;
     this.root.add(floor, rim, pedestal);
+  }
+
+  /** Lights up the rail nearest to an arena-local point (a top just dashed there). */
+  flashRail(x: number, z: number) {
+    const a = Math.atan2(z, x);
+    let best = 0;
+    let gap = Infinity;
+    RAILS.forEach((r, i) => {
+      const d = Math.abs(Math.atan2(Math.sin(a - r), Math.cos(a - r)));
+      if (d < gap) {
+        gap = d;
+        best = i;
+      }
+    });
+    this.railFlash[best] = 1;
+  }
+
+  /** Fades rail flashes back to idle. */
+  update(dt: number) {
+    this.railMats.forEach((m, i) => {
+      this.railFlash[i] = Math.max(0, this.railFlash[i] - dt * 3);
+      m.color.copy(this.railIdle).lerp(this.railHot, this.railFlash[i]);
+    });
   }
 
   private vi(ring: number, seg: number) {
@@ -276,8 +333,10 @@ export class ArenaView {
         const h = arena.height(x, z);
         pos.setXYZ(i, x, h, z);
         const shape = arena.shapeHeight(x, z);
+        const dip = -arena.pocketDip(x, z) / 0.003;
         if (shape > 0) this.tmp.copy(this.base).lerp(this.warm, Math.min(1, shape / 0.02));
         else this.tmp.copy(this.base).lerp(this.cold, Math.min(1, -shape / 0.02));
+        if (dip > 0) this.tmp.lerp(this.pit, Math.min(1, dip) * 0.8);
         this.colors[i * 3] = this.tmp.r;
         this.colors[i * 3 + 1] = this.tmp.g;
         this.colors[i * 3 + 2] = this.tmp.b;
