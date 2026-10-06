@@ -67,7 +67,9 @@ export class Wall {
     this.hudTex = new CanvasTexture(this.hudCanvas);
     this.hudTex.colorSpace = SRGBColorSpace;
     this.hud = new Mesh(new PlaneGeometry(1.6, 0.377), new MeshBasicMaterial({ map: this.hudTex, transparent: true, depthWrite: false }));
-    this.hud.position.y = 0.15;
+    // Compact: it supports the fight and must not outweigh the arena.
+    this.hud.scale.setScalar(0.55);
+    this.hud.position.y = 0.05;
     this.root.add(this.panel, this.hud);
     this.root.visible = false;
     this.score(['SpinSmith']);

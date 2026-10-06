@@ -257,3 +257,26 @@ export function allBuilds(): TopBuild[] {
       }
   return out;
 }
+
+/**
+ * Rivals: build archetypes the player can learn. A rival keeps its build and spin for a whole
+ * match; higher Smith levels add archetypes. Difficulty comes from launch quality, not stats.
+ */
+export interface Rival {
+  name: string;
+  /** How it plays, in a few words. */
+  style: string;
+  build: TopBuild;
+  /** Smith level from which it can appear. */
+  level: number;
+}
+
+export const RIVALS: Rival[] = [
+  { name: 'Rim Raider', style: 'aggressive rim attacker', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: -1, color: 0 }, level: 1 },
+  { name: 'Iron Keep', style: 'heavy center holder', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: -1, color: 0 }, level: 1 },
+  { name: 'Drifter', style: 'stamina drifter', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
+  { name: 'Leech', style: 'opposite-spin equalizer', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
+  { name: 'Hookjaw', style: 'upper attacker, deadly on low walls', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
+  { name: 'Sawtooth', style: 'chips toward a burst', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
+  { name: 'Bastion', style: 'tall, locked and patient', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
+];

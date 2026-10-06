@@ -72,8 +72,11 @@ What works:
   (Apprentice, Journeyman, Smith, Master Smith, Legend). Levels open options, never power: you
   start with the classic tops' parts, two paints and two arenas, and each level opens a part, a
   paint or an arena; the 9-60 core comes from a first burst win and the Hook ring from a first
-  pocket or over win. Locked parts and arenas show dark with how they are earned. Rivals grow
-  tougher with your level (any build from level 4, stronger picks and harder rips higher up).
+  pocket or over win. Locked parts and arenas show dark with how they are earned. A match is
+  against one rival archetype that keeps its build and spin for every round (Rim Raider, Iron
+  Keep and Drifter at first; Leech, Hookjaw, Sawtooth and Bastion join with levels); its name
+  and style show at the start. Higher levels make rivals rip harder and aim steadier, never
+  stronger in stats.
   After a round the match bar shows the XP earned and the level bar; a level-up rings and
   throws sparks, and each unlock spins over the arena. Your level and rank sit beside the stand.
   Progress is saved in the browser.

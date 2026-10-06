@@ -11,7 +11,8 @@ import { Progress } from './progress.js';
 import { Hub, miniArena } from './hub.js';
 import { Wall } from './wall.js';
 import type { WallPlane } from './wall.js';
-import { allBuilds, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS } from './parts.js';
+import { allBuilds, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
+import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, Cord, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
 
@@ -105,6 +106,8 @@ export class MatchSystem extends createSystem({
   private hubLogPending = false;
   /** The word in the middle of the wall's match bar. */
   private barMessage = '';
+  /** This match's rival: its build and spin stay for every round. */
+  private rival: Rival = RIVALS[0];
   /** Points the match bar shows (kept after a match is decided), XP just earned, the last rip. */
   private barPoints: [number, number] = [0, 0];
   private xpGained = 0;
@@ -343,7 +346,7 @@ export class MatchSystem extends createSystem({
     this.sinceClashSound += dt;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
       const p = this.progress;
-      this.wall.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_POINTS, ['YOU', 'RIVAL'], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage, {
+      this.wall.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_POINTS, ['YOU', this.rival.name.toUpperCase()], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage, {
         level: p.level,
         rank: p.rank,
         fraction: p.fraction,
@@ -431,6 +434,7 @@ export class MatchSystem extends createSystem({
     if (!action) return;
     if (action.kind === 'play') {
       this.hub.hide();
+      this.rival = this.pickRival();
       this.myPoints = 0;
       this.theirPoints = 0;
       this.typesPicked = false;
@@ -495,20 +499,21 @@ export class MatchSystem extends createSystem({
   }
 
   /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
-  /**
-   * An opponent for your level: classic tops at first; from level 4 any build, and the higher you
-   * are the more builds it weighs to pick the strongest; mostly the other spin.
-   */
+  /** A rival for a new match, from the archetypes your level has reached; the same all match. */
+  private pickRival(): Rival {
+    const pool = RIVALS.filter((r) => r.level <= this.progress.level);
+    // Newly reached archetypes come up more often.
+    const weights = pool.map((r) => 1 + r.level / 4);
+    let x = Math.random() * weights.reduce((t, w) => t + w, 0);
+    for (let i = 0; i < pool.length; i++) if ((x -= weights[i]) <= 0) return pool[i];
+    return pool[0];
+  }
+
+  /** Any build, for the workshop's demo rounds. */
   private randomBuild(): TopBuild {
-    const level = this.progress.level;
-    const pool = level < 4 ? PRESETS.map((p) => p.build) : allBuilds();
-    const tries = 1 + Math.floor(level / 4);
-    let best = pool[Math.floor(Math.random() * pool.length)];
-    for (let i = 1; i < tries; i++) {
-      const b = pool[Math.floor(Math.random() * pool.length)];
-      if (strength(b) > strength(best)) best = b;
-    }
-    return { ...best, spin: Math.random() < 0.7 ? -1 : 1, color: OPPONENT_COLOR };
+    const pool = allBuilds();
+    const b = pool[Math.floor(Math.random() * pool.length)];
+    return { ...b, spin: Math.random() < 0.7 ? -1 : 1, color: OPPONENT_COLOR };
   }
 
   private openWorkshop() {
@@ -588,6 +593,7 @@ export class MatchSystem extends createSystem({
     this.arenaIndex = this.arenas.length - 1;
     this.builder.close();
     this.forge.showShelf(true);
+    this.rival = this.pickRival();
     this.setArena(layout);
     this.myPoints = 0;
     this.theirPoints = 0;
@@ -604,7 +610,8 @@ export class MatchSystem extends createSystem({
 
   /** This round: your build against a fresh opponent. */
   private pickBuilds() {
-    this.setBuilds(this.myBuild, this.randomBuild());
+    this.setBuilds(this.myBuild, { ...this.rival.build, color: OPPONENT_COLOR });
+    console.log(`[MATCH] rival ${this.rival.name}: ${this.theirs.spec.name}, spin ${this.theirs.hand}`);
   }
 
   private describe(t: TopSpec) {
@@ -681,8 +688,10 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirs.hand);
     this.puller = null;
     this.cord.set(null);
-    // The scoreboard on the wall shows the match; the card over the arena only the round's messages.
-    this.label.set('');
+    // The scoreboard on the wall shows the match; the card over the arena only the round's messages,
+    // and at a match's start, who the rival is and how it plays.
+    if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name}\n${this.rival.style}`);
+    else this.label.set('');
     this.wall.setMode('match');
     this.barMessage = 'READY';
     this.barPoints = [this.myPoints, this.theirPoints];
@@ -794,9 +803,11 @@ export class MatchSystem extends createSystem({
     this.mine.launch(0, this.SPAWN, Math.sin(dir) * speed, -Math.cos(dir) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, mh);
     this.sparks.burst(0, this.arena.height(0, this.SPAWN), this.SPAWN, perfect ? 1 : power * 0.6);
     // The rival rips harder as you level up.
-    const aiMin = Math.min(0.75, 0.5 + 0.015 * this.progress.level);
+    // Difficulty is launch quality: the rival rips harder and aims steadier as you level up.
+    const skill = Math.min(1, (this.progress.level - 1) / 15);
+    const aiMin = 0.5 + 0.25 * skill;
     const aiPower = aiMin + Math.random() * (0.98 - aiMin);
-    const aiAim = (Math.random() - 0.5) * 1.0;
+    const aiAim = (Math.random() - 0.5) * (1.0 - 0.6 * skill);
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
     const aiDir = aiAim + LAUNCH_TILT;
     this.theirs.launch(0, -this.SPAWN, Math.sin(aiDir) * aiSpeed * th, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, th);
@@ -1033,12 +1044,6 @@ export class MatchSystem extends createSystem({
     }
     return false;
   }
-}
-
-/** A rough strength of a build from its box stats, for picking tougher opponents. */
-function strength(b: TopBuild): number {
-  const st = statsOf(specFromBuild(b));
-  return st.attack + st.defense + st.stamina + 0.5 * (st.dash + st.burst);
 }
 
 /** A readable name for an unlock key. */
