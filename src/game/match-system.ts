@@ -97,6 +97,7 @@ export class MatchSystem extends createSystem({
     justReleased: false,
     pinch: new Vector3(),
     index: new Vector3(),
+    wrist: new Vector3(),
     rayOrigin: new Vector3(),
     rayDir: new Vector3(),
     hasRay: false,
@@ -145,6 +146,7 @@ export class MatchSystem extends createSystem({
   /** Seconds left before a transient fight message clears. */
   private labelTimer = 0;
   private pullEnd = new Vector3();
+  private handleWorld = new Vector3();
   /** Dev-only keyboard + gaze controls so the prototype can be played in the emulator without pinching. */
   private keys = new Set<string>();
   private charge = 0;
@@ -333,13 +335,14 @@ export class MatchSystem extends createSystem({
 
   /** Workshop: pieces, the tray and the rim, all handled by the builder. */
   private updateBuilder(dt: number) {
-    // The tray is placed relative to the head, in arena-local space.
+    // The menu rides on the left hand; positions are arena-local.
     const head = this.player.head;
     head.getWorldPosition(this.p);
     const local = this.root.worldToLocal(this.p);
-    // Toward the arena (its center is the local origin), not wherever the player happened to look.
     this.fwd.set(-local.x, 0, -local.z).normalize();
-    this.builder.placeTray(local, this.fwd);
+    const left = this.hands.left;
+    const wrist = left.tracked ? this.root.worldToLocal(this.handleWorld.copy(left.wrist)) : null;
+    this.builder.placeMenu(wrist, local, this.fwd);
     this.builder.update(this.pointers, dt);
   }
 

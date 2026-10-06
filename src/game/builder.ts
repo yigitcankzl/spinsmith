@@ -239,14 +239,22 @@ const TRAY: [string, Piece[]][] = [
   ['Theme', (['forge', 'stone', 'clockwork', 'ice'] as Theme[]).map((value) => ({ kind: 'theme', value }))],
   ['Extras', (['vortex', 'spinner', 'tilt', 'shrink'] as const).map((value) => ({ kind: 'extra', value }))],
 ];
-const CELL = 0.034;
-/** The tray is placed this far in front of the eyes (m). */
-const TRAY_DISTANCE = 0.4;
-const TRAY_SCALE = 1.35;
+/** Spacing of the pieces in the menu row (m) and how much larger than life they are shown. */
+const ITEM_GAP = 0.046;
+const ITEM_SCALE = 1.6;
+/** The menu floats this high above the left wrist (m), turned toward the eyes. */
+const MENU_ABOVE_WRIST = 0.13;
+/** ...and this far in toward the middle of the view (m). */
+const MENU_INWARD = 0.1;
+/** Without a tracked left hand the menu stands this far toward the arena from the eyes (m). */
+const MENU_DISTANCE = 0.4;
 
 interface Slot {
   piece: Piece;
+  /** Index of its category tab. */
+  tab: number;
   model: Group;
+  name: Mesh;
   home: Vector3;
 }
 
@@ -277,6 +285,13 @@ export class Builder {
   draft!: ArenaLayout;
   private tray = new Group();
   private slots: Slot[] = [];
+  private tabs: Button[] = [];
+  /** Tabs and action buttons together, for hit tests. */
+  private pressables: Button[] = [];
+  private items = new Group();
+  private tab = 0;
+  /** Sliding transition between tabs: current x offset of the piece row (m). */
+  private slide = 0;
   private held: Held | null = null;
   private buttons: Button[] = [];
   private status: Mesh;
@@ -289,53 +304,58 @@ export class Builder {
   private readonly right = new Vector3();
   private readonly depth = new Vector3();
   private readonly basis = new Matrix4();
-  private trayPlaced = false;
+  private menuPlaced = false;
+  private logged = true;
 
   constructor(private readonly hooks: BuilderHooks) {
     this.root.name = 'arena-workshop';
-    // The tray is placed in front of the player's eyes when the workshop opens (see placeTray), a bit enlarged
-    // so the pieces and their names read well at that distance.
-    this.tray.scale.setScalar(TRAY_SCALE);
-    const board = new Mesh(new BoxGeometry(CELL * 5 + 0.05, 0.004, CELL * TRAY.length + 0.05), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x5a463a) }));
-    board.position.set(0.012, -0.003, 0.012);
-    this.tray.add(board);
-    TRAY.forEach(([label, pieces], r) => {
-      const z = (r - (TRAY.length - 1) / 2) * CELL;
-      const rowTag = tag(label, 0.04, 34);
-      rowTag.rotation.x = -Math.PI / 2;
-      rowTag.position.set(-CELL * 2.6, 0.001, z);
-      this.tray.add(rowTag);
+    // A hand-held menu, like Tiny Golf's: it rides above the left hand, facing the eyes. Tabs on
+    // top pick a category; that category's pieces sit big in one row below; pinch one with the
+    // other hand and carry it to the arena. Panel-local axes: x right, y up, +z toward the eyes.
+    const back = new Mesh(new PlaneGeometry(0.24, 0.17), new MeshBasicMaterial({ color: 0x1e1814, transparent: true, opacity: 0.82, depthWrite: false }));
+    back.position.z = -0.004;
+    this.tray.add(back);
+    TRAY.forEach(([label], t) => {
+      const b = new Button(`tab:${t}`, 0.036, 0.02);
+      b.set(label);
+      b.mesh.position.set((t - (TRAY.length - 1) / 2) * 0.038, 0.048, 0);
+      this.tabs.push(b);
+      this.tray.add(b.mesh);
+    });
+    this.tray.add(this.items);
+    TRAY.forEach(([, pieces], t) => {
       pieces.forEach((piece, c) => {
-        const home = new Vector3((c - 1.5) * CELL + 0.012, 0, z);
+        const home = new Vector3((c - (pieces.length - 1) / 2) * ITEM_GAP, 0.002, 0.012);
         const model = pieceModel(piece);
+        model.scale.setScalar(ITEM_SCALE);
+        // Tipped toward the eyes so the top of each piece shows.
+        model.rotation.x = 0.6;
         model.position.copy(home);
-        const name = tag(pieceName(piece), 0.032, 30);
-        name.rotation.x = -Math.PI / 2;
-        name.position.set(home.x, 0.001, z + 0.013);
-        this.tray.add(model, name);
-        this.slots.push({ piece, model, home });
+        const name = tag(pieceName(piece), 0.042, 34);
+        name.position.set(home.x, -0.026, 0.002);
+        this.items.add(model, name);
+        this.slots.push({ piece, tab: t, model, name, home });
       });
     });
-    // Action buttons along the tray's near edge.
+    // Actions along the bottom.
     const actions: [string, string][] = [
       ['try', 'Try it'],
       ['play', 'Save & play'],
       ['back', 'Back'],
     ];
     actions.forEach(([id, text], i) => {
-      const b = new Button(id, 0.06, 0.022);
+      const b = new Button(id, 0.064, 0.022);
       b.set(text);
-      b.mesh.rotation.x = -Math.PI / 2;
-      b.mesh.position.set((i - 1) * 0.064 + 0.012, 0.001, (TRAY.length / 2) * CELL + 0.012);
+      b.mesh.position.set((i - 1) * 0.07, -0.06, 0);
       this.buttons.push(b);
       this.tray.add(b.mesh);
     });
-    // The status line floats above the arena, facing the player.
+    // The status line along the top.
     this.status = tag('', 0.22, 34);
-    // The status line sits along the tray's far edge, readable with the pieces.
-    this.status.rotation.x = -Math.PI / 2;
-    this.status.position.set(0.012, 0.002, -(TRAY.length / 2) * CELL - 0.02);
+    this.status.position.set(0, 0.073, 0);
     this.tray.add(this.status);
+    this.pressables = [...this.tabs, ...this.buttons];
+    this.showTab(0, 0);
     this.root.add(this.tray);
     this.root.visible = false;
   }
@@ -344,16 +364,11 @@ export class Builder {
     this.draft = cloneLayout(from);
     this.draft.name = 'My Arena';
     this.root.visible = true;
-    this.trayPlaced = false;
+    this.menuPlaced = false;
     this.held = null;
     this.say('Pinch a piece and drop it on the arena');
     this.hooks.preview(this.draft);
-    if (import.meta.env.DEV) {
-      // Piece positions, for driving the workshop from the emulator CLI.
-      this.root.updateWorldMatrix(true, true);
-      const at = (o: { getWorldPosition(v: Vector3): Vector3 }) => o.getWorldPosition(new Vector3()).toArray().map((v) => v.toFixed(3)).join(',');
-      console.log(`[BUILD] ${this.slots.map((s) => `${pieceName(s.piece)}@${at(s.model)}`).join(' ')} ${this.buttons.map((b) => `${b.id}@${at(b.mesh)}`).join(' ')}`);
-    }
+    this.logged = false;
   }
 
   close() {
@@ -369,6 +384,9 @@ export class Builder {
       this.updateHeld();
       return;
     }
+    // Slide the piece row in after a tab change.
+    this.slide *= Math.exp(-dt * 14);
+    this.items.position.x = this.slide;
     // Hover feedback: pieces under a pointer lift and turn, buttons light up.
     let hovered: Slot | null = null;
     let hoveredButton: Button | null = null;
@@ -378,11 +396,13 @@ export class Builder {
       hoveredButton ??= this.buttonUnder(h);
     }
     for (const s of this.slots) {
+      if (s.tab !== this.tab) continue;
       const lift = s === hovered ? 0.006 + 0.002 * Math.sin(this.time * 8) : 0;
-      s.model.position.set(s.home.x, s.home.y + lift, s.home.z);
+      s.model.position.set(s.home.x, s.home.y + lift, s.home.z + lift);
       s.model.rotation.y = s === hovered ? this.time * 2 : 0;
     }
     for (const b of this.buttons) b.highlight(b === hoveredButton);
+    for (const b of this.tabs) b.highlight(b === hoveredButton || b.id === `tab:${this.tab}`);
 
     // A new pinch: a button, a tray piece, a piece on the arena, or the rim to resize.
     for (const h of pointers) {
@@ -561,6 +581,7 @@ export class Builder {
     let best: Slot | null = null;
     let bestD = Infinity;
     for (const s of this.slots) {
+      if (s.tab !== this.tab) continue;
       s.model.getWorldPosition(this.p);
       const d = this.distance(h, this.p, GRAB_NEAR, GRAB_RAY);
       if (d < bestD) {
@@ -572,7 +593,7 @@ export class Builder {
   }
 
   private buttonUnder(h: HandState): Button | null {
-    for (const b of this.buttons) {
+    for (const b of this.pressables) {
       b.mesh.getWorldPosition(this.p);
       if (this.distance(h, this.p, 0.03, 0.02) < Infinity) return b;
     }
@@ -591,6 +612,7 @@ export class Builder {
   }
 
   private press(id: string) {
+    if (id.startsWith('tab:')) return this.showTab(Number(id.slice(4)), id === `tab:${this.tab}` ? 0 : 1);
     if (id === 'back') return this.hooks.exit();
     const problem = validate(this.draft);
     if (problem) return this.reject(problem);
@@ -638,23 +660,49 @@ export class Builder {
     this.tray.add(this.status);
   }
 
+  /** Switches the piece row to a category; the new pieces slide in from the side. */
+  private showTab(t: number, direction: number) {
+    if (direction !== 0) this.slide = (t > this.tab ? 1 : -1) * 0.12;
+    this.tab = t;
+    for (const s of this.slots) {
+      const on = s.tab === t;
+      s.model.visible = on;
+      s.name.visible = on;
+    }
+    if (direction !== 0) playPick();
+  }
+
   /**
-   * Places the tray once, when the workshop opens: about 40 cm from the eyes toward the arena, at
-   * eye level (slightly below) and to the right of the arena, facing the player. It then stays where it is, so
-   * the player neither has to bend down to it nor chase it. head and forward are arena-local.
+   * Holds the menu above the left hand, turned toward the eyes. Without a tracked left hand it
+   * stands at eye level beside the arena instead. All arguments are arena-local.
    */
-  placeTray(head: Vector3, forward: Vector3) {
-    if (this.trayPlaced) return;
-    this.trayPlaced = true;
-    // Level forward: looking down at the arena while opening must not put the tray down there.
-    const level = this.depth.set(forward.x, 0, forward.z).normalize();
-    const right = this.right.set(-level.z, 0, level.x);
-    this.tray.position.copy(head).addScaledVector(level, TRAY_DISTANCE).addScaledVector(right, 0.2);
-    this.tray.position.y -= 0.06;
-    // Face the eyes upright: the board's up side (+Y) toward the head, its x axis to the right.
-    const toward = this.p.copy(head).sub(this.tray.position).normalize();
-    const x = this.q.copy(right).addScaledVector(toward, -right.dot(toward)).normalize();
-    const z = this.up.crossVectors(x, toward);
-    this.tray.quaternion.setFromRotationMatrix(this.basis.makeBasis(x, toward, z));
+  placeMenu(wrist: Vector3 | null, head: Vector3, towardArena: Vector3) {
+    if (wrist) {
+      // Above the hand and a little in toward the middle of the view, between the hands.
+      const inward = this.right.set(-towardArena.z, 0, towardArena.x);
+      this.q.copy(wrist).addScaledVector(inward, MENU_INWARD);
+      this.q.y += MENU_ABOVE_WRIST;
+      // Smoothed so hand tracking jitter does not shake the menu.
+      if (this.menuPlaced) this.tray.position.lerp(this.q, 0.35);
+      else this.tray.position.copy(this.q);
+    } else {
+      const right = this.right.set(-towardArena.z, 0, towardArena.x);
+      this.q.copy(head).addScaledVector(towardArena, MENU_DISTANCE).addScaledVector(right, 0.2);
+      this.q.y -= 0.06;
+      this.tray.position.lerp(this.q, this.menuPlaced ? 0.1 : 1);
+    }
+    this.menuPlaced = true;
+    // Face the eyes upright: +Z toward the head, +Y up.
+    const z = this.depth.copy(head).sub(this.tray.position).normalize();
+    const x = this.right.crossVectors(this.up.set(0, 1, 0), z).normalize();
+    const y = this.up.crossVectors(z, x);
+    this.tray.quaternion.setFromRotationMatrix(this.basis.makeBasis(x, y, z));
+    if (import.meta.env.DEV && !this.logged) {
+      // Piece and button positions once the menu is in place, for driving the workshop from the emulator CLI.
+      this.logged = true;
+      this.root.updateWorldMatrix(true, true);
+      const at = (o: { getWorldPosition(v: Vector3): Vector3 }) => o.getWorldPosition(new Vector3()).toArray().map((v) => v.toFixed(3)).join(',');
+      console.log(`[BUILD] ${this.slots.map((s) => `${pieceName(s.piece)}@${at(s.model)}`).join(' ')} ${this.pressables.map((b) => `${b.id}@${at(b.mesh)}`).join(' ')}`);
+    }
   }
 }

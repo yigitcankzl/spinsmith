@@ -41,11 +41,13 @@ What works:
   the opponent's is random.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
-- **Arena workshop:** pinch *Build arena* next to the arena. A tray of little 3D pieces appears
-  at eye level to the right of the arena, facing you, and stays there: pockets, rails, pillars and bumpers to place;
-  circle, oval and square plates; miniature floors (bowl, flat, hill, ridge, tiers); wall
-  rings (low, standard, high, none); theme gems; and extras (vortex, turntable, rocking,
-  embers). Pinch a piece, carry it over the arena and let go: pockets and rails snap to the
+- **Arena workshop:** pinch *Build arena* next to the arena. A menu rides above your left
+  hand, facing you (like Tiny Golf's builder): tabs on top (Place, Shape, Floor, Wall, Theme,
+  Extras), and the chosen category's pieces shown large in one row below, sliding in when the
+  tab changes. Without a tracked left hand the menu stands at eye level beside the arena.
+  The pieces: pockets, rails, pillars and bumpers to place; circle, oval and square plates;
+  miniature floors (bowl, flat, hill, ridge, tiers); wall rings (low, standard, high, none);
+  theme gems; and extras (vortex, turntable, rocking, embers). Pinch a piece, carry it over the arena and let go: pockets and rails snap to the
   rim where you drop them, pillars and bumpers stand where you drop them, the others change
   the arena. Pieces on the arena can be picked up and moved, or dropped off the arena to
   remove them; a quick tap on a pocket flips it between 2 and 3 points. Pinch the rim and

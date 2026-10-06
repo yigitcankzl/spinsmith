@@ -16,6 +16,8 @@ export interface HandState {
   pinch: Vector3;
   /** Index fingertip, world space (grip position for controllers). */
   index: Vector3;
+  /** Wrist, world space (grip position for controllers): where hand-held menus attach. */
+  wrist: Vector3;
   /** Pointing ray (the system target ray), world space. */
   rayOrigin: Vector3;
   rayDir: Vector3;
@@ -29,6 +31,7 @@ const newHand = (): HandState => ({
   justReleased: false,
   pinch: new Vector3(),
   index: new Vector3(),
+  wrist: new Vector3(),
   rayOrigin: new Vector3(),
   rayDir: new Vector3(),
   hasRay: false,
@@ -86,6 +89,10 @@ export class HandInput {
         const d = Math.hypot(t.x - i.x, t.y - i.y, t.z - i.z);
         player.localToWorld(h.pinch.set((t.x + i.x) / 2, (t.y + i.y) / 2, (t.z + i.z) / 2));
         player.localToWorld(h.index.set(i.x, i.y, i.z));
+        const wristJoint = hand.get('wrist');
+        const wp = wristJoint && frame.getJointPose(wristJoint, ref);
+        if (wp) player.localToWorld(h.wrist.set(wp.transform.position.x, wp.transform.position.y, wp.transform.position.z));
+        else h.wrist.copy(h.index);
         return pressed || (h.pinching ? d < PINCH_OFF : d < PINCH_ON);
       }
     }
@@ -95,6 +102,7 @@ export class HandInput {
     const p = pose.transform.position;
     player.localToWorld(h.pinch.set(p.x, p.y, p.z));
     h.index.copy(h.pinch);
+    h.wrist.copy(h.pinch);
     return pressed;
   }
 
