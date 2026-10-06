@@ -263,7 +263,10 @@ export class MatchSystem extends createSystem({
       const onKey = (e: KeyboardEvent) => {
         if (e.repeat) return;
         this.keys.add(e.code);
-        if (e.code === 'KeyR') this.toReady();
+        if (e.code === 'KeyR') {
+          if (this.phase === 'hub' || this.phase === 'forge' || this.phase === 'build') this.startMatch();
+          else this.toReady();
+        }
         // Asset review: the three classic tops side by side over the arena, turning slowly.
         if (e.code === 'KeyV') {
           if (this.showcase.children.length === 0) {
@@ -492,13 +495,8 @@ export class MatchSystem extends createSystem({
     const action = this.hub.update(this.pointers, dt, this.p);
     if (!action) return;
     if (action.kind === 'play') {
-      this.hub.hide();
       if (this.progress.guide === 'rematch') this.progress.advance('done');
-      this.rival = this.pickRival();
-      this.myPoints = 0;
-      this.theirPoints = 0;
-      this.typesPicked = false;
-      this.toReady();
+      this.startMatch();
     } else if (action.kind === 'forge') {
       this.hub.hide();
       this.openForge();
@@ -609,6 +607,7 @@ export class MatchSystem extends createSystem({
   /** Back to the workshop or the forge after a demo round. */
   private endDemo() {
     this.demo = false;
+    this.typesPicked = false;
     this.phase = 'build';
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
@@ -654,12 +653,26 @@ export class MatchSystem extends createSystem({
   private playBuilt(layout: ArenaLayout) {
     this.arenas.push(layout);
     this.arenaIndex = this.arenas.length - 1;
-    this.builder.close();
-    this.forge.showShelf(true);
-    this.rival = this.pickRival();
     this.setArena(layout);
+    this.startMatch();
+  }
+
+  /**
+   * A new match from anywhere (home, the workshop's Save & play, the dev key): every other
+   * place closes, a rival is picked, the score and this round's builds are fresh.
+   */
+  private startMatch() {
+    this.hub.hide();
+    this.builder.close();
+    this.forge.close();
+    this.forge.showShelf(true);
+    this.stage.visible = true;
+    this.demo = false;
+    this.rival = this.pickRival();
     this.myPoints = 0;
     this.theirPoints = 0;
+    // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
+    this.typesPicked = false;
     this.phase = 'ready';
     this.toReady();
   }
