@@ -50,6 +50,8 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
+/** Seconds the rival and arena intro shows before the first session's rip hint. */
+const INTRO_TIME = 2.5;
 /** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
 const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
@@ -127,6 +129,8 @@ export class MatchSystem extends createSystem({
   private paused = false;
   /** Seconds the pulling hand has been untracked. */
   private lostFor = 0;
+  /** When the current ready phase began (for the intro before the first rip hint). */
+  private readySince = 0;
   /** Seconds left of the simulation-only pause after a hard hit. */
   private hitStop = 0;
   private lastHardHit = -1;
@@ -497,9 +501,10 @@ export class MatchSystem extends createSystem({
     // The note hangs over the station it points at: the stand, or the anvil for the new part.
     const guide = this.progress.guide;
     if (guide === 'launch') this.label.set('Your top is on the stand\nPut it in the arena to play');
-    else if (guide === 'forge') this.label.set('New part: Rush tip!\nPinch the anvil to fit it');
+    else if (guide === 'bump' || guide === 'match') this.label.set('Finish your first match\nPut your top in the arena');
+    else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Rush tip!\nPinch the anvil to fit it');
     else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
-    if (guide === 'forge') this.label.mesh.position.set(ANVIL_AT.x, 0.27, ANVIL_AT.z - 0.02);
+    if (guide === 'forge' || guide === 'fit') this.label.mesh.position.set(ANVIL_AT.x, 0.27, ANVIL_AT.z - 0.02);
     else this.label.mesh.position.set(-0.23, 0.27, 0.04);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
@@ -772,6 +777,7 @@ export class MatchSystem extends createSystem({
 
   private toReady() {
     if (this.phase === 'placing') return;
+    this.readySince = this.time;
     this.matchOver = false;
     this.phase = 'ready';
     this.menuButton.mesh.visible = true;
@@ -1098,7 +1104,8 @@ export class MatchSystem extends createSystem({
         c.position.set(0, y, this.SPAWN + 0.03 + k * 0.08);
         ((c as Mesh).material as MeshBasicMaterial).opacity = Math.sin(k * Math.PI);
       });
-      this.label.set('Pinch near your top and pull back toward you\nthen let go');
+      // The rival and arena intro shows first; the rip hint follows.
+      if (this.time - this.readySince > INTRO_TIME) this.label.set('Pinch near your top and pull back toward you\nthen let go');
     }
     const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > 3 && this.theirs.alive;
     this.bumpMark.visible = bump;

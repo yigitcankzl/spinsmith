@@ -136,8 +136,9 @@ export class Hub {
     this.shelf.visible = !first;
     this.anvil.visible = !first;
     // The guide's beacon: on the stand to start (and for the rematch), on the anvil for the new part.
-    this.beacon.visible = progress.guide === 'launch' || progress.guide === 'rematch' || progress.guide === 'forge';
-    const onAnvil = progress.guide === 'forge';
+    // Every unfinished guide step points somewhere: the stand to play, the anvil for the new part.
+    this.beacon.visible = progress.guide !== 'done';
+    const onAnvil = progress.guide === 'forge' || progress.guide === 'fit';
     this.beacon.position.set(onAnvil ? ANVIL_AT.x : STAND_AT.x, TABLE_Y + (onAnvil ? ANVIL_FACE + 0.01 : 0.1), onAnvil ? ANVIL_AT.z : STAND_AT.z);
     const topKey = JSON.stringify(build);
     if (topKey !== this.topKey) {
