@@ -230,7 +230,7 @@ export class MatchSystem extends createSystem({
     this.root.visible = false;
     // Messages hang small over the arena's far rim, never between the eyes and the tops.
     this.label.mesh.position.copy(LABEL_AT);
-    this.label.mesh.scale.setScalar(0.8);
+    this.label.mesh.scale.setScalar(1);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
     this.stage.add(
@@ -262,6 +262,12 @@ export class MatchSystem extends createSystem({
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
     this.world.createTransformEntity(this.cord.line);
     this.world.createTransformEntity(this.wall.root);
+    // The match bar: small, just above the far rim and behind the round messages, tipped toward
+    // the player, so score and fight share one view.
+    this.wall.hud.position.set(0, 0.2, -0.26);
+    this.wall.hud.rotation.x = -0.25;
+    this.wall.hud.scale.setScalar(0.2);
+    this.root.add(this.wall.hud);
     this.builder.hangOn(this.wall.tools);
 
     if (import.meta.env.DEV) {

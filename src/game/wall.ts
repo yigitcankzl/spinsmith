@@ -4,7 +4,8 @@
  * - forge: a board with a SPINSMITH sign, filled with the parts (point at one and pinch: it flies
  *   to your hand);
  * - workshop: the workshop's board on the left and a short help on the right;
- * - match: just a fighting-game bar, each top's spin draining as a health bar, the points below;
+ * - match: nothing on the wall; its fighting-game bar (each top's spin as a health bar, points
+ *   below) is placed over the arena's far rim by the match system;
  * - home: nothing.
  */
 import { CanvasTexture, Group, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from '@iwsdk/core';
@@ -36,7 +37,11 @@ export class Wall {
   /** The board with its sign and halves (forge, workshop). */
   private panel = new Group();
   /** The match bar. */
-  private hud: Mesh;
+  /**
+   * The match bar. It is not hung on the wall: the match system places it just over the arena's
+   * far rim, so the score sits next to the fight instead of high on the wall.
+   */
+  readonly hud: Mesh;
   private hudCanvas = document.createElement('canvas');
   private hudTex: CanvasTexture;
   private hudKey = '';
@@ -67,10 +72,8 @@ export class Wall {
     this.hudTex = new CanvasTexture(this.hudCanvas);
     this.hudTex.colorSpace = SRGBColorSpace;
     this.hud = new Mesh(new PlaneGeometry(1.6, 0.377), new MeshBasicMaterial({ map: this.hudTex, transparent: true, depthWrite: false }));
-    // Compact: it supports the fight and must not outweigh the arena.
-    this.hud.scale.setScalar(0.55);
-    this.hud.position.y = 0.05;
-    this.root.add(this.panel, this.hud);
+    this.hud.visible = false;
+    this.root.add(this.panel);
     this.root.visible = false;
     this.score(['SpinSmith']);
   }
@@ -124,7 +127,8 @@ export class Wall {
   /** Shows only what the current activity needs (see the file comment). */
   setMode(mode: WallMode) {
     this.mode = mode;
-    this.root.visible = this.placed && mode !== 'home';
+    // In a match the wall itself steps away; only the bar shows, over the arena.
+    this.root.visible = this.placed && (mode === 'forge' || mode === 'workshop');
     this.panel.visible = mode === 'forge' || mode === 'workshop';
     this.hud.visible = mode === 'match';
     this.board.visible = mode === 'workshop';

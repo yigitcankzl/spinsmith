@@ -22,8 +22,9 @@ What works:
   at the end opens the workshop. The smithy wall hangs on the real wall straight ahead (a
   detected wall plane, or a virtual wall 1.6 m ahead) only when it has a use: in the forge and
   the workshop it is a board with the parts or pieces on the left (they fly to your hand too);
-  in a match it is a fighting-game bar, each top's spin draining as a health bar, points as pips
-  and the round's result in the middle. A small *Menu* button beside the arena returns home, and
+  in a match the wall steps away and a compact fighting-game bar hangs just over the arena's far
+  rim (each top's spin draining as a health bar, points as pips, the round's result in the
+  middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
   the match ends back home after 4 points.
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
