@@ -54,6 +54,12 @@ const EXTENT = MAX_RADIUS + 0.01;
 const CELL = (2 * EXTENT) / (GRID - 1);
 /** Shapes the player makes flatten back with this time constant (~2-3 s to vanish). */
 const RELAX_TAU = 0.8;
+/** Player shapes: a ramp's and a well's width (sigma, m), and how hard a fresh well slows a top (1/s). */
+const RAMP_SIGMA = 0.03;
+const WELL_SIGMA = 0.022;
+const WELL_DRAG = 3;
+/** How much less a top in the middle of a fresh well is knocked back (0..1). */
+const WELL_BRACE = 0.5;
 const GRAVITY = 9.81;
 /** Global feel knobs (tuned with scripts/sim-check.ts and on device). */
 export const TUNING = {
@@ -76,6 +82,8 @@ export const TUNING = {
   drainSpread: 0.565,
   /** Outward speed (m/s) a top needs to drop into a pocket. */
   pocket: 0.27,
+  /** Seconds a player's ramp or well stays at full strength before it starts to relax. */
+  shapeHold: 0.5,
   /** Seconds after the launch during which pockets and walls hold every top (no instant finishes). */
   grace: 2.5,
 };
@@ -123,6 +131,8 @@ export class Arena {
   private tiltVZ = 0;
   /** Fight clock, for the shrinking ring. */
   elapsed = 0;
+  /** Live player-made shapes (ramps and wells); each fades as it relaxes. */
+  shapes: FloorShape[] = [];
 
   constructor(layout: ArenaLayout = ARENAS[0]) {
     this.layout = layout;
@@ -214,11 +224,76 @@ export class Arena {
     }
   }
 
+  /**
+   * Adds a ramp or well. An owner holds one live shape at a time: its previous one dissolves.
+   * Returns the shape.
+   */
+  addShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0): FloorShape {
+    this.shapes = this.shapes.filter((s) => s.owner !== owner);
+    const len = Math.hypot(dx, dz);
+    const shape: FloorShape = { kind, x, z, dx: len > 1e-6 ? dx / len : 0, dz: len > 1e-6 ? dz / len : 0, amp, age: 0, owner };
+    this.shapes.push(shape);
+    return shape;
+  }
+
+  /** How strong a shape is now: full for a moment after it is made, then fading as it relaxes. */
+  static strength(s: FloorShape) {
+    return s.age < TUNING.shapeHold ? 1 : Math.exp(-(s.age - TUNING.shapeHold) / RELAX_TAU);
+  }
+
+  /** Height of the live shapes at (x, z). */
+  shapesHeight(x: number, z: number): number {
+    let h = 0;
+    for (const s of this.shapes) {
+      const k = s.amp * Arena.strength(s);
+      const rx = x - s.x;
+      const rz = z - s.z;
+      if (s.kind === 'well') {
+        h -= k * Math.exp(-(rx * rx + rz * rz) / (WELL_SIGMA * WELL_SIGMA));
+        continue;
+      }
+      // A ramp: a mound whose front half (along its push direction) falls away steeply, so a top
+      // on it slides off toward the push.
+      const g = Math.exp(-(rx * rx + rz * rz) / (RAMP_SIGMA * RAMP_SIGMA));
+      const u = rx * s.dx + rz * s.dz;
+      h += k * g * 0.5 * (1 - Math.tanh(u / (0.5 * RAMP_SIGMA)));
+    }
+    return h;
+  }
+
+  /** How deep in a well a point is (0 outside, about 1 at a fresh well's middle). */
+  well(x: number, z: number): number {
+    let w = 0;
+    for (const s of this.shapes) {
+      if (s.kind !== 'well') continue;
+      const rx = x - s.x;
+      const rz = z - s.z;
+      w += Arena.strength(s) * Math.exp(-(rx * rx + rz * rz) / (WELL_SIGMA * WELL_SIGMA));
+    }
+    return Math.min(1, w);
+  }
+
+  /** Extra drag (1/s) where wells catch a top. */
+  drag(x: number, z: number): number {
+    let d = 0;
+    for (const s of this.shapes) {
+      if (s.kind !== 'well') continue;
+      const rx = x - s.x;
+      const rz = z - s.z;
+      d += WELL_DRAG * Arena.strength(s) * Math.exp(-(rx * rx + rz * rz) / (WELL_SIGMA * WELL_SIGMA));
+    }
+    return d;
+  }
+
   /** Per-step arena update: shapes relax, the dish rocks under the tops' weight. */
   update(dt: number, a: Top, b: Top) {
     this.elapsed += dt;
     const k = Math.exp(-dt / RELAX_TAU);
     for (let i = 0; i < this.shape.length; i++) this.shape[i] *= k;
+    if (this.shapes.length) {
+      for (const s of this.shapes) s.age += dt;
+      this.shapes = this.shapes.filter((s) => Arena.strength(s) > 0.03);
+    }
     if (this.layout.tilt > 0) {
       // The dish dips toward where the spinning tops are (rotation about x tips +z down, and so on).
       const wx = ((a.alive ? a.x : 0) + (b.alive ? b.x : 0)) / this.radius;
@@ -236,12 +311,14 @@ export class Arena {
   reset(layout = this.layout) {
     this.layout = layout;
     this.shape.fill(0);
+    this.shapes = [];
     this.tiltX = this.tiltZ = this.tiltVX = this.tiltVZ = 0;
     this.elapsed = 0;
   }
 
   clear() {
     this.shape.fill(0);
+    this.shapes = [];
   }
 
   /** Bilinear sample of the player-made shape layer (bump > 0, dent < 0). */
@@ -255,8 +332,23 @@ export class Arena {
     const s = this.shape;
     const a = s[j * GRID + i] * (1 - u) + s[j * GRID + i + 1] * u;
     const b = s[(j + 1) * GRID + i] * (1 - u) + s[(j + 1) * GRID + i + 1] * u;
-    return a * (1 - v) + b * v;
+    return a * (1 - v) + b * v + (this.shapes.length ? this.shapesHeight(x, z) : 0);
   }
+}
+
+export type ShapeKind = 'ramp' | 'well';
+
+/** A player-made shape on the floor: a ramp pushing toward (dx, dz), or a well. */
+export interface FloorShape {
+  kind: ShapeKind;
+  x: number;
+  z: number;
+  dx: number;
+  dz: number;
+  /** Peak height (ramp) or depth (well) when made (m). */
+  amp: number;
+  age: number;
+  owner: string;
 }
 
 function smoothstep(e0: number, e1: number, x: number) {
@@ -378,7 +470,7 @@ export function step(arena: Arena, a: Top, b: Top, dt = STEP): Clash | null {
   arena.update(dt, a, b);
   advance(arena, a, b, dt);
   advance(arena, b, a, dt);
-  return a.alive && b.alive ? collide(a, b) : null;
+  return a.alive && b.alive ? collide(a, b, arena) : null;
 }
 
 function advance(arena: Arena, t: Top, other: Top, dt: number) {
@@ -461,6 +553,15 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.z += t.vz * dt;
   // Spin drains on its own, faster while scraping across the floor, much faster in the embers.
   t.spin -= (DRAIN_MID + (s.spinDrain - DRAIN_MID) * TUNING.drainSpread + v * 0.02) * TUNING.drain * dt;
+  // A well catches the top: it slows down inside it.
+  if (arena.shapes.length) {
+    const drag = arena.drag(t.x, t.z);
+    if (drag > 0) {
+      const f = Math.exp(-drag * dt);
+      t.vx *= f;
+      t.vz *= f;
+    }
+  }
   // A low ring scrapes the floor on steep slopes (the bumps the player raises, steep bowls).
   if (s.height < LOW_HEIGHT) {
     const steep = Math.hypot(slopeTmp.x, slopeTmp.z) - SCRAPE_SLOPE;
@@ -591,7 +692,7 @@ function burstApart(t: Top) {
   t.finish = 'burst';
 }
 
-function collide(a: Top, b: Top): Clash | null {
+function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   let nx = b.x - a.x;
   let nz = b.z - a.z;
   const dist = Math.hypot(nx, nz);
@@ -615,8 +716,11 @@ function collide(a: Top, b: Top): Clash | null {
   const gap = Math.max(-1, Math.min(1, (a.spec.height - b.spec.height) / HEIGHT_GAP));
   const liftA = gap > 0 ? gap * HEIGHT_LIFT : 0;
   const liftB = gap < 0 ? -gap * HEIGHT_LIFT : 0;
-  const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA);
-  const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB);
+  // A top braced in a well is knocked back less.
+  const braceA = arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(a.x, a.z) : 1;
+  const braceB = arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(b.x, b.z) : 1;
+  const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA) * braceA;
+  const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB) * braceB;
   a.vx -= nx * ja;
   a.vz -= nz * ja;
   b.vx += nx * jb;

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { ARENAS } from '../src/game/arenas.ts';
 import { cloneLayout, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
+import { SHAPING, ShapingCharges } from '../src/game/shaping.ts';
 import { LEVEL_UNLOCKS, Progress, xpToNext } from '../src/game/progress.ts';
 import { allBuilds, PRESETS, specFromBuild, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
@@ -186,6 +187,38 @@ TUNING.grace = 0;
     }
   }
   assert.ok(bursts > 0, 'full-power head-on fights must sometimes burst the stamina top');
+}
+
+// 6b. Player shapes: a ramp pushes toward its direction, a well catches and braces, one live
+// shape per owner, and the shaping economy's rules.
+{
+  const flat = arenaWith({ floor: 'flat', pockets: [], rails: [] });
+  const t = new Top(DEFENSE);
+  const idle = new Top(STAMINA);
+  idle.state = 'toppled';
+  t.launch(0, 0, 0, 0, 1, 1);
+  flat.addShape('ramp', -0.01, 0, 0.06, 'me', 1, 0);
+  for (let i = 0; i < 30; i++) step(flat, t, idle);
+  assert.ok(t.vx > 0.02, `a ramp should push a top toward its direction, vx ${t.vx.toFixed(3)}`);
+  flat.reset();
+  flat.addShape('well', 0, 0, 0.02, 'me');
+  assert.ok(flat.drag(0, 0) > 0 && flat.well(0, 0) > 0.9 && flat.shapesHeight(0, 0) < 0, 'a well is a hollow that drags');
+  flat.addShape('ramp', 0.05, 0, 0.06, 'me', 1, 0);
+  assert.equal(flat.shapes.length, 1, 'an owner keeps one live shape');
+  flat.addShape('well', -0.05, 0, 0.02, 'rival');
+  assert.equal(flat.shapes.length, 2);
+  for (let i = 0; i < 600; i++) flat.update(STEP, t, idle);
+  assert.equal(flat.shapes.length, 0, 'shapes relax away within a few seconds');
+
+  const c = new ShapingCharges();
+  assert.equal(c.spend(1, 2.5), 0, 'no shaping during the opening grace');
+  assert.equal(c.spend(3, 2.5), 1);
+  assert.equal(c.spend(3.5, 2.5), SHAPING.strainFactor, 'a second shape within a second is weaker');
+  assert.equal(c.spend(6, 2.5), 0, 'two charges, then none');
+  c.clash(0.9, 6);
+  assert.equal(c.charges, 1, 'a solid clash refills a charge');
+  c.update(SHAPING.refill + 0.01);
+  assert.equal(c.charges, 2, 'the slow passive refill');
 }
 
 TUNING.grace = GRACE;
