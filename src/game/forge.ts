@@ -193,11 +193,9 @@ export class Forge {
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
     this.displayTilt.rotation.x = 0.6;
     this.displayHolder.add(this.displayTilt);
-    // The stats card hangs on the wall over the scoreboard while forging.
-    this.card.mesh.scale.setScalar(3.6);
-    this.card.mesh.visible = false;
-    this.wall.cardSpot.add(this.card.mesh);
-    this.root.add(this.bucket, this.halo, this.displayHolder);
+    // The stats card floats to the right of your top, close enough to read.
+    this.card.mesh.scale.setScalar(0.6);
+    this.root.add(this.bucket, this.halo, this.displayHolder, this.card.mesh);
     this.rebuildDisplay();
     this.root.visible = false;
   }
@@ -207,7 +205,6 @@ export class Forge {
     this.build = loadBuild();
     this.rebuildDisplay();
     this.root.visible = true;
-    this.card.mesh.visible = true;
     this.dropAll();
     this.say('Pick up your top, or bring it a part from the shelf');
     this.logPending = true;
@@ -215,7 +212,6 @@ export class Forge {
 
   close() {
     this.root.visible = false;
-    this.card.mesh.visible = false;
     this.dropAll();
   }
 
@@ -246,6 +242,8 @@ export class Forge {
     this.halo.scale.setScalar(1 + 0.04 * Math.sin(this.time * 3) + 0.8 * this.glow);
     (this.halo.material as MeshBasicMaterial).color.setHex(0xff9a3c).lerp(this.white, this.glow);
     this.face(this.bucket, head);
+    this.card.mesh.position.set(this.floatSpot.x + 0.14, this.floatSpot.y + 0.05, this.floatSpot.z - 0.02);
+    this.face(this.card.mesh, head);
   }
 
   update(pointers: HandState[], dt: number) {
@@ -523,16 +521,16 @@ export class Forge {
   private buildShelf() {
     ROWS.forEach(([label, items, gap], r) => {
       const y = 0.33 - r * ROW_GAP;
-      const name = tag(label, 0.1, 44);
-      name.position.set(-0.385, y, 0.005);
+      const name = tag(label, 0.12, 44);
+      name.position.set(-0.47, y, 0.005);
       this.shelf.add(name);
-      const step = gap * WALL_SCALE * 0.9;
+      const step = Math.max(0.15, gap * WALL_SCALE * 1.25);
       items.forEach((item, c) => {
         // Tips and cores stand up from their base, so they sit lower on the card.
         const low = item.kind === 'tip' || item.kind === 'core';
-        const home = new Vector3((c - (items.length - 1) / 2) * step + 0.085, y + (low ? -0.028 : 0.008), 0.04);
+        const home = new Vector3((c - (items.length - 1) / 2) * step + 0.08, y + (low ? -0.028 : 0.008), 0.04);
         // A card behind each part: a lit frame, a lighter face, the part's name below.
-        const w = Math.min(step - 0.01, 0.15);
+        const w = Math.min(step - 0.012, 0.16);
         const frame = new MeshBasicMaterial({ color: FRAME_IDLE.clone() });
         const border = new Mesh(new PlaneGeometry(w, ROW_GAP - 0.012), frame);
         border.position.set(home.x, y, 0.004);
@@ -550,7 +548,7 @@ export class Forge {
         model.add(inner);
         model.position.copy(home);
         // Rings and preset tops are wide: a little smaller, so they stay on their card.
-        const size = WALL_SCALE * (item.kind === 'ring' ? 0.78 : item.kind === 'preset' ? 0.62 : item.kind === 'core' ? 0.62 : 1);
+        const size = WALL_SCALE * (item.kind === 'ring' ? 0.98 : item.kind === 'preset' ? 0.78 : item.kind === 'core' ? 0.8 : 1.3);
         model.scale.setScalar(size);
         this.shelf.add(border, face, label, equipped, model);
         this.slots.push({ item, model, home, frame, equipped, flash: 0, size });

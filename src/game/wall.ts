@@ -1,8 +1,9 @@
 /**
  * The smithy wall: hung on the real wall in front of the player (a detected wall plane), or on a
  * virtual one when the room has none, facing the player. It only shows when there is a use for it:
- * - forge and workshop: a board with a SPINSMITH sign, the tool panel on the left where the parts
- *   hang (point at one and pinch: it flies to your hand), and a card or help on the right;
+ * - forge: a board with a SPINSMITH sign, filled with the parts (point at one and pinch: it flies
+ *   to your hand);
+ * - workshop: the workshop's board on the left and a short help on the right;
  * - match: just a fighting-game bar, each top's spin draining as a health bar, the points below;
  * - home: nothing.
  */
@@ -31,8 +32,6 @@ export class Wall {
   readonly root = new Group();
   /** Left half: the forge's tool panel (local +x right, +y up, +z toward the player). */
   readonly tools = new Group();
-  /** Right half, top: where the forge's stats card hangs (over the scoreboard). */
-  readonly cardSpot = new Group();
   private board: Mesh;
   /** The board with its sign and halves (forge, workshop). */
   private panel = new Group();
@@ -55,7 +54,6 @@ export class Wall {
     const sign = titleMesh('SPINSMITH', 0.9, 0.12);
     sign.position.set(0, HEIGHT / 2 - 0.1, 0.01);
     this.tools.position.set(-WIDTH / 4 - 0.02, -0.07, 0.02);
-    this.cardSpot.position.set(WIDTH / 4 + 0.03, 0.12, 0.03);
     // The scoreboard: a slate in the right half.
     this.canvas.width = 1024;
     this.canvas.height = 420;
@@ -63,7 +61,7 @@ export class Wall {
     this.tex.colorSpace = SRGBColorSpace;
     this.board = new Mesh(new PlaneGeometry(0.72, 0.295), new MeshBasicMaterial({ map: this.tex, transparent: true }));
     this.board.position.set(WIDTH / 4 + 0.03, 0.12, 0.021);
-    this.panel.add(back, sign, this.board, this.tools, this.cardSpot);
+    this.panel.add(back, sign, this.board, this.tools);
     this.hudCanvas.width = 1400;
     this.hudCanvas.height = 260;
     this.hudTex = new CanvasTexture(this.hudCanvas);
@@ -96,7 +94,7 @@ export class Wall {
     this.root.position.copy(at);
     this.root.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0);
     // A farther wall gets a larger board, so it reads the same.
-    this.root.scale.setScalar(Math.min(1.5, Math.max(1, (best ? bestT : VIRTUAL_DISTANCE) / 1.5)));
+    this.root.scale.setScalar(Math.min(1.8, Math.max(1, (best ? bestT : VIRTUAL_DISTANCE) / 1.2)));
     this.placed = true;
     this.setMode(this.mode);
     console.log(`[WALL] on ${best ? 'detected wall' : 'virtual wall'} ${bestT.toFixed(2)} m ahead`);
@@ -127,8 +125,15 @@ export class Wall {
     this.root.visible = this.placed && mode !== 'home';
     this.panel.visible = mode === 'forge' || mode === 'workshop';
     this.hud.visible = mode === 'match';
-    this.cardSpot.visible = mode === 'forge';
     this.board.visible = mode === 'workshop';
+    // In the forge the parts fill the whole board, larger; in the workshop its board takes the left half.
+    if (mode === 'forge') {
+      this.tools.position.set(-0.03, -0.1, 0.02);
+      this.tools.scale.setScalar(1.08);
+    } else {
+      this.tools.position.set(-WIDTH / 4 - 0.02, -0.07, 0.02);
+      this.tools.scale.setScalar(1);
+    }
   }
 
   /**
