@@ -40,13 +40,17 @@ What works:
   the opponent's is random.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
-- **Arena builder:** pinch *Build arena* next to the arena. A panel to its left sets size,
-  shape, floor, wall, theme and the vortex, turntable, rocking and ember toggles; four tools
-  place things by pinching the arena (near, or point and pinch): *Pocket* on the rim adds a
-  pocket, pinching it again makes it 3 points, then removes it; *Rail* on the rim adds or
-  removes a rail; *Pillar* and *Bumper* on the floor add or remove one. Every change shows
-  live. *Test* simulates the arena and says how it plays; *Save & play* stores it in the
-  browser, adds it to the arena rotation and starts a match in it.
+- **Arena workshop:** pinch *Build arena* next to the arena. A tray of little 3D pieces sits
+  to the right of the arena, within reach: pockets, rails, pillars and bumpers to place;
+  circle, oval and square plates; miniature floors (bowl, flat, hill, ridge, tiers); wall
+  rings (low, standard, high, none); theme gems; and extras (vortex, turntable, rocking,
+  embers). Pinch a piece, carry it over the arena and let go: pockets and rails snap to the
+  rim where you drop them, pillars and bumpers stand where you drop them, the others change
+  the arena. Pieces on the arena can be picked up and moved, or dropped off the arena to
+  remove them; a quick tap on a pocket flips it between 2 and 3 points. Pinch the rim and
+  pull to resize. *Try it* plays an AI-vs-AI demo round in the draft (no points) and shows
+  how it played; *Save & play* stores the arena in the browser, adds it to the rotation and
+  starts a match in it.
 - **Points, first to 4:** pocket, over or burst finish +2, spin finish (the other top
   stops first, or has less spin at the 45 s limit) +1. The score shows on the card.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
@@ -120,7 +124,7 @@ The console logs `[MATCH]` lines for placement, launches and results.
 src/game/layout.ts         Arena layout data, rim shapes, validation
 src/game/arenas.ts         The built-in arenas
 src/game/arena-report.ts   Simulated play report for a layout
-src/game/builder.ts        Arena builder panel, placement tools, saved arenas
+src/game/builder.ts        Arena workshop: piece tray, drag and drop, resize, saved arenas
 src/game/sim.ts            Fight simulation (no three.js): arena from a layout, tops, collisions, verdict
 src/game/hands.ts          Pinch and fingertip input from WebXR hand joints
 src/game/visuals.ts        Generated matcaps, top shapes per type, burst debris, arena, sparks, cord, text card

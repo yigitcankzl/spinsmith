@@ -76,9 +76,15 @@ export class MatchSystem extends createSystem({
   /** The arena builder and the button that opens it. */
   private builder = new Builder({
     preview: (layout) => this.showLayout(layout),
+    tryIt: (layout) => this.tryArena(layout),
     play: (layout) => this.playBuilt(layout),
     exit: () => this.leaveBuilder(),
+    arenaPoint: (h) => this.arenaPoint(h),
+    toLocal: (world, out) => this.root.worldToLocal(out.copy(world)),
+    floorHeight: (n) => this.arena.floorHeight(n),
   });
+  /** A demo round from the workshop's Try it: two AI tops, no score, back to the workshop after. */
+  private demo = false;
   private buildButton = new Button('build', 0.12, 0.034);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
@@ -173,10 +179,7 @@ export class MatchSystem extends createSystem({
       ...[...this.myViews, ...this.theirViews].flatMap((v) => [v.root, v.shadowMesh, v.debris]),
       this.sparks.points,
     );
-    this.root.add(this.stage, this.label.mesh, this.builder.panel, this.buildButton.mesh);
-    // The builder panel stands to the player's left of the arena, turned toward them.
-    this.builder.panel.position.set(-0.31, 0.26, 0.04);
-    this.builder.panel.rotation.y = 0.5;
+    this.root.add(this.stage, this.label.mesh, this.builder.root, this.buildButton.mesh);
     this.buildButton.mesh.position.set(0.2, 0.05, 0.14);
     this.buildButton.mesh.rotation.y = -0.4;
     this.buildButton.set('Build arena');
@@ -240,14 +243,18 @@ export class MatchSystem extends createSystem({
         if (this.settle >= SETTLE) this.place();
         return;
       case 'build':
-        this.updateBuilder();
+        this.updateBuilder(dt);
         break;
       case 'ready':
       case 'result':
         if (this.pressedBuild()) break;
         if (this.phase === 'result') {
           this.resultTimer -= dt;
-          if (this.resultTimer <= 0) this.toReady();
+          if (this.resultTimer <= 0) {
+            if (this.demo) this.endDemo();
+            else this.toReady();
+          }
+          if (this.demo) break;
         }
         this.updateReadyPinch();
         break;
@@ -299,7 +306,8 @@ export class MatchSystem extends createSystem({
 
   /** Ready/result: a pinch on the Build button opens the builder. */
   private pressedBuild(): boolean {
-    this.buildButton.mesh.visible = true;
+    this.buildButton.mesh.visible = !this.demo;
+    if (this.demo) return false;
     this.buildButton.mesh.getWorldPosition(this.p);
     let hover = false;
     for (const h of this.pointers) {
@@ -321,16 +329,27 @@ export class MatchSystem extends createSystem({
     return false;
   }
 
-  /** Builder: panel buttons first; otherwise a pinch on the arena edits it with the current tool (one edit per pinch). */
-  private updateBuilder() {
-    if (this.builder.update(this.pointers)) return;
-    for (const h of this.pointers) {
-      if (!h.tracked || !h.justPinched) continue;
-      const hit = this.arenaPoint(h);
-      if (!hit) continue;
-      this.builder.edit(hit.x, hit.z, normRadius(this.arena.layout, hit.x, hit.z));
-      return;
-    }
+  /** Workshop: pieces, the tray and the rim, all handled by the builder. */
+  private updateBuilder(dt: number) {
+    this.builder.update(this.pointers, dt);
+  }
+
+  /** Try it: two AI tops fight in the draft arena; the workshop comes back after the round. */
+  private tryArena(layout: ArenaLayout) {
+    this.arena.reset(layout);
+    this.demo = true;
+    this.mine.spec = TYPES[Math.floor(Math.random() * TYPES.length)];
+    this.theirs.spec = TYPES[Math.floor(Math.random() * TYPES.length)];
+    this.launch(0.6 + Math.random() * 0.35, (Math.random() - 0.5) * 0.6);
+  }
+
+  /** Back to the workshop after a demo round. */
+  private endDemo() {
+    this.demo = false;
+    this.phase = 'build';
+    this.label.set('');
+    for (const top of this.tops) top.state = 'out';
+    this.arena.reset();
   }
 
   /**
@@ -652,6 +671,14 @@ export class MatchSystem extends createSystem({
   private finish(v: -1 | 1 | 2) {
     this.phase = 'result';
     this.resultTimer = RESULT_TIME;
+    if (this.demo) {
+      // Workshop demo: say how it ended, no points.
+      const loser = v === 1 ? this.theirs : this.mine;
+      const winner = v === 1 ? this.mine : this.theirs;
+      this.label.set(v === 2 ? 'Draw' : `${winner.spec.name} won\n${loser.finish === 'spin' ? 'outspun' : loser.finish} after ${this.elapsed.toFixed(0)} s`);
+      this.resultTimer = 3;
+      return;
+    }
     const name = (t: Top) =>
       t.finish === 'pocket' ? 'Pocket finish' : t.finish === 'over' ? 'Over finish' : t.finish === 'burst' ? 'BURST' : 'Spin finish';
     for (const t of this.tops) {

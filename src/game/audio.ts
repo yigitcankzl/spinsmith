@@ -188,3 +188,20 @@ export class CordTone {
     this.gain!.gain.setTargetAtTime(0.03 + 0.05 * power, t, 0.03);
   }
 }
+
+/** Builder: picking a piece up from the tray or the arena. */
+export function playPick() {
+  tone(880, 0.06, 0.08, 'triangle');
+}
+
+/** Builder: a piece clicks into place. */
+export function playPlace() {
+  tone(520, 0.1, 0.12, 'triangle');
+  tone(1560, 0.05, 0.1, 'sine', 0.02);
+  hiss(0.12, 0.05, 3000, 2000, 1);
+}
+
+/** Builder: a piece dropped off the arena is thrown away. */
+export function playRemove() {
+  hiss(0.18, 0.2, 1500, 300, 1.5);
+}
