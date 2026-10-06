@@ -18,7 +18,14 @@ function audio(): AudioContext | null {
     }
     master = ctx.createGain();
     master.gain.value = 0.7;
-    master.connect(ctx.destination);
+    // A limiter at the end: stacked bursts, clashes and hums never clip.
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.knee.value = 4;
+    limiter.ratio.value = 12;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.15;
+    master.connect(limiter).connect(ctx.destination);
     // One second of white noise, reused by every noisy sound.
     noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noise.getChannelData(0);
