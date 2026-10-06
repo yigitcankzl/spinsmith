@@ -176,7 +176,7 @@ export class Builder {
         const t = this.q.copy(this.p).sub(h.rayOrigin).dot(h.rayDir);
         if (t > 0) {
           const off = this.q.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p);
-          if (off < Math.min(b.width, b.height) * 0.6) d = off + 0.05;
+          if (off < Math.min(b.width, b.height) * 0.75) d = off + 0.05;
         }
       }
       if (d < bestD) {
@@ -200,7 +200,8 @@ export class Builder {
       const b = this.pick(h);
       if (!b) continue;
       hovered.add(b);
-      if (h.justPinched) {
+      // One press per pinch, even when several pointers aim at the same button.
+      if (h.justPinched && !consumed) {
         this.press(b.id);
         consumed = true;
       }

@@ -38,6 +38,8 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
+/** A pointing ray this close to a button's center (m) presses it. */
+const BUTTON_REACH = 0.035;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
 const MATCH_POINTS = 4;
 /** Launch power at or above this is a perfect rip: extra starting spin. */
@@ -77,8 +79,20 @@ export class MatchSystem extends createSystem({
     play: (layout) => this.playBuilt(layout),
     exit: () => this.leaveBuilder(),
   });
-  private buildButton = new Button('build', 0.09, 0.022);
-  private builderHands: HandState[] = [];
+  private buildButton = new Button('build', 0.12, 0.034);
+  /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
+  private pointers: HandState[] = [];
+  private gazePointer: HandState = {
+    tracked: false,
+    pinching: false,
+    justPinched: false,
+    justReleased: false,
+    pinch: new Vector3(),
+    index: new Vector3(),
+    rayOrigin: new Vector3(),
+    rayDir: new Vector3(),
+    hasRay: false,
+  };
   /** The player's top and the opponent's; their type (spec) changes between rounds. */
   private mine = new Top(TYPES[0]);
   private theirs = new Top(TYPES[1]);
@@ -166,7 +180,7 @@ export class MatchSystem extends createSystem({
     this.buildButton.mesh.position.set(0.2, 0.05, 0.14);
     this.buildButton.mesh.rotation.y = -0.4;
     this.buildButton.set('Build arena');
-    this.builderHands = [this.hands.left, this.hands.right];
+    this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];
     this.setArena(this.arenas[this.arenaIndex]);
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
@@ -218,6 +232,7 @@ export class MatchSystem extends createSystem({
     this.frameDt = dt;
     this.time += dt;
     this.hands.update(frame, ref, session, this.player);
+    if (import.meta.env.DEV) this.updateGazePointer();
 
     switch (this.phase) {
       case 'placing':
@@ -285,13 +300,16 @@ export class MatchSystem extends createSystem({
   /** Ready/result: a pinch on the Build button opens the builder. */
   private pressedBuild(): boolean {
     this.buildButton.mesh.visible = true;
-    for (const h of this.builderHands) {
-      if (!h.tracked || !h.justPinched) continue;
-      this.buildButton.mesh.getWorldPosition(this.p);
-      const near = h.pinch.distanceTo(this.p) < 0.04;
+    this.buildButton.mesh.getWorldPosition(this.p);
+    let hover = false;
+    for (const h of this.pointers) {
+      if (!h.tracked) continue;
+      const near = h.pinch.distanceTo(this.p) < 0.05;
       const t = this.local.copy(this.p).sub(h.rayOrigin).dot(h.rayDir);
-      const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < 0.02;
+      const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < BUTTON_REACH;
       if (!near && !far) continue;
+      hover = true;
+      if (!h.justPinched) continue;
       this.phase = 'build';
       this.buildButton.mesh.visible = false;
       this.label.set('');
@@ -299,17 +317,38 @@ export class MatchSystem extends createSystem({
       this.builder.open(this.arena.layout);
       return true;
     }
+    this.buildButton.highlight(hover);
     return false;
   }
 
-  /** Builder: panel buttons first; otherwise a pinch on the arena edits it with the current tool. */
+  /** Builder: panel buttons first; otherwise a pinch on the arena edits it with the current tool (one edit per pinch). */
   private updateBuilder() {
-    if (this.builder.update(this.builderHands)) return;
-    for (const h of this.builderHands) {
+    if (this.builder.update(this.pointers)) return;
+    for (const h of this.pointers) {
       if (!h.tracked || !h.justPinched) continue;
       const hit = this.arenaPoint(h);
-      if (hit) this.builder.edit(hit.x, hit.z, normRadius(this.arena.layout, hit.x, hit.z));
+      if (!hit) continue;
+      this.builder.edit(hit.x, hit.z, normRadius(this.arena.layout, hit.x, hit.z));
+      return;
     }
+  }
+
+  /**
+   * Dev builds add the head's gaze as a pointer that pinches whenever a hand pinches: in the
+   * emulator's mouse-look mode the hands hang below the view, so you aim with the view instead.
+   */
+  private updateGazePointer() {
+    const g = this.gazePointer;
+    const head = this.player.head;
+    head.getWorldPosition(g.rayOrigin);
+    head.getWorldDirection(g.rayDir).negate();
+    g.hasRay = true;
+    g.tracked = true;
+    g.pinch.set(0, -100, 0);
+    const was = g.pinching;
+    g.pinching = this.hands.left.pinching || this.hands.right.pinching;
+    g.justPinched = g.pinching && !was;
+    g.justReleased = !g.pinching && was;
   }
 
   /** Where a hand points at the arena (near pinch first, else its ray), including just past the rim. */

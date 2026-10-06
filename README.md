@@ -87,6 +87,10 @@ Pinching in the emulator is awkward, so the prototype can also be played with th
 keyboard and the head's gaze. Enter play mode in the emulator toolbar to look around
 with the mouse; a small blue reticle marks where you look on the arena floor.
 
+In dev builds the view itself is also a pointer: in play mode, look at a button (or a spot on
+the arena in the builder) and click. The hands hang below the view in the emulator, so their
+own rays rarely line up with what you are looking at.
+
 | Key | Action |
 |---|---|
 | `Space` | Hold to charge, release to launch toward where you are looking |
