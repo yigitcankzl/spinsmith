@@ -403,7 +403,15 @@ export class Builder {
     for (const b of this.buttons) b.highlight(b === hoveredButton);
     for (const b of this.tabs) b.highlight(b === hoveredButton || b.id === `tab:${this.tab}`);
 
-    // A new pinch: a button, a tray piece, a piece on the arena, or the rim to resize.
+    // A new pinch: a button, a tray piece, a piece on the arena, or the rim to resize. A hand
+    // touching a button or piece goes first, so a ray or the dev gaze can't take its pinch.
+    for (const h of pointers) {
+      if (!h.tracked || !h.justPinched) continue;
+      const button = this.buttonUnder(h, true);
+      if (button) return this.press(button.id);
+      const slot = this.slotUnder(h, true);
+      if (slot) return this.grab(slot.piece, h, 'tray', 2);
+    }
     for (const h of pointers) {
       if (!h.tracked || !h.justPinched) continue;
       const button = this.buttonUnder(h);
@@ -576,13 +584,13 @@ export class Builder {
     return n > 0.88 && n < 1.25;
   }
 
-  private slotUnder(h: HandState): Slot | null {
+  private slotUnder(h: HandState, touchOnly = false): Slot | null {
     let best: Slot | null = null;
     let bestD = Infinity;
     for (const s of this.slots) {
       if (s.tab !== this.tab) continue;
       s.model.getWorldPosition(this.p);
-      const d = this.distance(h, this.p, GRAB_NEAR * MENU_SCALE, GRAB_RAY * MENU_SCALE);
+      const d = this.distance(h, this.p, GRAB_NEAR * MENU_SCALE, touchOnly ? 0 : GRAB_RAY * MENU_SCALE);
       if (d < bestD) {
         bestD = d;
         best = s;
@@ -591,10 +599,10 @@ export class Builder {
     return best;
   }
 
-  private buttonUnder(h: HandState): Button | null {
+  private buttonUnder(h: HandState, touchOnly = false): Button | null {
     for (const b of this.pressables) {
       b.mesh.getWorldPosition(this.p);
-      if (this.distance(h, this.p, 0.03 * MENU_SCALE, (b.height / 2) * MENU_SCALE) < Infinity) return b;
+      if (this.distance(h, this.p, 0.03 * MENU_SCALE, touchOnly ? 0 : (b.height / 2) * MENU_SCALE) < Infinity) return b;
     }
     return null;
   }
