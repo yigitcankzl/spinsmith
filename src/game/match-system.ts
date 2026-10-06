@@ -124,6 +124,7 @@ export class MatchSystem extends createSystem({
   private hitStop = 0;
   private lastHardHit = -1;
   private impacts = new Impacts();
+  private showcase = new Group();
   /** First-session hints: arrows teaching the rip, and a marker where a bump would pay off. */
   private ripArrows = new Group();
   private bumpMark = new Mesh(new RingGeometry(0.012, 0.016, 32).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffd28a, transparent: true, depthWrite: false }));
@@ -259,6 +260,20 @@ export class MatchSystem extends createSystem({
         if (e.repeat) return;
         this.keys.add(e.code);
         if (e.code === 'KeyR') this.toReady();
+        // Asset review: the three classic tops side by side over the arena, turning slowly.
+        if (e.code === 'KeyV') {
+          if (this.showcase.children.length === 0) {
+            PRESETS.forEach((p, i) => {
+              const v = new TopView(p.build, p.build.color);
+              v.root.position.set((i - 1) * 0.15, 0.05, 0.02);
+              v.root.scale.setScalar(1.6);
+              this.showcase.add(v.root);
+            });
+            this.stage.add(this.showcase);
+            this.showcase.visible = false;
+          }
+          this.showcase.visible = !this.showcase.visible;
+        }
         // Start over as a new player: progress and the saved top are cleared.
         if (e.code === 'Backquote') {
           localStorage.removeItem('spinsmith.progress.v1');
@@ -381,6 +396,7 @@ export class MatchSystem extends createSystem({
     this.sparks.update(dt);
     this.impacts.update(dt);
     this.updateGuide();
+    for (const c of this.showcase.children) c.rotation.y += dt * 0.6;
     this.updateRewards(dt);
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
