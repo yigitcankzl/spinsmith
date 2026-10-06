@@ -267,7 +267,13 @@ export class MatchSystem extends createSystem({
     this.frameDt = dt;
     this.time += dt;
     this.hands.update(frame, ref, session, this.player);
-    if (import.meta.env.DEV) this.updateGazePointer();
+    if (import.meta.env.DEV) {
+      // In the emulator the gaze crosshair is the only far pointer: the hands' own rays would aim
+      // somewhere else at the same time. Hands still work by touch. On a headset, hands do both.
+      this.hands.left.hasRay = false;
+      this.hands.right.hasRay = false;
+      this.updateGazePointer();
+    }
 
     switch (this.phase) {
       case 'placing':
