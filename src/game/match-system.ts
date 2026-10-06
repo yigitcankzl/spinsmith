@@ -10,6 +10,7 @@ import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
 import { GUIDE_ORDER, MARK, Progress } from './progress.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
+import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
 import { anvilModel, Hub, miniArena, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
@@ -614,6 +615,22 @@ export class MatchSystem extends createSystem({
       this.toHub();
       this.label.set(`Your top: ${buildName(this.myBuild)}\n${c.wins} match win${c.wins === 1 ? '' : 's'}`);
       this.labelTimer = 2.5;
+    } else if (action.kind === 'reset') {
+      return;
+    } else if (action.kind === 'armReset') {
+      this.label.set('Start over as a new smith?\nPinch the level plate again');
+      this.labelTimer = 3;
+    } else if (action.kind === 'newSmith') {
+      // A new player on a shared headset: progress, the saved top and built arenas are forgotten.
+      this.progress.reset();
+      for (const k of SAVE_KEYS) if (k !== 'spinsmith.progress.v1') localStorage.removeItem(k);
+      this.myBuild = this.forge.allowed({ ...PRESETS[0].build });
+      this.arenas = [...ARENAS];
+      this.arenaIndex = 0;
+      this.setArena(this.arenas[0]);
+      playLevelUp();
+      console.log('[HUB] new smith');
+      this.toHub();
     } else if (action.kind === 'locked') {
       this.label.set(action.text);
       this.labelTimer = 2;

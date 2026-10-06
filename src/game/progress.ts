@@ -313,6 +313,21 @@ export class Progress {
     this.save();
   }
 
+  /** Starts over as a new smith: level 1, the first session, nothing earned. */
+  reset() {
+    this.level = 1;
+    this.xp = 0;
+    this.matches = 0;
+    this.guide = 'launch';
+    this.unlocked = new Set(STARTERS);
+    this.quests.clear();
+    this.orders.clear();
+    this.marks = {};
+    this.champions = [];
+    this.order = null;
+    this.save();
+  }
+
   /** Moves the first-session guide on (only forward) and saves. */
   advance(to: Guide) {
     if (GUIDE_ORDER.indexOf(to) <= GUIDE_ORDER.indexOf(this.guide)) return;

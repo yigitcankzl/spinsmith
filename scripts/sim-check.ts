@@ -12,6 +12,7 @@ import { CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STA
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
+import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
@@ -562,6 +563,25 @@ TUNING.grace = 0;
   assert.ok(!placeArena(head, 0, -1, [{ x: 0.3, y: 0.4, z: -0.9 }]).onTable, 'a table far below the eyes is not used');
   assert.ok(!placeArena({ ...head, y: 1.7 }, 0, -1, [{ x: 0.3, y: 0.9, z: -0.9 }]).onTable, 'standing over a low table uses the tray');
   assert.ok(Number.isFinite(placeArena(head, 0, 0, []).x), 'looking straight down still places ahead');
+}
+
+// 15. Shared headsets: the demo save is a level-8 smith past the first session with stamps, marks
+// and champions; a fresh save and Progress.reset() bring back the first session.
+{
+  const mem = new Map<string, string>();
+  const st = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) };
+  demoSave(st, new Date(2026, 9, 7));
+  const p = new Progress(st);
+  assert.equal(p.level, 8);
+  assert.equal(p.guide, 'done');
+  assert.equal(p.stamps, 3);
+  assert.ok(p.champions.length >= 2 && p.marksOf('Rim Raider') === 7, 'the demo shows champions and a full medallion');
+  assert.ok(mem.has('spinsmith.top.v1'));
+  p.reset();
+  const again = new Progress(st);
+  assert.ok(again.level === 1 && again.guide === 'launch' && again.stamps === 0 && again.champions.length === 0, 'a reset is a new smith');
+  freshSave(st);
+  for (const k of SAVE_KEYS) assert.ok(!mem.has(k), `fresh clears ${k}`);
 }
 
 console.log('sim-check: all passed');

@@ -2,7 +2,20 @@ import { World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { MatchSystem } from './game/match-system.js';
 import { loadFonts } from './game/ui.js';
+import { demoSave, freshSave } from './game/demo-save.js';
 import { PanelSystem } from './panel.js';
+
+// For shared headsets: ?fresh starts as a new player (the first session again), ?demo as a prepared
+// level-8 smith. The flag is then dropped from the address, so a reload keeps the progress made.
+const params = new URLSearchParams(location.search);
+if (params.has('fresh') || params.has('demo')) {
+  if (params.has('fresh')) freshSave(localStorage);
+  else demoSave(localStorage);
+  params.delete('fresh');
+  params.delete('demo');
+  const query = params.toString();
+  history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+}
 
 // Panels are drawn into canvases as the game starts, so the display font must be loaded first.
 loadFonts()

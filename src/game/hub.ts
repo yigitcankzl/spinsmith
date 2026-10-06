@@ -52,6 +52,9 @@ export type HubAction =
   | { kind: 'workshop' }
   | { kind: 'order' }
   | { kind: 'champion'; index: number }
+  | { kind: 'reset' }
+  | { kind: 'armReset' }
+  | { kind: 'newSmith' }
   | { kind: 'locked'; text: string };
 
 /** A hand lost this long (s) cancels a carry instead of dropping (same as the match's rip). */
@@ -66,6 +69,9 @@ const BOARD_AT = new Vector3(-0.17, 0.12, -0.25);
 const CHAMPION_AT = [new Vector3(-0.215, 0, 0.07), new Vector3(-0.23, 0, -0.01), new Vector3(-0.215, 0, -0.09)];
 /** The anvil and the dock on the rim are small models of the full ones. */
 const RIM_SCALE = 0.42;
+/** Starting over: hold the level plate this long (s), then pinch it again within this long. */
+const RESET_HOLD = 2;
+const RESET_CONFIRM = 3;
 /** Miniatures on the arena shelf: this much larger than on a table, this far apart, this many a row. */
 const WALL_MINI_SCALE = 2.4;
 const WALL_MINI_GAP = 0.17;
@@ -130,6 +136,10 @@ export class Hub {
   private time = 0;
   /** The first session: every station shows its name. */
   private teaching = true;
+  /** Starting over: the hand holding the level plate and for how long, then a short window to confirm. */
+  private hold: { hand: HandState; t: number } | null = null;
+  private armed = 0;
+  private holdBar = new Mesh(new PlaneGeometry(0.08, 0.004).translate(0.04, 0, 0), new MeshBasicMaterial({ color: ORANGE, transparent: true, depthWrite: false }));
   private board = new SmithBoard();
   private champions = new Group();
   private championViews: TopView[] = [];
@@ -224,6 +234,22 @@ export class Hub {
       l.lookAt(this.q.copy(head).setY(this.p.y));
     }
     if (this.held) return this.updateHeld(dt);
+    // Holding the level plate fills its bar; at 2 s a second pinch within 3 s confirms.
+    this.armed = Math.max(0, this.armed - dt);
+    if (this.hold) {
+      if (this.hold.hand.pinching && this.hold.hand.tracked) {
+        this.hold.t += dt;
+        this.holdBar.scale.x = Math.min(1, this.hold.t / RESET_HOLD);
+        if (this.hold.t < RESET_HOLD) return null;
+        this.hold = null;
+        this.armed = RESET_CONFIRM;
+        playLocked();
+        return { kind: 'armReset' };
+      }
+      this.hold = null;
+    }
+    this.holdBar.visible = this.hold !== null || this.armed > 0;
+    if (this.armed > 0) this.holdBar.scale.x = 1;
 
     let hovered: Pickable | null = null;
     for (const h of pointers) if (h.tracked) hovered ??= this.under(h);
@@ -243,6 +269,15 @@ export class Hub {
         return { kind: 'locked', text: `Locked: ${it.locked}` };
       }
       playPick();
+      if (it.action.kind === 'reset') {
+        if (this.armed > 0) {
+          this.armed = 0;
+          return { kind: 'newSmith' };
+        }
+        this.hold = { hand: h, t: 0 };
+        this.holdBar.scale.x = 0.001;
+        return null;
+      }
       if (!it.carry) return it.action;
       // Carried things move into the arena's space; from afar they fly to the hand first.
       const from = it.model.getWorldPosition(new Vector3());
@@ -437,10 +472,16 @@ export class Hub {
     this.rankTex = new CanvasTexture(this.rankCanvas);
     this.rankTex.colorSpace = SRGBColorSpace;
     const rank = new Mesh(new PlaneGeometry(0.1, 0.039), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
-    rank.position.set(0, TABLE_Y + 0.045, DOCK_AT.z + 0.04);
     rank.rotation.x = -1;
     rank.scale.setScalar(0.8);
-    this.root.add(rank);
+    // Held for 2 s, then pinched again, the level plate starts over as a new smith (shared headsets).
+    const plate = new Group();
+    plate.position.set(0, TABLE_Y + 0.045, DOCK_AT.z + 0.04);
+    this.holdBar.position.set(-0.04, -0.022, 0.012);
+    this.holdBar.rotation.x = -1;
+    plate.add(rank, this.holdBar);
+    this.root.add(plate);
+    this.items.push({ action: { kind: 'reset' }, carry: false, model: plate, home: plate.position.clone() });
     const dock = standModel();
     dock.scale.setScalar(RIM_SCALE);
     this.stand.add(dock);
