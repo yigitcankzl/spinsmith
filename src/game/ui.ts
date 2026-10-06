@@ -1,13 +1,15 @@
 /**
  * The look of every panel, card and button: dark tinted glass with cut corners, thin glowing edges
- * (orange for SpinSmith, cyan as the second accent) and light, spaced lettering.
+ * (orange for SpinSmith and the player, steel for neutral UI; cyan is kept for the rival) and light, spaced lettering.
  */
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
 
 export const GLASS = 'rgba(9, 13, 21, 0.86)';
 export const GLASS_LIGHT = 'rgba(22, 30, 44, 0.9)';
 export const ORANGE = '#ff8a2a';
+/** Cyan belongs to the rival; neutral UI accents use steel. */
 export const CYAN = '#4fd1ff';
+export const STEEL = '#c9d3e0';
 export const TEXT = '#eef3fa';
 export const TEXT_DIM = '#8f9bb0';
 

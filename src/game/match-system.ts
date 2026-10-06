@@ -110,6 +110,7 @@ export class MatchSystem extends createSystem({
   private xpGained = 0;
   private lastPerfect = false;
   private levelUpText = '';
+  private perfTimer = 0;
   /** Unlocks waiting to be shown over the arena, and the one showing. */
   private reveals: string[] = [];
   private reveal: { obj: Object3D; t: number } | null = null;
@@ -326,7 +327,15 @@ export class MatchSystem extends createSystem({
         this.updateFight(dt);
         break;
     }
-    if (import.meta.env.DEV) this.devControls(dt);
+    if (import.meta.env.DEV) {
+      this.devControls(dt);
+      // Draw calls and triangles of the last frame, every few seconds, to keep an eye on the budget.
+      if ((this.perfTimer += dt) > 3) {
+        this.perfTimer = 0;
+        const r = this.world.renderer.info.render;
+        console.log(`[PERF] ${this.phase} calls ${r.calls} tris ${r.triangles}`);
+      }
+    }
     this.updateReticle();
     this.arenaView.sync(this.arena);
     const live = this.phase === 'fight';

@@ -8,7 +8,7 @@
  * - home: nothing.
  */
 import { CanvasTexture, Group, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from '@iwsdk/core';
-import { CYAN, glass, GLASS_LIGHT, glassMesh, ORANGE, TEXT, TEXT_DIM, titleMesh } from './ui.js';
+import { CYAN, glass, GLASS_LIGHT, STEEL, glassMesh, ORANGE, TEXT, TEXT_DIM, titleMesh } from './ui.js';
 
 /** Wall board size (m). */
 const WIDTH = 1.7;
@@ -105,7 +105,7 @@ export class Wall {
     if (lines.join('\n') === this.lines.join('\n')) return;
     this.lines = lines;
     const g = this.canvas.getContext('2d')!;
-    glass(g, 1024, 420, CYAN, GLASS_LIGHT);
+    glass(g, 1024, 420, STEEL, GLASS_LIGHT);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     lines.forEach((line, i) => {
@@ -194,10 +194,10 @@ export class Wall {
     g.fillText(xp.rank.toUpperCase(), 130, 281);
     g.fillStyle = 'rgba(255,255,255,0.1)';
     g.fillRect(380, 270, 760, 20);
-    g.fillStyle = CYAN;
+    g.fillStyle = STEEL;
     g.fillRect(380, 270, 760 * xp.fraction, 20);
     if (xp.gained > 0) {
-      g.fillStyle = CYAN;
+      g.fillStyle = ORANGE;
       g.textAlign = 'right';
       g.font = '800 32px system-ui, sans-serif';
       g.fillText(`+${xp.gained} XP`, W - 40, 280);

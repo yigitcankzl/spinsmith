@@ -34,7 +34,7 @@ import { playLocked, playPick, playPlace, playRemove } from './audio.js';
 import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
 import { tag } from './builder.js';
-import { CYAN, glass, GLASS_LIGHT, ORANGE, TEXT, TEXT_DIM } from './ui.js';
+import { glass, GLASS_LIGHT, STEEL, ORANGE, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
@@ -606,7 +606,7 @@ export class Forge {
   /** The quench bucket: dunk your top in it to save and go home. */
   private buildBucket() {
     this.bucket.position.copy(BUCKET_AT);
-    const wall = new Mesh(new CylinderGeometry(0.035, 0.03, 0.05, 24, 1, true), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x6b4a32), side: 2 }));
+    const wall = new Mesh(new CylinderGeometry(0.035, 0.03, 0.05, 24, 1, true), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57), side: 2 }));
     wall.position.y = 0.025;
     const hoop = new Mesh(new TorusGeometry(0.035, 0.0025, 8, 32).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x8a8f99) }));
     hoop.position.y = 0.05;
@@ -687,7 +687,7 @@ class StatsCard {
   /** Draws the build; a preview build shows as gains (green) and losses (red) on each bar. */
   draw(build: TopBuild, preview: TopBuild | null, message: string) {
     const g = this.canvas.getContext('2d')!;
-    glass(g, 512, 470, CYAN, GLASS_LIGHT);
+    glass(g, 512, 470, STEEL, GLASS_LIGHT);
     const spec = specFromBuild(build);
     const now = statsOf(spec);
     const next = preview ? statsOf(specFromBuild(preview)) : null;
@@ -731,7 +731,7 @@ class StatsCard {
       }
     });
     // What just happened, or what to do next.
-    g.fillStyle = CYAN;
+    g.fillStyle = STEEL;
     let size = 26;
     do g.font = `${size--}px system-ui, sans-serif`;
     while (g.measureText(message).width > 470 && size > 14);

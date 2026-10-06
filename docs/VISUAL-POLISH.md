@@ -77,3 +77,39 @@ cyan as the rival and UI accent. Glow comes from heat (orange) and energy (cyan)
 
 Steps 1-4 change the first impression most and are each small. Every step needs a frame-time
 check on the headset.
+
+## 6. First pass (done, Oct 6, 2026)
+
+Following a review of this plan, the first pass made the four changes that turn four styles
+into one, and nothing else:
+
+1. **Arena floor:** cream replaced by mid-dark graphite per theme (not black, which loses detail
+   in MR), faint brushed rings and one engraved groove in the floor's vertex colors (no extra
+   draw call), a thin glowing accent line just inside the rim.
+2. **Grounding:** soft radial shadows under the tops (replacing hard discs), under the anvil
+   and the stand, and a dark ring on the table under the arena. The anvil and stand now stand on
+   the table instead of floating at arena-floor height.
+3. **Top metals:** only the blades and ratchets use `MeshStandardMaterial` (shared), lit by
+   IWSDK's built-in `IBLTexture { src: 'room' }` studio environment (not the real room); the
+   painted and plastic parts stay matcap.
+4. **Props:** the anvil, stand, bucket, shelf planks and miniature bases moved from brown clay
+   and wood to the graphite, steel, brass and orange set.
+
+Also: cyan is reserved for the rival; neutral UI accents and bars use steel.
+
+Before and after, same camera: `polish-before-after-hub.png`, `polish-before-after-fight.png`.
+
+Cost in the emulator (desktop browser, uncalibrated, frame interval capped by vsync):
+
+| | Draw calls | Triangles | CPU per frame |
+|---|---|---|---|
+| Before | 166 | 85.4k | 5.5 ms |
+| After | 168-170 | 89-90k | 5.9-6.5 ms (run-to-run noise ~0.6 ms) |
+
+The draw-call count was already above the ~150 guideline before this pass; it is the next thing
+to bring down (merging the arena's rim tubes and the shelf cards). The GPU cost of the standard
+materials has to be measured on the headset.
+
+Second pass, if this is not enough: bigger sparks with a 40-50 ms simulation-only hit stop, and
+emissive chips. The font comes after the 3D look has settled, as one central constant
+(Rajdhani only).

@@ -21,7 +21,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { arenaWarning, reportArena } from './arena-report.js';
-import { chamfer, CYAN, GLASS_LIGHT, glassMesh, ORANGE, TEXT } from './ui.js';
+import { chamfer, GLASS_LIGHT, STEEL as UI_STEEL, glassMesh, ORANGE, TEXT } from './ui.js';
 import { playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
@@ -314,7 +314,7 @@ export class Builder {
     // Panel-local axes: x right, y up, +z toward the eyes.
     this.tray.scale.setScalar(MENU_SCALE);
     // Opaque, so it never blends over the tabs and pieces in front of it.
-    const back = glassMesh(0.24, 0.17, CYAN);
+    const back = glassMesh(0.24, 0.17, UI_STEEL);
     back.position.z = -0.004;
     this.tray.add(back);
     TRAY.forEach(([label], t) => {

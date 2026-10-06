@@ -19,6 +19,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshMatcapMaterial,
+  MeshStandardMaterial,
   Path,
   PlaneGeometry,
   Points,
@@ -115,8 +116,9 @@ const BRASS = makeMatcap('metal', 0xe2b866);
  * plastic layer and an emblem chip on top, a dark ratchet below, and a bit with a gear ring and
  * the tip. Every part is generated here from the part's numbers.
  */
-const CHROME = makeMatcap('chrome', 0xe8eef8);
-const RATCHET = makeMatcap('metal', 0x5c626e);
+/** Real metal on the blades and ratchets: reflections of the room environment sweep across them as they spin. */
+const BLADE_METAL = new MeshStandardMaterial({ color: 0xb9c0cc, metalness: 1, roughness: 0.32 });
+const RATCHET_METAL = new MeshStandardMaterial({ color: 0x6b717d, metalness: 0.85, roughness: 0.45 });
 /** Bit: the tip below a gear ring that catches the rails. */
 const GEAR_H = 0.003;
 const GEAR_R = 0.0088;
@@ -124,6 +126,22 @@ const TIP_H: Record<TipShape, number> = { flat: 0.004, rush: 0.0045, taper: 0.00
 /** Chip on top: a dome in the body color with a glowing emblem that heats as spin drains. */
 const CHIP_R = 0.0095;
 const EMBLEM = emblemTexture();
+/** A soft round shadow: dark in the middle, fading to nothing at the edge. */
+export const SOFT_SHADOW = softShadowTexture();
+
+function softShadowTexture(): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.45, 'rgba(255,255,255,0.75)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  // Used on black materials: the shadow is the texture's alpha.
+  return new CanvasTexture(c);
+}
 
 /** Merges geometries (positions and normals only) into one, so a part stays one mesh. */
 function merge(parts: BufferGeometry[]): BufferGeometry {
@@ -199,7 +217,7 @@ export function coreMesh(core: Core): Mesh {
     const a = (i / core.teeth) * Math.PI * 2;
     parts.push(new BoxGeometry(0.004, core.height * 0.85, 0.0035).translate(r + 0.0012, 0, 0).rotateY(a));
   }
-  const m = new Mesh(merge(parts), new MeshMatcapMaterial({ matcap: RATCHET }));
+  const m = new Mesh(merge(parts), RATCHET_METAL);
   m.position.y = core.height / 2;
   return m;
 }
@@ -286,7 +304,7 @@ export function ringMeshes(ring: Ring, color: number, base: number, glow = new M
     tier.push([Math.cos(a) * r, Math.sin(a) * r]);
   }
   const tierGeo = extrudeOutline(tier, halo ? ring.radius * 0.62 : 0.006, 0.0018).translate(0, thick, 0);
-  const bladeMesh = new Mesh(merge([bladeGeo, tierGeo]), new MeshMatcapMaterial({ matcap: CHROME }));
+  const bladeMesh = new Mesh(merge([bladeGeo, tierGeo]), BLADE_METAL);
   bladeMesh.position.y = base;
   const layerMesh = new Mesh(extrudeOutline(layer, CHIP_R * 0.9, 0.0025), new MeshMatcapMaterial({ matcap: makeMatcap('clay', color) }));
   layerMesh.position.y = base + thick + 0.0018;
@@ -366,8 +384,8 @@ export class TopView {
     this.spinner.add(...this.parts);
     this.root.add(this.spinner);
     this.shadow = new Mesh(
-      new CircleGeometry(ring.radius * 1.15, 24).rotateX(-Math.PI / 2),
-      new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false }),
+      new PlaneGeometry(ring.radius * 3.2, ring.radius * 3.2).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, opacity: 0.5, depthWrite: false }),
     );
     // One flying copy per part, sharing geometry and materials.
     for (const p of this.parts) {
@@ -394,8 +412,11 @@ export class TopView {
   dispose() {
     for (const p of [...this.parts, this.shadow, this.blur]) {
       p.geometry.dispose();
-      (p.material as MeshBasicMaterial).map?.dispose?.();
-      (p.material as MeshBasicMaterial).dispose();
+      // Shared materials and textures (metals, the emblem, the soft shadow) stay.
+      const m = p.material as MeshBasicMaterial;
+      if (m === (BLADE_METAL as unknown) || m === (RATCHET_METAL as unknown)) continue;
+      if (m.map && m.map !== EMBLEM && m.map !== SOFT_SHADOW) m.map.dispose();
+      m.dispose();
     }
     this.root.removeFromParent();
     this.shadow.removeFromParent();
@@ -512,15 +533,17 @@ const STONE = makeMatcap('clay', 0x9a948a);
 const FROST = makeMatcap('metal', 0xbfe0f2);
 
 const PALETTES: Record<Theme, Palette> = {
-  forge: { floor: 0xe9dfd0, pit: 0x4a3a33, wall: LIGHT_STEEL, rail: 0xd9a441, railHot: 0xfff0b0, accent: 0xff5a28, pedestal: 0x6f5a4c },
-  stone: { floor: 0xcdc5b8, pit: 0x3b3a40, wall: STONE, rail: 0x8fb7c9, railHot: 0xe6fbff, accent: 0x6fc7ff, pedestal: 0x6b665e },
-  clockwork: { floor: 0xeadcb8, pit: 0x4a3d2a, wall: BRASS, rail: 0x5fc9b8, railHot: 0xd8fff6, accent: 0xffc04a, pedestal: 0x7a6440 },
-  ice: { floor: 0xe4f4fb, pit: 0x34506a, wall: FROST, rail: 0x7fdcff, railHot: 0xffffff, accent: 0x8fe8ff, pedestal: 0x7d93a6 },
+  forge: { floor: 0x5b5f69, pit: 0x4a3a33, wall: LIGHT_STEEL, rail: 0xd9a441, railHot: 0xfff0b0, accent: 0xff5a28, pedestal: 0x6f5a4c },
+  stone: { floor: 0x606369, pit: 0x3b3a40, wall: STONE, rail: 0x8fb7c9, railHot: 0xe6fbff, accent: 0x6fc7ff, pedestal: 0x6b665e },
+  clockwork: { floor: 0x675d4d, pit: 0x4a3d2a, wall: BRASS, rail: 0x5fc9b8, railHot: 0xd8fff6, accent: 0xffc04a, pedestal: 0x7a6440 },
+  ice: { floor: 0x6a7f8f, pit: 0x34506a, wall: FROST, rail: 0x7fdcff, railHot: 0xffffff, accent: 0x8fe8ff, pedestal: 0x7d93a6 },
 };
 
 /** Wall heights (m) by wall type. */
 const WALL_HEIGHT: Record<Wall, number> = { low: 0.007, standard: 0.012, high: 0.028, none: 0 };
 const POCKET_REACH = 0.03;
+/** The floor ring (of 18) that carries the engraved groove. */
+const GROOVE = 11;
 
 /** Points along the rim from angle a0 to a1, pushed out (or in) by `offset`, at height y. */
 function rimPath(layout: ArenaLayout, a0: number, a1: number, offset: number, y: number) {
@@ -607,7 +630,7 @@ export class ArenaView {
   private palette!: Palette;
   private readonly base = new Color();
   private readonly warm = new Color(0xffa155);
-  private readonly cold = new Color(0x8f8576);
+  private readonly cold = new Color(0x2c3442);
   private readonly pit = new Color();
   private readonly ember = new Color(0xff4a12);
   private readonly tmp = new Color();
@@ -740,6 +763,14 @@ export class ArenaView {
       this.spinnerDisc = add(new Mesh(new CircleGeometry(center, 40).rotateX(-Math.PI / 2), mat));
     }
 
+    // A thin glowing line just inside the rim, at floor height, in the theme's accent.
+    const rimY = new Arena(layout).floorHeight(0.97) + 0.0008;
+    add(tube(rimPath(layout, 0, Math.PI * 2, -0.005, rimY), 0.0011, accent));
+    // A soft dark ring on the table where the pedestal stands, so the arena sits on it.
+    const ao = add(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), own(new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }))));
+    ao.scale.set(0.15 * 3.1 * (layout.radius / 0.15) * (layout.shape === 'square' ? 1.12 : 1), 1, 0.15 * 3.1 * (layout.radius / 0.15) * (layout.shape === 'oval' ? 0.78 : 1));
+    ao.position.y = -this.pedestalHeight + 0.0006;
+
     // Pedestal: the forge shell for forge arenas, a plain themed plinth for the others.
     const sx = layout.shape === 'square' ? 1.12 : 1;
     const sz = layout.shape === 'oval' ? 0.78 : sx;
@@ -845,6 +876,8 @@ export class ArenaView {
         if (dip > 0) this.tmp.lerp(this.pit, Math.min(1, dip) * 0.8);
         // Embers: outside the shrinking safe zone the floor glows, pulsing.
         if (n > safe) this.tmp.lerp(this.ember, 0.45 + 0.15 * Math.sin(this.time * 6));
+        // Brushed metal: faint alternating rings, and one engraved groove with a lit edge.
+        this.tmp.multiplyScalar(r === GROOVE ? 0.55 : r === GROOVE + 1 ? 1.18 : r % 2 ? 1.03 : 0.97);
         this.colors[i * 3] = this.tmp.r;
         this.colors[i * 3 + 1] = this.tmp.g;
         this.colors[i * 3 + 2] = this.tmp.b;

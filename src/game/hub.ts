@@ -24,12 +24,12 @@ import {
 } from '@iwsdk/core';
 import { playLocked, playPick, playRemove } from './audio.js';
 import type { Progress } from './progress.js';
-import { CYAN, glass, ORANGE, TEXT } from './ui.js';
+import { glass, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import type { ArenaLayout, Theme } from './layout.js';
 import type { TopBuild } from './parts.js';
-import { makeMatcap, TopView } from './visuals.js';
+import { makeMatcap, SOFT_SHADOW, TopView } from './visuals.js';
 
 export type HubAction = { kind: 'play' } | { kind: 'arena'; index: number } | { kind: 'forge' } | { kind: 'workshop' } | { kind: 'locked'; text: string };
 
@@ -54,9 +54,12 @@ const TAP_MOVE = 0.03;
 
 const THEME_COLOR: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff };
 const FLOOR_COLOR: Record<Theme, number> = { forge: 0xe8dcc4, stone: 0xb9b3a8, clockwork: 0xd9c9a3, ice: 0xdff1fa };
-const IRON = makeMatcap('metal', 0x5d6068);
-const DARK = makeMatcap('clay', 0x3a2f28);
-const WOOD = makeMatcap('clay', 0x8a5a36);
+const IRON = makeMatcap('metal', 0x6a707b);
+/** The forged-tech set: graphite bodies, light steel, brass trim, orange heat. */
+const GRAPHITE = makeMatcap('metal', 0x4a4e57);
+const STEEL = makeMatcap('metal', 0x8a909b);
+/** The table is this far below the arena floor (arena-local): props stand on the table itself. */
+const TABLE_Y = -0.04;
 const BRASS = makeMatcap('metal', 0xe2b866);
 
 interface Pickable {
@@ -123,7 +126,7 @@ export class Hub {
       this.anvilTop?.dispose();
       this.standTop = new TopView(build, build.color);
       this.standTop.root.scale.setScalar(1.1);
-      this.standTop.root.position.y = 0.06;
+      this.standTop.root.position.y = 0.1;
       this.standHolder.add(this.standTop.root);
       this.anvilTop = new TopView(build, build.color);
       this.anvilTop.root.scale.setScalar(1.3);
@@ -250,7 +253,7 @@ export class Hub {
 
   /** The arena shelf on the wall: planks for the miniatures and the blueprint at the end. */
   private buildShelf() {
-    const wood = new MeshMatcapMaterial({ matcap: WOOD });
+    const wood = new MeshMatcapMaterial({ matcap: GRAPHITE });
     for (let r = 0; r < 2; r++) {
       // A thin glowing ledge under each row.
       const plank = new Mesh(new BoxGeometry(WALL_MINI_GAP * WALL_ROW + 0.06, 0.008, 0.09), wood);
@@ -298,10 +301,10 @@ export class Hub {
 
   /** The anvil; your top turns on its face. */
   private buildAnvil() {
-    this.anvil.position.copy(ANVIL_AT);
+    this.anvil.position.set(ANVIL_AT.x, TABLE_Y, ANVIL_AT.z);
     const body = anvilModel();
     this.anvil.add(body);
-    this.label('FORGE', this.anvil, 0.17);
+    this.label('FORGE', this.anvil, 0.21);
     this.items.push({ action: { kind: 'forge' }, carry: false, model: body, home: new Vector3() });
   }
 
@@ -322,27 +325,30 @@ export class Hub {
     g.fillText(progress.rank.toUpperCase(), 190, 54);
     g.fillStyle = 'rgba(255,255,255,0.1)';
     g.fillRect(28, 100, 456, 20);
-    g.fillStyle = CYAN;
+    g.fillStyle = UI_STEEL;
     g.fillRect(28, 100, 456 * progress.fraction, 20);
     this.rankTex.needsUpdate = true;
   }
 
   private buildStand() {
-    this.stand.position.copy(STAND_AT);
+    this.stand.position.set(STAND_AT.x, TABLE_Y, STAND_AT.z);
     this.rankCanvas.width = 512;
     this.rankCanvas.height = 150;
     this.rankTex = new CanvasTexture(this.rankCanvas);
     this.rankTex.colorSpace = SRGBColorSpace;
     const rank = new Mesh(new PlaneGeometry(0.1, 0.029), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
-    rank.position.set(0, 0.17, 0);
+    rank.position.set(0, 0.21, 0);
     rank.rotation.x = -0.3;
     this.stand.add(rank);
-    const stem = new Mesh(new CylinderGeometry(0.008, 0.016, 0.05, 16), new MeshMatcapMaterial({ matcap: DARK }));
-    stem.position.y = 0.025;
+    // An octagonal graphite post with a glowing seam and a brass cup on top.
+    const stem = new Mesh(new CylinderGeometry(0.011, 0.02, 0.09, 8), new MeshMatcapMaterial({ matcap: GRAPHITE }));
+    stem.position.y = 0.045;
+    const seam = new Mesh(new TorusGeometry(0.0125, 0.0016, 6, 24).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: ORANGE }));
+    seam.position.y = 0.088;
     const cup = new Mesh(new TorusGeometry(0.016, 0.003, 8, 32).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
-    cup.position.y = 0.052;
-    this.stand.add(stem, cup);
-    this.label('PLAY', this.stand, 0.11);
+    cup.position.y = 0.092;
+    this.stand.add(stem, seam, cup, softShadow(0.06));
+    this.label('PLAY', this.stand, 0.15);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
     this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3() });
@@ -362,7 +368,7 @@ export function miniArena(layout: ArenaLayout, current: boolean): Group {
   const g = new Group();
   outer.add(g);
   const square = layout.shape === 'square';
-  const base = new Mesh(new CylinderGeometry(MINI_R + 0.004, MINI_R + 0.006, 0.014, square ? 4 : 32, 1), new MeshMatcapMaterial({ matcap: DARK }));
+  const base = new Mesh(new CylinderGeometry(MINI_R + 0.004, MINI_R + 0.006, 0.014, square ? 4 : 32, 1), new MeshMatcapMaterial({ matcap: GRAPHITE }));
   base.position.y = 0.007;
   const floor = new Mesh(new CircleGeometry(MINI_R, square ? 4 : 32).rotateX(-Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', FLOOR_COLOR[layout.theme]) }));
   floor.position.y = 0.0142;
@@ -382,32 +388,49 @@ export function miniArena(layout: ArenaLayout, current: boolean): Group {
 }
 
 /** Height of the anvil's face (m): a top set on the anvil stands here. */
-export const ANVIL_FACE = 0.1035;
+export const ANVIL_FACE = 0.1435;
 
-/** An iron anvil with a horn on a wooden block, a glow on its face and a hammer leaning on it. */
+/**
+ * The anvil, standing on the table: a steel anvil with a horn on an octagonal graphite plinth with
+ * a brass band and a glowing seam, heat on its face and a hammer leaning on it.
+ */
 export function anvilModel(): Group {
   const iron = new MeshMatcapMaterial({ matcap: IRON });
-  const block = new Mesh(new CylinderGeometry(0.05, 0.055, 0.035, 20), new MeshMatcapMaterial({ matcap: WOOD }));
-  block.position.y = 0.0175;
+  const graphite = new MeshMatcapMaterial({ matcap: GRAPHITE });
+  const plinth = new Mesh(new CylinderGeometry(0.048, 0.056, 0.075, 8), graphite);
+  plinth.position.y = 0.0375;
+  const band = new Mesh(new TorusGeometry(0.049, 0.003, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshMatcapMaterial({ matcap: BRASS }));
+  band.position.y = 0.071;
+  const seam = new Mesh(new TorusGeometry(0.053, 0.0015, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshBasicMaterial({ color: ORANGE }));
+  seam.position.y = 0.012;
   const foot = new Mesh(new BoxGeometry(0.09, 0.016, 0.06), iron);
-  foot.position.y = 0.043;
+  foot.position.y = 0.083;
   const waist = new Mesh(new BoxGeometry(0.05, 0.03, 0.035), iron);
-  waist.position.y = 0.066;
-  const face = new Mesh(new BoxGeometry(0.11, 0.022, 0.05), iron);
-  face.position.y = 0.092;
+  waist.position.y = 0.106;
+  const face = new Mesh(new BoxGeometry(0.11, 0.022, 0.05), new MeshMatcapMaterial({ matcap: STEEL }));
+  face.position.y = 0.132;
   const horn = new Mesh(new ConeGeometry(0.02, 0.06, 16).rotateZ(Math.PI / 2), iron);
-  horn.position.set(-0.084, 0.092, 0);
+  horn.position.set(-0.084, 0.132, 0);
   const glow = new Mesh(new CircleGeometry(0.03, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0.5 }));
   glow.position.y = ANVIL_FACE;
   const hammer = new Group();
-  const handle = new Mesh(new CylinderGeometry(0.004, 0.005, 0.09, 10), new MeshMatcapMaterial({ matcap: WOOD }));
+  const handle = new Mesh(new CylinderGeometry(0.004, 0.005, 0.09, 8), graphite);
   handle.position.y = 0.045;
-  const head = new Mesh(new BoxGeometry(0.034, 0.016, 0.016), iron);
+  const ferrule = new Mesh(new CylinderGeometry(0.0055, 0.0055, 0.008, 8), new MeshMatcapMaterial({ matcap: BRASS }));
+  ferrule.position.y = 0.082;
+  const head = new Mesh(new BoxGeometry(0.034, 0.016, 0.016), new MeshMatcapMaterial({ matcap: STEEL }));
   head.position.y = 0.09;
-  hammer.add(handle, head);
-  hammer.position.set(0.06, 0, 0.04);
-  hammer.rotation.z = 0.35;
+  hammer.add(handle, ferrule, head);
+  hammer.position.set(0.075, 0, 0.045);
+  hammer.rotation.z = 0.3;
   const g = new Group();
-  g.add(block, foot, waist, face, horn, glow, hammer);
+  g.add(plinth, band, seam, foot, waist, face, horn, glow, hammer, softShadow(0.16));
   return g;
+}
+
+/** A soft round shadow on the table under a prop (size in m, arena-local). */
+function softShadow(size: number): Mesh {
+  const m = new Mesh(new PlaneGeometry(size, size).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, opacity: 0.55, depthWrite: false }));
+  m.position.y = 0.0005;
+  return m;
 }
