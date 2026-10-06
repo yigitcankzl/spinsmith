@@ -559,6 +559,8 @@ export class MatchSystem extends createSystem({
     this.hub.show(this.arenas, this.arenaIndex, this.myBuild, this.progress, this.order);
     if (import.meta.env.DEV) console.log(`[ORDER] today ${this.order.date}: ${this.order.text} in ${this.order.arena}${this.progress.hasOrder(this.order.date) ? ' (done)' : ''} · ${this.progress.stamps} stamps`);
     this.label.set('');
+    // A message still timing out must not wipe the note set below.
+    this.labelTimer = 0;
     this.bar.mesh.visible = false;
     // The first session says where to reach next.
     const guide = this.progress.guide;

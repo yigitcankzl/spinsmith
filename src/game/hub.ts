@@ -136,6 +136,8 @@ export class Hub {
   private time = 0;
   /** The first session: every station shows its name. */
   private teaching = true;
+  /** The blueprint, its cradle and name: the workshop comes after the first match. */
+  private blueprint = new Group();
   /** Starting over: the hand holding the level plate and for how long, then a short window to confirm. */
   private hold: { hand: HandState; t: number } | null = null;
   private armed = 0;
@@ -177,6 +179,7 @@ export class Hub {
     const first = progress.matches === 0;
     this.shelf.visible = !first;
     this.anvil.visible = !first;
+    this.blueprint.visible = !first;
     // Every unfinished guide step points somewhere: the dock to play, the anvil for the new part.
     this.beacon.visible = progress.guide !== 'done';
     this.teaching = progress.guide !== 'done';
@@ -396,7 +399,8 @@ export class Hub {
     const build = tag('BUILD', 0.07, 46);
     build.position.set(home.x, home.y + 0.035, home.z);
     this.labels.push(build);
-    this.root.add(cradle, holder, build);
+    this.blueprint.add(cradle, holder, build);
+    this.root.add(this.blueprint);
     this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home, name: build });
   }
 
