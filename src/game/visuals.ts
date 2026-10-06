@@ -11,14 +11,15 @@ import {
   CylinderGeometry,
   DataTexture,
   DoubleSide,
+  ExtrudeGeometry,
   Float32BufferAttribute,
   Group,
   InstancedMesh,
-  LatheGeometry,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshMatcapMaterial,
+  Path,
   PlaneGeometry,
   Points,
   PointsMaterial,
@@ -26,6 +27,7 @@ import {
   RepeatWrapping,
   RingGeometry,
   SphereGeometry,
+  Shape,
   SRGBColorSpace,
   TorusGeometry,
   TubeGeometry,
@@ -45,7 +47,7 @@ import type { Core, Ring, TipShape, TopBuild } from './parts.js';
  * and no dependency on real-room reflections we cannot capture.
  */
 
-type MatcapKind = 'clay' | 'metal';
+type MatcapKind = 'clay' | 'metal' | 'chrome';
 
 /** Builds a 128x128 matcap: soft diffuse clay, or bright studio-strip metal. */
 export function makeMatcap(kind: MatcapKind, hex: number): DataTexture {
@@ -68,6 +70,17 @@ export function makeMatcap(kind: MatcapKind, hex: number): DataTexture {
         r = base.r * k + rim;
         g = base.g * k + rim;
         b = base.b * k + rim;
+      } else if (kind === 'chrome') {
+        // Polished die-cast metal: faces toward the eye mid grey, a bright strip above, a dark
+        // band below it, and edges catching the light.
+        const ry = 2 * z * y;
+        let env = 0.5 + 0.28 * ry;
+        env -= 0.32 * Math.exp(-(((ry + 0.25) / 0.12) ** 2));
+        env += 0.85 * Math.exp(-(((ry - 0.45) / 0.08) ** 2));
+        env += 0.7 * (1 - z) ** 2;
+        r = base.r * env + 0.1 * env ** 4;
+        g = base.g * env + 0.1 * env ** 4;
+        b = base.b * env + 0.1 * env ** 4;
       } else {
         // Reflection direction's vertical component picks a bright studio strip.
         const ry = 2 * z * y;
@@ -93,30 +106,23 @@ export function makeMatcap(kind: MatcapKind, hex: number): DataTexture {
   return tex;
 }
 
-/** Vertical stripes around the body so spin speed is readable at a glance. */
-function stripeTexture(): CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 64;
-  c.height = 4;
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#ffffff';
-  g.fillRect(0, 0, 64, 4);
-  g.fillStyle = '#c9c0b6';
-  for (let i = 0; i < 4; i++) g.fillRect(i * 16, 0, 5, 4);
-  const t = new CanvasTexture(c);
-  t.wrapS = RepeatWrapping;
-  t.colorSpace = SRGBColorSpace;
-  return t;
-}
-
 const LIGHT_STEEL = makeMatcap('metal', 0xc8ccd6);
 const BRASS = makeMatcap('metal', 0xe2b866);
-const STRIPES = stripeTexture();
 
-/** Tip height (m); the core band sits on the tip and the ring on the core. */
-const TIP_H = 0.005;
-const NEEDLE_H = 0.008;
-const DARK_STEEL = makeMatcap('metal', 0x6d6f78);
+/**
+ * Tops in the style of modern battle tops: a chrome blade with sharp contact points, a colored
+ * plastic layer and an emblem chip on top, a dark ratchet below, and a bit with a gear ring and
+ * the tip. Every part is generated here from the part's numbers.
+ */
+const CHROME = makeMatcap('chrome', 0xe8eef8);
+const RATCHET = makeMatcap('clay', 0x2c2e34);
+/** Bit: the tip below a gear ring that catches the rails. */
+const GEAR_H = 0.003;
+const GEAR_R = 0.0088;
+const TIP_H: Record<TipShape, number> = { flat: 0.004, rush: 0.0045, taper: 0.005, ball: 0.0045, needle: 0.007, orb: 0.005 };
+/** Chip on top: a dome in the body color with a glowing emblem that heats as spin drains. */
+const CHIP_R = 0.0095;
+const EMBLEM = emblemTexture();
 
 /** Merges geometries (positions and normals only) into one, so a part stays one mesh. */
 function merge(parts: BufferGeometry[]): BufferGeometry {
@@ -136,76 +142,168 @@ function merge(parts: BufferGeometry[]): BufferGeometry {
   return out;
 }
 
-export function tipHeight(tip: TipShape) {
-  return tip === 'needle' ? NEEDLE_H : TIP_H;
+/** A spark emblem (four-point star in a ring), white on transparent, tinted by its material. */
+function emblemTexture(): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  g.strokeStyle = g.fillStyle = '#ffffff';
+  g.lineWidth = 9;
+  g.beginPath();
+  g.arc(64, 64, 52, 0, Math.PI * 2);
+  g.stroke();
+  g.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? 44 : 11;
+    g.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r);
+  }
+  g.closePath();
+  g.fill();
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
 }
 
-/** The tip, standing on y = 0. */
-export function tipMesh(tip: TipShape): Mesh {
-  const h = tipHeight(tip);
-  const mat = new MeshMatcapMaterial({ matcap: tip === 'ball' || tip === 'orb' ? BRASS : LIGHT_STEEL });
-  let g: BufferGeometry;
-  if (tip === 'flat') g = new CylinderGeometry(0.008, 0.0065, h, 20);
-  else if (tip === 'rush') g = new CylinderGeometry(0.0075, 0.0045, h, 20);
-  else if (tip === 'taper') g = new CylinderGeometry(0.0075, 0.0025, h, 20);
-  else if (tip === 'ball') g = new SphereGeometry(h / 2 + 0.0005, 16, 12);
-  else if (tip === 'orb') g = new SphereGeometry(h / 2 + 0.0018, 16, 12);
-  else g = new ConeGeometry(0.006, h, 20).rotateX(Math.PI);
-  const m = new Mesh(g, mat);
+/** Full height of a bit (tip + gear ring). */
+export function tipHeight(tip: TipShape) {
+  return TIP_H[tip] + GEAR_H;
+}
+
+/** The bit: tip and gear ring, standing on y = 0. */
+export function tipMesh(tip: TipShape, color = 0xe9e6df): Mesh {
+  const h = TIP_H[tip];
+  const parts: BufferGeometry[] = [];
+  if (tip === 'flat') parts.push(new CylinderGeometry(0.0072, 0.0062, h, 24));
+  else if (tip === 'rush') parts.push(new CylinderGeometry(0.0072, 0.0042, h, 24));
+  else if (tip === 'taper') parts.push(new CylinderGeometry(0.0072, 0.0018, h, 24));
+  else if (tip === 'ball') parts.push(new SphereGeometry(0.0045, 16, 12).translate(0, 0.0005, 0), new CylinderGeometry(0.0072, 0.004, h * 0.5, 24).translate(0, h * 0.25, 0));
+  else if (tip === 'orb') parts.push(new SphereGeometry(0.0062, 18, 12).scale(1, 0.75, 1).translate(0, 0.0005, 0), new CylinderGeometry(0.0072, 0.006, h * 0.4, 24).translate(0, h * 0.3, 0));
+  else parts.push(new ConeGeometry(0.0055, h, 20).rotateX(Math.PI));
+  // The gear ring: twelve teeth that catch the rails.
+  parts.push(new CylinderGeometry(GEAR_R, GEAR_R, GEAR_H, 24).translate(0, h / 2 + GEAR_H / 2, 0));
+  for (let i = 0; i < 12; i++) {
+    parts.push(new BoxGeometry(0.0022, GEAR_H, 0.0016).translate(GEAR_R + 0.0008, h / 2 + GEAR_H / 2, 0).rotateY((i / 12) * Math.PI * 2));
+  }
+  const m = new Mesh(merge(parts), new MeshMatcapMaterial({ matcap: makeMatcap('clay', color) }));
   m.position.y = h / 2;
   return m;
 }
 
-/** The core band: a dark steel collar whose height is the core's, with one notch per lock tooth. */
+/** The ratchet: a dark collar as tall as the core, with one protrusion per lock tooth. */
 export function coreMesh(core: Core): Mesh {
-  const r = 0.0095;
-  const parts: BufferGeometry[] = [new CylinderGeometry(r, r, core.height, 24)];
+  const r = 0.0105;
+  const parts: BufferGeometry[] = [new CylinderGeometry(r, r * 0.92, core.height, 28)];
   for (let i = 0; i < core.teeth; i++) {
     const a = (i / core.teeth) * Math.PI * 2;
-    parts.push(new BoxGeometry(0.002, core.height * 0.7, 0.0025).translate(r, 0, 0).rotateY(a));
+    parts.push(new BoxGeometry(0.004, core.height * 0.85, 0.0035).translate(r + 0.0012, 0, 0).rotateY(a));
   }
-  const m = new Mesh(merge(parts), new MeshMatcapMaterial({ matcap: DARK_STEEL }));
+  const m = new Mesh(merge(parts), new MeshMatcapMaterial({ matcap: RATCHET }));
   m.position.y = core.height / 2;
   return m;
 }
 
-/** Contact blades around the ring, shaped by the contact style. */
-function bladesGeometry(ring: Ring, base: number): BufferGeometry | null {
-  if (ring.blades === 0) return null;
-  const widest = ring.profile.reduce((a, b) => (b[0] > a[0] ? b : a));
-  const r = widest[0];
-  const y = base + widest[1];
-  const out: BufferGeometry[] = [];
-  for (let i = 0; i < ring.blades; i++) {
-    const a = (i / ring.blades) * Math.PI * 2;
-    let g: BufferGeometry;
-    if (ring.contact === 'grind') g = new BoxGeometry(0.003, 0.004, 0.003).translate(r + 0.001, 0, 0);
-    else if (ring.id === 'saw') g = new ConeGeometry(0.0022, 0.005, 4).rotateZ(-Math.PI / 2).translate(r + 0.002, 0, 0);
-    else {
-      // A fin: sloped down for smash, up for upper.
-      g = new BoxGeometry(0.008, 0.0025, 0.007)
-        .rotateZ(ring.contact === 'upper' ? 0.45 : -0.45)
-        .translate(r + 0.002, 0, 0);
+/** Outline radius of a ring's blade at angle a: the contact points around a round body. */
+function bladeRadius(ring: Ring, a: number): number {
+  const R = ring.radius;
+  const n = ring.blades || (ring.id === 'anvil' ? 6 : 1);
+  const u = (((a * n) / (Math.PI * 2)) % 1 + 1) % 1;
+  switch (ring.id) {
+    case 'striker': {
+      // Three swept swords: a long rise to a sharp point, then a sheer drop.
+      const R0 = R * 0.52;
+      return R0 + (R - R0) * (u < 0.8 ? Math.pow(u / 0.8, 2.2) : Math.pow((1 - u) / 0.2, 0.5));
     }
-    out.push(g.rotateY(a).translate(0, y, 0));
+    case 'hook': {
+      const R0 = R * 0.6;
+      return R0 + (R - R0) * Math.pow(u < 0.65 ? u / 0.65 : (1 - u) / 0.35, 0.8);
+    }
+    case 'anvil': {
+      // Six heavy rounded lobes.
+      const R0 = R * 0.86;
+      return R0 + (R - R0) * Math.pow(0.5 + 0.5 * Math.cos(u * Math.PI * 2), 0.5);
+    }
+    case 'saw': {
+      const R0 = R * 0.84;
+      return R0 + (R - R0) * u;
+    }
+    case 'cog': {
+      const R0 = R * 0.88;
+      return u > 0.15 && u < 0.55 ? R : R0;
+    }
+    default:
+      return R;
   }
-  return merge(out);
 }
 
-/** The ring's meshes (body, metal band, blades), with its bottom at y = base. */
-export function ringMeshes(ring: Ring, color: number, base: number): Mesh[] {
-  const body = new Mesh(
-    new LatheGeometry(ring.profile.map(([r, h]) => new Vector2(r, h + base)), 40),
-    new MeshMatcapMaterial({ matcap: makeMatcap('clay', color), map: STRIPES }),
-  );
-  const metal = new MeshMatcapMaterial({ matcap: ring.contact === 'absorb' ? BRASS : LIGHT_STEEL });
-  const widest = ring.profile.reduce((a, b) => (b[0] > a[0] ? b : a));
-  const band = new Mesh(new TorusGeometry(widest[0], 0.0028, 8, 40).rotateX(Math.PI / 2), metal);
-  band.position.y = base + widest[1];
-  const out: Mesh[] = [body, band];
-  const blades = bladesGeometry(ring, base);
-  if (blades) out.push(new Mesh(blades, metal));
-  return out;
+/** Contact slope: upper blades rise toward their points, smash blades lean down. */
+const BLADE_SLOPE: Record<string, number> = { hook: 0.45, striker: -0.22, saw: -0.15 };
+
+/** A flat outline extruded upward from y = 0 (shape points are (x, z) pairs). */
+function extrudeOutline(points: [number, number][], hole: number, depth: number): BufferGeometry {
+  const shape = new Shape(points.map(([x, z]) => new Vector2(x, -z)));
+  const h = new Path();
+  h.absarc(0, 0, hole, 0, Math.PI * 2, true);
+  shape.holes.push(h);
+  const g = new ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.0006, bevelSize: 0.0005, bevelSegments: 2, curveSegments: 24 });
+  return g.rotateX(-Math.PI / 2);
+}
+
+/** The ring's meshes (chrome blade, colored layer, emblem chip), with its bottom at y = base. */
+export function ringMeshes(ring: Ring, color: number, base: number, glow = new MeshBasicMaterial({ color: 0xffb347 })): Mesh[] {
+  const steps = 240;
+  const blade: [number, number][] = [];
+  const layer: [number, number][] = [];
+  const halo = ring.id === 'halo';
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const r = bladeRadius(ring, a);
+    blade.push([Math.cos(a) * r, Math.sin(a) * r]);
+    // The plastic layer is a smaller star of the same outline, so the chrome blade dominates.
+    const lr = halo ? ring.radius * 0.66 : CHIP_R * 1.15 + (r - ring.radius * 0.6) * 0.9;
+    layer.push([Math.cos(a) * lr, Math.sin(a) * lr]);
+  }
+  const thick = ring.id === 'anvil' ? 0.007 : halo ? 0.004 : 0.005;
+  const bladeGeo = extrudeOutline(blade, halo ? ring.radius * 0.6 : 0.006, thick);
+  // Tilt the contact points up (upper) or down (smash) by how far out they reach.
+  const slope = BLADE_SLOPE[ring.id] ?? 0;
+  if (slope !== 0) {
+    const pos = bladeGeo.getAttribute('position');
+    const R0 = ring.radius * 0.7;
+    for (let i = 0; i < pos.count; i++) {
+      const r = Math.hypot(pos.getX(i), pos.getZ(i));
+      if (r > R0) pos.setY(i, pos.getY(i) + slope * (r - R0));
+    }
+    bladeGeo.computeVertexNormals();
+  }
+  // A raised inner tier, turned half a blade, so the chrome reads as layered and faceted.
+  const n = ring.blades || 6;
+  const tier: [number, number][] = [];
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const r = halo ? ring.radius * 0.8 : ring.radius * 0.42 + (bladeRadius(ring, a + Math.PI / n) - ring.radius * 0.5) * 0.55;
+    tier.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  const tierGeo = extrudeOutline(tier, halo ? ring.radius * 0.62 : 0.006, 0.0018).translate(0, thick, 0);
+  const bladeMesh = new Mesh(merge([bladeGeo, tierGeo]), new MeshMatcapMaterial({ matcap: CHROME }));
+  bladeMesh.position.y = base;
+  const layerMesh = new Mesh(extrudeOutline(layer, CHIP_R * 0.9, 0.0025), new MeshMatcapMaterial({ matcap: makeMatcap('clay', color) }));
+  layerMesh.position.y = base + thick + 0.0018;
+  // The chip: a dome in a lighter body color, the emblem glowing on top.
+  const light = new Color(color).lerp(new Color(0xffffff), 0.35).getHex();
+  const dome = new Mesh(new SphereGeometry(CHIP_R, 24, 10, 0, Math.PI * 2, 0, Math.PI * 0.32), new MeshMatcapMaterial({ matcap: makeMatcap('metal', light) }));
+  const domeTop = base + thick + 0.0018 + 0.0025;
+  dome.position.y = domeTop - CHIP_R * Math.cos(Math.PI * 0.32);
+  glow.map = EMBLEM;
+  glow.transparent = true;
+  const emblem = new Mesh(new CircleGeometry(CHIP_R * 0.85, 24).rotateX(-Math.PI / 2), glow);
+  emblem.position.y = domeTop + CHIP_R * (1 - Math.cos(Math.PI * 0.32)) + 0.0003;
+  return [bladeMesh, layerMesh, dome, emblem];
+}
+
+/** Top of a build above its tip (m). */
+function topHeight(ring: Ring, base: number) {
+  return base + (ring.id === 'anvil' ? 0.007 : ring.id === 'halo' ? 0.004 : 0.005) + 0.0043;
 }
 
 export const PLAYER_COLOR = 0xd6784f;
@@ -234,6 +332,7 @@ export class TopView {
   private debrisAge = 0;
   private burst = false;
   private core: MeshBasicMaterial;
+  private blur: Mesh;
   private shadow: Mesh;
   private readonly hot = new Color(0xff5a14);
   private readonly cool = new Color(0xffb347);
@@ -244,16 +343,20 @@ export class TopView {
   constructor(build: TopBuild, color: number) {
     const ring = ringOf(build);
     const core = coreOf(build);
-    const tip = tipMesh(build.tip);
-    const collar = coreMesh(core);
-    collar.position.y += tipHeight(build.tip);
+    const bit = tipMesh(build.tip);
+    const ratchet = coreMesh(core);
+    ratchet.position.y += tipHeight(build.tip);
     const base = tipHeight(build.tip) + core.height;
-    const [body, band, ...blades] = ringMeshes(ring, color, base);
     this.core = new MeshBasicMaterial({ color: this.cool.clone() });
-    const top = base + ring.profile[ring.profile.length - 1][1];
-    const glow = new Mesh(new CircleGeometry(ring.profile[ring.profile.length - 2][0] * 0.55, 24).rotateX(-Math.PI / 2), this.core);
-    glow.position.y = top + 0.0005;
-    this.parts = [body, tip, collar, band, glow, ...blades];
+    const ringParts = ringMeshes(ring, color, base, this.core);
+    this.parts = [...ringParts, ratchet, bit];
+    // A blur halo in the body color at the blade's height, bright while spinning fast.
+    this.blur = new Mesh(
+      new RingGeometry(ring.radius * 0.5, ring.radius * 1.12, 48).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.4), transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
+    );
+    this.blur.position.y = topHeight(ring, base) - 0.002;
+    this.root.add(this.blur);
     this.spinner.add(...this.parts);
     this.root.add(this.spinner);
     this.shadow = new Mesh(
@@ -271,7 +374,7 @@ export class TopView {
 
   /** Frees the GPU buffers when the top is rebuilt with other parts. */
   dispose() {
-    for (const p of [...this.parts, this.shadow]) {
+    for (const p of [...this.parts, this.shadow, this.blur]) {
       p.geometry.dispose();
       (p.material as MeshBasicMaterial).map?.dispose?.();
       (p.material as MeshBasicMaterial).dispose();
@@ -326,6 +429,8 @@ export class TopView {
       this.fallX = -az / l;
     }
     this.core.color.copy(this.cool).lerp(this.hot, top.wobble);
+    const blur = this.blur.material as MeshBasicMaterial;
+    blur.opacity = top.state === 'spinning' ? 0.28 * Math.min(1, Math.max(0, top.spin)) : 0;
   }
 
   /** Burst: the parts fly apart, tumble, bounce on the floor and fade out. */

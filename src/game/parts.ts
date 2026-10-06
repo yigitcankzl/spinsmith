@@ -21,9 +21,7 @@ export interface Ring {
   drain: number;
   /** Grams, against the weight limit. */
   weight: number;
-  /** Body silhouette as (radius, height) pairs from the bottom up, heights relative to the core top. */
-  profile: [number, number][];
-  /** Contact blades around the rim (count and style), drawn as small fins. */
+  /** Contact points around the blade (0 = a round blade).*/
   blades: number;
   blurb: string;
 }
@@ -72,15 +70,6 @@ export const RINGS: Ring[] = [
     chip: 1,
     drain: 1,
     weight: 24,
-    profile: [
-      [0.008, 0],
-      [0.02, 0.003],
-      [0.024, 0.007],
-      [0.022, 0.011],
-      [0.012, 0.014],
-      [0.011, 0.02],
-      [0, 0.02],
-    ],
     blades: 3,
     blurb: 'Smash: hits hard, bounces hard',
   },
@@ -95,14 +84,6 @@ export const RINGS: Ring[] = [
     chip: 1,
     drain: 1,
     weight: 23,
-    profile: [
-      [0.009, 0],
-      [0.025, 0.002],
-      [0.023, 0.006],
-      [0.016, 0.01],
-      [0.011, 0.016],
-      [0, 0.016],
-    ],
     blades: 3,
     blurb: 'Upper: lifts tops over walls',
   },
@@ -117,15 +98,6 @@ export const RINGS: Ring[] = [
     chip: 1,
     drain: 1,
     weight: 30,
-    profile: [
-      [0.01, 0],
-      [0.026, 0.003],
-      [0.03, 0.008],
-      [0.03, 0.014],
-      [0.02, 0.018],
-      [0.016, 0.023],
-      [0, 0.023],
-    ],
     blades: 0,
     blurb: 'Absorb: heavy, shrugs off hits',
   },
@@ -140,15 +112,6 @@ export const RINGS: Ring[] = [
     chip: 1,
     drain: 0.92,
     weight: 27,
-    profile: [
-      [0.003, 0],
-      [0.012, 0.004],
-      [0.025, 0.01],
-      [0.027, 0.014],
-      [0.014, 0.02],
-      [0.012, 0.028],
-      [0, 0.028],
-    ],
     blades: 0,
     blurb: 'Mass on the rim: spins long',
   },
@@ -163,15 +126,6 @@ export const RINGS: Ring[] = [
     chip: 1.45,
     drain: 1,
     weight: 25,
-    profile: [
-      [0.009, 0],
-      [0.022, 0.003],
-      [0.026, 0.007],
-      [0.024, 0.01],
-      [0.013, 0.014],
-      [0.011, 0.019],
-      [0, 0.019],
-    ],
     blades: 6,
     blurb: 'Many small teeth: chips toward a burst',
   },
@@ -186,15 +140,6 @@ export const RINGS: Ring[] = [
     chip: 1,
     drain: 0.965,
     weight: 26,
-    profile: [
-      [0.009, 0],
-      [0.024, 0.004],
-      [0.026, 0.008],
-      [0.026, 0.012],
-      [0.014, 0.016],
-      [0.012, 0.021],
-      [0, 0.021],
-    ],
     blades: 12,
     blurb: 'Grind: steals spin from opposite spin',
   },
