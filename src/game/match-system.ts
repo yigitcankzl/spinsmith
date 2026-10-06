@@ -21,9 +21,9 @@ const PEDESTAL = 0.08;
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = 2;
 /** How far in front of the seated player's head the arena goes (m, horizontal). */
-const REACH = 0.55;
+const REACH = 0.6;
 /** Without a table the arena floats on a tray this far below the head. */
-const TRAY_DROP = 0.5;
+const TRAY_DROP = 0.35;
 const TABLE_MIN_H = 0.45;
 const TABLE_MAX_H = 1.15;
 const TABLE_MAX_DIST = 1.6;
@@ -221,7 +221,9 @@ export class MatchSystem extends createSystem({
     this.root.name = 'spinsmith-arena';
     this.reticle.visible = false;
     this.root.visible = false;
-    this.label.mesh.position.set(0, 0.17, -0.03);
+    // Messages hang small over the arena's far rim, never between the eyes and the tops.
+    this.label.mesh.position.set(0, 0.1, -0.2);
+    this.label.mesh.scale.setScalar(0.8);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
     this.stage.add(
