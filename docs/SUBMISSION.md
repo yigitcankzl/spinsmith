@@ -12,9 +12,10 @@ submission form; the hosted link, cover image and video come later.
 SpinSmith is a seated, hands-first mixed reality spinning-top battler. Your arena sits on your
 real table; everything you do in it, you do with your hands.
 
-**Forge.** At the anvil you build your top from three parts: a metal ring that decides how it
+**Forge.** Pinch the small anvil and the arena turns into a forge: the floor sinks, an anvil rises
+with your top on it and drawers slide out of the rim. There you build your top from three parts: a metal ring that decides how it
 hits, a core that sets its height and how hard it is to burst, and a tip that decides how it
-moves. Pinch a part from the wall and press it onto the top; the stats change as it clicks in.
+moves. Pinch a part from the drawer and press it onto the top; the stats change as it clicks in.
 Six rings, four cores and six tips make 136 legal builds, and each one plays differently:
 Striker smashes, Anvil absorbs, Needle outlasts.
 
@@ -45,14 +46,16 @@ shaper wins about six in ten against an equal rival while random shaping does no
 ## Hands-first interaction
 
 - **No controllers, no menus to aim at.** Every action is a pinch, a pull or a press on an object:
-  the part on the wall, the top on the stand, the floor of the arena.
+  the part in the drawer, the top in its dock, the floor of the arena. The arena, the forge and
+  the score are one machine on the table, so the hands never switch between touching and pointing.
 - **Pinch and pull to launch:** the rip is the motion of pulling a cord, with arrows showing the
   direction the first time.
 - **Pinch, lift and pull to ramp:** the position locks when the pinch starts, a ghost shows the
   ramp before you let go, and release commits it. Far shapes use the hand ray with the same lock,
   so tracking jitter never moves them.
 - **Press to well:** a fingertip pressed into the arena floor.
-- **Seated:** the arena, the anvil and the stand all sit within a seated player's reach.
+- **Seated:** everything touched sits within a seated arm's reach (about 0.45 m); only the
+  score and the stats, which are read, sit on the far rim.
 - **Forgiving by design:** tracking loss shorter than a tenth of a second is ignored, and a lost
   hand cancels a half-made shape instead of committing it.
 
@@ -64,7 +67,7 @@ reshape the arena to win.*
 | Time | Shot | On screen |
 |---|---|---|
 | 0:00-0:08 | Over the shoulder: a real table, the arena appears on it | Title: SpinSmith |
-| 0:08-0:18 | Hands pinch a tip from the wall and press it onto the top | "Forge it by hand" |
+| 0:08-0:18 | The arena transforms into the forge; hands pinch a tip from the drawer and press it onto the top | "Forge it by hand" |
 | 0:18-0:28 | Pinch and pull back; the top rips into the arena | "Rip it into your real table" |
 | 0:28-0:40 | Pinch the floor, lift and pull: a ramp throws the rival into a pocket | "Reshape the arena to win" · YOUR RAMP → POCKET |
 | 0:40-0:45 | XP fills, LEVEL 2, a new part spins over the arena | Rematch |

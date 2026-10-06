@@ -116,3 +116,25 @@ any of these. Everything stays **pinch, carry, drop into a slot**.
   one side.
 - **The workshop** keeps the wall; two styles side by side until the builder moves to the rim
   too (out of scope now).
+
+---
+
+## 6. Status (Oct 6, 2026): steps 1-7 done
+
+| Step | Result |
+|---|---|
+| 1 Near-rim tray | Four engraved tabs on the near rim (Ring, Core, Tip, Style); the open drawer's parts (at most six) on pedestals in a half circle around the anvil, about 9 cm apart in the world. Presets left the forge |
+| 2 Anvil at the near third | The forge's anvil (1.35x the home one) stands at arena-local z 0.06, your top 1.7x on it, about 0.5 m from the eyes; the quench slot beside it on the right. Let go of the top anywhere and it settles back on the anvil |
+| 3 Stats on the far rim | A machined plate with the build engraved, weight against the limit and five dials; a second needle previews a part (green gain, red loss) |
+| 4 Wall catalog removed | The wall only shows for the arena workshop; its forge mode is gone |
+| 5 Hub merge | The stand is now a dock on the near rim's left, the forge a small anvil on its right, the level plate between them; notes hang over the far rim's left, the arena shelf to its right; the beacon marks the dock or the anvil |
+| 6 Transformation | 0.8 s open: the floor sinks 3 cm, the anvil rises out of it, the tabs and tray slide out, the stats plate rises; a mechanical rumble. Saving folds it back in 0.4 s |
+| 7 Match bar | A machined strip set into the far rim, tipped toward the player, under the round messages |
+
+Draw calls (IWER, most parts unlocked): hub 228 → 196, forge 188 → 162, fight 108, workshop 118.
+The first-session flow from a clean save runs end to end: dock → match → XP and unlocks → small
+anvil → Tip drawer open with Rush pulsing → fit → quench → dock for the rematch.
+Screenshots: `docs/review/home.png`, `docs/review/forge.png`.
+
+Still for the headset: reach to the tabs on a real table (they sit lowest), hand occlusion over the
+tray, and whether a 0.8 s transformation feels quick enough on the tenth visit.

@@ -7,9 +7,9 @@ import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
-import { Forge, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
+import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
 import { GUIDE_ORDER, Progress } from './progress.js';
-import { ANVIL_AT, anvilModel, Hub, miniArena, standModel } from './hub.js';
+import { anvilModel, Hub, miniArena, standModel } from './hub.js';
 import { Wall } from './wall.js';
 import type { WallPlane } from './wall.js';
 import { allBuilds, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
@@ -58,7 +58,7 @@ const INTRO_TIME = 2.5;
 /** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
 const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
-const LABEL_AT = new Vector3(0, 0.1, -0.21);
+const LABEL_AT = new Vector3(0, 0.115, -0.21);
 /** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
@@ -115,7 +115,7 @@ export class MatchSystem extends createSystem({
   private forge = new Forge({
     done: (build) => this.leaveForge(build),
     fitted: () => this.progress.advance('rematch'),
-  }, this.wall, this.progress);
+  }, this.progress);
   /** A demo round from the workshop's Try it: AI launches, no score, then back to the workshop. */
   private demo = false;
   private hubLogPending = false;
@@ -289,11 +289,11 @@ export class MatchSystem extends createSystem({
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
     this.world.createTransformEntity(this.cord.line);
     this.world.createTransformEntity(this.wall.root);
-    // The match bar: small, just above the far rim and behind the round messages, tipped toward
-    // the player, so score and fight share one view.
-    this.wall.hud.position.set(0, 0.2, -0.26);
-    this.wall.hud.rotation.x = -0.25;
-    this.wall.hud.scale.setScalar(0.2);
+    // The match bar: a metal strip set into the far rim, tipped back toward the player, under the
+    // round messages, so score and fight share one view.
+    this.wall.hud.position.set(0, 0.03, -0.205);
+    this.wall.hud.rotation.x = -0.55;
+    this.wall.hud.scale.setScalar(0.17);
     this.root.add(this.wall.hud);
     this.builder.hangOn(this.wall.tools);
 
@@ -396,9 +396,9 @@ export class MatchSystem extends createSystem({
         this.updateBuilder(dt);
         break;
       case 'forge':
-        this.player.head.getWorldPosition(this.p);
-        this.forge.place(this.root.worldToLocal(this.p));
         this.forge.update(this.pointers, dt);
+        // The arena floor sinks as the forge rises out of it.
+        this.stage.position.y = -FORGE_SINK * this.forge.opened;
         break;
       case 'ready':
       case 'result':
@@ -522,18 +522,14 @@ export class MatchSystem extends createSystem({
     this.label.set('');
     this.wall.setMode('home');
     // The first session says where to reach next.
-    // The note hangs over the station it points at: the stand, or the anvil for the new part.
     const guide = this.progress.guide;
-    if (guide === 'launch') this.label.set('Your top is on the stand\nPut it in the arena to play');
+    if (guide === 'launch') this.label.set('Your top waits in its dock\nPut it in the arena to play');
     else if (guide === 'bump' || guide === 'match') this.label.set('Finish your first match\nPut your top in the arena');
-    else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Rush tip!\nPinch the anvil to fit it');
+    else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Rush tip!\nPinch the small anvil to forge');
     else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
-    // Over the anvil for the new part; otherwise over the far rim (the stand's beacon marks it).
-    const atAnvil = guide === 'forge' || guide === 'fit';
-    if (atAnvil) this.label.mesh.position.set(ANVIL_AT.x, 0.24, ANVIL_AT.z - 0.02);
-    else this.label.mesh.position.copy(LABEL_AT);
-    // The anvil is near the eyes; the far rim needs the larger card.
-    this.label.mesh.scale.setScalar(atAnvil ? 0.9 : 1.25);
+    // Notes hang over the far rim, left of the arena shelf; the beacon marks the dock or the anvil.
+    this.label.mesh.position.set(-0.16, LABEL_AT.y, LABEL_AT.z);
+    this.label.mesh.scale.setScalar(1.25);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
@@ -569,9 +565,8 @@ export class MatchSystem extends createSystem({
     this.phase = 'forge';
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
-    // The forge is its own place: the arena hides while you build.
-    this.stage.visible = false;
-    this.wall.setMode('forge');
+    // The forge is the arena transformed: the floor sinks, the anvil and the drawers rise.
+    this.wall.setMode('home');
     // The first session's forge visit is about one part: the one just earned.
     const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:rush' : null;
     this.progress.advance('fit');
@@ -581,7 +576,7 @@ export class MatchSystem extends createSystem({
   /** Back home from the forge; a saved build becomes your top. */
   private leaveForge(build: TopBuild | null) {
     this.forge.close();
-    this.stage.visible = true;
+    this.stage.position.y = 0;
     if (build) this.myBuild = { ...build };
     this.toHub();
   }
@@ -633,7 +628,6 @@ export class MatchSystem extends createSystem({
     this.phase = 'build';
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
-    this.forge.showShelf(false);
     this.wall.setMode('workshop');
     this.wall.score(['Arena workshop', 'Pinch a piece on the wall and drop it on the arena', 'Try it, Save & play or Back on the board']);
     this.builder.open(this.arena.layout);
@@ -717,7 +711,6 @@ export class MatchSystem extends createSystem({
     this.hub.hide();
     this.builder.close();
     this.forge.close();
-    this.forge.showShelf(true);
     this.stage.visible = true;
     this.demo = false;
     this.rival = this.pickRival();
@@ -731,7 +724,6 @@ export class MatchSystem extends createSystem({
 
   private leaveBuilder() {
     this.builder.close();
-    this.forge.showShelf(true);
     this.setArena(this.arenas[this.arenaIndex]);
     this.toHub();
   }

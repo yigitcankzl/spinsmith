@@ -257,3 +257,16 @@ export function playThock() {
 export function playCrunch() {
   hiss(0.12, 0.09, 2200, 900, 2);
 }
+
+/** The arena turns into the forge: a low mechanical rumble that ends in a clunk. */
+export function playMachine() {
+  hiss(0.6, 0.12, 400, 150, 1.5);
+  tone(70, 0.2, 0.5, 'sawtooth', 0, 55);
+  tone(160, 0.25, 0.15, 'square', 0.6, 90);
+}
+
+/** A forge drawer slides out: a short slide and a click. */
+export function playDrawer() {
+  hiss(0.14, 0.08, 2500, 1200, 1);
+  tone(700, 0.06, 0.05, 'triangle', 0.13);
+}

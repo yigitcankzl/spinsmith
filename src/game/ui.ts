@@ -146,3 +146,64 @@ export function titleMesh(text: string, width: number, height: number): Mesh {
   t.colorSpace = SRGBColorSpace;
   return new Mesh(new PlaneGeometry(width, height), new MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
 }
+
+/**
+ * Paints a machined plate filling the canvas, the forge's sign language: dark graphite with fine
+ * brushing, a bevelled edge (light on top, dark below) and a steel rivet in each corner. Text on it
+ * goes through engrave().
+ */
+export function metalPlate(g: CanvasRenderingContext2D, w: number, h: number) {
+  const c = Math.min(w, h) * 0.06;
+  g.clearRect(0, 0, w, h);
+  chamfer(g, 2, 2, w - 4, h - 4, c);
+  const body = g.createLinearGradient(0, 0, 0, h);
+  body.addColorStop(0, '#3a3f48');
+  body.addColorStop(1, '#23272e');
+  g.fillStyle = body;
+  g.fill();
+  g.save();
+  g.clip();
+  // Brushing: faint horizontal strokes.
+  for (let y = 0; y < h; y += 3) {
+    g.fillStyle = `rgba(255,255,255,${0.012 + 0.018 * ((y * 7919) % 13) / 13})`;
+    g.fillRect(0, y, w, 1);
+  }
+  g.restore();
+  // Bevel: light along the top edge, dark along the bottom.
+  g.lineWidth = Math.max(2, h * 0.012);
+  g.strokeStyle = 'rgba(255,255,255,0.28)';
+  g.beginPath();
+  g.moveTo(2 + c, 3);
+  g.lineTo(w - 2 - c, 3);
+  g.stroke();
+  g.strokeStyle = 'rgba(0,0,0,0.55)';
+  g.beginPath();
+  g.moveTo(2 + c, h - 3);
+  g.lineTo(w - 2 - c, h - 3);
+  g.stroke();
+  chamfer(g, 2, 2, w - 4, h - 4, c);
+  g.strokeStyle = 'rgba(150,160,175,0.5)';
+  g.lineWidth = 2;
+  g.stroke();
+  const r = Math.max(3, h * 0.03);
+  for (const [x, y] of [[c + r * 2, c * 0.4 + r * 2], [w - c - r * 2, c * 0.4 + r * 2], [c + r * 2, h - c * 0.4 - r * 2], [w - c - r * 2, h - c * 0.4 - r * 2]]) {
+    const metal = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+    metal.addColorStop(0, '#ffffff');
+    metal.addColorStop(0.45, STEEL);
+    metal.addColorStop(1, '#4a5566');
+    g.fillStyle = metal;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+/** Text engraved into a metal plate: a dark cut with a light lower lip; color for filled (hot) text. */
+export function engrave(g: CanvasRenderingContext2D, text: string, x: number, y: number, color = '#c9d3e0') {
+  g.fillStyle = 'rgba(255,255,255,0.18)';
+  g.fillText(text, x, y + 1.5);
+  g.fillStyle = 'rgba(0,0,0,0.7)';
+  g.fillText(text, x, y - 1);
+  g.fillStyle = color;
+  g.fillText(text, x, y);
+}

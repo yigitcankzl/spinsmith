@@ -1,15 +1,15 @@
 /**
- * The forge: build your top with your hands, away from the arena (which hides meanwhile). Your
- * top floats large in the air in front of you, turning over a ring of light; the parts hang on the
- * tool panel of the smithy wall (tips, cores, rings, style, presets). Point at a part and pinch:
- * it flies to your hand.
- * - Pinch your top to pick it up: it follows your hand and turns with it, to look at from any side.
- *   Let go and it settles back on the anvil.
- * - Pinch a part on the shelf and bring it to your top (on the anvil or in your other hand): the
- *   top comes apart to show where it goes and that slot pulses; let go to fit it with a clack. The
- *   old part goes back to the shelf. Builds over the weight limit are refused.
- * - Tap a paint pot (or dip the top into it) to paint the top; spin tokens set its spin direction.
- * - Dunk the top in the quench bucket to save it and go home.
+ * The forge is the arena, transformed: its floor sinks, an anvil rises at the near third of the
+ * bowl with your top on it, drawers slide out of the near rim and the stats rise on the far rim.
+ * Everything is within a seated arm's reach and used the same way: pinch, carry, drop.
+ * - Four drawer tabs on the near rim (Ring, Core, Tip, Style) choose which parts lie on the tray,
+ *   a half circle around the anvil's near side. One kind at a time, at most six parts.
+ * - Pinch a part and bring it to your top: the top comes apart to show where it goes and that
+ *   slot pulses; let go to fit it with a clack. A tap fits it too. Builds over the weight limit
+ *   are refused.
+ * - Pinch your top to pick it up and turn it; let go and it settles back on the anvil. Dip it in
+ *   a paint pot to paint it; spin tokens set its spin direction.
+ * - Drop the top in the quench slot beside the anvil to save it and go home.
  */
 import {
   BoxGeometry,
@@ -31,16 +31,15 @@ import {
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
-import { playLocked, playPick, playPlace, playRemove } from './audio.js';
+import { playDrawer, playLocked, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
 import { tag } from './builder.js';
-import { FONT, glass, GLASS_LIGHT, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
+import { engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
-import { ANVIL_AT } from './hub.js';
-import type { Wall } from './wall.js';
+import { ANVIL_FACE, anvilModel } from './hub.js';
 import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js';
 
 const STORE_KEY = 'spinsmith.top.v1';
@@ -72,7 +71,9 @@ export type Item =
   | { kind: 'color'; value: number; name: string; blurb: string }
   | { kind: 'preset'; build: TopBuild; name: string; blurb: string };
 
-/** Shelf rows, front (low) to back (high): label, items, item spacing. */
+export type Drawer = 'ring' | 'core' | 'tip' | 'style';
+
+/** Every part on offer by kind: label, items, spacing (also used to show unlocks). */
 export const ROWS: [string, Item[], number][] = [
   ['TIPS', TIPS.map((t) => ({ kind: 'tip' as const, id: t.id, name: t.name, blurb: t.blurb })), 0.05],
   ['CORES', CORES.map((c) => ({ kind: 'core' as const, id: c.id, name: c.name, blurb: c.blurb })), 0.06],
@@ -86,23 +87,42 @@ export const ROWS: [string, Item[], number][] = [
     ],
     0.05,
   ],
-  ['PRESETS', PRESETS.map((p) => ({ kind: 'preset' as const, build: p.build, name: p.name, blurb: `A classic ${roleOf(specFromBuild(p.build))} top` })), 0.08],
 ];
-/** Tool panel rows (wall space, m): row spacing, and how much larger than on the table parts hang. */
-const ROW_GAP = 0.165;
-const WALL_SCALE = 2.2;
-/** The quench bucket stands beside the anvil, toward the player (arena-local). */
-const BUCKET_AT = new Vector3(ANVIL_AT.x - 0.05, 0, ANVIL_AT.z + 0.12);
-/** Your top floats this much larger than life (arena-local; the arena is drawn larger still). */
-const DISPLAY_SCALE = 1.8;
-/** It first floats this far (world m) ahead of the eyes, to the right and below them, clear of the wall. */
-const FLOAT_AHEAD = 0.35;
-const FLOAT_RIGHT = 0.22;
-const FLOAT_BELOW = 0.2;
+/** The drawers, left to right on the near rim, and which shelf row each opens. */
+const DRAWERS: [Drawer, string, number][] = [
+  ['ring', 'RING', 2],
+  ['core', 'CORE', 1],
+  ['tip', 'TIP', 0],
+  ['style', 'STYLE', 3],
+];
+/** Arena-local layout (the arena center is the origin, +Z toward the player, the world is half as large). */
+/** Your top stands here on the anvil: the near third of the bowl, about 0.45 m from the eyes. */
+const WORK = new Vector3(0, 0.07, 0.06);
+/** The anvil is drawn this much larger than the home one. */
+const ANVIL_SCALE = 1.35;
+/** The arena floor sinks this far while the forge is open. */
+export const FORGE_SINK = 0.03;
+/** The tray: parts on a half circle this far around the anvil, toward the player, at this height. */
+const TRAY_R = 0.105;
+const TRAY_Y = 0.035;
+/** The drawer tabs: a row along the near rim. */
+const TAB_Z = 0.19;
+const TAB_Y = 0.006;
+const TAB_W = 0.058;
+const TAB_GAP = 0.066;
+const TAB_H = 0.024;
+/** The quench slot, beside the anvil on the right. */
+const QUENCH_AT = new Vector3(0.19, 0, 0.05);
+/** The stats plate stands on the far rim. */
+const STATS_AT = new Vector3(0, 0.1, -0.2);
+/** Your top on the anvil is this much larger than in the arena. */
+const DISPLAY_SCALE = 1.7;
+/** The transformation takes this long (s). */
+const OPEN_TIME = 0.8;
 /** A carried part makes the top come apart within this distance, and fits within SNAP (world m). */
 const EXPLODE_R = 0.3;
 const SNAP = 0.15;
-/** A carried top dipped this close to a paint pot is painted; this close to the bucket, saved (world m). */
+/** A carried top dipped this close to a paint pot is painted; this close to the quench slot, saved (world m). */
 const DIP = 0.12;
 /** Pinch distances (world m): touching a thing, and a pointing ray passing this close. */
 const GRAB_NEAR = 0.07;
@@ -116,27 +136,19 @@ const TAP_MOVE = 0.03;
 
 interface Slot {
   item: Item;
+  drawer: Drawer;
   model: Object3D;
   home: Vector3;
-  /** Its card: the instance in the shared frame and face meshes, its width and row center. */
-  card: number;
-  w: number;
-  y: number;
+  /** Its pedestal: the instance in the shared pedestal mesh. */
+  pad: number;
   /** Seconds left of the flash after the part was fitted. */
   flash: number;
-  /** Its scale on the wall. */
+  /** Its scale on the tray. */
   size: number;
   /** Unlock key ('ring:hook'), or null for things never locked, and how it is earned. */
   key: string | null;
   hint: string | null;
 }
-
-/** The tool panel's text layer: one canvas over the whole panel (panel-local meters). */
-const TEXT_X0 = -0.56;
-const TEXT_Y0 = -0.47;
-const TEXT_W = 1.18;
-const TEXT_H = 0.94;
-const TEXT_PX = 1600;
 
 /** The unlock key of a shelf item, or null when it is never locked. */
 export function itemKey(item: Item): string | null {
@@ -145,13 +157,11 @@ export function itemKey(item: Item): string | null {
   return null;
 }
 
-/** Tile frame colors: idle, pointed at, on your top. */
-const FRAME_IDLE = new Color(0x2a3446);
-const FRAME_HOVER = new Color(0xdfe8f5);
-const FRAME_ON = new Color(ORANGE);
-/** Card faces: normal, and darker while locked. */
-const FACE = new Color(0x111824);
-const FACE_LOCKED = new Color(0x07090e);
+/** Pedestal colors: idle, pointed at, on your top, locked. */
+const PAD_IDLE = new Color(0x8a919c);
+const PAD_HOVER = new Color(0xdfe8f5);
+const PAD_ON = new Color(ORANGE);
+const PAD_LOCKED = new Color(0x2a2e35);
 
 export interface ForgeHooks {
   /** Save the build and go back. */
@@ -160,42 +170,44 @@ export interface ForgeHooks {
   fitted?(): void;
 }
 
-type Target = { kind: 'slot'; slot: Slot } | { kind: 'top' } | { kind: 'bucket' };
+type Target = { kind: 'slot'; slot: Slot } | { kind: 'top' } | { kind: 'quench' } | { kind: 'tab'; drawer: Drawer };
 
 export class Forge {
   /** Lives in arena-local space (a child of the arena root). */
   readonly root = new Group();
   build: TopBuild = loadBuild();
-  private shelf = new Group();
+  /** 0 closed .. 1 open: the arena sinks and the forge rises with it. */
+  opened = 0;
+  private opening = false;
+  /** Saved: the forge folds back into the arena, then goes home. */
+  private closing = false;
+  private tray = new Group();
   private slots: Slot[] = [];
-  private bucket = new Group();
+  private pads!: InstancedMesh;
+  private drawer: Drawer = 'tip';
+  /** Seconds since the drawer opened: its parts pop up one after another. */
+  private drawerT = 1;
+  private tabs = new Group();
+  private tabCanvas = document.createElement('canvas');
+  private tabTex: CanvasTexture;
+  private tabKey = '';
+  private tabAt: Record<Drawer, Vector3> = { ring: new Vector3(), core: new Vector3(), tip: new Vector3(), style: new Vector3() };
+  private anvil = anvilModel();
+  private quench = new Group();
   private display!: TopView;
-  /** The top's resting spot on the anvil, and the holder that is carried around. */
-  /** Where your top floats (arena-local): first set from the head, then wherever you leave it. */
-  private floatSpot = new Vector3(0, 0.2, 0.05);
-  private floatSet = false;
-  private halo: Mesh;
-  /** Tips the floating top toward the eyes so its face shows; it spins about its own axis inside. */
+  /** Tips the top toward the eyes so its face shows; it spins about its own axis inside. */
   private displayTilt = new Group();
   private displayHolder = new Group();
-  private card = new StatsCard();
+  private stats = new StatsPlate();
   private cardKey = '';
   private message = '';
   private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
   private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion; lost: number } | null = null;
   private explode = 0;
-  /** The tool panel's cards (instanced) and their text canvas. */
-  private frames!: InstancedMesh;
-  private faces!: InstancedMesh;
-  private textCanvas = document.createElement('canvas');
-  private textTex!: CanvasTexture;
-  private textKey = '';
-  private readonly frameColor = new Color();
+  private readonly padColor = new Color();
   /** The part the first session asks the player to fit, if any. */
   private focus: Slot | null = null;
-  /** The halo flares when a part is fitted. */
-  private glow = 0;
   private readonly white = new Color(0xffffff);
   /** The paint pot the carried top is dipped in (so a dip paints once). */
   private dippedIn: Slot | null = null;
@@ -211,29 +223,29 @@ export class Forge {
   private readonly at = new Vector3();
   private readonly topAt = new Vector3();
   private readonly quat = new Quaternion();
-  private readonly up = new Vector3();
-  private readonly right = new Vector3();
-  private readonly depth = new Vector3();
-  private readonly basis = new Matrix4();
+  private readonly q2 = new Quaternion();
+  private readonly m = new Matrix4();
 
   constructor(
     private readonly hooks: ForgeHooks,
-    private readonly wall: Wall,
     private readonly progress: Progress,
   ) {
     this.root.name = 'top-forge';
-    this.buildShelf();
-    this.wall.tools.add(this.shelf);
-    this.buildBucket();
-    // A ring of light under the floating top.
-    this.halo = new Mesh(new TorusGeometry(0.035, 0.0018, 8, 48).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.8 }));
-    this.displayHolder.position.copy(this.floatSpot);
+    this.buildTray();
+    this.tabCanvas.width = 1024;
+    this.tabCanvas.height = Math.round((1024 * TAB_H) / (TAB_GAP * 4));
+    this.tabTex = new CanvasTexture(this.tabCanvas);
+    this.tabTex.colorSpace = SRGBColorSpace;
+    this.buildTabs();
+    this.buildQuench();
+    this.anvil.scale.setScalar(ANVIL_SCALE);
+    this.displayHolder.position.copy(WORK);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
-    this.displayTilt.rotation.x = 0.6;
+    this.displayTilt.rotation.x = 0.5;
     this.displayHolder.add(this.displayTilt);
-    // The stats card floats to the right of your top, close enough to read.
-    this.card.mesh.scale.setScalar(0.6);
-    this.root.add(this.bucket, this.halo, this.displayHolder, this.card.mesh);
+    this.stats.mesh.position.copy(STATS_AT);
+    this.stats.mesh.rotation.x = -0.3;
+    this.root.add(this.anvil, this.tray, this.tabs, this.quench, this.displayHolder, this.stats.mesh);
     this.rebuildDisplay();
     this.root.visible = false;
   }
@@ -250,20 +262,26 @@ export class Forge {
     return out;
   }
 
-  /** Opens the forge; with a focus key (the first session's new part) only that part is called out. */
+  /** Opens the forge; with a focus key (the first session's new part) its drawer opens and it pulses. */
   open(focus: string | null = null) {
-    this.floatSet = false;
     this.build = this.allowed(loadBuild());
     this.rebuildDisplay();
     this.root.visible = true;
     this.dropAll();
+    this.opened = 0;
+    this.opening = true;
+    playMachine();
     this.focus = focus ? (this.slots.find((s) => s.key === focus) ?? null) : null;
-    this.say(this.focus ? `Your new part: bring the ${this.focus.item.name} ${this.focus.item.kind} to your top` : 'Pick up your top, or bring it a part from the shelf');
+    this.setDrawer(this.focus?.drawer ?? 'ring', false);
+    this.say(this.focus ? `Your new part: bring the ${this.focus.item.name} ${this.focus.item.kind} to your top` : 'Pick a drawer, bring a part to your top');
     this.logPending = true;
   }
 
   close() {
     this.root.visible = false;
+    this.opened = 0;
+    this.opening = false;
+    this.closing = false;
     this.dropAll();
   }
 
@@ -271,31 +289,21 @@ export class Forge {
     if (this.heldPart) this.root.remove(this.heldPart.model);
     this.heldPart = null;
     this.heldTop = null;
-    this.displayHolder.position.copy(this.floatSpot);
+    this.displayHolder.position.copy(WORK);
     this.displayHolder.quaternion.identity();
   }
 
-  /** The parts on the wall's tool panel hide while the workshop hangs its board there. */
-  showShelf(on: boolean) {
-    this.shelf.visible = on;
-  }
-
-  /** Sets where the top first floats and turns the bucket toward the head (arena-local). */
-  place(head: Vector3) {
-    if (!this.floatSet) {
-      // Once, when the forge opens: ahead and to the right, below the line of sight to the wall.
-      this.floatSet = true;
-      const k = 1 / this.root.parent!.getWorldScale(this.p).x;
-      this.floatSpot.set(head.x + FLOAT_RIGHT * k, head.y - FLOAT_BELOW * k, head.z - FLOAT_AHEAD * k);
-      this.displayHolder.position.copy(this.floatSpot);
+  private setDrawer(d: Drawer, sound = true) {
+    this.drawer = d;
+    this.drawerT = 0;
+    // Only the open drawer's parts and pedestals show; the others' pedestals shrink to nothing.
+    for (const s of this.slots) {
+      s.model.visible = s.drawer === d;
+      this.pads.setMatrixAt(s.pad, this.m.makeScale(s.drawer === d ? 1 : 0, 1, s.drawer === d ? 1 : 0).setPosition(s.home.x, s.home.y - 0.016, s.home.z));
     }
-    this.halo.position.set(this.floatSpot.x, this.floatSpot.y - 0.03, this.floatSpot.z);
-    this.glow = Math.max(0, this.glow - 0.03);
-    this.halo.scale.setScalar(1 + 0.04 * Math.sin(this.time * 3) + 0.8 * this.glow);
-    (this.halo.material as MeshBasicMaterial).color.setHex(0xff9a3c).lerp(this.white, this.glow);
-    this.face(this.bucket, head);
-    this.card.mesh.position.set(this.floatSpot.x + 0.14, this.floatSpot.y + 0.05, this.floatSpot.z - 0.02);
-    this.face(this.card.mesh, head);
+    this.pads.instanceMatrix.needsUpdate = true;
+    if (sound) playDrawer();
+    this.logPending = true;
   }
 
   update(pointers: HandState[], dt: number) {
@@ -304,6 +312,7 @@ export class Forge {
       this.logPending = false;
       console.log(`[FORGE] ${this.debugPositions()}`);
     }
+    this.animate(dt);
     // A core lock clicks the top round tooth by tooth.
     if (this.clicks > 0 && (this.clickTimer -= dt) <= 0) {
       this.clicks--;
@@ -316,6 +325,8 @@ export class Forge {
       this.display.root.rotation.y += step;
       this.twist -= step;
     }
+    // Nothing is picked until the forge has risen.
+    if (this.opened < 1) return;
 
     // New pinches: a hand touching something goes first, then pointing rays (and the dev gaze).
     for (const touchOnly of [true, false]) {
@@ -327,42 +338,83 @@ export class Forge {
     }
     this.updateTop(dt);
     this.updatePart(dt);
-    // Hover: shelf items under a free pointer lift and turn.
+    // Hover: tray parts under a free pointer lift and turn.
     let hovered: Slot | null = null;
+    let hoveredTab: Drawer | null = null;
     for (const h of pointers) {
       if (!h.tracked || h === this.heldPart?.hand || h === this.heldTop?.hand) continue;
       const t = this.under(h, false);
       if (t?.kind === 'slot') hovered ??= t.slot;
+      if (t?.kind === 'tab') hoveredTab ??= t.drawer;
     }
-    this.drawShelfText();
+    this.drawTabs(hoveredTab);
+    this.drawerT += dt;
     for (const s of this.slots) {
+      if (s.drawer !== this.drawer) continue;
       const locked = this.locked(s);
-      this.faces.setColorAt(s.card, locked ? FACE_LOCKED : FACE);
       const on = s === hovered && !locked;
-      const fitted = this.isOn(s.item);
       s.flash = Math.max(0, s.flash - dt);
-      const frame = this.frameColor.copy(fitted ? FRAME_ON : on ? FRAME_HOVER : FRAME_IDLE);
-      // A part just fitted flashes white and pulses.
-      if (s.flash > 0) frame.lerp(this.white, s.flash / 0.8);
-      // The first session's new part breathes until it is fitted.
-      if (s === this.focus) frame.copy(FRAME_ON).lerp(this.white, 0.5 + 0.5 * Math.sin(this.time * 5));
-      this.frames.setColorAt(s.card, frame);
+      const pad = this.padColor.copy(locked ? PAD_LOCKED : this.isOn(s.item) ? PAD_ON : on ? PAD_HOVER : PAD_IDLE);
+      // A part just fitted flashes white; the first session's new part breathes until fitted.
+      if (s.flash > 0) pad.lerp(this.white, s.flash / 0.8);
+      if (s === this.focus) pad.copy(PAD_ON).lerp(this.white, 0.5 + 0.5 * Math.sin(this.time * 5));
+      this.pads.setColorAt(s.pad, pad);
+      // Out of the drawer one after another, then a slow turn; lifted while pointed at.
+      const order = this.slots.filter((x) => x.drawer === this.drawer).indexOf(s);
+      const pop = Math.min(1, Math.max(0, (this.drawerT - order * 0.05) / 0.2));
       const pulse = s.flash > 0 ? 1 + 0.25 * Math.sin((s.flash / 0.8) * Math.PI) : 1;
-      s.model.position.set(s.home.x, s.home.y, s.home.z + (on ? 0.03 + 0.005 * Math.sin(this.time * 8) : 0));
-      s.model.scale.setScalar(s.size * (on ? 1.15 : 1) * pulse * (locked ? 0.55 : 1));
+      s.model.position.set(s.home.x, s.home.y + (on ? 0.012 : 0) - 0.02 * (1 - pop), s.home.z);
+      s.model.rotation.y += dt * (on ? 2 : 0.4);
+      s.model.scale.setScalar(s.size * pop * (on ? 1.15 : 1) * pulse * (locked ? 0.7 : 1));
     }
-    this.frames.instanceColor!.needsUpdate = true;
-    this.faces.instanceColor!.needsUpdate = true;
-    if (!this.heldPart) this.showCard(hovered ? this.withItem(hovered.item) : null);
+    this.pads.instanceColor!.needsUpdate = true;
+    if (!this.heldPart) {
+      this.showCard(hovered ? this.withItem(hovered.item) : null);
+      if (hovered) this.hint(this.locked(hovered) ? `${hovered.item.name}: locked, ${hovered.hint}` : `${hovered.item.name}: ${hovered.item.blurb}`);
+      else this.hint(null);
+    }
+  }
+
+  /** The transformation: the anvil rises, the tray and tabs slide out, the stats rise on the far rim. */
+  private animate(dt: number) {
+    if (this.opening) {
+      this.opened = Math.min(1, this.opened + dt / OPEN_TIME);
+      if (this.opened >= 1) this.opening = false;
+    }
+    if (this.closing) {
+      this.opened = Math.max(0, this.opened - dt / (OPEN_TIME / 2));
+      if (this.opened <= 0) {
+        this.closing = false;
+        this.hooks.done(this.build);
+        return;
+      }
+    }
+    const k = this.opened;
+    const ease = (u: number) => 1 - (1 - Math.min(1, Math.max(0, u))) ** 3;
+    // The anvil stands on the sunken floor, its plinth under it; it rises out of the floor.
+    const rise = ease(k / 0.7);
+    this.anvil.position.set(WORK.x, WORK.y - ANVIL_FACE * ANVIL_SCALE - 0.16 * (1 - rise), WORK.z);
+    if (!this.heldTop) this.displayHolder.position.y = WORK.y + 0.004 * Math.sin(this.time * 1.6) - 0.16 * (1 - rise);
+    const slide = ease((k - 0.4) / 0.6);
+    this.tabs.position.set(0, -0.02 * (1 - slide), -0.03 * (1 - slide));
+    this.tabs.visible = slide > 0.01;
+    this.tray.visible = slide > 0.01;
+    this.tray.scale.setScalar(Math.max(0.001, slide));
+    this.tray.position.set(WORK.x * (1 - slide), 0, WORK.z * (1 - slide));
+    this.quench.scale.setScalar(Math.max(0.001, slide));
+    const up = ease((k - 0.2) / 0.6);
+    this.stats.mesh.position.set(STATS_AT.x, STATS_AT.y - 0.08 * (1 - up), STATS_AT.z);
+    this.stats.mesh.visible = up > 0.01;
   }
 
   private pinch(target: Target, h: HandState) {
-    if (target.kind === 'bucket') return this.save();
+    if (target.kind === 'tab') return target.drawer === this.drawer ? undefined : this.setDrawer(target.drawer);
+    if (target.kind === 'quench') return this.save();
     if (target.kind === 'top') {
       if (this.heldTop) return;
       this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone(), lost: 0 };
       playPick();
-      this.say('Move it anywhere and let go: it stays. Dunk it in the bucket to save');
+      this.say('Turn it to look. Drop it in the quench slot to save');
       return;
     }
     if (this.heldPart) return;
@@ -373,8 +425,9 @@ export class Forge {
     }
     const item = target.slot.item;
     const model = itemModel(item);
+    model.scale.multiplyScalar(0.8);
     this.root.add(model);
-    // From the wall the part flies to the hand.
+    // From afar the part flies to the hand.
     const from = target.slot.model.getWorldPosition(new Vector3());
     this.heldPart = { item, model, hand: h, startAt: this.pointAt(h, new Vector3()), from, fly: h.pinch.distanceTo(from) > 0.3 ? 0 : 1, lost: 0 };
     playPick();
@@ -385,8 +438,7 @@ export class Forge {
   private updateTop(dt: number) {
     const held = this.heldTop;
     if (!held) {
-      // Floats with a slow bob.
-      this.q.copy(this.floatSpot).setY(this.floatSpot.y + 0.004 * Math.sin(this.time * 1.6));
+      this.q.set(WORK.x, this.displayHolder.position.y, WORK.z);
       this.displayHolder.position.lerp(this.q, Math.min(1, dt * 10));
       this.displayHolder.quaternion.slerp(this.quat.identity(), Math.min(1, dt * 8));
       if (!this.heldPart) this.display.root.rotation.y += dt * 0.5;
@@ -399,24 +451,24 @@ export class Forge {
     this.quat.copy(h.rayQuat).multiply(this.q2.copy(held.handQuat).invert());
     this.displayHolder.quaternion.copy(this.quat).multiply(held.topQuat);
     // Dipped into a paint pot: painted once per dip.
-    const pot = this.slots.find((s) => s.item.kind === 'color' && s.model.getWorldPosition(this.p).distanceTo(at) < DIP) ?? null;
+    const pot = this.slots.find((s) => s.item.kind === 'color' && s.model.visible && !this.locked(s) && s.model.getWorldPosition(this.p).distanceTo(at) < DIP) ?? null;
     if (pot && pot !== this.dippedIn) this.fit(pot.item);
     this.dippedIn = pot;
     if (h.pinching && h.tracked) {
       held.lost = 0;
       return;
     }
-    // A lost hand is not a release: after a moment the top floats back to its spot, unsaved.
+    // A lost hand is not a release: after a moment the top goes back to the anvil, unsaved.
     if (!h.tracked) {
       if ((held.lost += dt) < HAND_LOSS_GRACE) return;
       this.heldTop = null;
       return;
     }
     this.heldTop = null;
-    this.bucket.getWorldPosition(this.p);
-    if (at.distanceTo(this.p) < DIP * 1.5) return this.save();
-    // Left anywhere else, it floats right there.
-    this.floatSpot.copy(this.displayHolder.position);
+    // Saved when let go over the quench slot, or pointing into it from afar.
+    this.quench.getWorldPosition(this.p);
+    if (at.distanceTo(this.p) < DIP * 1.5 || this.distance(h, this.p, 0, GRAB_RAY * 1.5) < Infinity) return this.save();
+    // Let go anywhere else: it settles back on the anvil.
     playPlace();
   }
 
@@ -437,7 +489,7 @@ export class Forge {
     held.model.rotation.y = this.time * 2;
     const d = at.distanceTo(this.topAt);
     const slotKind = held.item.kind === 'ring' || held.item.kind === 'core' || held.item.kind === 'tip' ? held.item.kind : null;
-    const target = slotKind && d < EXPLODE_R ? Math.min(1, (EXPLODE_R - d) / (EXPLODE_R - SNAP) ) : 0;
+    const target = slotKind && d < EXPLODE_R ? Math.min(1, (EXPLODE_R - d) / (EXPLODE_R - SNAP)) : 0;
     this.explode += (target - this.explode) * 0.25;
     this.display.explode(this.explode, slotKind, this.time);
     this.showCard(this.withItem(held.item));
@@ -445,7 +497,7 @@ export class Forge {
       held.lost = 0;
       return;
     }
-    // A lost hand is not a release: after a moment the part goes back to the wall, unfitted.
+    // A lost hand is not a release: after a moment the part goes back to the tray, unfitted.
     if (!h.tracked) {
       if ((held.lost += dt) < HAND_LOSS_GRACE) return;
       this.root.remove(held.model);
@@ -463,13 +515,12 @@ export class Forge {
 
   /** Where a pointer is: the pinch itself when the hand is near the forge, else along its ray. */
   private pointAt(h: HandState, out: Vector3): Vector3 {
-    this.root.localToWorld(this.q.copy(this.floatSpot));
+    this.root.localToWorld(this.q.copy(WORK));
     if (h.pinch.distanceTo(this.q) < 0.9 || !h.hasRay) return out.copy(h.pinch);
     // Along the ray, as far out as the anvil is.
     const d = this.q.distanceTo(h.rayOrigin);
     return out.copy(h.rayDir).multiplyScalar(d).add(h.rayOrigin);
   }
-
   /** The build with this item fitted, or null when the item does not change the build. */
   private withItem(item: Item): TopBuild | null {
     const b = { ...this.build };
@@ -533,10 +584,9 @@ export class Forge {
     this.rebuildDisplay();
     if (slot && JSON.stringify(this.build) !== before) {
       slot.flash = 0.8;
-      this.glow = 1;
       if (slot === this.focus) {
         this.focus = null;
-        this.say('Fitted! Dunk your top in the bucket to save it, then play');
+        this.say('Fitted! Drop your top in the quench slot to save it');
         this.hooks.fitted?.();
       }
     }
@@ -565,8 +615,9 @@ export class Forge {
   private save() {
     saveBuild(this.build);
     playPlace();
+    playMachine();
     this.dropAll();
-    this.hooks.done(this.build);
+    this.closing = true;
   }
 
   private rebuildDisplay() {
@@ -579,13 +630,20 @@ export class Forge {
   }
 
   private showCard(preview: TopBuild | null) {
-    const key = JSON.stringify([this.build, preview, this.message]);
+    const message = this.hinted ?? this.message;
+    const key = JSON.stringify([this.build, preview, message]);
     if (key === this.cardKey) return;
     this.cardKey = key;
-    this.card.draw(this.build, preview, this.message);
+    this.stats.draw(this.build, preview, message);
   }
 
-  /** What a pointer would pinch: the top, a shelf item, or the bucket (nearest wins). */
+  /** Distance from a pointer to a fixed point (world), handed to a callback. */
+  private consider(h: HandState, local: Vector3, touchOnly: boolean, take: (d: number) => void) {
+    this.root.localToWorld(this.p.copy(local));
+    take(this.distance(h, this.p, GRAB_NEAR, touchOnly ? 0 : GRAB_RAY));
+  }
+
+  /** What a pointer would pinch: the top, a tray part, a drawer tab or the quench slot (nearest wins). */
   private under(h: HandState, touchOnly: boolean): Target | null {
     let best: Target | null = null;
     let bestD = Infinity;
@@ -598,8 +656,14 @@ export class Forge {
       }
     };
     if (!this.heldTop) consider(this.displayHolder, { kind: 'top' }, GRAB_NEAR * 1.5);
-    for (const slot of this.slots) consider(slot.model, { kind: 'slot', slot });
-    consider(this.bucket, { kind: 'bucket' });
+    for (const slot of this.slots) if (slot.drawer === this.drawer) consider(slot.model, { kind: 'slot', slot });
+    for (const [d] of DRAWERS) this.consider(h, this.tabAt[d], touchOnly, (dist) => {
+      if (dist < bestD) {
+        bestD = dist;
+        best = { kind: 'tab', drawer: d };
+      }
+    });
+    consider(this.quench, { kind: 'quench' });
     return best;
   }
 
@@ -614,6 +678,13 @@ export class Forge {
     return off < ray ? off + 0.05 : Infinity;
   }
 
+  /** A passing line (the part pointed at) shown instead of the last message; null puts it back. */
+  private hint(text: string | null) {
+    this.hinted = text;
+  }
+
+  private hinted: string | null = null;
+
   private say(text: string) {
     this.message = text;
     this.cardKey = '';
@@ -621,120 +692,104 @@ export class Forge {
     if (import.meta.env.DEV) console.log(`[FORGE] ${text} | ${buildName(this.build)} ${weightOf(this.build)} g spin ${this.build.spin}`);
   }
 
-  /** Turns an object upright toward the head: +Z toward the head, +Y up. */
-  private face(o: Object3D, head: Vector3) {
-    const z = this.depth.copy(head).sub(o.position).setY(0).normalize();
-    const x = this.right.crossVectors(this.up.set(0, 1, 0), z).normalize();
-    const y = this.up.crossVectors(z, x);
-    o.quaternion.setFromRotationMatrix(this.basis.makeBasis(x, y, z));
-  }
-
-  /** The tool panel on the wall: a row of parts on pegs per kind, its name above the row. */
-  /**
-   * The tool panel on the wall: a row of parts per kind on cards. To keep draw calls low the cards
-   * are two instanced meshes (frames and faces, colored per card) and all their text is one
-   * canvas, redrawn only when what is equipped or locked changes.
-   */
-  private buildShelf() {
-    const cards: { x: number; y: number; w: number }[] = [];
-    ROWS.forEach(([, items, gap], r) => {
-      const y = 0.33 - r * ROW_GAP;
-      const step = Math.max(0.15, gap * WALL_SCALE * 1.25);
-      items.forEach((item, c) => {
-        // Tips and cores stand up from their base, so they sit lower on the card.
-        const low = item.kind === 'tip' || item.kind === 'core';
-        const home = new Vector3((c - (items.length - 1) / 2) * step + 0.08, y + (low ? -0.028 : 0.008), 0.04);
-        const w = Math.min(step - 0.012, 0.16);
-        // Rings and presets show their top face; tips and cores their profile; pots their paint.
+  /** The tray: every part on its pedestal around the anvil; only the open drawer's parts show. */
+  private buildTray() {
+    const pads: Vector3[] = [];
+    for (const [drawer, , row] of DRAWERS) {
+      const items = ROWS[row][1];
+      items.forEach((item, i) => {
+        // A half circle on the anvil's near side, evenly spread.
+        const a = (Math.PI * (i + 0.5)) / items.length;
+        const home = new Vector3(WORK.x - Math.cos(a) * TRAY_R, TRAY_Y, WORK.z + Math.sin(a) * TRAY_R);
         const model = new Group();
         const inner = itemModel(item);
-        inner.rotation.x = item.kind === 'tip' || item.kind === 'core' ? 0.35 : item.kind === 'color' ? 1.35 : 1.1;
+        // Rings show their top face; tips and cores their profile; pots their paint.
+        inner.rotation.x = item.kind === 'tip' || item.kind === 'core' ? 0.35 : item.kind === 'color' ? 0.9 : 0.8;
         model.add(inner);
         model.position.copy(home);
-        // Rings and preset tops are wide: a little smaller, so they stay on their card.
-        const size = WALL_SCALE * (item.kind === 'ring' ? 0.98 : item.kind === 'preset' ? 0.78 : item.kind === 'core' ? 0.8 : 1.3);
-        model.scale.setScalar(size);
-        this.shelf.add(model);
+        model.visible = false;
+        const size = item.kind === 'ring' ? 0.62 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
+        this.tray.add(model);
         const key = itemKey(item);
-        this.slots.push({ item, model, home, card: cards.length, w, y, flash: 0, size, key, hint: key ? unlockHint(key) : null });
-        cards.push({ x: home.x, y, w });
+        this.slots.push({ item, drawer, model, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null });
+        pads.push(home);
       });
-    });
-    const plane = new PlaneGeometry(1, 1);
-    this.frames = new InstancedMesh(plane, new MeshBasicMaterial(), cards.length);
-    this.faces = new InstancedMesh(plane, new MeshBasicMaterial(), cards.length);
-    const m = new Matrix4();
-    cards.forEach((c, i) => {
-      this.frames.setMatrixAt(i, m.makeScale(c.w, ROW_GAP - 0.012, 1).setPosition(c.x, c.y, 0.004));
-      this.faces.setMatrixAt(i, m.makeScale(c.w - 0.008, ROW_GAP - 0.02, 1).setPosition(c.x, c.y, 0.005));
-      this.frames.setColorAt(i, FRAME_IDLE);
-      this.faces.setColorAt(i, FACE);
-    });
-    this.textCanvas.width = TEXT_PX;
-    this.textCanvas.height = Math.round((TEXT_PX * TEXT_H) / TEXT_W);
-    this.textTex = new CanvasTexture(this.textCanvas);
-    this.textTex.colorSpace = SRGBColorSpace;
-    this.textTex.anisotropy = 4;
-    const text = new Mesh(new PlaneGeometry(TEXT_W, TEXT_H), new MeshBasicMaterial({ map: this.textTex, transparent: true, depthWrite: false }));
-    text.position.set(TEXT_X0 + TEXT_W / 2, TEXT_Y0 + TEXT_H / 2, 0.007);
-    this.shelf.add(this.frames, this.faces, text);
-  }
-
-  /** Redraws the panel's text: row names, part names, and EQUIPPED or LOCKED on the cards. */
-  private drawShelfText() {
-    const key = this.slots.map((s) => (this.locked(s) ? 'L' : this.isOn(s.item) ? 'E' : '-')).join('');
-    if (key === this.textKey) return;
-    this.textKey = key;
-    const g = this.textCanvas.getContext('2d')!;
-    const k = TEXT_PX / TEXT_W;
-    const px = (x: number) => (x - TEXT_X0) * k;
-    const py = (y: number) => (TEXT_Y0 + TEXT_H - y) * k;
-    g.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    const write = (text: string, x: number, y: number, size: number, maxW: number, color: string) => {
-      let s = size * k;
-      do g.font = `700 ${Math.round(s--)}px ${FONT}`;
-      while (g.measureText(text).width > maxW * k && s > 8);
-      g.fillStyle = color;
-      g.fillText(text, px(x), py(y));
-    };
-    ROWS.forEach(([label], r) => write(label, -0.49, 0.33 - r * ROW_GAP, 0.022, 0.09, TEXT_DIM));
-    for (const s of this.slots) {
-      write(s.item.name, s.home.x, s.y - ROW_GAP / 2 + 0.022, 0.02, s.w * 0.92, TEXT);
-      const top = s.y + ROW_GAP / 2 - 0.02;
-      if (this.locked(s)) write(`LOCKED · ${s.hint}`, s.home.x, top, 0.015, s.w * 0.92, TEXT_DIM);
-      else if (this.isOn(s.item)) write('EQUIPPED', s.home.x, top, 0.016, s.w * 0.8, ORANGE);
     }
-    this.textTex.needsUpdate = true;
+    // The pedestals: one instanced mesh for all, recolored per state; hidden ones sink away.
+    const graphite = new CylinderGeometry(0.017, 0.019, 0.003, 24);
+    this.pads = new InstancedMesh(graphite, new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xffffff) }), pads.length);
+    pads.forEach((p, i) => {
+      this.pads.setMatrixAt(i, this.m.makeTranslation(p.x, p.y - 0.016, p.z));
+      this.pads.setColorAt(i, PAD_IDLE);
+    });
+    this.tray.add(this.pads);
   }
 
-  /** The quench bucket: dunk your top in it to save and go home. */
-  private buildBucket() {
-    this.bucket.position.copy(BUCKET_AT);
-    const wall = new Mesh(new CylinderGeometry(0.035, 0.03, 0.05, 24, 1, true), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57), side: 2 }));
-    wall.position.y = 0.025;
-    const hoop = new Mesh(new TorusGeometry(0.035, 0.0025, 8, 32).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x8a8f99) }));
-    hoop.position.y = 0.05;
-    const water = new Mesh(new CircleGeometry(0.033, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x3f8fb8, transparent: true, opacity: 0.8 }));
-    water.position.y = 0.042;
-    const sign = tag('SAVE', 0.1, 48);
-    sign.position.set(0, 0.09, 0);
-    this.bucket.add(wall, hoop, water, sign);
+  /** The drawer tabs: four engraved plates on the near rim, all drawn on one canvas. */
+  private buildTabs() {
+    const w = TAB_GAP * DRAWERS.length;
+    const plate = new Mesh(new PlaneGeometry(w, TAB_H), new MeshBasicMaterial({ map: this.tabTex, transparent: true, depthWrite: false }));
+    plate.rotation.x = -1.1;
+    plate.position.set(0, TAB_Y, TAB_Z);
+    this.tabs.add(plate);
+    DRAWERS.forEach(([d], i) => this.tabAt[d].set((i - (DRAWERS.length - 1) / 2) * TAB_GAP, TAB_Y, TAB_Z));
   }
 
-  /** Dev: world positions of the top, the shelf items and the bucket, for the emulator CLI. */
+  private drawTabs(hovered: Drawer | null) {
+    const key = `${this.drawer}|${hovered}|${this.focus?.drawer}|${Math.floor(this.time * 4) % 2}`;
+    if (key === this.tabKey) return;
+    this.tabKey = key;
+    const g = this.tabCanvas.getContext('2d')!;
+    const { width: W, height: H } = this.tabCanvas;
+    g.clearRect(0, 0, W, H);
+    const cw = W / DRAWERS.length;
+    DRAWERS.forEach(([d, label], i) => {
+      const x = i * cw;
+      g.save();
+      g.translate(x + cw * (1 - TAB_W / TAB_GAP) / 2, 0);
+      const pw = cw * (TAB_W / TAB_GAP);
+      metalPlate(g, pw, H);
+      g.restore();
+      const open = d === this.drawer;
+      const calls = this.focus?.drawer === d && !open && Math.floor(this.time * 4) % 2 === 0;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.font = `700 ${Math.round(H * 0.5)}px ${FONT}`;
+      engrave(g, label, x + cw / 2, H / 2 + 2, open || calls ? ORANGE : d === hovered ? '#ffffff' : STEEL);
+      if (open) {
+        g.fillStyle = ORANGE;
+        g.fillRect(x + cw * 0.3, H - H * 0.14, cw * 0.4, H * 0.06);
+      }
+    });
+    this.tabTex.needsUpdate = true;
+  }
+
+  /** The quench slot beside the anvil: drop your top in to save it and go home. */
+  private buildQuench() {
+    this.quench.position.copy(QUENCH_AT);
+    const wall = new Mesh(new CylinderGeometry(0.03, 0.026, 0.035, 8, 1, true), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57), side: 2 }));
+    wall.position.y = 0.0175;
+    const lip = new Mesh(new TorusGeometry(0.03, 0.003, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xe2b866) }));
+    lip.position.y = 0.035;
+    const water = new Mesh(new CircleGeometry(0.028, 8).rotateX(-Math.PI / 2).rotateY(Math.PI / 8), new MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0.85 }));
+    water.position.y = 0.03;
+    const sign = tag('QUENCH TO SAVE', 0.1, 40);
+    sign.position.set(0, 0.06, 0);
+    this.quench.add(wall, lip, water, sign);
+  }
+
+  /** Dev: world positions of the top, the tabs, the open drawer's parts and the quench slot. */
   debugPositions(): string {
     this.root.updateWorldMatrix(true, true);
-    const at = (o: Object3D) => o.getWorldPosition(new Vector3()).toArray().map((v) => v.toFixed(3)).join(',');
+    const fmt = (v: Vector3) => v.toArray().map((x) => x.toFixed(3)).join(',');
+    const at = (o: Object3D) => fmt(o.getWorldPosition(new Vector3()));
     return [
       `top@${at(this.displayHolder)}`,
-      ...this.slots.map((s) => `${s.item.name.replace(/ /g, '_')}${s.item.kind === 'color' ? this.slots.indexOf(s) : ''}@${at(s.model)}`),
-      `bucket@${at(this.bucket)}`,
+      ...DRAWERS.map(([d]) => `tab_${d}@${fmt(this.root.localToWorld(this.tabAt[d].clone()))}`),
+      ...this.slots.filter((s) => s.drawer === this.drawer).map((s) => `${s.item.name.replace(/ /g, '_')}${s.item.kind === 'color' ? this.slots.indexOf(s) : ''}@${fmt(this.root.localToWorld(s.home.clone()))}`),
+      `quench@${at(this.quench)}`,
     ].join(' ');
   }
-
-  private readonly q2 = new Quaternion();
 }
 
 /** The model of a shelf item, sized to be easy to grab. */
@@ -775,73 +830,94 @@ export function itemModel(item: Item): Object3D {
   return g;
 }
 
-/** A card beside your top: its name, weight against the limit, and box-style stat bars. */
-class StatsCard {
+/**
+ * The stats plate on the far rim: the build engraved, weight against the limit, and one dial per
+ * stat; a preview build shows as a second needle, green for a gain and red for a loss.
+ */
+class StatsPlate {
   readonly mesh: Mesh;
   private canvas = document.createElement('canvas');
   private tex: CanvasTexture;
 
   constructor() {
-    this.canvas.width = 512;
-    this.canvas.height = 470;
+    this.canvas.width = 1200;
+    this.canvas.height = 500;
     this.tex = new CanvasTexture(this.canvas);
     this.tex.colorSpace = SRGBColorSpace;
-    this.mesh = new Mesh(new PlaneGeometry(0.16, 0.147), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
+    this.tex.anisotropy = 4;
+    this.mesh = new Mesh(new PlaneGeometry(0.26, 0.108), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
     this.mesh.name = 'forge-stats';
   }
 
-  /** Draws the build; a preview build shows as gains (green) and losses (red) on each bar. */
   draw(build: TopBuild, preview: TopBuild | null, message: string) {
     const g = this.canvas.getContext('2d')!;
-    glass(g, 512, 470, STEEL, GLASS_LIGHT);
-    const spec = specFromBuild(build);
-    const now = statsOf(spec);
-    const next = preview ? statsOf(specFromBuild(preview)) : null;
-    g.fillStyle = TEXT;
+    const W = this.canvas.width;
+    metalPlate(g, W, 500);
+    const shown = preview ?? build;
+    const spec = specFromBuild(shown);
+    const now = statsOf(specFromBuild(build));
+    const next = preview ? statsOf(spec) : null;
     g.textBaseline = 'middle';
-    g.font = `700 38px ${FONT}`;
-    g.fillText(buildName(preview ?? build), 26, 44);
-    g.font = `28px ${FONT}`;
-    const w = weightOf(preview ?? build);
-    g.fillStyle = w > WEIGHT_LIMIT ? '#ff5a4a' : TEXT_DIM;
-    g.fillText(`${roleOf(specFromBuild(preview ?? build))} · ${build.spin === 1 ? 'right' : 'left'} spin · ${w} / ${WEIGHT_LIMIT} g`, 26, 88);
+    g.textAlign = 'center';
+    g.font = `700 64px ${FONT}`;
+    engrave(g, buildName(shown).toUpperCase(), W / 2, 62, TEXT);
+    const w = weightOf(shown);
+    g.font = `600 36px ${FONT}`;
+    engrave(g, `${roleOf(spec)} · ${shown.spin === 1 ? 'right' : 'left'} spin · ${w} / ${WEIGHT_LIMIT} g`, W / 2, 116, w > WEIGHT_LIMIT ? '#ff5a4a' : TEXT_DIM);
     const rows: [keyof TopStats, string][] = [
-      ['attack', 'Attack'],
-      ['defense', 'Defense'],
-      ['stamina', 'Stamina'],
-      ['dash', 'Dash'],
-      ['burst', 'Burst res.'],
+      ['attack', 'ATTACK'],
+      ['defense', 'DEFENSE'],
+      ['stamina', 'STAMINA'],
+      ['dash', 'DASH'],
+      ['burst', 'BURST RES'],
     ];
+    const R = 74;
     rows.forEach(([key, label], i) => {
-      const y = 140 + i * 54;
-      g.fillStyle = TEXT;
-      g.font = `700 28px ${FONT}`;
-      g.fillText(label, 26, y);
-      const x0 = 190;
-      const width = 290;
-      g.fillStyle = 'rgba(255,255,255,0.08)';
-      g.fillRect(x0, y - 14, width, 28);
-      const a = now[key] / 100;
-      const b = next ? next[key] / 100 : a;
-      const fill = g.createLinearGradient(x0, 0, x0 + width, 0);
-      fill.addColorStop(0, '#ff6a1a');
-      fill.addColorStop(1, '#ffb347');
-      g.fillStyle = fill;
-      g.fillRect(x0, y - 14, width * Math.min(a, b), 28);
-      if (b > a) {
-        g.fillStyle = '#6fd36f';
-        g.fillRect(x0 + width * a, y - 14, width * (b - a), 28);
-      } else if (b < a) {
-        g.fillStyle = '#e0574a';
-        g.fillRect(x0 + width * b, y - 14, width * (a - b), 28);
+      const cx = W * ((i + 0.5) / rows.length);
+      const cy = 268;
+      // The dial: a dark face, ticks along a 240 degree arc, and the needle.
+      g.fillStyle = '#15181d';
+      g.beginPath();
+      g.arc(cx, cy, R, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = '#8a94a3';
+      g.lineWidth = 4;
+      g.stroke();
+      const a0 = Math.PI * (5 / 6);
+      const span = Math.PI * (4 / 3);
+      for (let t = 0; t <= 10; t++) {
+        const a = a0 + (span * t) / 10;
+        g.strokeStyle = t % 5 === 0 ? '#c9d3e0' : '#5d6672';
+        g.lineWidth = t % 5 === 0 ? 4 : 2;
+        g.beginPath();
+        g.moveTo(cx + Math.cos(a) * R * 0.78, cy + Math.sin(a) * R * 0.78);
+        g.lineTo(cx + Math.cos(a) * R * 0.92, cy + Math.sin(a) * R * 0.92);
+        g.stroke();
       }
+      const needle = (v: number, color: string, width: number) => {
+        const a = a0 + span * Math.min(1, Math.max(0, v / 100));
+        g.strokeStyle = color;
+        g.lineWidth = width;
+        g.lineCap = 'round';
+        g.beginPath();
+        g.moveTo(cx, cy);
+        g.lineTo(cx + Math.cos(a) * R * 0.8, cy + Math.sin(a) * R * 0.8);
+        g.stroke();
+      };
+      if (next && next[key] !== now[key]) needle(next[key], next[key] > now[key] ? '#6fd36f' : '#e0574a', 6);
+      needle(now[key], ORANGE, 8);
+      g.fillStyle = '#c9d3e0';
+      g.beginPath();
+      g.arc(cx, cy, 9, 0, Math.PI * 2);
+      g.fill();
+      g.font = `700 30px ${FONT}`;
+      engrave(g, label, cx, cy + R + 32, STEEL);
     });
     // What just happened, or what to do next.
-    g.fillStyle = STEEL;
-    let size = 26;
-    do g.font = `${size--}px ${FONT}`;
-    while (g.measureText(message).width > 470 && size > 14);
-    g.fillText(message, 26, 425);
+    let size = 36;
+    do g.font = `600 ${size--}px ${FONT}`;
+    while (g.measureText(message).width > W - 80 && size > 16);
+    engrave(g, message, W / 2, 450, STEEL);
     this.tex.needsUpdate = true;
   }
 }

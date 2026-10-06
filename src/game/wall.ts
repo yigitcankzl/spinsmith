@@ -1,15 +1,13 @@
 /**
  * The smithy wall: hung on the real wall in front of the player (a detected wall plane), or on a
  * virtual one when the room has none, facing the player. It only shows when there is a use for it:
- * - forge: a board with a SPINSMITH sign, filled with the parts (point at one and pinch: it flies
- *   to your hand);
  * - workshop: the workshop's board on the left and a short help on the right;
  * - match: nothing on the wall; its fighting-game bar (each top's spin as a health bar, points
  *   below) is placed over the arena's far rim by the match system;
- * - home: nothing.
+ * - home and forge (the forge is built into the arena): nothing.
  */
 import { CanvasTexture, Group, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from '@iwsdk/core';
-import { CYAN, FONT, glass, GLASS_LIGHT, glassMesh, ORANGE, STEEL, TEXT, TEXT_DIM, titleMesh } from './ui.js';
+import { CYAN, FONT, glass, GLASS_LIGHT, glassMesh, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM, titleMesh } from './ui.js';
 
 /** Wall board size (m). */
 const WIDTH = 1.7;
@@ -20,7 +18,7 @@ const VIRTUAL_DISTANCE = 1.6;
 const MIN_DISTANCE = 0.7;
 const MAX_DISTANCE = 4;
 
-export type WallMode = 'home' | 'forge' | 'workshop' | 'match';
+export type WallMode = 'home' | 'workshop' | 'match';
 
 export interface WallPlane {
   /** Center and unit normal, world space. */
@@ -31,7 +29,7 @@ export interface WallPlane {
 export class Wall {
   /** World space: add with world.createTransformEntity. */
   readonly root = new Group();
-  /** Left half: the forge's tool panel (local +x right, +y up, +z toward the player). */
+  /** Left half: the workshop's pieces (local +x right, +y up, +z toward the player). */
   readonly tools = new Group();
   private board: Mesh;
   /** The board with its sign and halves (forge, workshop). */
@@ -128,18 +126,10 @@ export class Wall {
   setMode(mode: WallMode) {
     this.mode = mode;
     // In a match the wall itself steps away; only the bar shows, over the arena.
-    this.root.visible = this.placed && (mode === 'forge' || mode === 'workshop');
-    this.panel.visible = mode === 'forge' || mode === 'workshop';
+    this.root.visible = this.placed && mode === 'workshop';
+    this.panel.visible = mode === 'workshop';
     this.hud.visible = mode === 'match';
     this.board.visible = mode === 'workshop';
-    // In the forge the parts fill the whole board, larger; in the workshop its board takes the left half.
-    if (mode === 'forge') {
-      this.tools.position.set(-0.03, -0.1, 0.02);
-      this.tools.scale.setScalar(1.08);
-    } else {
-      this.tools.position.set(-WIDTH / 4 - 0.02, -0.07, 0.02);
-      this.tools.scale.setScalar(1);
-    }
   }
 
   /**
@@ -155,12 +145,12 @@ export class Wall {
     this.hudKey = key;
     const g = this.hudCanvas.getContext('2d')!;
     const W = 1400;
-    glass(g, W, 330, ORANGE);
+    metalPlate(g, W, 330);
     const barW = 560;
     const barY = 90;
     const side = (x0: number, dir: 1 | -1, value: number, color: string, name: string, points: number) => {
-      // Frame, then the fill anchored at the outer end, draining toward the middle.
-      g.fillStyle = 'rgba(255,255,255,0.08)';
+      // A dark slot cut into the plate, then the fill anchored at the outer end, draining toward the middle.
+      g.fillStyle = '#121418';
       g.fillRect(dir === 1 ? x0 : x0 - barW, barY, barW, 56);
       g.fillStyle = value > 25 ? color : '#e0574a';
       const w = (barW * value) / 100;

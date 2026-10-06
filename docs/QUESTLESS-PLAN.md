@@ -218,3 +218,5 @@ device.
   hub 226-228, forge 188 with most parts unlocked (over the ~180 guide; it grows with the shelf),
   workshop 118. Screenshots in `docs/review/`.
 - **Priority 6:** texts in `SUBMISSION.md`. Hosting waits for the developer.
+- **After the plan:** the arena and the forge became one machine (`FORGE-STADIUM.md`): hub 196,
+  forge 162 draw calls, under the gates.

@@ -15,9 +15,10 @@ What works:
   8 cm above the nearest detected table, or on a floating tray when there is no table or the
   table is far below the eyes (standing over a coffee table).
 - **The room is the smithy** (`src/game/wall.ts`, `src/game/hub.ts`): the arena sits on your
-  table, drawn twice its simulation size (about 60 cm across). At home, your top waits on a stand
-  at the arena's left (carry it into the arena or tap it to play), an anvil at its right holds
-  your top (pinch it to forge), and a row of arena miniatures floats behind the arena: point at
+  table, drawn twice its simulation size (about 60 cm across). At home, your top waits in its dock
+  on the near rim's left (carry it into the arena or tap it to play), a small anvil on the near
+  rim's right opens the forge, your level sits on a plate between them, and a row of arena
+  miniatures floats behind the arena: point at
   one and pinch, it flies to your hand; drop it on the arena (or tap it) to switch. The blueprint
   at the end opens the workshop. The smithy wall hangs on the real wall straight ahead (a
   detected wall plane, or a virtual wall 1.6 m ahead) only when it has a use: in the forge and
@@ -56,25 +57,26 @@ What works:
   their gear, Saw rings chip toward a burst. The classic Striker (attack), Anvil (defense)
   and Needle (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
   the opponent's cool teal; the opponent gets a random build each round.
-- **Forge, by hand** (`src/game/forge.ts`): pinch the anvil. The forge is its own place: the arena hides and your top
-  floats large in the air ahead and to your right, clear of the wall, tipped toward you, over a
-  ring of light; carry it anywhere and let go, it stays there. The
-  parts hang on the wall's tool panel (tips, cores, rings, style, presets) and fly to your hand. Pinch your
-  top to pick it up: it follows your hand and turns with it. Pinch a part on the wall and bring
-  it to the top (floating or in your other hand): the top comes apart to show where the part
-  goes and that slot pulses; let go to fit it with a clack (tapping a part fits it too). A core
-  locks with one click per tooth; overweight builds are refused. Tap a paint pot or dip the top
-  in it to paint it; spin tokens set the spin direction. Dunk the top in the quench bucket to save and go
-  home. A stats card floating to the right of your top shows the build, previews a part's effect (green gains, red losses) and says what
-  just happened. `npm run report:tops` plays every build against the others and flags dominant
+- **Forge, by hand** (`src/game/forge.ts`, `docs/FORGE-STADIUM.md`): pinch the small anvil and
+  the arena turns into the forge: its floor sinks, an anvil rises at the near third of the bowl
+  with your top on it, four drawer tabs slide out of the near rim (Ring, Core, Tip, Style) and a
+  stats plate rises on the far rim. Everything you touch is within a seated arm's reach. The open
+  drawer's parts (at most six) lie on a half circle around the anvil. Pinch a part and bring it
+  to your top: the top comes apart to show where the part goes and that slot pulses; let go to
+  fit it with a clack (tapping a part fits it too). A core locks with one click per tooth;
+  overweight builds are refused. Pinch your top to pick it up and turn it; let go and it settles
+  back on the anvil. Tap a paint pot or dip the top in it to paint it; spin tokens set the spin
+  direction. Drop the top in the quench slot beside the anvil to save: the forge folds back into
+  the arena. The stats plate shows the build, one dial per stat with a second needle previewing
+  a part (green gain, red loss), and what just happened. `npm run report:tops` plays every build against the others and flags dominant
   builds and dead parts.
 - **First session** (docs/GAMEPLAY-DIRECTION.md, section 12): until the first match is
-  finished the home is just your top on its stand (a breathing ring calls you to it) and the
+  finished the home is just your top in its dock (a breathing ring calls you to it) and the
   arena; the anvil, the arena shelf and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
   the rival where lifting would push it, until your first ramp. Finishing the first match, won or
   lost, earns the Rush tip: the anvil appears and calls for it, the forge highlights only that
-  part, and after saving the stand calls you back for the rematch.
+  part, and after saving the dock calls you back for the rematch.
 - **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
   burst, pocket or over finish, a perfect rip, and the match), filling levels 1-20 with ranks
   (Apprentice, Journeyman, Smith, Master Smith, Legend). Levels open options, never power: you
@@ -86,7 +88,7 @@ What works:
   and style show at the start. Higher levels make rivals rip harder and aim steadier, never
   stronger in stats.
   After a round the match bar shows the XP earned and the level bar; a level-up rings and
-  throws sparks, and each unlock spins over the arena. Your level and rank sit beside the stand.
+  throws sparks, and each unlock spins over the arena. Your level and rank sit on the near rim.
   Progress is saved in the browser.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.

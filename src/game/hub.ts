@@ -1,7 +1,7 @@
 /**
  * The home screen as a smithy, with no buttons: things to pick up, on the table and on the wall.
- * - Your top waits on a stand at the arena's left: carry it into the arena (or tap it) to play.
- * - An anvil at the arena's right holds your top: pinch it to forge your top.
+ * - Your top waits in its dock on the arena's near rim: carry it into the arena (or tap it) to play.
+ * - A small anvil on the near rim's right opens the forge: the arena itself turns into it.
  * - A row of arena miniatures floats behind the arena: point at one and pinch, it flies to your
  *   hand; drop it on the arena (or tap it) to switch. The blueprint at the end opens the workshop.
  * Table things are arena-local (arena center at the origin, +Z toward the player).
@@ -42,9 +42,11 @@ export type HubAction = { kind: 'play' } | { kind: 'arena'; index: number } | { 
 /** A hand lost this long (s) cancels a carry instead of dropping (same as the match's rip). */
 const HAND_LOSS_GRACE = 0.1;
 
-/** Table stations (arena-local): the anvil at the right, the stand at the left, both near the player. */
-export const ANVIL_AT = new Vector3(0.24, 0, 0.06);
-const STAND_AT = new Vector3(-0.23, 0, 0.06);
+/** Near-rim stations (arena-local): your top's dock at the left, the forge's anvil at the right. */
+export const FORGE_AT = new Vector3(0.14, 0, 0.15);
+const DOCK_AT = new Vector3(-0.14, 0, 0.15);
+/** The anvil and the dock on the rim are small models of the full ones. */
+const RIM_SCALE = 0.42;
 /** Miniatures on the wall shelf: this much larger than on a table, this far apart, this many a row. */
 const WALL_MINI_SCALE = 2.4;
 const WALL_MINI_GAP = 0.17;
@@ -101,7 +103,6 @@ export class Hub {
   private rankKey = '';
   private names: Mesh[] = [];
   private standTop: TopView | null = null;
-  private anvilTop: TopView | null = null;
   private topKey = '';
   private arenasKey = '';
   private held: { item: Pickable; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
@@ -117,9 +118,9 @@ export class Hub {
     this.buildShelf();
     this.buildAnvil();
     this.buildStand();
-    // The miniatures float in a row behind the arena's far rim (drawn at wall size: the arena's
-    // space is twice as large as the world).
-    this.shelf.position.set(0, 0.13, -0.26);
+    // The miniatures float in a row behind the arena's far rim, to the right of the notes (drawn at
+    // wall size: the arena's space is twice as large as the world).
+    this.shelf.position.set(0.2, 0.13, -0.28);
     this.shelf.scale.setScalar(0.5);
     this.beacon.rotation.x = -Math.PI / 2;
     this.root.add(this.anvil, this.stand, this.shelf, this.beacon);
@@ -135,24 +136,18 @@ export class Hub {
     const first = progress.matches === 0;
     this.shelf.visible = !first;
     this.anvil.visible = !first;
-    // The guide's beacon: on the stand to start (and for the rematch), on the anvil for the new part.
-    // Every unfinished guide step points somewhere: the stand to play, the anvil for the new part.
+    // Every unfinished guide step points somewhere: the dock to play, the anvil for the new part.
     this.beacon.visible = progress.guide !== 'done';
     const onAnvil = progress.guide === 'forge' || progress.guide === 'fit';
-    this.beacon.position.set(onAnvil ? ANVIL_AT.x : STAND_AT.x, TABLE_Y + (onAnvil ? ANVIL_FACE + 0.01 : 0.1), onAnvil ? ANVIL_AT.z : STAND_AT.z);
+    const at = onAnvil ? FORGE_AT : DOCK_AT;
+    this.beacon.position.set(at.x, TABLE_Y + DOCK_TOP + 0.003, at.z);
     const topKey = JSON.stringify(build);
     if (topKey !== this.topKey) {
       this.topKey = topKey;
       this.standTop?.dispose();
-      this.anvilTop?.dispose();
       this.standTop = new TopView(build, build.color);
-      this.standTop.root.scale.setScalar(1.1);
-      this.standTop.root.position.y = 0.1;
+      this.standTop.root.position.y = DOCK_TOP;
       this.standHolder.add(this.standTop.root);
-      this.anvilTop = new TopView(build, build.color);
-      this.anvilTop.root.scale.setScalar(1.3);
-      this.anvilTop.root.position.set(0, ANVIL_FACE, 0);
-      this.anvil.add(this.anvilTop.root);
     }
     const locks = arenas.map((a) => progress.lockText(`arena:${a.name}`));
     const arenasKey = JSON.stringify([arenas.map((a) => a.name), current, locks]);
@@ -176,7 +171,6 @@ export class Hub {
     this.beacon.scale.setScalar(1 + 0.35 * k);
     (this.beacon.material as MeshBasicMaterial).opacity = 0.35 + 0.5 * (1 - k);
     if (this.standTop) this.standTop.root.rotation.y += dt * 0.8;
-    if (this.anvilTop) this.anvilTop.root.rotation.y -= dt * 0.4;
     // Station names turn to face the player.
     for (const l of this.labels) {
       l.getWorldPosition(this.p);
@@ -335,12 +329,17 @@ export class Hub {
     });
   }
 
-  /** The anvil; your top turns on its face. */
+  /** The small anvil on the near rim: pinch it to turn the arena into the forge. */
   private buildAnvil() {
-    this.anvil.position.set(ANVIL_AT.x, TABLE_Y, ANVIL_AT.z);
-    const body = anvilModel();
+    this.anvil.position.set(FORGE_AT.x, TABLE_Y, FORGE_AT.z);
+    // The picked thing is a holder (hover rescales it), the model inside is at rim scale.
+    const body = new Group();
+    const model = anvilModel();
+    model.scale.setScalar(RIM_SCALE);
+    model.rotation.y = -0.6;
+    body.add(model);
     this.anvil.add(body);
-    this.label('FORGE', this.anvil, 0.21);
+    this.label('FORGE', this.anvil, ANVIL_FACE * RIM_SCALE + 0.035);
     this.items.push({ action: { kind: 'forge' }, carry: false, model: body, home: new Vector3() });
   }
 
@@ -371,18 +370,22 @@ export class Hub {
     this.rankTex.needsUpdate = true;
   }
 
+  /** Your top's dock on the near rim, with your smith level on a plate between it and the anvil. */
   private buildStand() {
-    this.stand.position.set(STAND_AT.x, TABLE_Y, STAND_AT.z);
+    this.stand.position.set(DOCK_AT.x, TABLE_Y, DOCK_AT.z);
     this.rankCanvas.width = 512;
     this.rankCanvas.height = 200;
     this.rankTex = new CanvasTexture(this.rankCanvas);
     this.rankTex.colorSpace = SRGBColorSpace;
     const rank = new Mesh(new PlaneGeometry(0.1, 0.039), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
-    rank.position.set(0, 0.21, 0);
-    rank.rotation.x = -0.3;
-    this.stand.add(rank);
-    this.stand.add(standModel());
-    this.label('PLAY', this.stand, 0.15);
+    rank.position.set(0, TABLE_Y + 0.045, DOCK_AT.z + 0.04);
+    rank.rotation.x = -1;
+    rank.scale.setScalar(0.8);
+    this.root.add(rank);
+    const dock = standModel();
+    dock.scale.setScalar(RIM_SCALE);
+    this.stand.add(dock);
+    this.label('PLAY', this.stand, DOCK_TOP + 0.06);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
     this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3() });
@@ -423,6 +426,8 @@ export function miniArena(layout: ArenaLayout, current: boolean): Group {
 
 /** Height of the anvil's face (m): a top set on the anvil stands here. */
 export const ANVIL_FACE = 0.1435;
+/** Height of the dock's cup above the table (the stand's cup, at rim scale). */
+const DOCK_TOP = 0.097 * RIM_SCALE;
 
 /**
  * The anvil, standing on the table: a forged steel anvil drawn from its side profile (a horn that
