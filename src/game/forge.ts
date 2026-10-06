@@ -14,6 +14,7 @@
 import {
   BoxGeometry,
   CanvasTexture,
+  Color,
   CircleGeometry,
   ConeGeometry,
   CylinderGeometry,
@@ -111,7 +112,19 @@ interface Slot {
   item: Item;
   model: Object3D;
   home: Vector3;
+  /** The card behind the part: its frame lights up when the part is on your top. */
+  frame: MeshBasicMaterial;
+  equipped: Mesh;
+  /** Seconds left of the flash after the part was fitted. */
+  flash: number;
+  /** Its scale on the wall. */
+  size: number;
 }
+
+/** Tile frame colors: idle, pointed at, on your top. */
+const FRAME_IDLE = new Color(0x4a3a30);
+const FRAME_HOVER = new Color(0xc9a27a);
+const FRAME_ON = new Color(0xff9a3c);
 
 export interface ForgeHooks {
   /** Save the build and go back. */
@@ -143,6 +156,9 @@ export class Forge {
   /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
   private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion } | null = null;
   private explode = 0;
+  /** The halo flares when a part is fitted. */
+  private glow = 0;
+  private readonly white = new Color(0xffffff);
   /** The paint pot the carried top is dipped in (so a dip paints once). */
   private dippedIn: Slot | null = null;
   /** Lock clicks still to play after a core is fitted, and the time to the next one. */
@@ -225,7 +241,9 @@ export class Forge {
       this.displayHolder.position.copy(this.floatSpot);
     }
     this.halo.position.set(this.floatSpot.x, this.floatSpot.y - 0.03, this.floatSpot.z);
-    this.halo.scale.setScalar(1 + 0.04 * Math.sin(this.time * 3));
+    this.glow = Math.max(0, this.glow - 0.03);
+    this.halo.scale.setScalar(1 + 0.04 * Math.sin(this.time * 3) + 0.8 * this.glow);
+    (this.halo.material as MeshBasicMaterial).color.setHex(0xff9a3c).lerp(this.white, this.glow);
     this.face(this.bucket, head);
   }
 
@@ -267,8 +285,15 @@ export class Forge {
     }
     for (const s of this.slots) {
       const on = s === hovered;
+      const fitted = this.isOn(s.item);
+      s.flash = Math.max(0, s.flash - dt);
+      s.equipped.visible = fitted;
+      s.frame.color.copy(fitted ? FRAME_ON : on ? FRAME_HOVER : FRAME_IDLE);
+      // A part just fitted flashes white and pulses.
+      if (s.flash > 0) s.frame.color.lerp(this.white, s.flash / 0.8);
+      const pulse = s.flash > 0 ? 1 + 0.25 * Math.sin((s.flash / 0.8) * Math.PI) : 1;
       s.model.position.set(s.home.x, s.home.y, s.home.z + (on ? 0.03 + 0.005 * Math.sin(this.time * 8) : 0));
-      s.model.scale.setScalar(WALL_SCALE * (on ? 1.15 : 1));
+      s.model.scale.setScalar(s.size * (on ? 1.15 : 1) * pulse);
     }
     if (!this.heldPart) this.showCard(hovered ? this.withItem(hovered.item) : null);
   }
@@ -374,7 +399,28 @@ export class Forge {
     return b;
   }
 
+  /** True when the item is part of your top right now. */
+  private isOn(item: Item): boolean {
+    const b = this.build;
+    switch (item.kind) {
+      case 'ring':
+        return b.ring === item.id;
+      case 'core':
+        return b.core === item.id;
+      case 'tip':
+        return b.tip === item.id;
+      case 'spin':
+        return b.spin === item.value;
+      case 'color':
+        return b.color === item.value;
+      default:
+        return b.ring === item.build.ring && b.core === item.build.core && b.tip === item.build.tip;
+    }
+  }
+
   private fit(item: Item) {
+    const slot = this.slots.find((s) => s.item === item);
+    const before = JSON.stringify(this.build);
     if (item.kind === 'spin') {
       this.build = { ...this.build, spin: item.value };
       this.say(item.value === 1 ? 'Right spin' : 'Left spin: steals spin from right spinners');
@@ -399,6 +445,10 @@ export class Forge {
     }
     playPlace();
     this.rebuildDisplay();
+    if (slot && JSON.stringify(this.build) !== before) {
+      slot.flash = 0.8;
+      this.glow = 1;
+    }
   }
 
   private save() {
@@ -470,25 +520,39 @@ export class Forge {
 
   /** The tool panel on the wall: a row of parts on pegs per kind, its name above the row. */
   private buildShelf() {
-    const iron = new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x5d6068) });
     ROWS.forEach(([label, items, gap], r) => {
       const y = 0.33 - r * ROW_GAP;
-      const name = tag(label, 0.16, 44);
-      name.position.set(-0.32, y + 0.065, 0.005);
+      const name = tag(label, 0.14, 44);
+      name.position.set(-0.36, y + 0.0, 0.005);
       this.shelf.add(name);
+      const step = gap * WALL_SCALE * 0.9;
       items.forEach((item, c) => {
-        const home = new Vector3((c - (items.length - 1) / 2) * gap * WALL_SCALE * 0.9 + 0.03, y, 0.04);
-        const peg = new Mesh(new CylinderGeometry(0.004, 0.004, 0.04, 8).rotateX(Math.PI / 2), iron);
-        peg.position.set(home.x, y + 0.01, 0.02);
-        // Each part hangs tipped toward the player, so its top face shows.
+        // Tips and cores stand up from their base, so they sit lower on the card.
+        const low = item.kind === 'tip' || item.kind === 'core';
+        const home = new Vector3((c - (items.length - 1) / 2) * step + 0.06, y + (low ? -0.028 : 0.008), 0.04);
+        // A card behind each part: a lit frame, a lighter face, the part's name below.
+        const w = Math.min(step - 0.01, 0.15);
+        const frame = new MeshBasicMaterial({ color: FRAME_IDLE.clone() });
+        const border = new Mesh(new PlaneGeometry(w, ROW_GAP - 0.012), frame);
+        border.position.set(home.x, y, 0.004);
+        const face = new Mesh(new PlaneGeometry(w - 0.008, ROW_GAP - 0.02), new MeshBasicMaterial({ color: 0x5b4a3e }));
+        face.position.set(home.x, y, 0.005);
+        const label = tag(item.name, w * 0.95, 40);
+        label.position.set(home.x, y - ROW_GAP / 2 + 0.022, 0.007);
+        const equipped = tag('EQUIPPED', w * 0.8, 40);
+        equipped.position.set(home.x, y + ROW_GAP / 2 - 0.02, 0.007);
+        equipped.visible = false;
+        // Rings and presets show their top face; tips and cores their profile; pots their paint.
         const model = new Group();
         const inner = itemModel(item);
-        inner.rotation.x = 1.1;
+        inner.rotation.x = item.kind === 'tip' || item.kind === 'core' ? 0.35 : item.kind === 'color' ? 1.35 : 1.1;
         model.add(inner);
         model.position.copy(home);
-        model.scale.setScalar(WALL_SCALE);
-        this.shelf.add(peg, model);
-        this.slots.push({ item, model, home });
+        // Rings and preset tops are wide: a little smaller, so they stay on their card.
+        const size = WALL_SCALE * (item.kind === 'ring' ? 0.78 : item.kind === 'preset' ? 0.62 : item.kind === 'core' ? 0.62 : 1);
+        model.scale.setScalar(size);
+        this.shelf.add(border, face, label, equipped, model);
+        this.slots.push({ item, model, home, frame, equipped, flash: 0, size });
       });
     });
   }
@@ -549,7 +613,7 @@ function itemModel(item: Item): Object3D {
     const pot = new Mesh(new CylinderGeometry(0.014, 0.012, 0.018, 20), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x7d828c) }));
     pot.position.y = 0.009;
     const paint = new Mesh(new CircleGeometry(0.0125, 20).rotateX(-Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', item.value) }));
-    paint.position.y = 0.0175;
+    paint.position.y = 0.0186;
     g.add(pot, paint);
   } else if (item.kind === 'preset') {
     const view = new TopView(item.build, item.build.color);
