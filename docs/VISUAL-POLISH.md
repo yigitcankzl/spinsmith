@@ -113,3 +113,27 @@ materials has to be measured on the headset.
 Second pass, if this is not enough: bigger sparks with a 40-50 ms simulation-only hit stop, and
 emissive chips. The font comes after the 3D look has settled, as one central constant
 (Rajdhani only).
+
+## 7. Asset quality sprint (Oct 6, 2026)
+
+After a review found the first pass mostly recolored existing objects (models and surfaces 4/10,
+presentation 4.5/10), a sprint on the objects themselves:
+
+1. **Tops:** each ring has its own design (outline, thickness, contact tilt, raised tier, layer,
+   windows). Striker is low and wide with three swept swords, Anvil tall and heavy with six lobes
+   under a crown, Halo a wide open wheel on four spokes. Blades carry a spun-metal texture as
+   color and roughness. `tops-silhouettes.png`.
+2. **Arena:** a machined floor texture (fine brushing, two engraved grooves, dial ticks, an
+   engraved emblem, wear where the tops run) instead of wide bands; the rim is three layers (dark
+   body, metal lip, one accent light); rails idle in steel. `arena-surface.png`.
+3. **Framing:** without a table the arena stands about 30 degrees below the eyes; notes hang over
+   the far rim or over the station they point at, never between the eyes and the tops.
+4. **Props:** the anvil is modelled from a classic side profile (tapering horn, face plate with a
+   hardy hole, stepped heel, waist, feet); the stand is a turned pedestal with brass prongs.
+5. **UI:** one display font, Rajdhani, loaded before any panel is drawn.
+
+Same camera, before the visual work and after the sprint: `polish-sprint-before-after.png`.
+
+Still weak, in order: the colored plastic layers on the tops are plain flat shapes; the wall and
+panels are generic glass rather than SpinSmith-specific; the arena shell's clamps are still
+primitive boxes; impact effects are untested on the headset; nothing has been measured on Quest.
