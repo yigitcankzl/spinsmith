@@ -25,6 +25,7 @@ import { arenaWarning } from './arena-report.js';
 import type { ArenaReport } from './arena-report.js';
 import { engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
+import { RAIL, TAB_LINE } from './reach.js';
 import { playDrawer, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
@@ -263,17 +264,17 @@ const PLACED = new Set(['pocket', 'rail', 'pillar', 'bumper']);
 /** The drawer tabs in a row on the near rim (as in the forge), and the actions on the side rims. */
 const PLATES = [...TRAY.map(([label]) => label.toUpperCase()), 'BACK', 'TRY', 'SAVE'];
 const DRAWERS = TRAY.length;
-const PLATE_GAP = 0.066;
-const PLATE_Z = 0.232;
-const PLATE_Y = -0.012;
+const PLATE_GAP = TAB_LINE.gap;
+const PLATE_Z = TAB_LINE.z;
+const PLATE_Y = TAB_LINE.y;
 const PLATE_W = 0.058;
 const PLATE_H = 0.024;
 /** Back on the left rim, Try and Save on the right; Save's plate sits in front of its stamp slot. */
 const SAVE_AT = new Vector3(0.205, -0.006, 0.0);
 const ACTIONS_AT = [new Vector3(-0.205, 0.004, 0.1), new Vector3(0.205, 0.004, 0.1), new Vector3(0.215, 0.004, 0.045)];
 /** The tool rail across the near rim, no wider than the arena: its pieces this far apart, this much larger than life. */
-const RAIL_Z = 0.2;
-const RAIL_Y = 0.03;
+const RAIL_Z = RAIL.z;
+const RAIL_Y = RAIL.y;
 const RAIL_W = 0.27;
 const ITEM_GAP = 0.046;
 const ITEM_SCALE = 0.95;

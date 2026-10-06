@@ -32,6 +32,7 @@ import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
 import { ORANGE, TEXT_DIM } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
+import { TAB_LINE, traySpot, WORK as REACH_WORK } from './reach.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
@@ -78,8 +79,7 @@ export const ROWS: [string, Item[], number][] = [
   [
     'STYLE',
     [
-      { kind: 'spin', value: 1, name: 'Right spin', blurb: 'Spins clockwise' },
-      { kind: 'spin', value: -1, name: 'Left spin', blurb: 'Steals spin from right spinners' },
+      { kind: 'spin', value: 1, name: 'Spin direction', blurb: 'Tap to turn it: left spin steals spin from right spinners' },
       ...TOP_COLORS.map((value) => ({ kind: 'color' as const, value, name: 'Paint', blurb: 'Dip your top or tap the pot' })),
       { kind: 'emblem' as const, name: 'Emblem glow', blurb: 'Tap to step through the glows you have earned' },
     ],
@@ -93,21 +93,18 @@ const DRAWERS: [Drawer, string, number][] = [
   ['tip', 'TIP', 0],
   ['style', 'STYLE', 3],
 ];
-/** Arena-local layout (the arena center is the origin, +Z toward the player, the world is half as large). */
-/** Your top stands here on the anvil: the near third of the bowl, about 0.45 m from the eyes. */
-const WORK = new Vector3(0, 0.07, 0.06);
+/** Arena-local layout (the arena center is the origin, +Z toward the player, the world is half as large); the touch layout is in reach.ts. */
+/** Your top stands here on the anvil: the near third of the bowl, about 0.5 m from the eyes. */
+const WORK = new Vector3(REACH_WORK.x, REACH_WORK.y, REACH_WORK.z);
 /** The anvil is drawn this much larger than the home one. */
 const ANVIL_SCALE = 1.35;
 /** The arena floor sinks this far while the forge is open. */
 export const FORGE_SINK = 0.03;
-/** The tray: parts on a half circle this far around the anvil, toward the player, at this height. */
-const TRAY_R = 0.105;
-const TRAY_Y = 0.035;
-/** The drawer tabs: a row along the near rim. */
-const TAB_Z = 0.19;
-const TAB_Y = 0.006;
+/** The drawer tabs: a row along the near rim (the line in reach.ts, shared with the workshop). */
+const TAB_Z = TAB_LINE.z;
+const TAB_Y = TAB_LINE.y;
 const TAB_W = 0.058;
-const TAB_GAP = 0.066;
+const TAB_GAP = TAB_LINE.gap;
 const TAB_H = 0.024;
 /** The quench slot, set into the right rim beside the anvil. */
 const QUENCH_AT = new Vector3(0.205, -0.006, 0.06);
@@ -549,7 +546,7 @@ export class Forge {
       case 'tip':
         return b.tip === item.id;
       case 'spin':
-        return b.spin === item.value;
+        return b.spin === -1;
       case 'color':
         return b.color === item.value;
       case 'emblem':
@@ -563,8 +560,10 @@ export class Forge {
     const slot = this.slots.find((s) => s.item === item);
     const before = JSON.stringify(this.build);
     if (item.kind === 'spin') {
-      this.build = { ...this.build, spin: item.value };
-      this.say(item.value === 1 ? 'Right spin' : 'Left spin: steals spin from right spinners');
+      // One token: each tap turns the spin the other way.
+      const spin = this.build.spin === 1 ? -1 : 1;
+      this.build = { ...this.build, spin };
+      this.say(spin === 1 ? 'Right spin' : 'Left spin: steals spin from right spinners');
     } else if (item.kind === 'color') {
       this.build = { ...this.build, color: item.value };
       this.say('Painted');
@@ -729,8 +728,9 @@ export class Forge {
       const items = ROWS[row][1];
       items.forEach((item, i) => {
         // A half circle on the anvil's near side, evenly spread.
-        const a = (Math.PI * (i + 0.5)) / items.length;
-        const home = new Vector3(WORK.x - Math.cos(a) * TRAY_R, TRAY_Y, WORK.z + Math.sin(a) * TRAY_R);
+        // An arc on the anvil's near side, opening wider for a fuller drawer.
+        const at = traySpot(i, items.length);
+        const home = new Vector3(at.x, at.y, at.z);
         const model = new Group();
         const inner = itemModel(item);
         // Rings show their top face; tips and cores their profile; pots their paint.

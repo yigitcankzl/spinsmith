@@ -14,6 +14,7 @@ import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
+import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
@@ -582,6 +583,20 @@ TUNING.grace = 0;
   assert.ok(again.level === 1 && again.guide === 'launch' && again.stamps === 0 && again.champions.length === 0, 'a reset is a new smith');
   freshSave(st);
   for (const k of SAVE_KEYS) assert.ok(!mem.has(k), `fresh clears ${k}`);
+}
+
+// 16. Reach: every target touched directly sits within a seated arm's comfortable reach and not
+// too steeply below the eyes, for trays 0.30-0.45 m below the eyes (Meta suggests 0.42-0.46 m for
+// direct touch and warns against 0.5-0.8 m; a fuller forge drawer spreads a little farther).
+{
+  const targets: [string, { x: number; y: number; z: number }][] = [...touchTargets(), ['tray, outer of a full drawer', traySpot(0, 8)]];
+  for (const drop of [0.3, 0.35, 0.4, 0.45]) {
+    for (const [name, at] of targets) {
+      const v = eyeView(at, drop);
+      assert.ok(v.distance >= 0.32 && v.distance <= 0.62, `${name} at drop ${drop}: ${v.distance.toFixed(2)} m from the eyes`);
+      assert.ok(v.below <= 63, `${name} at drop ${drop}: ${v.below.toFixed(0)} degrees below the eyes`);
+    }
+  }
 }
 
 console.log('sim-check: all passed');

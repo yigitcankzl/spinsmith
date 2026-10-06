@@ -1,8 +1,9 @@
 import { Matrix4, Object3D, Quaternion, Vector3 } from '@iwsdk/core';
+import { TUNE } from './tuning.js';
 
-/** Thumb-to-index distance hysteresis (m): close below ON, open above OFF. */
-const PINCH_ON = 0.02;
-const PINCH_OFF = 0.035;
+/** Thumb-to-index distance hysteresis (m): close below ON, open above OFF (tunable on a headset). */
+const PINCH_ON = TUNE.pinchOn;
+const PINCH_OFF = TUNE.pinchOff;
 
 export type Side = 'left' | 'right';
 

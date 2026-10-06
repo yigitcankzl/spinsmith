@@ -21,10 +21,11 @@ import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, OPPONENT_COLOR
 import type { ShapeMarkSpec } from './visuals.js';
 import { SHAPE_SIZE, ShapingCharges } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena } from './placement.js';
+import { TUNE } from './tuning.js';
 import type { Point } from './placement.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
-const ARENA_SCALE = 2;
+const ARENA_SCALE = TUNE.scale;
 /** Placing waits at least this long for planes, and places on the tray after SETTLE_MAX without a table (s). */
 const SETTLE_MIN = 0.5;
 const SETTLE_MAX = 5;
@@ -34,8 +35,8 @@ const LATE_TABLE = 30;
 const HANDLE_GRAB = 0.06;
 const HANDLE_LIFT = 0.1;
 /** Cord pull that counts as a full-power rip (m) and full-power pull speed (m/s). */
-const FULL_PULL = 0.22;
-const FULL_SPEED = 1.0;
+const FULL_PULL = TUNE.fullPull;
+const FULL_SPEED = TUNE.fullSpeed;
 /** Pulls shorter than this count as no pull (hand jitter). */
 const MIN_PULL = 0.05;
 /** Below this power nothing launches (a quick tap). */
@@ -67,7 +68,7 @@ const HIT_STOP = 0.045;
 const BUTTON_REACH = 0.035;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
 /** Launch power at or above this is a perfect rip: extra starting spin. */
-const PERFECT = 0.92;
+const PERFECT = TUNE.perfect;
 const PERFECT_SPIN = 1.1;
 /** Far ramps (and the dev key's) grow at this rate (m/s) while the pinch is held. */
 const RAY_BUMP_RATE = 0.05;
@@ -841,7 +842,7 @@ export class MatchSystem extends createSystem({
     head.getWorldDirection(this.fwd);
     // getWorldDirection returns +Z of the object; the camera looks down -Z.
     this.fwd.negate();
-    const at = placeArena(this.head, this.fwd.x, this.fwd.z, this.tables());
+    const at = placeArena(this.head, this.fwd.x, this.fwd.z, this.tables(), TUNE.reach);
     this.root.position.set(at.x, at.y, at.z);
     this.root.scale.setScalar(ARENA_SCALE);
     // Local +Z points back at the player.

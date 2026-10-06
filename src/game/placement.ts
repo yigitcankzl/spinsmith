@@ -46,15 +46,15 @@ export function pickTable(head: Point, tables: Point[]): number | null {
 }
 
 /** The arena's pose for a head and its horizontal look direction (any length; zero means ahead). */
-export function placeArena(head: Point, fwdX: number, fwdZ: number, tables: Point[]): Placement {
+export function placeArena(head: Point, fwdX: number, fwdZ: number, tables: Point[], reach = REACH): Placement {
   let len = Math.hypot(fwdX, fwdZ);
   if (len < 1e-6) {
     fwdX = 0;
     fwdZ = -1;
     len = 1;
   }
-  const x = head.x + (fwdX / len) * REACH;
-  const z = head.z + (fwdZ / len) * REACH;
+  const x = head.x + (fwdX / len) * reach;
+  const z = head.z + (fwdZ / len) * reach;
   const table = pickTable(head, tables);
   const y = table !== null ? table + PEDESTAL : head.y - TRAY_DROP;
   return { x, y, z, yaw: Math.atan2(head.x - x, head.z - z), onTable: table !== null };

@@ -41,6 +41,7 @@ import type { ArenaLayout, Theme } from './layout.js';
 import type { TopBuild } from './parts.js';
 import { RIVALS } from './parts.js';
 import { SmithBoard } from './board.js';
+import { BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE } from './reach.js';
 import type { Order } from './orders.js';
 import { MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
@@ -61,9 +62,9 @@ export type HubAction =
 const HAND_LOSS_GRACE = 0.1;
 
 /** Near-rim stations (arena-local): your top's dock at the left, the forge's anvil at the right. */
-export const FORGE_AT = new Vector3(0.14, 0, 0.15);
-const DOCK_AT = new Vector3(-0.14, 0, 0.15);
-const BLUEPRINT_AT = new Vector3(0.08, 0, 0.185);
+export const FORGE_AT = new Vector3(REACH_FORGE.x, REACH_FORGE.y, REACH_FORGE.z);
+const DOCK_AT = new Vector3(REACH_DOCK.x, REACH_DOCK.y, REACH_DOCK.z);
+const BLUEPRINT_AT = new Vector3(REACH_BLUEPRINT.x, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
 /** The Smith's board (where the first session's notes hang) and the champions' stands on the left rim. */
 const BOARD_AT = new Vector3(-0.17, 0.12, -0.25);
 const CHAMPION_AT = [new Vector3(-0.215, 0, 0.07), new Vector3(-0.23, 0, -0.01), new Vector3(-0.215, 0, -0.09)];
