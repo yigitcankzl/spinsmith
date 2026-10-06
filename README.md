@@ -54,14 +54,15 @@ What works:
   their gear, Saw rings chip toward a burst. The classic Striker (attack), Anvil (defense)
   and Needle (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
   the opponent's cool teal; the opponent gets a random build each round.
-- **Forge, by hand** (`src/game/forge.ts`): pinch the anvil. Your top stands on the anvil; the
+- **Forge, by hand** (`src/game/forge.ts`): pinch the anvil. The forge is its own place: the arena hides and your top
+  floats large in the air in front of you, tipped toward you, over a ring of light; the
   parts hang on the wall's tool panel (tips, cores, rings, style, presets) and fly to your hand. Pinch your
-  top to pick it up: it follows your hand and turns with it. Pinch a part on the shelf and bring
-  it to the top (on the anvil or in your other hand): the top comes apart to show where the part
+  top to pick it up: it follows your hand and turns with it. Pinch a part on the wall and bring
+  it to the top (floating or in your other hand): the top comes apart to show where the part
   goes and that slot pulses; let go to fit it with a clack (tapping a part fits it too). A core
   locks with one click per tooth; overweight builds are refused. Tap a paint pot or dip the top
-  in it to paint it; spin tokens set the spin direction. Drop the top into the arena to test it
-  in a round; dunk it in the quench bucket to save and go home. A stats card on the wall (over the
+  in it to paint it; spin tokens set the spin direction. Lower the top into the TEST ring where the arena
+  stands to test it in a round; dunk it in the quench bucket to save and go home. A stats card on the wall (over the
   scoreboard) shows the build, previews a part's effect (green gains, red losses) and says what
   just happened. `npm run report:tops` plays every build against the others and flags dominant
   builds and dead parts.

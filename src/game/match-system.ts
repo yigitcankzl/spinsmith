@@ -430,12 +430,15 @@ export class MatchSystem extends createSystem({
     this.phase = 'forge';
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
+    // The forge is its own place: the arena hides while you build.
+    this.stage.visible = false;
     this.forge.open();
   }
 
   /** Back home from the forge; a saved build becomes your top. */
   private leaveForge(build: TopBuild | null) {
     this.forge.close();
+    this.stage.visible = true;
     if (build) this.myBuild = { ...build };
     this.toHub();
   }
@@ -443,6 +446,7 @@ export class MatchSystem extends createSystem({
   /** Forge Test: your build against a random one, launched by the AI; back to the forge after. */
   private testBuild(build: TopBuild) {
     this.forge.root.visible = false;
+    this.stage.visible = true;
     this.demo = true;
     this.demoFrom = 'forge';
     this.setBuilds(build, this.randomBuild());
@@ -514,7 +518,10 @@ export class MatchSystem extends createSystem({
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.arena.reset();
-    if (this.demoFrom === 'forge') this.forge.root.visible = true;
+    if (this.demoFrom === 'forge') {
+      this.forge.root.visible = true;
+      this.stage.visible = false;
+    }
   }
 
   /**

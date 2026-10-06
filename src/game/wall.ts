@@ -60,7 +60,7 @@ export class Wall {
     const sign = signMesh('S P I N S M I T H', 1.1, 0.13);
     sign.position.set(0, HEIGHT / 2 - 0.1, 0.02);
     this.tools.position.set(-WIDTH / 4 - 0.02, -0.07, 0.02);
-    this.cardSpot.position.set(WIDTH / 4 + 0.03, 0.17, 0.02);
+    this.cardSpot.position.set(WIDTH / 4 + 0.03, 0.12, 0.03);
     this.arenas.position.set(WIDTH / 4 + 0.03, -0.3, 0.02);
     // The scoreboard: a slate in the right half.
     this.canvas.width = 1024;

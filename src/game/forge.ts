@@ -1,14 +1,16 @@
 /**
- * The forge: build your top with your hands. Your top stands on the anvil at the arena's right;
- * the parts hang on the tool panel of the smithy wall (tips, cores, rings, style, presets). Point
- * at a part and pinch: it flies to your hand.
+ * The forge: build your top with your hands, away from the arena (which hides meanwhile). Your
+ * top floats large in the air in front of you, turning over a ring of light; the parts hang on the
+ * tool panel of the smithy wall (tips, cores, rings, style, presets). Point at a part and pinch:
+ * it flies to your hand.
  * - Pinch your top to pick it up: it follows your hand and turns with it, to look at from any side.
  *   Let go and it settles back on the anvil.
  * - Pinch a part on the shelf and bring it to your top (on the anvil or in your other hand): the
  *   top comes apart to show where it goes and that slot pulses; let go to fit it with a clack. The
  *   old part goes back to the shelf. Builds over the weight limit are refused.
  * - Tap a paint pot (or dip the top into it) to paint the top; spin tokens set its spin direction.
- * - Drop the top into the arena to test it in a round; dunk it in the quench bucket to save and go home.
+ * - Lower the top into the TEST ring on the table to test it in a round; dunk it in the quench
+ *   bucket to save and go home.
  */
 import {
   BoxGeometry,
@@ -33,7 +35,7 @@ import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
-import { ANVIL_AT, ANVIL_FACE, anvilModel } from './hub.js';
+import { ANVIL_AT } from './hub.js';
 import type { Wall } from './wall.js';
 import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js';
 
@@ -87,8 +89,14 @@ const ROW_GAP = 0.165;
 const WALL_SCALE = 2.2;
 /** The quench bucket stands beside the anvil, toward the player (arena-local). */
 const BUCKET_AT = new Vector3(ANVIL_AT.x - 0.05, 0, ANVIL_AT.z + 0.12);
-/** Your top on the anvil is this much larger than life. */
+/** Your top floats this much larger than life (arena-local; the arena is drawn larger still). */
 const DISPLAY_SCALE = 1.8;
+/** It floats this far (world m) in front of the eyes and this far below them. */
+const FLOAT_AHEAD = 0.42;
+const FLOAT_BELOW = 0.12;
+/** The TEST ring on the table: a top released inside it, this low, starts a test round (arena-local). */
+const TEST_R = 0.15;
+const TEST_HEIGHT = 0.14;
 /** A carried part makes the top come apart within this distance, and fits within SNAP (world m). */
 const EXPLODE_R = 0.3;
 const SNAP = 0.15;
@@ -126,7 +134,11 @@ export class Forge {
   private bucket = new Group();
   private display!: TopView;
   /** The top's resting spot on the anvil, and the holder that is carried around. */
-  private anvilSpot = new Vector3(ANVIL_AT.x, ANVIL_FACE, ANVIL_AT.z);
+  /** Where your top floats (arena-local), set from the head in place(). */
+  private floatSpot = new Vector3(0, 0.2, 0.05);
+  private halo: Mesh;
+  /** Tips the floating top toward the eyes so its face shows; it spins about its own axis inside. */
+  private displayTilt = new Group();
   private displayHolder = new Group();
   private card = new StatsCard();
   private cardKey = '';
@@ -162,15 +174,25 @@ export class Forge {
     this.buildShelf();
     this.wall.tools.add(this.shelf);
     this.buildBucket();
-    const anvil = anvilModel();
-    anvil.position.copy(ANVIL_AT);
-    this.displayHolder.position.copy(this.anvilSpot);
+    // A ring of light under the floating top, and the TEST ring where the arena stands.
+    this.halo = new Mesh(new TorusGeometry(0.035, 0.0018, 8, 48).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.8 }));
+    const test = new Group();
+    const ring = new Mesh(new TorusGeometry(TEST_R, 0.004, 8, 64).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0x6fd3ff, transparent: true, opacity: 0.85 }));
+    ring.position.y = 0.004;
+    const disc = new Mesh(new CircleGeometry(TEST_R, 48).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x6fd3ff, transparent: true, opacity: 0.12, depthWrite: false }));
+    disc.position.y = 0.002;
+    const testTag = tag('TEST: drop your top here', 0.16, 40);
+    testTag.position.set(0, 0.03, -TEST_R + 0.02);
+    test.add(ring, disc, testTag);
+    this.displayHolder.position.copy(this.floatSpot);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
+    this.displayTilt.rotation.x = 0.6;
+    this.displayHolder.add(this.displayTilt);
     // The stats card hangs on the wall over the scoreboard while forging.
-    this.card.mesh.scale.setScalar(4.5);
+    this.card.mesh.scale.setScalar(3.6);
     this.card.mesh.visible = false;
     this.wall.cardSpot.add(this.card.mesh);
-    this.root.add(this.bucket, anvil, this.displayHolder);
+    this.root.add(this.bucket, test, this.halo, this.displayHolder);
     this.rebuildDisplay();
     this.root.visible = false;
   }
@@ -197,7 +219,7 @@ export class Forge {
     if (this.heldPart) this.root.remove(this.heldPart.model);
     this.heldPart = null;
     this.heldTop = null;
-    this.displayHolder.position.copy(this.anvilSpot);
+    this.displayHolder.position.copy(this.floatSpot);
     this.displayHolder.quaternion.identity();
   }
 
@@ -206,8 +228,12 @@ export class Forge {
     this.shelf.visible = on;
   }
 
-  /** Turns the bucket and its sign toward the head (arena-local). */
+  /** Sets where the top floats, in front of the eyes, and turns the bucket toward the head (arena-local). */
   place(head: Vector3) {
+    const k = 1 / this.root.parent!.getWorldScale(this.p).x;
+    this.floatSpot.set(head.x * 0.4, head.y - FLOAT_BELOW * k, head.z - FLOAT_AHEAD * k);
+    this.halo.position.set(this.floatSpot.x, this.floatSpot.y - 0.03, this.floatSpot.z);
+    this.halo.scale.setScalar(1 + 0.04 * Math.sin(this.time * 3));
     this.face(this.bucket, head);
   }
 
@@ -261,7 +287,7 @@ export class Forge {
       if (this.heldTop) return;
       this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone() };
       playPick();
-      this.say('Turn it in your hand. Drop it in the arena to test, dunk it in the bucket to save');
+      this.say('Turn it in your hand. Lower it into the TEST ring to test, dunk it in the bucket to save');
       return;
     }
     if (this.heldPart) return;
@@ -279,7 +305,9 @@ export class Forge {
   private updateTop(dt: number) {
     const held = this.heldTop;
     if (!held) {
-      this.displayHolder.position.lerp(this.anvilSpot, Math.min(1, dt * 10));
+      // Floats with a slow bob.
+      this.q.copy(this.floatSpot).setY(this.floatSpot.y + 0.004 * Math.sin(this.time * 1.6));
+      this.displayHolder.position.lerp(this.q, Math.min(1, dt * 10));
       this.displayHolder.quaternion.slerp(this.quat.identity(), Math.min(1, dt * 8));
       if (!this.heldPart) this.display.root.rotation.y += dt * 0.5;
       return;
@@ -299,7 +327,7 @@ export class Forge {
     this.bucket.getWorldPosition(this.p);
     if (at.distanceTo(this.p) < DIP * 1.5) return this.save();
     const local = this.root.worldToLocal(this.q.copy(at));
-    if (Math.hypot(local.x, local.z) < 0.17 && local.distanceTo(this.anvilSpot) > 0.1) {
+    if (Math.hypot(local.x, local.z) < TEST_R + 0.03 && local.y < TEST_HEIGHT) {
       playPlace();
       this.hooks.test(this.build);
       return;
@@ -340,7 +368,7 @@ export class Forge {
 
   /** Where a pointer is: the pinch itself when the hand is near the forge, else along its ray. */
   private pointAt(h: HandState, out: Vector3): Vector3 {
-    this.root.localToWorld(this.q.copy(this.anvilSpot));
+    this.root.localToWorld(this.q.copy(this.floatSpot));
     if (h.pinch.distanceTo(this.q) < 0.9 || !h.hasRay) return out.copy(h.pinch);
     // Along the ray, as far out as the anvil is.
     const d = this.q.distanceTo(h.rayOrigin);
@@ -395,7 +423,7 @@ export class Forge {
   private rebuildDisplay() {
     this.display?.dispose();
     this.display = new TopView(this.build, this.build.color);
-    this.displayHolder.add(this.display.root);
+    this.displayTilt.add(this.display.root);
     this.explode = 0;
     this.cardKey = '';
     this.showCard(null);
