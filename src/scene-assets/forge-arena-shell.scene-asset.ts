@@ -18,7 +18,6 @@ export const FORGE_SHELL_HEIGHT = 0.08;
 
 const iron = new MeshStandardMaterial({ color: 0x51464a, metalness: 0.62, roughness: 0.5 });
 const darkIron = new MeshStandardMaterial({ color: 0x242027, metalness: 0.58, roughness: 0.62 });
-const brass = new MeshStandardMaterial({ color: 0xc4873b, metalness: 0.78, roughness: 0.34 });
 const ember = new MeshBasicMaterial({
   color: 0xff5a24,
   transparent: true,
@@ -49,22 +48,16 @@ const body = new Mesh(
 body.name = 'ForgedPlinth';
 root.add(body);
 
+// The rim's three layers are the dark body, the arena's metal lip and one accent light inside it,
+// so the collar and trims stay dark here.
 const topCollar = new Mesh(
   new TorusGeometry(ARENA_RADIUS + 0.013, 0.004, 8, 64).rotateX(Math.PI / 2),
-  brass,
+  darkIron,
 );
 topCollar.name = 'TopCollar';
 topCollar.position.y = -0.01;
 root.add(topCollar);
 
-const emberBand = new Mesh(
-  new TorusGeometry(ARENA_RADIUS + 0.014, 0.0022, 6, 64).rotateX(Math.PI / 2),
-  ember,
-);
-emberBand.name = 'EmberBand';
-emberBand.position.y = -0.064;
-emberBand.userData.iwsdkPreviewBounds = 'exclude';
-root.add(emberBand);
 
 const clampGeo = new BoxGeometry(0.022, 0.042, 0.016);
 const shoulderGeo = new BoxGeometry(0.032, 0.007, 0.029);
@@ -79,13 +72,13 @@ for (let i = 0; i < 8; i++) {
   const clamp = new Mesh(clampGeo, darkIron);
   clamp.name = 'ClampBody';
   clamp.position.set(0, -0.039, ARENA_RADIUS + 0.021);
-  const shoulder = new Mesh(shoulderGeo, brass);
+  const shoulder = new Mesh(shoulderGeo, iron);
   shoulder.name = 'Shoulder';
   shoulder.position.set(0, -0.015, ARENA_RADIUS + 0.014);
   frame.add(clamp, shoulder);
 
   for (const x of [-0.006, 0.006]) {
-    const bolt = new Mesh(boltGeo, brass);
+    const bolt = new Mesh(boltGeo, iron);
     bolt.name = 'Bolt';
     bolt.position.set(x, -0.039, ARENA_RADIUS + 0.03);
     frame.add(bolt);

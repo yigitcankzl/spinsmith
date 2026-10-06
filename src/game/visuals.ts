@@ -642,17 +642,101 @@ const STONE = makeMatcap('clay', 0x9a948a);
 const FROST = makeMatcap('metal', 0xbfe0f2);
 
 const PALETTES: Record<Theme, Palette> = {
-  forge: { floor: 0x5b5f69, pit: 0x4a3a33, wall: LIGHT_STEEL, rail: 0xd9a441, railHot: 0xfff0b0, accent: 0xff5a28, pedestal: 0x6f5a4c },
-  stone: { floor: 0x606369, pit: 0x3b3a40, wall: STONE, rail: 0x8fb7c9, railHot: 0xe6fbff, accent: 0x6fc7ff, pedestal: 0x6b665e },
-  clockwork: { floor: 0x675d4d, pit: 0x4a3d2a, wall: BRASS, rail: 0x5fc9b8, railHot: 0xd8fff6, accent: 0xffc04a, pedestal: 0x7a6440 },
-  ice: { floor: 0x6a7f8f, pit: 0x34506a, wall: FROST, rail: 0x7fdcff, railHot: 0xffffff, accent: 0x8fe8ff, pedestal: 0x7d93a6 },
+  // Three layers at the rim: a dark body, a metal lip (walls and rails), one accent light.
+  forge: { floor: 0x5b5f69, pit: 0x2a2523, wall: LIGHT_STEEL, rail: 0x9aa1ad, railHot: 0xff8a2a, accent: 0xff6a1a, pedestal: 0x3a3d45 },
+  stone: { floor: 0x606369, pit: 0x26262b, wall: STONE, rail: 0x9aa1ad, railHot: 0xffe2b8, accent: 0xf2e6d2, pedestal: 0x3d3f45 },
+  clockwork: { floor: 0x675d4d, pit: 0x2e2618, wall: BRASS, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0x463b2c },
+  ice: { floor: 0x6a7f8f, pit: 0x22303e, wall: FROST, rail: 0xb8c6d2, railHot: 0xffffff, accent: 0xe8f4ff, pedestal: 0x3e4a56 },
 };
+
+/**
+ * The stadium floor's surface, mapped across the arena (center at 0.5, 0.5, rim at the edge):
+ * fine spun brushing, two engraved grooves, dial ticks at the rim, an engraved emblem in the
+ * middle, and wear where the tops run. Grayscale: the theme's floor color tints it.
+ */
+const FLOOR_TEXTURE = floorTexture();
+
+function floorTexture(): CanvasTexture {
+  const S = 1024;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d')!;
+  const C = S / 2;
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  // Base: a soft light center falling off to the rim.
+  const base = g.createRadialGradient(C, C, 0, C, C, C);
+  base.addColorStop(0, '#f2f2f2');
+  base.addColorStop(1, '#c9c9c9');
+  g.fillStyle = base;
+  g.fillRect(0, 0, S, S);
+  // Fine spun brushing.
+  for (let i = 0; i < 1400; i++) {
+    const v = 170 + Math.floor(rnd() * 85);
+    g.strokeStyle = `rgba(${v},${v},${v},${0.05 + rnd() * 0.1})`;
+    g.lineWidth = 0.6 + rnd();
+    g.beginPath();
+    g.arc(C, C, rnd() * C, 0, Math.PI * 2);
+    g.stroke();
+  }
+  // Wear where the tops run: soft scuffs and short arcs in the outer band.
+  for (let i = 0; i < 260; i++) {
+    const a = rnd() * Math.PI * 2;
+    const r = C * (0.5 + rnd() * 0.42);
+    g.strokeStyle = `rgba(60,60,60,${0.04 + rnd() * 0.08})`;
+    g.lineWidth = 1 + rnd() * 2.5;
+    g.beginPath();
+    g.arc(C, C, r, a, a + 0.1 + rnd() * 0.5);
+    g.stroke();
+  }
+  // Two engraved grooves: a dark cut with a lit lower edge.
+  for (const f of [0.36, 0.72]) {
+    g.lineWidth = 5;
+    g.strokeStyle = 'rgba(40,40,40,0.55)';
+    g.beginPath();
+    g.arc(C, C, C * f, 0, Math.PI * 2);
+    g.stroke();
+    g.lineWidth = 2;
+    g.strokeStyle = 'rgba(255,255,255,0.45)';
+    g.beginPath();
+    g.arc(C, C, C * f + 4, 0, Math.PI * 2);
+    g.stroke();
+  }
+  // Dial ticks just inside the rim.
+  for (let i = 0; i < 48; i++) {
+    const a = (i / 48) * Math.PI * 2;
+    const long = i % 4 === 0;
+    g.strokeStyle = `rgba(40,40,40,${long ? 0.55 : 0.35})`;
+    g.lineWidth = long ? 4 : 2;
+    g.beginPath();
+    g.moveTo(C + Math.cos(a) * C * 0.9, C + Math.sin(a) * C * 0.9);
+    g.lineTo(C + Math.cos(a) * C * (long ? 0.82 : 0.86), C + Math.sin(a) * C * (long ? 0.82 : 0.86));
+    g.stroke();
+  }
+  // The engraved emblem in the middle: a spark in a ring.
+  g.strokeStyle = 'rgba(40,40,40,0.5)';
+  g.lineWidth = 6;
+  g.beginPath();
+  g.arc(C, C, C * 0.16, 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = 'rgba(40,40,40,0.45)';
+  g.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? C * 0.13 : C * 0.035;
+    g.lineTo(C + Math.cos(a) * r, C + Math.sin(a) * r);
+  }
+  g.closePath();
+  g.fill();
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
 
 /** Wall heights (m) by wall type. */
 const WALL_HEIGHT: Record<Wall, number> = { low: 0.007, standard: 0.012, high: 0.028, none: 0 };
 const POCKET_REACH = 0.03;
-/** The floor ring (of 18) that carries the engraved groove. */
-const GROOVE = 11;
 
 /** Points along the rim from angle a0 to a1, pushed out (or in) by `offset`, at height y. */
 function rimPath(layout: ArenaLayout, a0: number, a1: number, offset: number, y: number) {
@@ -771,11 +855,22 @@ export class ArenaView {
         }
       }
     }
+    // Texture coordinates follow the rim: the floor texture maps to the arena whatever its shape.
+    const uv = new Float32Array(count * 2);
+    uv.set([0.5, 0.5], 0);
+    for (let r = 1; r <= this.rings; r++) {
+      for (let s = 0; s < this.segs; s++) {
+        const a = (s / this.segs) * Math.PI * 2;
+        const n = r / this.rings;
+        uv.set([0.5 + 0.5 * n * Math.cos(a), 0.5 + 0.5 * n * Math.sin(a)], this.vi(r, s) * 2);
+      }
+    }
     this.geo = new BufferGeometry();
     this.geo.setAttribute('position', new BufferAttribute(pos, 3));
     this.geo.setAttribute('color', new BufferAttribute(this.colors, 3));
+    this.geo.setAttribute('uv', new BufferAttribute(uv, 2));
     this.geo.setIndex(idx);
-    const floor = new Mesh(this.geo, new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0xffffff), vertexColors: true }));
+    const floor = new Mesh(this.geo, new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0xffffff), map: FLOOR_TEXTURE, vertexColors: true }));
     floor.frustumCulled = false;
     this.root.add(floor, this.features);
   }
@@ -985,8 +1080,6 @@ export class ArenaView {
         if (dip > 0) this.tmp.lerp(this.pit, Math.min(1, dip) * 0.8);
         // Embers: outside the shrinking safe zone the floor glows, pulsing.
         if (n > safe) this.tmp.lerp(this.ember, 0.45 + 0.15 * Math.sin(this.time * 6));
-        // Brushed metal: faint alternating rings, and one engraved groove with a lit edge.
-        this.tmp.multiplyScalar(r === GROOVE ? 0.55 : r === GROOVE + 1 ? 1.18 : r % 2 ? 1.03 : 0.97);
         this.colors[i * 3] = this.tmp.r;
         this.colors[i * 3 + 1] = this.tmp.g;
         this.colors[i * 3 + 2] = this.tmp.b;
