@@ -311,7 +311,8 @@ export class Builder {
     // category's pieces sit big in one row below; pinch one and carry it over the arena.
     // Panel-local axes: x right, y up, +z toward the eyes.
     this.tray.scale.setScalar(MENU_SCALE);
-    const back = new Mesh(new PlaneGeometry(0.24, 0.17), new MeshBasicMaterial({ color: 0x1e1814, transparent: true, opacity: 0.82, depthWrite: false }));
+    // Opaque, so it never blends over the tabs and pieces in front of it.
+    const back = new Mesh(new PlaneGeometry(0.24, 0.17), new MeshBasicMaterial({ color: 0x241c17 }));
     back.position.z = -0.004;
     this.tray.add(back);
     TRAY.forEach(([label], t) => {
@@ -581,7 +582,7 @@ export class Builder {
     for (const s of this.slots) {
       if (s.tab !== this.tab) continue;
       s.model.getWorldPosition(this.p);
-      const d = this.distance(h, this.p, GRAB_NEAR, GRAB_RAY);
+      const d = this.distance(h, this.p, GRAB_NEAR * MENU_SCALE, GRAB_RAY * MENU_SCALE);
       if (d < bestD) {
         bestD = d;
         best = s;
@@ -593,7 +594,7 @@ export class Builder {
   private buttonUnder(h: HandState): Button | null {
     for (const b of this.pressables) {
       b.mesh.getWorldPosition(this.p);
-      if (this.distance(h, this.p, 0.03, 0.02) < Infinity) return b;
+      if (this.distance(h, this.p, 0.03 * MENU_SCALE, (b.height / 2) * MENU_SCALE) < Infinity) return b;
     }
     return null;
   }
