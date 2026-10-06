@@ -1,0 +1,79 @@
+# Visual polish: why it looks cheap and what to change
+
+Research notes (Oct 6, 2026) on how polished Quest mixed-reality games look premium, and a plan
+for SpinSmith. Sources are linked inline; claims we could not verify are marked.
+
+## 1. Diagnosis
+
+Looking at the hub and a fight in the emulator:
+
+| Problem | Where |
+|---|---|
+| **No single art direction.** Chrome tops, brown clay anvil and stand, a cream drum arena, sci-fi glass UI: four styles side by side | Everything |
+| **Nothing is grounded.** No shadows or contact darkening, so things float over the real table | Tops, arena, props |
+| **Flat lighting.** Matcaps are baked: a spinning metal top never catches a moving highlight, so it reads as plastic | Tops, arena |
+| **The arena floor is a flat cream disc** with no material, print or depth | Arena |
+| **System font** in every canvas texture | All UI |
+| **Little juice.** Small sparks on hits, no trails, no flash, no hit stop | Fights |
+| **Primitive props.** The anvil and stand are boxes and cylinders | Hub |
+
+## 2. What premium Quest MR games do
+
+- **Stylized, well-lit objects in the real room, not photorealism.** Starship Home "blends
+  stylized objects with passthrough tinting" ([Meta](https://www.meta.com/blog/starship-home-launch/),
+  [GDC talk](https://gdcvault.com/play/1034292/Future-Realities-Summit-Art-Directing)).
+- **A tight palette:** one neutral plus one or two saturated accents that stand out against noisy
+  passthrough; emissive accents carry the premium read (Cubism, Laser Dance:
+  [UploadVR](https://www.uploadvr.com/cubism-quest-3-update/),
+  [Road to VR](https://www.roadtovr.com/designing-mixed-reality-apps-dynamic-spaces-laser-dance-case-study/)).
+- **Every object is grounded.** Cubism's main grounding cue on the real desk is drop shadows.
+- **The play area is framed:** Demeo's board has a bevelled edge, rim light and a skirt
+  ([Mixed](https://mixed-news.com/en/demeo-tabletop-vr-role-playing-game-gets-hand-tracking/)).
+- **Focus by dimming the room** around the play area
+  ([Meta passthrough design](https://developers.meta.com/horizon/resources/mr-design-passthrough/)).
+
+## 3. Technical options on Quest Browser (WebXR, three.js)
+
+| Technique | Verdict |
+|---|---|
+| Blob / contact shadows (radial gradient quad under each top, AO ring under the arena) | Near-free, ~80% of the grounding effect |
+| Real shadow catcher (`ShadowMaterial` plane on the table + one shadowed directional light, 512-1024 map) | Medium cost, worth it after blob shadows |
+| WebXR light estimation | Treat as **unsupported** on Quest Browser (developers report "not permitted by permissions policy": [forum](https://communityforums.atmeta.com/discussions/dev-quest/feature-light-estimation-is-not-permitted-by-permissions-policy/1238655)) |
+| `MeshStandardMaterial` + environment map (IWSDK `IBLTexture { src: 'room' }`) instead of matcaps | Low cost; moving reflections on spinning metal are the main "real metal" cue. One light only ([Meta perf](https://developers.meta.com/horizon/documentation/web/webxr-perf-bp/)) |
+| Bloom post-processing | **Not viable**: IWSDK renders multiview stereo; post passes do not reach the XR framebuffer and would eat the frame budget |
+| Fake glow: emissive parts, additive sprites, a Fresnel rim via `onBeforeCompile` | Cheap; gives the bloom look |
+| Display fonts (OFL): Rajdhani, Oxanium, Chakra Petch, Exo 2 | Load with the `FontFace` API before drawing canvases; Bold/SemiBold, 2x resolution ([Meta typography](https://developers.meta.com/horizon/design/styles_typography/)) |
+| Depth occlusion (IWSDK `DepthOccludable`) | Hands pass in front of tops; apply to tops and arena only |
+
+Budget: 13.7 ms at 72 Hz; aim for under 100-150 draw calls; transparency and overlapping
+particles are the main fill-rate risk ([Meta perf workflow](https://developers.meta.com/horizon/documentation/web/webxr-perf-workflow/)).
+
+## 4. Art direction for SpinSmith
+
+**"Forged tech":** dark gunmetal and graphite as the neutral, molten orange as the player accent,
+cyan as the rival and UI accent. Glow comes from heat (orange) and energy (cyan) lines.
+
+- **Arena:** a dark metal stadium instead of the cream drum. A brushed graphite floor with
+  engraved concentric rings and a faint printed emblem, an emissive orange line inside the rim,
+  a bevelled lip, a dark skirt and an AO ring where it meets the table.
+- **Tops:** real metal (`MeshStandardMaterial`, metalness 1, roughness ~0.3) with the room
+  environment, a Fresnel rim and an emissive chip in the owner's color.
+- **Props:** the anvil and stand in the same graphite and orange, with simple bevels; or
+  replaced by glowing pedestals of the arena's style.
+- **UI:** keep the dark glass; add a display font, an animated sheen and spring-in animations.
+
+## 5. Plan, highest impact per cost first
+
+1. Contact shadows under tops and an AO ring under the arena.
+2. Metal tops with `MeshStandardMaterial` and the room environment map.
+3. The dark metal arena floor, rim glow and skirt.
+4. Display font (Rajdhani for numbers and labels, Oxanium for titles) loaded before canvases.
+5. Props restyled to graphite and orange.
+6. Fresnel rim and emissive chips on tops.
+7. Impact juice: bigger sparks, an 80 ms flash on both tops, 50 ms hit stop, a floor ring.
+8. Spin trails or a motion-blur disc driven by spin.
+9. A real shadow catcher on the table.
+10. Depth occlusion for hands.
+
+Steps 1-4 change the first impression most and are each small. Every step needs a frame-time
+check on the headset.
