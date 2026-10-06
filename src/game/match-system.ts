@@ -53,7 +53,7 @@ const RAY_BUMP_RATE = 0.05;
 const SHAPES = [STRIKER_SHAPE, ANVIL_SHAPE, NEEDLE_SHAPE];
 const TYPE_ROLE = ['attack', 'defense', 'stamina'];
 
-type Phase = 'placing' | 'ready' | 'pulling' | 'fight' | 'result' | 'build';
+type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build';
 
 type RawPlane = { orientation?: string; semanticLabel?: string };
 
@@ -87,7 +87,9 @@ export class MatchSystem extends createSystem({
   });
   /** A demo round from the workshop's Try it: two AI tops, no score, back to the workshop after. */
   private demo = false;
-  private buildButton = new Button('build', 0.12, 0.034);
+  /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
+  private hubButtons = [new Button('play', 0.11, 0.04), new Button('workshop', 0.11, 0.04), new Button('arena', 0.15, 0.04)];
+  private menuButton = new Button('menu', 0.07, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
   private gazePointer: HandState = {
@@ -183,10 +185,19 @@ export class MatchSystem extends createSystem({
       ...[...this.myViews, ...this.theirViews].flatMap((v) => [v.root, v.shadowMesh, v.debris]),
       this.sparks.points,
     );
-    this.root.add(this.stage, this.label.mesh, this.builder.root, this.buildButton.mesh);
-    this.buildButton.mesh.position.set(-0.2, 0.05, 0.14);
-    this.buildButton.mesh.rotation.y = 0.4;
-    this.buildButton.set('Build arena');
+    this.root.add(this.stage, this.label.mesh, this.builder.root, this.menuButton.mesh, ...this.hubButtons.map((b) => b.mesh));
+    // Home buttons: a row above the near rim, tipped back toward the player.
+    this.hubButtons.forEach((b, i) => {
+      b.mesh.position.set((i - 1) * 0.135, 0.09, 0.2);
+      b.mesh.rotation.x = -0.35;
+      b.mesh.visible = false;
+    });
+    this.hubButtons[0].set('Play');
+    this.hubButtons[1].set('Workshop');
+    this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
+    this.menuButton.mesh.rotation.y = 0.4;
+    this.menuButton.set('Menu');
+    this.menuButton.mesh.visible = false;
     this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];
     this.setArena(this.arenas[this.arenaIndex]);
     this.world.createTransformEntity(this.root);
@@ -199,9 +210,10 @@ export class MatchSystem extends createSystem({
         this.keys.add(e.code);
         if (e.code === 'KeyR') this.toReady();
         if (e.code === 'KeyP') this.phase = 'placing';
-        if (e.code === 'KeyA' && this.phase !== 'fight' && this.phase !== 'pulling') {
+        if (e.code === 'KeyA' && (this.phase === 'hub' || this.phase === 'ready')) {
           this.nextArena();
-          this.toReady();
+          if (this.phase === 'hub') this.toHub();
+          else this.toReady();
         }
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
         if (e.code === 'KeyK' && this.phase === 'fight') {
@@ -246,19 +258,27 @@ export class MatchSystem extends createSystem({
         this.settle += dt;
         if (this.settle >= SETTLE) this.place();
         return;
+      case 'hub':
+        this.updateHub();
+        break;
       case 'build':
         this.updateBuilder(dt);
         break;
       case 'ready':
       case 'result':
-        if (this.pressedBuild()) break;
         if (this.phase === 'result') {
           this.resultTimer -= dt;
           if (this.resultTimer <= 0) {
             if (this.demo) this.endDemo();
+            else if (this.matchOver) this.toHub();
             else this.toReady();
+            break;
           }
           if (this.demo) break;
+        }
+        if (this.pickButton([this.menuButton]) === 'menu') {
+          this.toHub();
+          break;
         }
         this.updateReadyPinch();
         break;
@@ -308,29 +328,69 @@ export class MatchSystem extends createSystem({
     this.arenaView.build(layout);
   }
 
-  /** Ready/result: a pinch on the Build button opens the builder. */
-  private pressedBuild(): boolean {
-    this.buildButton.mesh.visible = !this.demo;
-    if (this.demo) return false;
-    this.buildButton.mesh.getWorldPosition(this.p);
-    let hover = false;
+  /**
+   * Hover and press for a set of buttons, near (pinch) or far (pointing ray, or the gaze in dev).
+   * Returns the id of a button pinched this frame, else null. Only one press per frame.
+   */
+  private pickButton(buttons: Button[]): string | null {
+    let hovered: Button | null = null;
+    let pressed: string | null = null;
     for (const h of this.pointers) {
       if (!h.tracked) continue;
-      const near = h.pinch.distanceTo(this.p) < 0.05;
-      const t = this.local.copy(this.p).sub(h.rayOrigin).dot(h.rayDir);
-      const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < BUTTON_REACH;
-      if (!near && !far) continue;
-      hover = true;
-      if (!h.justPinched) continue;
-      this.phase = 'build';
-      this.buildButton.mesh.visible = false;
-      this.label.set('');
-      for (const top of this.tops) top.state = 'out';
-      this.builder.open(this.arena.layout);
-      return true;
+      for (const b of buttons) {
+        if (!b.mesh.visible) continue;
+        b.mesh.getWorldPosition(this.p);
+        const near = h.pinch.distanceTo(this.p) < 0.05;
+        const t = this.local.copy(this.p).sub(h.rayOrigin).dot(h.rayDir);
+        const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < Math.max(BUTTON_REACH, b.height * 0.8);
+        if (!near && !far) continue;
+        hovered ??= b;
+        if (h.justPinched && !pressed) pressed = b.id;
+      }
     }
-    this.buildButton.highlight(hover);
-    return false;
+    for (const b of buttons) b.highlight(b === hovered);
+    return pressed;
+  }
+
+  /** Home: the arena waits with both tops; Play, Workshop, or switch arena. Pinching never launches here. */
+  private toHub() {
+    this.phase = 'hub';
+    this.matchOver = false;
+    this.arena.reset(this.arenas[this.arenaIndex]);
+    this.arenaView.build(this.arena.layout);
+    this.mine.launch(0, this.SPAWN, 0, 0, 1, 1);
+    this.theirs.launch(0, -this.SPAWN, 0, 0, 1, -1);
+    this.cord.set(null);
+    this.menuButton.mesh.visible = false;
+    for (const b of this.hubButtons) b.mesh.visible = true;
+    this.hubButtons[2].set(`Arena: ${this.arena.layout.name} ▸`);
+    this.label.set(`SpinSmith\n${this.arena.layout.name}`);
+  }
+
+  private updateHub() {
+    switch (this.pickButton(this.hubButtons)) {
+      case 'play':
+        this.myPoints = 0;
+        this.theirPoints = 0;
+        this.typesPicked = false;
+        this.toReady();
+        break;
+      case 'workshop':
+        this.openWorkshop();
+        break;
+      case 'arena':
+        this.nextArena();
+        this.toHub();
+        break;
+    }
+  }
+
+  private openWorkshop() {
+    this.phase = 'build';
+    for (const b of this.hubButtons) b.mesh.visible = false;
+    this.label.set('');
+    for (const top of this.tops) top.state = 'out';
+    this.builder.open(this.arena.layout);
   }
 
   /** Workshop: pieces, the tray and the rim, all handled by the builder. */
@@ -348,6 +408,7 @@ export class MatchSystem extends createSystem({
 
   /** Try it: two AI tops fight in the draft arena; the workshop comes back after the round. */
   private tryArena(layout: ArenaLayout) {
+    this.menuButton.mesh.visible = false;
     this.arena.reset(layout);
     this.demo = true;
     this.mine.spec = TYPES[Math.floor(Math.random() * TYPES.length)];
@@ -404,6 +465,8 @@ export class MatchSystem extends createSystem({
     this.arenaIndex = this.arenas.length - 1;
     this.builder.close();
     this.setArena(layout);
+    this.myPoints = 0;
+    this.theirPoints = 0;
     this.phase = 'ready';
     this.toReady();
   }
@@ -411,8 +474,7 @@ export class MatchSystem extends createSystem({
   private leaveBuilder() {
     this.builder.close();
     this.setArena(this.arenas[this.arenaIndex]);
-    this.phase = 'ready';
-    this.toReady();
+    this.toHub();
   }
 
   /** Shows the view for the top's current type and hides the others. */
@@ -449,8 +511,7 @@ export class MatchSystem extends createSystem({
     this.root.rotation.set(0, Math.atan2(this.head.x - center.x, this.head.z - center.z), 0);
     this.root.visible = true;
     console.log(`[MATCH] arena on ${table !== null ? 'table' : 'tray'} at ${center.toArray().map((v) => v.toFixed(2)).join(',')}`);
-    this.phase = 'ready';
-    this.toReady();
+    this.toHub();
   }
 
   /** Height of the nearest table/desk plane within reach, or null. */
@@ -476,11 +537,10 @@ export class MatchSystem extends createSystem({
 
   private toReady() {
     if (this.phase === 'placing') return;
-    if (this.matchOver) {
-      this.matchOver = false;
-      this.nextArena();
-    }
+    this.matchOver = false;
     this.phase = 'ready';
+    for (const b of this.hubButtons) b.mesh.visible = false;
+    this.menuButton.mesh.visible = true;
     this.arena.reset();
     // Both tops wait upright at their spawn points.
     if (!this.typesPicked) this.pickTypes();
@@ -503,6 +563,8 @@ export class MatchSystem extends createSystem({
    * the same frame (the emulator's click does), the hand closer to the arena wins.
    */
   private updateReadyPinch() {
+    // After the deciding round the result card leads back home, not into another round.
+    if (this.matchOver) return;
     let pick: Side | null = null;
     let best = Infinity;
     for (const side of ['left', 'right'] as const) {
@@ -586,7 +648,6 @@ export class MatchSystem extends createSystem({
 
   /** Launches both tops. aim: radians off straight-at-center for the player's top. */
   private launch(power: number, aim: number) {
-    this.buildButton.mesh.visible = false;
     if (this.phase === 'result') this.toReady();
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
@@ -713,7 +774,7 @@ export class MatchSystem extends createSystem({
       else this.theirPoints += points;
       const score = `You ${this.myPoints} - ${this.theirPoints}`;
       if (this.myPoints >= MATCH_POINTS || this.theirPoints >= MATCH_POINTS) {
-        text = `${this.myPoints > this.theirPoints ? 'You win the match!' : 'You lose the match'}\n${score} · next: ${this.arenas[(this.arenaIndex + 1) % this.arenas.length].name}`;
+        text = `${this.myPoints > this.theirPoints ? 'You win the match!' : 'You lose the match'}\n${score}`;
         this.myPoints = 0;
         this.theirPoints = 0;
         this.matchOver = true;
