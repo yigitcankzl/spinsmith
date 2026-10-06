@@ -180,8 +180,8 @@ export class MatchSystem extends createSystem({
       this.sparks.points,
     );
     this.root.add(this.stage, this.label.mesh, this.builder.root, this.buildButton.mesh);
-    this.buildButton.mesh.position.set(0.2, 0.05, 0.14);
-    this.buildButton.mesh.rotation.y = -0.4;
+    this.buildButton.mesh.position.set(-0.2, 0.05, 0.14);
+    this.buildButton.mesh.rotation.y = 0.4;
     this.buildButton.set('Build arena');
     this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];
     this.setArena(this.arenas[this.arenaIndex]);
@@ -331,6 +331,13 @@ export class MatchSystem extends createSystem({
 
   /** Workshop: pieces, the tray and the rim, all handled by the builder. */
   private updateBuilder(dt: number) {
+    // The tray is placed relative to the head, in arena-local space.
+    const head = this.player.head;
+    head.getWorldPosition(this.p);
+    head.getWorldDirection(this.fwd).negate();
+    const local = this.root.worldToLocal(this.p);
+    this.fwd.transformDirection(this.rootInverse.copy(this.root.matrixWorld).invert());
+    this.builder.placeTray(local, this.fwd, dt);
     this.builder.update(this.pointers, dt);
   }
 

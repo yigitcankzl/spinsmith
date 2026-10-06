@@ -7,6 +7,7 @@ import {
   CylinderGeometry,
   Group,
   LatheGeometry,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshMatcapMaterial,
@@ -239,6 +240,10 @@ const TRAY: [string, Piece[]][] = [
   ['Extras', (['vortex', 'spinner', 'tilt', 'shrink'] as const).map((value) => ({ kind: 'extra', value }))],
 ];
 const CELL = 0.034;
+/** The tray floats this far in front of the eyes (m), and follows once it is this far off the gaze. */
+const TRAY_DISTANCE = 0.4;
+const FOLLOW_ANGLE = 0.5;
+const TRAY_SCALE = 1.35;
 
 interface Slot {
   piece: Piece;
@@ -281,12 +286,18 @@ export class Builder {
   private readonly p = new Vector3();
   private readonly q = new Vector3();
   private readonly hit = new Vector3();
+  private readonly up = new Vector3();
+  private readonly right = new Vector3();
+  private readonly depth = new Vector3();
+  private readonly basis = new Matrix4();
+  private trayPlaced = false;
+  private following = false;
 
   constructor(private readonly hooks: BuilderHooks) {
     this.root.name = 'arena-workshop';
-    // The tray sits to the right of the arena, close to the player, tilted up toward them.
-    this.tray.position.set(0.27, 0.0, 0.08);
-    this.tray.rotation.set(-0.55, -0.45, 0, 'YXZ');
+    // The tray is placed in front of the player's eyes each frame (see placeTray), a bit enlarged
+    // so the pieces and their names read well at that distance.
+    this.tray.scale.setScalar(TRAY_SCALE);
     const board = new Mesh(new BoxGeometry(CELL * 5 + 0.05, 0.004, CELL * TRAY.length + 0.05), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x5a463a) }));
     board.position.set(0.012, -0.003, 0.012);
     this.tray.add(board);
@@ -323,8 +334,11 @@ export class Builder {
     });
     // The status line floats above the arena, facing the player.
     this.status = tag('', 0.22, 34);
-    this.status.position.set(0, 0.26, -0.03);
-    this.root.add(this.tray, this.status);
+    // The status line sits along the tray's far edge, readable with the pieces.
+    this.status.rotation.x = -Math.PI / 2;
+    this.status.position.set(0.012, 0.002, -(TRAY.length / 2) * CELL - 0.02);
+    this.tray.add(this.status);
+    this.root.add(this.tray);
     this.root.visible = false;
   }
 
@@ -332,6 +346,7 @@ export class Builder {
     this.draft = cloneLayout(from);
     this.draft.name = 'My Arena';
     this.root.visible = true;
+    this.trayPlaced = false;
     this.held = null;
     this.say('Pinch a piece and drop it on the arena');
     this.hooks.preview(this.draft);
@@ -616,11 +631,40 @@ export class Builder {
     const old = this.status;
     this.status = tag(text, 0.22, 34);
     this.status.position.copy(old.position);
-    this.root.remove(old);
+    this.status.rotation.copy(old.rotation);
+    this.tray.remove(old);
     old.geometry.dispose();
     const mat = old.material as MeshBasicMaterial;
     mat.map?.dispose();
     mat.dispose();
-    this.root.add(this.status);
+    this.tray.add(this.status);
+  }
+
+  /**
+   * Keeps the tray in front of the eyes, facing them: about 40 cm ahead, a little below eye
+   * level and to the right of the gaze (the middle stays free for the arena). It stays put while the view moves a little and glides
+   * after the view when it drifts away (lazy follow), so it never has to be hunted for.
+   * head and forward are in arena-local space.
+   */
+  placeTray(head: Vector3, forward: Vector3, dt: number) {
+    // Offsets are in view space (right of and below the gaze), so looking down at the arena
+    // does not slide the tray over it.
+    const right = this.q.set(-forward.z, 0, forward.x).normalize();
+    const up = this.up.crossVectors(right, forward).normalize();
+    const target = this.hit.copy(head).addScaledVector(forward, TRAY_DISTANCE).addScaledVector(right, 0.28).addScaledVector(up, -0.05);
+    const toTray = this.p.copy(this.tray.position).sub(head).normalize();
+    if (!this.trayPlaced || toTray.dot(forward) < Math.cos(FOLLOW_ANGLE) || this.tray.position.distanceTo(target) > 0.25) this.following = true;
+    if (this.following) {
+      const k = this.trayPlaced ? Math.min(1, dt * 5) : 1;
+      this.tray.position.lerp(target, k);
+      if (this.tray.position.distanceTo(target) < 0.01) this.following = false;
+      this.trayPlaced = true;
+    }
+    // Face the eyes without rolling: the board's up side (+Y) points at the head, its x axis
+    // along the view's right, so its first row (-Z) is at the top of the view.
+    const toward = this.p.copy(head).sub(this.tray.position).normalize();
+    const x = this.right.copy(right).addScaledVector(toward, -right.dot(toward)).normalize();
+    const z = this.depth.crossVectors(x, toward);
+    this.tray.quaternion.setFromRotationMatrix(this.basis.makeBasis(x, toward, z));
   }
 }
