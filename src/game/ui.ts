@@ -14,8 +14,8 @@ export const FONT = 'Rajdhani, system-ui, sans-serif';
 export async function loadFonts() {
   const base = import.meta.env.BASE_URL;
   const faces = [
-    new FontFace('Rajdhani', `url(${base}fonts/Rajdhani-SemiBold.ttf)`, { weight: '600' }),
-    new FontFace('Rajdhani', `url(${base}fonts/Rajdhani-Bold.ttf)`, { weight: '700' }),
+    new FontFace('Rajdhani', `url(${base}fonts/Rajdhani-SemiBold.woff2)`, { weight: '600' }),
+    new FontFace('Rajdhani', `url(${base}fonts/Rajdhani-Bold.woff2)`, { weight: '700' }),
   ];
   await Promise.all(faces.map((f) => f.load().then((loaded) => document.fonts.add(loaded)).catch(() => undefined)));
 }
