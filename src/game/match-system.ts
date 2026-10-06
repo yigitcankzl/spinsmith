@@ -60,6 +60,11 @@ const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
 const LABEL_AT = new Vector3(0, 0.115, -0.21);
 /** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
+/** Rivals from level 6 set a ramp at most this often (s). */
+const RIVAL_SHAPE_GAP = 3;
+/** A finish your shape caused plays its visuals at SLOW_MO speed for this long (real s). */
+const SLOW_MO_TIME = 0.6;
+const SLOW_MO = 0.3;
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
 const HIT_STOP_GAP = 0.3;
@@ -232,6 +237,12 @@ export class MatchSystem extends createSystem({
   private rampAt: Record<Side, number> = { left: -9, right: -9 };
   /** The shaping economy, the marks for shapes and ghosts, the charge embers at the near rim. */
   private charges = new ShapingCharges();
+  /** Rivals from level 6 shape too: their own charges, their last ramp, and its cyan marks. */
+  private rivalCharges = new ShapingCharges();
+  private rivalShapeAt = -9;
+  private rivalMarks = new ShapeMarks(0x4fd1ff);
+  /** After a finish your shape caused, the visuals play slowly for a moment (real seconds left). */
+  private slowMo = 0;
   private marks = new ShapeMarks(0xff8a2a);
   private pips = new ChargePips();
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
@@ -288,6 +299,7 @@ export class MatchSystem extends createSystem({
       this.ripArrows,
       this.bumpMark,
       this.marks.root,
+      this.rivalMarks.root,
       this.pips.root,
     );
     this.myBuild = this.forge.allowed(this.myBuild);
@@ -357,6 +369,10 @@ export class MatchSystem extends createSystem({
           // Burst the opponent now, to see the burst finish.
           this.theirs.state = 'out';
           this.theirs.finish = 'burst';
+        }
+        if (e.code === 'KeyH' && (this.phase === 'hub' || this.phase === 'result' || this.phase === 'ready')) {
+          // A match against Hookjaw, the first rival that uses the arena too.
+          this.startMatch(RIVALS.find((r) => r.name === 'Hookjaw'));
         }
         if (e.code === 'KeyO' && this.phase === 'fight') {
           // Throw the opponent over the wall now, outward from the center, to see it land on the table.
@@ -499,10 +515,13 @@ export class MatchSystem extends createSystem({
         show: this.phase === 'result',
       });
     }
-    this.myView.sync(this.mine, this.arena, this.time, dt);
-    this.theirView.sync(this.theirs, this.arena, this.time, dt);
-    this.sparks.update(dt);
-    this.impacts.update(dt);
+    // Visuals only: after a finish your shape caused they slow down for a moment.
+    const vdt = this.slowMo > 0 ? dt * SLOW_MO : dt;
+    this.slowMo = Math.max(0, this.slowMo - dt);
+    this.myView.sync(this.mine, this.arena, this.time, vdt);
+    this.theirView.sync(this.theirs, this.arena, this.time, vdt);
+    this.sparks.update(vdt);
+    this.impacts.update(vdt);
     this.updateGuide();
     for (const c of this.showcase.children) c.rotation.y += dt * 0.4;
     this.updateRewards(dt);
@@ -1088,6 +1107,8 @@ export class MatchSystem extends createSystem({
     const perfect = power >= PERFECT;
     this.lastPerfect = perfect;
     this.charges.reset();
+    this.rivalCharges.reset();
+    this.rivalShapeAt = -9;
     this.lastShape = null;
     this.wellInRound = false;
     this.rampAt.left = this.rampAt.right = -9;
@@ -1104,8 +1125,10 @@ export class MatchSystem extends createSystem({
     // Difficulty is launch quality: the rival rips harder and aims steadier as you level up.
     const skill = Math.min(1, (this.progress.level - 1) / 15);
     const aiMin = 0.5 + 0.25 * skill;
-    const aiPower = aiMin + Math.random() * (0.98 - aiMin);
-    const aiAim = (Math.random() - 0.5) * (1.0 - 0.6 * skill);
+    // The very first match is steadier, so its lesson (the ramp) is not lost to a wild rip.
+    const first = this.progress.matches === 0 && !this.demo;
+    const aiPower = first ? 0.7 + Math.random() * 0.1 : aiMin + Math.random() * (0.98 - aiMin);
+    const aiAim = first ? (Math.random() - 0.5) * 0.3 : (Math.random() - 0.5) * (1.0 - 0.6 * skill);
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
     const aiDir = aiAim + LAUNCH_TILT;
     this.theirs.launch(0, -this.SPAWN, Math.sin(aiDir) * aiSpeed * th, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, th);
@@ -1204,9 +1227,30 @@ export class MatchSystem extends createSystem({
     playThock();
   }
 
+  /**
+   * Rivals from level 6 use the arena too, as a player would but slower: when your top is out in
+   * the outer band, a ramp just inside it pushing it outward, at most every RIVAL_SHAPE_GAP, under
+   * the same charges. Seeing it done teaches the move.
+   */
+  private rivalShaping() {
+    if (this.demo || this.rival.level < 6) return;
+    this.rivalCharges.update(STEP);
+    const me = this.mine;
+    const r = Math.hypot(me.x, me.z);
+    if (!me.alive || r < this.arena.radius * 0.6 || r < 1e-3 || this.elapsed - this.rivalShapeAt < RIVAL_SHAPE_GAP) return;
+    const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
+    if (!f) return;
+    this.arena.addShape('ramp', me.x - (me.x / r) * 0.012, me.z - (me.z / r) * 0.012, SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r);
+    this.rivalShapeAt = this.elapsed;
+    playThock();
+    if (import.meta.env.DEV) console.log(`[SHAPE] rival ramp at ${me.x.toFixed(3)},${me.z.toFixed(3)} t ${this.elapsed.toFixed(1)}`);
+  }
+
   /** Marks for live shapes and ghosts, the charge embers, and a crunch when a top runs into a shape. */
   private updateShapes() {
-    const specs: ShapeMarkSpec[] = this.arena.shapes.map((s) => ({ kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false }));
+    const mark = (s: FloorShape): ShapeMarkSpec => ({ kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false });
+    const specs = this.arena.shapes.filter((s) => s.owner !== 'rival').map(mark);
+    this.rivalMarks.show(this.phase === 'fight' ? this.arena.shapes.filter((s) => s.owner === 'rival').map(mark) : [], (x, z) => this.arena.height(x, z), this.time);
     for (const side of ['left', 'right'] as const) {
       const d = this.shaping[side];
       if (d) specs.push({ kind: 'ramp', x: d.x, z: d.z, dx: d.dx, dz: d.dz, strength: d.amp / SHAPE_SIZE.ramp, ghost: true });
@@ -1251,9 +1295,11 @@ export class MatchSystem extends createSystem({
       this.elapsed += STEP;
       const clash = step(this.arena, this.mine, this.theirs);
       this.charges.update(STEP);
+      this.rivalShaping();
       if (clash) {
         this.clashes++;
         this.charges.clash(clash.strength, this.elapsed);
+        this.rivalCharges.clash(clash.strength, this.elapsed);
         const y = this.arena.height(clash.x, clash.z);
         this.sparks.burst(clash.x, y, clash.z, clash.strength);
         if (clash.strength > HARD_HIT && this.elapsed - this.lastHardHit > HIT_STOP_GAP) {
@@ -1334,8 +1380,13 @@ export class MatchSystem extends createSystem({
       }
       // A finish within 1.5 s of the player's shape names it as the cause.
       const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? this.lastShape.kind.toUpperCase() : null;
-      if (recent && v === 1) text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
-      else if (recent && v === -1 && loser.finish !== 'spin') text = `YOUR ${recent} BACKFIRED\n${text}`;
+      const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
+      if (recent && v === 1) {
+        text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
+        // The decisive move plays out slowly for a moment.
+        if (loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME;
+      } else if (recent && v === -1 && loser.finish !== 'spin') text = `YOUR ${recent} BACKFIRED\n${text}`;
+      else if (theirs && v === -1 && loser.finish !== 'spin') text = `THEIR RAMP → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
     }
     this.label.set(text);
     this.barMessage = text.split('\n')[0].replace(/!.*$/, '!');

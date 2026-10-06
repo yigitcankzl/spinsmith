@@ -10,3 +10,8 @@ for (const [name, policy] of Object.entries(POLICIES)) {
     `${name.padEnd(11)} win ${(r.win * 100).toFixed(0)}%, points/round ${r.pointsPerRound.toFixed(2)}, KO wins ${(r.koWins * 100).toFixed(0)}%, median round ${r.medianRound.toFixed(1)} s, shapes/round ${r.shapesPerRound.toFixed(1)}, own KO after a shape ${(r.ownKo * 100).toFixed(0)}%${goal[name] ? `   (target: ${goal[name]})` : ''}`,
   );
 }
+// Rivals from level 6 ramp you out too: how a player fares against them.
+for (const name of ['none', 'pushOut']) {
+  const r = reportShaping(POLICIES[name], 24, POLICIES.pushOut);
+  console.log(`${name.padEnd(11)} vs a ramping rival: win ${(r.win * 100).toFixed(0)}%, median round ${r.medianRound.toFixed(1)} s`);
+}

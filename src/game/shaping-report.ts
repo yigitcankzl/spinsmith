@@ -7,37 +7,37 @@ import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMIN
 import { SHAPE_SIZE, ShapingCharges } from './shaping.ts';
 
 
-type Policy = (arena: Arena, me: Top, rival: Top, t: number, charges: ShapingCharges, rnd: () => number) => void;
+type Policy = (arena: Arena, me: Top, rival: Top, t: number, charges: ShapingCharges, rnd: () => number, owner?: string) => void;
 
 export const POLICIES: Record<string, Policy> = {
   none: () => {},
   // Shapes at random places and in random directions, as often as charges allow.
-  random: (arena, me, rival, t, charges, rnd) => {
+  random: (arena, me, rival, t, charges, rnd, owner = 'me') => {
     if (rnd() > 0.01) return;
     const f = charges.spend(t, TUNING.grace);
     if (!f) return;
     const a = rnd() * Math.PI * 2;
     const r = rnd() * arena.radius * 0.8;
     const d = rnd() * Math.PI * 2;
-    if (rnd() < 0.5) arena.addShape('ramp', Math.cos(a) * r, Math.sin(a) * r, SHAPE_SIZE.ramp * f, 'me', Math.cos(d), Math.sin(d));
-    else arena.addShape('well', Math.cos(a) * r, Math.sin(a) * r, SHAPE_SIZE.well * f, 'me');
+    if (rnd() < 0.5) arena.addShape('ramp', Math.cos(a) * r, Math.sin(a) * r, SHAPE_SIZE.ramp * f, owner, Math.cos(d), Math.sin(d));
+    else arena.addShape('well', Math.cos(a) * r, Math.sin(a) * r, SHAPE_SIZE.well * f, owner);
   },
   // When the rival is in the outer band, a ramp just inside it pushing it outward.
-  pushOut: (arena, me, rival, t, charges) => {
+  pushOut: (arena, me, rival, t, charges, rnd, owner = 'me') => {
     const r = Math.hypot(rival.x, rival.z);
     if (!rival.alive || r < arena.radius * 0.55 || r < 1e-3) return;
     const f = charges.spend(t, TUNING.grace);
     if (!f) return;
     const dx = rival.x / r;
     const dz = rival.z / r;
-    arena.addShape('ramp', rival.x - dx * 0.012, rival.z - dz * 0.012, SHAPE_SIZE.ramp * f, 'me', dx, dz);
+    arena.addShape('ramp', rival.x - dx * 0.012, rival.z - dz * 0.012, SHAPE_SIZE.ramp * f, owner, dx, dz);
   },
   // When your own top is near the middle, a well under it to hold it there.
-  centerWell: (arena, me, rival, t, charges) => {
+  centerWell: (arena, me, rival, t, charges, rnd, owner = 'me') => {
     if (!me.alive || Math.hypot(me.x, me.z) > arena.radius * 0.35) return;
     const f = charges.spend(t, TUNING.grace);
     if (!f) return;
-    arena.addShape('well', me.x, me.z, SHAPE_SIZE.well * f, 'me');
+    arena.addShape('well', me.x, me.z, SHAPE_SIZE.well * f, owner);
   },
 };
 
@@ -52,11 +52,13 @@ export interface ShapingResult {
 }
 
 /** Deterministic: same rules, same result. */
-export function reportShaping(policy: Policy, roundsPerPair = 16): ShapingResult {
+/** `rivalPolicy` lets the rival shape too, under its own charges. */
+export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: Policy = POLICIES.none): ShapingResult {
   let seed = 3;
   const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   const types = [ATTACK, DEFENSE, STAMINA];
   const charges = new ShapingCharges();
+  const rivalCharges = new ShapingCharges();
   let wins = 0, n = 0, points = 0, ko = 0, shapes = 0, ownKo = 0;
   const lengths: number[] = [];
   for (const layout of ARENAS) {
@@ -67,6 +69,7 @@ export function reportShaping(policy: Policy, roundsPerPair = 16): ShapingResult
         for (let i = 0; i < roundsPerPair; i++) {
           arena.reset(layout);
           charges.reset();
+          rivalCharges.reset();
           const a = new Top(x);
           const b = new Top(y);
           const pa = 0.5 + rnd() * 0.5, pb = 0.5 + rnd() * 0.5;
@@ -81,14 +84,19 @@ export function reportShaping(policy: Policy, roundsPerPair = 16): ShapingResult
           while (verdict(a, b, t) === 0) {
             const before = arena.shapes.length ? arena.shapes[arena.shapes.length - 1] : null;
             policy(arena, a, b, t, charges, rnd);
+            rivalPolicy(arena, b, a, t, rivalCharges, rnd, 'rival');
             const after = arena.shapes.length ? arena.shapes[arena.shapes.length - 1] : null;
             if (after && after !== before) {
               shapes++;
               lastShape = t;
             }
             charges.update(STEP);
+            rivalCharges.update(STEP);
             const clash = step(arena, a, b);
-            if (clash) charges.clash(clash.strength, t);
+            if (clash) {
+              charges.clash(clash.strength, t);
+              rivalCharges.clash(clash.strength, t);
+            }
             t += STEP;
           }
           const v = verdict(a, b, t);

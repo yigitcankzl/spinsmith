@@ -178,6 +178,7 @@ own rays rarely line up with what you are looking at.
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Shatter the opponent now (during a fight) |
 | `O` | Throw the opponent over the wall now (during a fight) |
+| `H` | A match against Hookjaw, a rival that ramps you out (home, ready or result) |
 | `` ` `` | Start over as a new player: clears progress and the saved top, reloads |
 | hold `1` / `2` + mouse | Move only the left / right hand across the view (the head stays still); the wheel moves it nearer or farther |
 | `R` | Reset to the ready screen |
