@@ -1,5 +1,5 @@
-import { AdditiveBlending, CircleGeometry, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, playCrunch, playLocked, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
+import { AdditiveBlending, CircleGeometry, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { CordTone, playCrunch, playLocked, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -16,25 +16,22 @@ import { MatchBar } from './match-bar.js';
 import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, OPPONENT_COLOR, ShapeMarks, Sparks, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, OPPONENT_COLOR, ShapeMarks, Sparks, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { SHAPE_SIZE, ShapingCharges } from './shaping.js';
+import { PEDESTAL, pickTable, placeArena } from './placement.js';
+import type { Point } from './placement.js';
 
-/** The arena floor sits this far above the real table, leaving room to press dents. */
-const PEDESTAL = 0.08;
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = 2;
-/** How far in front of the seated player's head the arena goes (m, horizontal). */
-const REACH = 0.6;
-/** Without a table the arena floats on a tray this far below the head. */
-const TRAY_DROP = 0.35;
-const TABLE_MIN_H = 0.45;
-const TABLE_MAX_H = 1.15;
-const TABLE_MAX_DIST = 1.6;
-/** A table more than this far below the eyes is not used (m). Seated at a desk it is about 0.4-0.6. */
-const TABLE_MAX_BELOW_EYES = 0.75;
-/** Wait for planes to arrive before placing. */
-const SETTLE = 2;
+/** Placing waits at least this long for planes, and places on the tray after SETTLE_MAX without a table (s). */
+const SETTLE_MIN = 0.5;
+const SETTLE_MAX = 5;
+/** A table found within this long after placing on the tray still gets the arena (s). */
+const LATE_TABLE = 30;
+/** The move handle: grabbed within this distance (world m); the arena moves at most this far up or down. */
+const HANDLE_GRAB = 0.06;
+const HANDLE_LIFT = 0.1;
 /** Cord pull that counts as a full-power rip (m) and full-power pull speed (m/s). */
 const FULL_PULL = 0.22;
 const FULL_SPEED = 1.0;
@@ -88,6 +85,17 @@ export class MatchSystem extends createSystem({
 }) {
   private phase: Phase = 'placing';
   private settle = 0;
+  /** The XR session the arena was placed in; a new one (or a recenter) places it again. */
+  private xrSession: XRSession | null = null;
+  private needPlace = false;
+  /** When the arena was placed, whether on a table, and the table height it eases to if one turns up late. */
+  private placedAt = 0;
+  private onTable = false;
+  private tableY: number | null = null;
+  private tableCheck = 0;
+  /** The brass handle on the pedestal's near face, and the hand dragging the arena by it. */
+  private handle = new Group();
+  private dragging: { hand: HandState; from: Vector3; start: Vector3 } | null = null;
   private hands = new HandInput();
   private root = new Group();
   private arena = new Arena();
@@ -276,7 +284,8 @@ export class MatchSystem extends createSystem({
     );
     this.myBuild = this.forge.allowed(this.myBuild);
     this.setBuilds(this.myBuild, this.theirBuild);
-    this.root.add(this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
+    this.buildHandle();
+    this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
     this.menuButton.mesh.rotation.y = 0.4;
     this.menuButton.set('Menu');
@@ -375,6 +384,12 @@ export class MatchSystem extends createSystem({
       setAudioPaused(paused);
     }
     if (paused) return;
+    // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
+    if (session !== this.xrSession) {
+      if (this.xrSession) this.needPlace = true;
+      this.xrSession = session;
+      ref.addEventListener('reset', () => (this.needPlace = true));
+    }
     const dt = Math.min(delta, 0.05);
     this.frameDt = dt;
     this.time += dt;
@@ -387,10 +402,19 @@ export class MatchSystem extends createSystem({
       this.updateGazePointer();
     }
 
+    if (this.needPlace && this.phase !== 'placing') {
+      this.needPlace = false;
+      if (this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') this.toReady();
+      this.placeRoot();
+    }
+    this.easeToTable(dt);
+    this.handle.visible = this.phase === 'hub';
     switch (this.phase) {
       case 'placing':
+        // Wait for a table to be detected, but never long: without one the arena floats on a tray.
         this.settle += dt;
-        if (this.settle >= SETTLE) this.place();
+        this.player.head.getWorldPosition(this.head);
+        if ((this.settle >= SETTLE_MIN && pickTable(this.head, this.tables()) !== null) || this.settle >= SETTLE_MAX) this.place();
         return;
       case 'hub':
         this.updateHub(dt);
@@ -548,6 +572,7 @@ export class MatchSystem extends createSystem({
   }
 
   private updateHub(dt: number) {
+    if (this.moveArena()) return;
     if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
     this.player.head.getWorldPosition(this.p);
     if (import.meta.env.DEV && this.hubLogPending) {
@@ -774,45 +799,107 @@ export class MatchSystem extends createSystem({
     return `${t.name} (${roleOf(t)})`;
   }
 
+  /** The first placement: the arena in front, then home. */
   private place() {
+    this.placeRoot();
+    this.toHub();
+  }
+
+  /** Puts the arena a comfortable reach ahead, on a table if there is one, facing the head. */
+  private placeRoot() {
     const head = this.player.head;
     head.getWorldPosition(this.head);
     head.getWorldDirection(this.fwd);
     // getWorldDirection returns +Z of the object; the camera looks down -Z.
-    this.fwd.negate().setY(0);
-    if (this.fwd.lengthSq() < 1e-6) this.fwd.set(0, 0, -1);
-    this.fwd.normalize();
-    const center = this.p.copy(this.head).addScaledVector(this.fwd, REACH);
-    const table = this.findTable();
-    center.y = table !== null ? table + PEDESTAL : this.head.y - TRAY_DROP;
-    this.root.position.copy(center);
+    this.fwd.negate();
+    const at = placeArena(this.head, this.fwd.x, this.fwd.z, this.tables());
+    this.root.position.set(at.x, at.y, at.z);
     this.root.scale.setScalar(ARENA_SCALE);
     // Local +Z points back at the player.
-    this.root.rotation.set(0, Math.atan2(this.head.x - center.x, this.head.z - center.z), 0);
+    this.root.rotation.set(0, at.yaw, 0);
     this.root.visible = true;
-    console.log(`[MATCH] arena on ${table !== null ? 'table' : 'tray'} at ${center.toArray().map((v) => v.toFixed(2)).join(',')}`);
-    this.toHub();
+    this.onTable = at.onTable;
+    this.tableY = null;
+    this.placedAt = this.time;
+    console.log(`[MATCH] arena on ${at.onTable ? 'table' : 'tray'} at ${[at.x, at.y, at.z].map((v) => v.toFixed(2)).join(',')}`);
+    if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
-  /** Height of the nearest table/desk plane within reach, or null. */
-  private findTable(): number | null {
-    let best: number | null = null;
-    let bestDist = TABLE_MAX_DIST;
+  /** The move handle: a brass grip on a short post, out from the pedestal's near face. */
+  private buildHandle() {
+    const brass = new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xe2b866) });
+    const post = new Mesh(new CylinderGeometry(0.003, 0.003, 0.02, 10).rotateX(Math.PI / 2), brass);
+    post.position.z = -0.01;
+    const grip = new Mesh(new TorusGeometry(0.009, 0.003, 8, 20), brass);
+    this.handle.add(post, grip);
+    this.handle.position.set(0, -0.026, 0.215);
+    this.handle.visible = false;
+  }
+
+  /** Centers of the detected horizontal table and desk planes (world). */
+  private tables(): Point[] {
+    const out: Point[] = [];
     for (const e of this.queries.planes.entities) {
       const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
       if (plane?.orientation !== 'horizontal' || !/table|desk/.test(plane.semanticLabel ?? '')) continue;
-      e.object3D!.getWorldPosition(this.local);
-      if (this.local.y < TABLE_MIN_H || this.local.y > TABLE_MAX_H) continue;
-      // A table far below the eyes (standing over a coffee table) would mean bending over it:
-      // use the floating tray at a comfortable height instead.
-      if (this.head.y - this.local.y > TABLE_MAX_BELOW_EYES) continue;
-      const d = Math.hypot(this.local.x - this.head.x, this.local.z - this.head.z);
-      if (d < bestDist) {
-        bestDist = d;
-        best = this.local.y;
+      const p = e.object3D!.getWorldPosition(new Vector3());
+      out.push({ x: p.x, y: p.y, z: p.z });
+    }
+    return out;
+  }
+
+  /** A table detected after the arena went on the tray: the arena eases down onto it. */
+  private easeToTable(dt: number) {
+    if (this.phase !== 'placing' && !this.onTable && !this.dragging && this.time - this.placedAt < LATE_TABLE && (this.tableCheck -= dt) <= 0) {
+      this.tableCheck = 0.5;
+      this.player.head.getWorldPosition(this.head);
+      const table = pickTable(this.head, this.tables());
+      if (table !== null) {
+        this.onTable = true;
+        this.tableY = table + PEDESTAL;
+        console.log(`[MATCH] snapped to table at ${this.tableY.toFixed(2)}`);
       }
     }
-    return best;
+    if (this.tableY !== null) {
+      const p = this.root.position;
+      p.y += (this.tableY - p.y) * Math.min(1, dt * 6);
+      if (Math.abs(this.tableY - p.y) < 1e-4) this.tableY = null;
+    }
+  }
+
+  /**
+   * Home only: pinch the brass handle on the pedestal and carry the arena (up or down a little;
+   * it snaps onto a table within 3 cm); on release it turns to face you. True while it handles the hand.
+   */
+  private moveArena(): boolean {
+    const d = this.dragging;
+    if (!d) {
+      for (const h of [this.hands.right, this.hands.left]) {
+        if (!h.tracked || !h.justPinched) continue;
+        this.handle.getWorldPosition(this.p);
+        if (h.pinch.distanceTo(this.p) > HANDLE_GRAB) continue;
+        this.dragging = { hand: h, from: h.pinch.clone(), start: this.root.position.clone() };
+        playPick();
+        return true;
+      }
+      return false;
+    }
+    const h = d.hand;
+    const p = this.root.position;
+    if (h.pinching && h.tracked) {
+      p.set(d.start.x + h.pinch.x - d.from.x, d.start.y + Math.max(-HANDLE_LIFT, Math.min(HANDLE_LIFT, h.pinch.y - d.from.y)), d.start.z + h.pinch.z - d.from.z);
+      for (const t of this.tables()) if (Math.abs(p.y - (t.y + PEDESTAL)) < 0.03) p.y = t.y + PEDESTAL;
+      return true;
+    }
+    this.dragging = null;
+    this.player.head.getWorldPosition(this.head);
+    this.root.rotation.set(0, Math.atan2(this.head.x - p.x, this.head.z - p.z), 0);
+    this.onTable = this.tables().some((t) => Math.abs(p.y - (t.y + PEDESTAL)) < 1e-3);
+    this.placedAt = this.time;
+    playPlace();
+    console.log(`[MATCH] arena moved to ${[p.x, p.y, p.z].map((v) => v.toFixed(2)).join(',')}`);
+    if (import.meta.env.DEV) this.hubLogPending = true;
+    return true;
   }
 
   private toReady() {

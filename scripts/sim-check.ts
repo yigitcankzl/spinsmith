@@ -12,6 +12,7 @@ import { CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STA
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
+import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
@@ -537,6 +538,30 @@ TUNING.grace = 0;
     assert.equal(finishPoints(t), heat, `${finish} should score ${heat} heat`);
   }
   for (const a of ARENAS) for (const p of a.pockets) assert.equal(p.points, 2, `${a.name}: every pit is worth 2`);
+}
+
+// 14. Placement: the arena goes a reach ahead whichever way the head faces, turned to face it,
+// onto the nearest usable table, and onto a tray when the only table is too low or too far.
+{
+  const head = { x: 0.3, y: 1.2, z: -0.4 };
+  for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    const fx = -Math.sin(yaw);
+    const fz = -Math.cos(yaw);
+    const at = placeArena(head, fx, fz, []);
+    assert.ok(Math.abs(Math.hypot(at.x - head.x, at.z - head.z) - REACH) < 1e-9, 'the arena is a reach ahead');
+    assert.ok(Math.abs(at.y - (head.y - TRAY_DROP)) < 1e-9 && !at.onTable, 'without a table it floats on the tray');
+    // Local +Z (sin yaw, cos yaw) points back at the head.
+    const back = [Math.sin(at.yaw), Math.cos(at.yaw)];
+    const toHead = [(head.x - at.x) / REACH, (head.z - at.z) / REACH];
+    assert.ok(Math.abs(back[0] - toHead[0]) < 1e-9 && Math.abs(back[1] - toHead[1]) < 1e-9, 'the arena faces the head');
+  }
+  const near = { x: 0.3, y: 0.75, z: -0.9 };
+  const far = { x: 1.5, y: 0.7, z: 0.5 };
+  const at = placeArena(head, 0, -1, [far, near]);
+  assert.ok(at.onTable && Math.abs(at.y - (near.y + PEDESTAL)) < 1e-9, 'the nearest table is used');
+  assert.ok(!placeArena(head, 0, -1, [{ x: 0.3, y: 0.4, z: -0.9 }]).onTable, 'a table far below the eyes is not used');
+  assert.ok(!placeArena({ ...head, y: 1.7 }, 0, -1, [{ x: 0.3, y: 0.9, z: -0.9 }]).onTable, 'standing over a low table uses the tray');
+  assert.ok(Number.isFinite(placeArena(head, 0, 0, []).x), 'looking straight down still places ahead');
 }
 
 console.log('sim-check: all passed');
