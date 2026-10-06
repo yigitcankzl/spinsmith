@@ -9,4 +9,6 @@ World.create(
 ).then((world) => {
   world.registerSystem(MatchSystem);
   world.registerSystem(PanelSystem);
+  // Emulator helper: move one hand at a time with the mouse (dev builds only).
+  if (import.meta.env.DEV) void import('./dev-hands.js').then((m) => m.installDevHands());
 });

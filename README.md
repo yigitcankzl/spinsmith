@@ -106,6 +106,7 @@ own rays rarely line up with what you are looking at.
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Burst the opponent now (during a fight) |
 | `A` | Switch to the next arena (outside a fight) |
+| hold `1` / `2` + mouse | Move only the left / right hand across the view (the head stays still); the wheel moves it nearer or farther |
 | `R` | Reset to the ready screen |
 | `P` | Re-place the arena in front of the current head pose |
 
@@ -133,6 +134,7 @@ src/game/hands.ts          Pinch and fingertip input from WebXR hand joints
 src/game/visuals.ts        Generated matcaps, top shapes per type, burst debris, arena, sparks, cord, text card
 src/game/audio.ts          Synthesized sound effects and the spin hum
 src/game/match-system.ts   Placement, rip-cord launch, arena moves, AI launch, match flow
+src/dev-hands.ts           Dev only: move one emulated hand with the mouse
 scripts/sim-check.ts       Headless simulation check
 docs/DESIGN.md             Game design document
 ```
