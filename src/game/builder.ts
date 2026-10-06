@@ -21,7 +21,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { arenaWarning, reportArena } from './arena-report.js';
-import { chamfer, FONT, GLASS_LIGHT, glassMesh, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
+import { FONT, glass, GLASS_LIGHT, glassMesh, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
@@ -97,13 +97,7 @@ export class Button {
     this.lit = lit;
     const g = this.canvas.getContext('2d')!;
     const { width: w, height: h } = this.canvas;
-    g.clearRect(0, 0, w, h);
-    chamfer(g, 3, 3, w - 6, h - 6, h * 0.25);
-    g.fillStyle = lit ? ORANGE : GLASS_LIGHT;
-    g.fill();
-    g.strokeStyle = lit ? '#ffd2a8' : 'rgba(160, 190, 230, 0.45)';
-    g.lineWidth = 2;
-    g.stroke();
+    glass(g, w, h, lit ? '#ffd2a8' : ORANGE, lit ? 'rgba(255, 138, 42, 0.92)' : GLASS_LIGHT);
     g.fillStyle = TEXT;
     g.textAlign = 'center';
     g.textBaseline = 'middle';

@@ -347,9 +347,12 @@ function ringDesign(ring: Ring): RingDesign {
       return { outline: claw, thick: 0.004, slope: 0.9, tier: (a) => R0 * 0.85 + (claw(a) - R0) * 0.4, tierHole: 0.006, tierThick: 0.0018, layer: (a) => CHIP_R * 1.15 + (claw(a) - R0) * 0.3, dome: 1 };
     }
     case 'anvil': {
-      // Six heavy rounded lobes, thick, under a raised crown: a squat, solid mass.
-      const lobes = (a: number) => R * (0.9 + 0.12 * Math.pow(0.5 + 0.5 * Math.cos(phase(a, 6) * Math.PI * 2), 0.6));
-      return { outline: lobes, thick: 0.008, slope: 0, tier: circle(R * 0.8), tierHole: 0.006, tierThick: 0.004, layer: circle(R * 0.56), dome: 1.4 };
+      // Six flat-faced blocks split by square notches, thick, under a raised crown: a heavy nut.
+      const blocks = (a: number) => {
+        const u = phase(a, 6);
+        return u < 0.07 || u > 0.93 ? R * 0.84 : (R * 0.93) / Math.cos((u - 0.5) * (Math.PI / 3));
+      };
+      return { outline: blocks, thick: 0.008, slope: 0, tier: circle(R * 0.8), tierHole: 0.006, tierThick: 0.004, layer: circle(R * 0.56), dome: 1.4 };
     }
     case 'halo':
       // A wide wheel: a raised outer rim on four spokes, open between them.
@@ -428,9 +431,22 @@ export function ringMeshes(ring: Ring, color: number, base: number, glow = new M
     bladeGeo.computeVertexNormals();
   }
   const tierGeo = extrudeOutline(sample(d.tier), d.tierHole, d.tierThick).translate(0, d.thick, 0);
-  const bladeMesh = new Mesh(merge([bladeGeo, tierGeo]), BLADE_METAL);
-  bladeMesh.position.y = base;
   const top = d.thick + d.tierThick;
+  // The plastic layer's one detail language: a metal inlay line just inside its edge and three
+  // bolts tying it to the blade, merged into the blade (no extra draw call).
+  const inlay = new Shape(sample((a) => d.layer(a) - 0.0009).map(([x, z]) => new Vector2(x, -z)));
+  inlay.holes.push(new Path(sample((a) => d.layer(a) - 0.0016).map(([x, z]) => new Vector2(x, -z)).reverse()));
+  const metal = [bladeGeo, tierGeo, new ExtrudeGeometry(inlay, { depth: 0.0005, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(0, top + 0.0028, 0)];
+  let inner = Infinity;
+  for (let i = 0; i < 24; i++) inner = Math.min(inner, d.layer((i / 24) * Math.PI * 2));
+  const boltR = (CHIP_R + inner - 0.0016) / 2;
+  // A narrow layer (Halo) has no room for bolts beside the chip.
+  for (let k = 0; boltR > CHIP_R + 0.001 && k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + Math.PI / 6;
+    metal.push(new CylinderGeometry(0.0008, 0.0009, 0.0007, 8).translate(Math.cos(a) * boltR, top + 0.0034, -Math.sin(a) * boltR));
+  }
+  const bladeMesh = new Mesh(merge(metal), BLADE_METAL);
+  bladeMesh.position.y = base;
   const layerMesh = new Mesh(extrudeOutline(sample(d.layer), CHIP_R * 0.9, 0.0025), new MeshMatcapMaterial({ matcap: makeMatcap('clay', color) }));
   layerMesh.position.y = base + top;
   // The chip: a dome in a lighter body color, the emblem glowing on top.

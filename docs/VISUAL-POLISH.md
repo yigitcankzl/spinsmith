@@ -137,3 +137,19 @@ Same camera, before the visual work and after the sprint: `polish-sprint-before-
 Still weak, in order: the colored plastic layers on the tops are plain flat shapes; the wall and
 panels are generic glass rather than SpinSmith-specific; the arena shell's clamps are still
 primitive boxes; impact effects are untested on the headset; nothing has been measured on Quest.
+
+## 8. One detail language (Oct 6, 2026)
+
+- **Plastic layers:** every colored layer carries a metal inlay line just inside its edge and
+  three bolts tying it to the blade (Halo's narrow layer keeps only the line). Both are merged
+  into the blade mesh: no extra draw call.
+- **Anvil ring:** six flat-faced blocks split by square notches instead of round lobes, so it
+  reads as a heavy machined nut.
+- **Signs:** the match bar, the notes, the rival card, the hub card and the buttons (Menu
+  included) are all the same panel: dark glass, orange corner accents and two steel rivets.
+- **Rival card:** a quarter larger over the far rim; notes over the anvil stay smaller because
+  the anvil is close to the eyes.
+- The arena shell's clamps read as part of the silhouette at the competition framing and were
+  left as they are.
+
+`tops-inlay.png`: Striker, Anvil and Halo from above.

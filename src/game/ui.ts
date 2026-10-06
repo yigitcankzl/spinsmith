@@ -44,8 +44,9 @@ export function chamfer(g: CanvasRenderingContext2D, x: number, y: number, w: nu
 }
 
 /**
- * Paints a glass panel filling the canvas: tinted fill, a faint grid, a thin edge, and short
- * bright accents on two opposite corners.
+ * Paints a glass panel filling the canvas: tinted fill, a faint grid, a thin edge, short bright
+ * accents on two opposite corners and a steel rivet in each of the other two. Every SpinSmith
+ * sign (match bar, notes, cards, buttons) is this panel.
  */
 export function glass(g: CanvasRenderingContext2D, w: number, h: number, accent = ORANGE, fill = GLASS) {
   const c = Math.min(w, h) * 0.08;
@@ -99,6 +100,17 @@ export function glass(g: CanvasRenderingContext2D, w: number, h: number, accent 
   g.lineTo(w - m - c - w * 0.18, h - m);
   g.stroke();
   g.shadowBlur = 0;
+  const r = Math.max(3, h * 0.022);
+  for (const [x, y] of [[w - m - c * 0.9, m + c * 0.9], [m + c * 0.9, h - m - c * 0.9]]) {
+    const metal = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+    metal.addColorStop(0, '#ffffff');
+    metal.addColorStop(0.45, STEEL);
+    metal.addColorStop(1, '#4a5566');
+    g.fillStyle = metal;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
 }
 
 /** A plane of the given size (m) showing a glass panel. */

@@ -529,8 +529,11 @@ export class MatchSystem extends createSystem({
     else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Rush tip!\nPinch the anvil to fit it');
     else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
     // Over the anvil for the new part; otherwise over the far rim (the stand's beacon marks it).
-    if (guide === 'forge' || guide === 'fit') this.label.mesh.position.set(ANVIL_AT.x, 0.24, ANVIL_AT.z - 0.02);
+    const atAnvil = guide === 'forge' || guide === 'fit';
+    if (atAnvil) this.label.mesh.position.set(ANVIL_AT.x, 0.24, ANVIL_AT.z - 0.02);
     else this.label.mesh.position.copy(LABEL_AT);
+    // The anvil is near the eyes; the far rim needs the larger card.
+    this.label.mesh.scale.setScalar(atAnvil ? 0.9 : 1.25);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
@@ -815,6 +818,7 @@ export class MatchSystem extends createSystem({
     this.puller = null;
     this.cord.set(null);
     this.label.mesh.position.copy(LABEL_AT);
+    this.label.mesh.scale.setScalar(1.25);
     // The scoreboard on the wall shows the match; the card over the arena only the round's messages,
     // and at a match's start, who the rival is and how it plays.
     if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name} · ${this.rival.style}\n${this.arena.layout.rule ?? this.arena.layout.name}`);
