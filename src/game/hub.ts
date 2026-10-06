@@ -5,6 +5,9 @@
  * - A blueprint on the near rim opens the arena workshop: the arena turns into a drafting table.
  * - A row of arena miniatures floats behind the arena: point at one and pinch, it flies to your
  *   hand; drop it on the arena (or tap it) to switch.
+ * - Once the first session is over: the Smith's board over the far rim's left (today's order, the
+ *   rivals' medallions, the ledger; pinch it to take the order) and your champions, the last three
+ *   tops that won a match, on small stands along the left rim (pinch one to make it your top).
  * Table things are arena-local (arena center at the origin, +Z toward the player).
  */
 import {
@@ -36,9 +39,20 @@ import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import type { ArenaLayout, Theme } from './layout.js';
 import type { TopBuild } from './parts.js';
+import { RIVALS } from './parts.js';
+import { SmithBoard } from './board.js';
+import type { Order } from './orders.js';
+import { MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
 
-export type HubAction = { kind: 'play' } | { kind: 'arena'; index: number } | { kind: 'forge' } | { kind: 'workshop' } | { kind: 'locked'; text: string };
+export type HubAction =
+  | { kind: 'play' }
+  | { kind: 'arena'; index: number }
+  | { kind: 'forge' }
+  | { kind: 'workshop' }
+  | { kind: 'order' }
+  | { kind: 'champion'; index: number }
+  | { kind: 'locked'; text: string };
 
 /** A hand lost this long (s) cancels a carry instead of dropping (same as the match's rip). */
 const HAND_LOSS_GRACE = 0.1;
@@ -47,6 +61,9 @@ const HAND_LOSS_GRACE = 0.1;
 export const FORGE_AT = new Vector3(0.14, 0, 0.15);
 const DOCK_AT = new Vector3(-0.14, 0, 0.15);
 const BLUEPRINT_AT = new Vector3(0.08, 0, 0.185);
+/** The Smith's board (where the first session's notes hang) and the champions' stands on the left rim. */
+const BOARD_AT = new Vector3(-0.17, 0.12, -0.25);
+const CHAMPION_AT = [new Vector3(-0.215, 0, 0.07), new Vector3(-0.23, 0, -0.01), new Vector3(-0.215, 0, -0.09)];
 /** The anvil and the dock on the rim are small models of the full ones. */
 const RIM_SCALE = 0.42;
 /** Miniatures on the arena shelf: this much larger than on a table, this far apart, this many a row. */
@@ -113,6 +130,10 @@ export class Hub {
   private time = 0;
   /** The first session: every station shows its name. */
   private teaching = true;
+  private board = new SmithBoard();
+  private champions = new Group();
+  private championViews: TopView[] = [];
+  private championsKey = '';
   private readonly p = new Vector3();
   private readonly q = new Vector3();
   private readonly hit = new Vector3();
@@ -130,12 +151,15 @@ export class Hub {
     this.shelf.position.set(0.2, 0.13, -0.28);
     this.shelf.scale.setScalar(0.5);
     this.beacon.rotation.x = -Math.PI / 2;
-    this.root.add(this.anvil, this.stand, this.shelf, this.beacon);
+    this.board.mesh.position.copy(BOARD_AT);
+    this.board.mesh.rotation.x = -0.25;
+    this.items.push({ action: { kind: 'order' }, carry: false, model: this.board.mesh, home: BOARD_AT.clone() });
+    this.root.add(this.anvil, this.stand, this.shelf, this.beacon, this.board.mesh, this.champions);
     this.root.visible = false;
   }
 
   /** Refreshes what the stations show: your top, and one miniature per arena. */
-  show(arenas: ArenaLayout[], current: number, build: TopBuild, progress: Progress) {
+  show(arenas: ArenaLayout[], current: number, build: TopBuild, progress: Progress, order: Order | null) {
     this.drawRank(progress);
     this.root.visible = true;
     // Before the first match the smithy is just your top and the arena: the anvil, the arena
@@ -146,6 +170,21 @@ export class Hub {
     // Every unfinished guide step points somewhere: the dock to play, the anvil for the new part.
     this.beacon.visible = progress.guide !== 'done';
     this.teaching = progress.guide !== 'done';
+    // The board and the champions come once the first session is over.
+    this.board.mesh.visible = !this.teaching;
+    this.champions.visible = !this.teaching;
+    if (!this.teaching) {
+      const next = Object.keys(STAMP_UNLOCKS).map(Number).find((n) => n > progress.stamps) ?? null;
+      this.board.draw({
+        order,
+        done: order ? progress.hasOrder(order.date) : false,
+        stamps: progress.stamps,
+        nextGlow: next,
+        rivals: RIVALS.map((r) => ({ name: r.name, level: r.level, met: r.level <= progress.level, marks: progress.marksOf(r.name) })),
+        gilded: progress.isUnlocked('ledger:gold') || progress.level >= MAX_LEVEL,
+      });
+      this.fillChampions(progress);
+    }
     const onAnvil = progress.guide === 'forge' || progress.guide === 'fit';
     const at = onAnvil ? FORGE_AT : DOCK_AT;
     this.beacon.position.set(at.x, TABLE_Y + DOCK_TOP + 0.003, at.z);
@@ -409,6 +448,34 @@ export class Hub {
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
     this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3(), name });
+  }
+
+  /** Your champions on small stands along the left rim, rebuilt when the list changes. */
+  private fillChampions(progress: Progress) {
+    const key = JSON.stringify(progress.champions);
+    if (key === this.championsKey) return;
+    this.championsKey = key;
+    for (const v of this.championViews) v.dispose();
+    this.championViews = [];
+    for (const c of [...this.champions.children]) c.removeFromParent();
+    this.labels = this.labels.filter((l) => !this.items.some((it) => it.action.kind === 'champion' && it.name === l));
+    this.items = this.items.filter((it) => it.action.kind !== 'champion');
+    progress.champions.forEach((c, i) => {
+      const holder = new Group();
+      holder.position.set(CHAMPION_AT[i].x, TABLE_Y, CHAMPION_AT[i].z);
+      const stand = standModel();
+      stand.scale.setScalar(RIM_SCALE * 0.8);
+      const view = new TopView(c.build, c.build.color);
+      view.root.scale.setScalar(0.8);
+      view.root.position.y = DOCK_TOP * 0.8;
+      this.championViews.push(view);
+      holder.add(stand, view.root);
+      const name = tag(`${c.wins} win${c.wins === 1 ? '' : 's'}`, 0.07, 44);
+      name.position.set(holder.position.x, TABLE_Y + DOCK_TOP + 0.045, holder.position.z);
+      this.labels.push(name);
+      this.champions.add(holder, name);
+      this.items.push({ action: { kind: 'champion', index: i }, carry: false, model: holder, home: holder.position.clone(), name });
+    });
   }
 
   /** Dev: world positions of the things to pick, for driving the hub from the emulator CLI. */

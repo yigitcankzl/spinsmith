@@ -79,15 +79,27 @@ What works:
   burst, pocket or over finish, a perfect rip, and the match), filling levels 1-20 with ranks
   (Apprentice, Journeyman, Smith, Master Smith, Legend). Levels open options, never power: you
   start with the classic tops' parts, two paints and two arenas, and each level opens a part, a
-  paint or an arena; the 9-60 core comes from a first burst win and the Hook ring from a first
+  paint, an arena or a rival, and levels 14-20 give paints and emblem glows (cosmetic only),
+  ending in a gilded ledger; the 9-60 core comes from a first burst win and the Hook ring from a first
   pocket or over win. Locked parts and arenas show dark with how they are earned. A match is
   against one rival archetype that keeps its build and spin for every round (Rim Raider, Iron
-  Keep and Drifter at first; Leech, Hookjaw, Sawtooth and Bastion join with levels); its name
-  and style show at the start. Higher levels make rivals rip harder and aim steadier, never
+  Keep and Drifter at first; Leech, Hookjaw, Sawtooth and Bastion join with levels, announced as
+  NEW RIVAL); its name and style show at the start. Higher levels make rivals rip harder and aim steadier, never
   stronger in stats.
   After a round the match bar shows the XP earned and the level bar; a level-up rings and
   throws sparks, and each unlock spins over the arena. Your level and rank sit on the near rim.
   Progress is saved in the browser.
+- **A reason to come back** (`src/game/orders.ts`, `src/game/board.ts`, `docs/COME-BACK.md`):
+  once the first session is over, the Smith's board over the far rim shows **today's Smith
+  Order**, made from the local date and what you have unlocked (the same all day): a rival, an
+  arena and one way of winning (ramp them out, burst them, outlast them from your well, win with
+  a given kind of top, with a perfect rip, without losing a point, on your own arena). Pinch the
+  board to play it; doing it strikes a stamp into the ledger (stamps 5, 10 and 15 earn emblem
+  glows). Missed days cost nothing. The board also shows the seven rivals as medallions with
+  three notches each: beaten, knocked out, beaten by your own ramp or well. The last three tops
+  that won a match stand as champions on the left rim with their record; pinch one to make it
+  your top again. The hosted build has a web app manifest, so it can be added to the Quest
+  library.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
 - **Arena workshop** (`src/game/builder.ts`, `docs/ARENA-WORKSHOP-RIM.md`): pinch the

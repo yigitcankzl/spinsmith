@@ -8,8 +8,11 @@ import { ARENAS } from '../src/game/arenas.ts';
 import { cloneLayout, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { SHAPING, ShapingCharges } from '../src/game/shaping.ts';
-import { LEVEL_UNLOCKS, Progress, xpToNext } from '../src/game/progress.ts';
-import { allBuilds, PRESETS, specFromBuild, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
+import { CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, xpToNext } from '../src/game/progress.ts';
+import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
+import type { OrderEvent } from '../src/game/orders.ts';
+import { reportArena } from '../src/game/arena-report.ts';
+import { allBuilds, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
@@ -442,6 +445,82 @@ TUNING.grace = 0;
   // Saves from before the guide existed skip it once the player has played.
   const old = new Map([['spinsmith.progress.v1', JSON.stringify({ level: 3, xp: 10, unlocked: [], quests: [] })]]);
   assert.equal(new Progress({ getItem: (k: string) => old.get(k) ?? null, setItem: () => {} }).guide, 'done');
+}
+
+// 12. Coming back: every level up to the top gives something, rivals arrive as announced, Smith
+// Orders are the same all day and always playable, and stamps, marks and champions are kept.
+{
+  for (let lv = 2; lv <= MAX_LEVEL; lv++) assert.ok(LEVEL_UNLOCKS[lv] || RIVAL_UNLOCKS[lv], `level ${lv} should give something`);
+  for (const r of RIVALS) {
+    if (r.level === 1) continue;
+    assert.equal(RIVAL_UNLOCKS[r.level], `rival:${r.name}`, `${r.name} should be announced at Lv ${r.level}`);
+  }
+  for (const k of [...Object.values(LEVEL_UNLOCKS), ...Object.values(STAMP_UNLOCKS)]) {
+    if (k.startsWith('emblem:')) assert.ok(Number(k.slice(7)) < EMBLEM_COLORS.length, `${k} should be a known glow`);
+  }
+  // Orders: deterministic per date, playable with what the player has, different over days.
+  const builtIn = ARENAS.slice(0, 3);
+  const mine = { ...cloneLayout(ARENAS[0]), name: 'My Arena 1' };
+  const ctx = { rivals: ['Rim Raider', 'Iron Keep', 'Drifter'], arenas: builtIn, built: [mine] };
+  const goals = new Set<string>();
+  const start = new Date(2026, 9, 1);
+  for (let i = 0; i < 120; i++) {
+    const date = localDate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+    const o = dailyOrder(date, ctx);
+    assert.deepEqual(dailyOrder(date, ctx), o, 'the same date gives the same order');
+    assert.ok(ctx.rivals.includes(o.rival), 'the order rival is one the player can meet');
+    const arena = [...builtIn, mine].find((a) => a.name === o.arena);
+    assert.ok(arena, 'the order arena is one the player has');
+    if (o.goal === 'ownArena') assert.equal(o.arena, mine.name);
+    if (o.goal === 'rampKO') assert.ok(canKnockOut(arena!), 'a knockout order needs an arena where knockouts happen');
+    goals.add(o.goal);
+  }
+  assert.ok(goals.size >= 6, `orders should vary over days (got ${[...goals].join(', ')})`);
+  assert.equal(localDate(new Date(2026, 0, 5)), '2026-01-05');
+  // Feasible in play: knockouts and bursts actually happen in simulated rounds on these arenas.
+  for (const a of ARENAS) {
+    const r = reportArena(a, 3);
+    if (canKnockOut(a)) assert.ok(r.knockout > 0, `${a.name}: knockouts should happen for knockout orders`);
+  }
+  assert.ok(ARENAS.some((a) => reportArena(a, 3).burst > 0), 'bursts should happen for burst orders');
+  // Goals are measured from what a round or match reports.
+  const o = dailyOrder('2026-10-07', ctx);
+  const base: OrderEvent = { rival: o.rival, arena: o.arena, wonRound: true, finish: 'pocket', cause: 'ramp', wellInRound: false, matchWon: false, shutout: false, role: 'attack', perfectInMatch: false };
+  assert.equal(orderMet({ ...o, goal: 'rampKO' }, base), true);
+  assert.equal(orderMet({ ...o, goal: 'rampKO' }, { ...base, cause: null }), false, 'a knockout without your ramp does not count');
+  assert.equal(orderMet({ ...o, goal: 'rampKO' }, { ...base, rival: 'Nobody' }), false, 'only against the order rival');
+  assert.equal(orderMet({ ...o, goal: 'wellSpin' }, { ...base, finish: 'spin', wellInRound: true }), true);
+  assert.equal(orderMet({ ...o, goal: 'sweep' }, { ...base, matchWon: true, shutout: true }), true);
+  // Stamps: once per date, with XP; glows at 5 stamps; a fresh progress has none.
+  const storage = new Map<string, string>();
+  const st = { getItem: (k: string) => storage.get(k) ?? null, setItem: (k: string, v: string) => void storage.set(k, v) };
+  const p = new Progress(st);
+  assert.ok(p.completeOrder('2026-10-01').gained > 0);
+  assert.equal(p.completeOrder('2026-10-01').gained, 0, 'a day gives one stamp');
+  for (let d = 2; d <= 5; d++) p.completeOrder(`2026-10-0${d}`);
+  assert.equal(p.stamps, 5);
+  assert.ok(p.isUnlocked(STAMP_UNLOCKS[5]), 'five stamps earn a glow');
+  // Marks: only new marks are reported; champions keep their wins, newest first, at most three.
+  assert.equal(p.mark('Iron Keep', MARK.beaten | MARK.knockout), MARK.beaten | MARK.knockout);
+  assert.equal(p.mark('Iron Keep', MARK.knockout), 0);
+  const b = (tip: 'flat' | 'ball' | 'needle' | 'orb') => ({ ...PRESETS[0].build, tip });
+  p.recordChampion(b('flat'));
+  p.recordChampion(b('ball'));
+  p.recordChampion(b('flat'));
+  for (const t of ['needle', 'orb'] as const) p.recordChampion(b(t));
+  assert.equal(p.champions.length, CHAMPIONS);
+  assert.equal(p.champions[0].build.tip, 'orb');
+  const back = new Progress(st);
+  assert.equal(back.stamps, 5, 'stamps survive a reload');
+  assert.equal(back.marksOf('Iron Keep'), MARK.beaten | MARK.knockout, 'marks survive a reload');
+  assert.deepEqual(back.champions.map((c) => c.build.tip), ['orb', 'needle', 'flat']);
+  assert.equal(back.champions[2].wins, 2, 'a champion keeps its record');
+  // Today's order stays the same all day, even after a level-up opens new rivals, and after a reload.
+  const first = back.orderFor('2026-10-07', () => dailyOrder('2026-10-07', ctx));
+  const later = back.orderFor('2026-10-07', () => dailyOrder('2026-10-07', { ...ctx, rivals: [...ctx.rivals, 'Leech'] }));
+  assert.deepEqual(later, first, 'the order is kept for the day');
+  assert.deepEqual(new Progress(st).orderFor('2026-10-07', () => dailyOrder('2026-10-07', { ...ctx, rivals: ['Leech'] })), first);
+  assert.notDeepEqual(back.orderFor('2026-10-08', () => dailyOrder('2026-10-08', ctx)).date, first.date);
 }
 
 console.log('sim-check: all passed');

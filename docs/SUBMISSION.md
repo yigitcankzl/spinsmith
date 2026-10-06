@@ -35,13 +35,14 @@ ring of embers that closes in, a dish that tips under weight, a walled spire wit
 an ice oval with a vortex, and a wall-less sumo square. Each says at the start who it favours.
 Rivals have their own styles: rim raiders, center holders and long drifters.
 
+**Come back.** Every day the Smith's board posts a new order: a rival, an arena and one way to win, such as ramping Iron Keep out of the ring. Doing it strikes a stamp into your ledger; missed days cost nothing. Rivals carry medallions with three marks to earn, and the tops that won stand as champions.
+
 **Grow.** Every round gives Smith XP. Levels unlock new parts, paints and arenas, and the first
 match teaches the whole loop in five minutes: rip, ramp, win or lose, forge a new tip, rematch.
 
-Built with the Immersive Web SDK on three.js, SpinSmith runs in the Quest browser with no install.
-A small deterministic simulation drives the fight, and the same simulation powers our balance
-reports: every part, arena and shaping strategy is measured over thousands of rounds, so a good
-shaper wins about six in ten against an equal rival while random shaping does not help.
+Built with the Immersive Web SDK, SpinSmith runs in the Quest browser with no install. A
+deterministic simulation drives the fight and our balance reports: every part, arena and shaping
+strategy is measured over thousands of rounds.
 
 ## Hands-first interaction
 
@@ -71,7 +72,8 @@ reshape the arena to win.*
 | 0:18-0:28 | Pinch and pull back; the top rips into the arena | "Rip it into your real table" |
 | 0:28-0:40 | Pinch the floor, lift and pull: a ramp throws the rival into a pocket | "Reshape the arena to win" · YOUR RAMP → POCKET |
 | 0:40-0:45 | XP fills, LEVEL 2, a new part spins over the arena | Rematch |
-| 0:45-1:15 | The well: holding a stamina top in the middle against an attacker | Two verbs: ramp and well |
+| 0:45-0:55 | Home: the Smith's board with today's order; pinch it, ramp the rival out, ORDER DONE and a stamp strikes the ledger | A new order every day |
+| 0:55-1:15 | The well: holding a stamina top in the middle against an attacker | Two verbs: ramp and well |
 | 1:15-1:45 | Three arenas in quick cuts: embers closing in, the tipping dish, the sumo square | Six arenas |
 | 1:45-2:15 | Forge close-ups: rings, cores, tips; stats changing as parts click in | 136 builds |
 | 2:15-2:40 | A full round from the rip to a burst finish | |

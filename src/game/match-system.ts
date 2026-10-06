@@ -1,5 +1,5 @@
-import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, playCrunch, playLocked, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
+import { AdditiveBlending, CircleGeometry, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { CordTone, playCrunch, playLocked, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -7,11 +7,13 @@ import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
-import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
-import { GUIDE_ORDER, Progress } from './progress.js';
+import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
+import { GUIDE_ORDER, MARK, Progress } from './progress.js';
+import { dailyOrder, localDate, orderMet } from './orders.js';
+import type { Order } from './orders.js';
 import { anvilModel, Hub, miniArena, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
-import { allBuilds, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, OPPONENT_COLOR, ShapeMarks, Sparks, TopView } from './visuals.js';
@@ -126,6 +128,11 @@ export class MatchSystem extends createSystem({
   private barPoints: [number, number] = [0, 0];
   private xpGained = 0;
   private lastPerfect = false;
+  /** Today's Smith Order, whether this match plays it, and what the order needs to know. */
+  private order: Order | null = null;
+  private orderMatch = false;
+  private wellInRound = false;
+  private perfectInMatch = false;
   private levelUpText = '';
   private perfTimer = 0;
   private paused = false;
@@ -515,7 +522,18 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.visible = false;
     // Your top waits on its stand, not in the arena.
     this.mine.state = 'out';
-    this.hub.show(this.arenas, this.arenaIndex, this.myBuild, this.progress);
+    // Today's order, from the local date and what the player can meet and play now.
+    this.orderMatch = false;
+    const today = localDate(new Date());
+    this.order = this.progress.orderFor(today, () =>
+      dailyOrder(today, {
+        rivals: RIVALS.filter((r) => r.level <= this.progress.level).map((r) => r.name),
+        arenas: ARENAS.filter((a) => this.progress.isUnlocked(`arena:${a.name}`)),
+        built: this.arenas.filter((a) => !ARENAS.includes(a)),
+      }),
+    );
+    this.hub.show(this.arenas, this.arenaIndex, this.myBuild, this.progress, this.order);
+    if (import.meta.env.DEV) console.log(`[ORDER] today ${this.order.date}: ${this.order.text} in ${this.order.arena}${this.progress.hasOrder(this.order.date) ? ' (done)' : ''} · ${this.progress.stamps} stamps`);
     this.label.set('');
     this.bar.mesh.visible = false;
     // The first session says where to reach next.
@@ -548,6 +566,30 @@ export class MatchSystem extends createSystem({
     } else if (action.kind === 'workshop') {
       this.hub.hide();
       this.openWorkshop();
+    } else if (action.kind === 'order') {
+      const o = this.order;
+      if (!o || this.progress.hasOrder(o.date)) {
+        this.label.set("Today's order is done\nA new one comes tomorrow");
+        this.labelTimer = 2.5;
+        return;
+      }
+      // The order's arena and rival, then a normal match.
+      const index = this.arenas.findIndex((a) => a.name === o.arena);
+      if (index >= 0) {
+        this.arenaIndex = index;
+        this.setArena(this.arenas[index]);
+      }
+      this.startMatch(RIVALS.find((r) => r.name === o.rival));
+      this.orderMatch = true;
+    } else if (action.kind === 'champion') {
+      const c = this.progress.champions[action.index];
+      if (!c) return;
+      this.myBuild = this.forge.allowed({ ...c.build });
+      saveBuild(this.myBuild);
+      playPlace();
+      this.toHub();
+      this.label.set(`Your top: ${buildName(this.myBuild)}\n${c.wins} match win${c.wins === 1 ? '' : 's'}`);
+      this.labelTimer = 2.5;
     } else if (action.kind === 'locked') {
       this.label.set(action.text);
       this.labelTimer = 2;
@@ -701,13 +743,14 @@ export class MatchSystem extends createSystem({
    * A new match from anywhere (home, the workshop's Save & play, the dev key): every other
    * place closes, a rival is picked, the score and this round's builds are fresh.
    */
-  private startMatch() {
+  private startMatch(rival?: Rival) {
     this.hub.hide();
     this.builder.close();
     this.forge.close();
     this.stage.visible = true;
     this.demo = false;
-    this.rival = this.pickRival();
+    this.rival = rival ?? this.pickRival();
+    this.perfectInMatch = false;
     this.myPoints = 0;
     this.theirPoints = 0;
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
@@ -912,6 +955,8 @@ export class MatchSystem extends createSystem({
     this.lastPerfect = perfect;
     this.charges.reset();
     this.lastShape = null;
+    this.wellInRound = false;
+    if (perfect && !this.demo) this.perfectInMatch = true;
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
     const mh = this.mine.hand;
@@ -1010,6 +1055,7 @@ export class MatchSystem extends createSystem({
     }
     this.arena.addShape(kind, x, z, amp * f, owner, dx, dz);
     this.lastShape = { t: this.elapsed, kind };
+    if (kind === 'well') this.wellInRound = true;
     this.progress.advance('match');
     playThock();
   }
@@ -1210,8 +1256,44 @@ export class MatchSystem extends createSystem({
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
     }
     this.reveals.push(...award.unlocked);
+    if (!this.demo) this.trackComeBack(won, loser, matchOver, matchWon);
     // The first match is over: the anvil appears and calls for the new part.
     if (matchOver && GUIDE_ORDER.indexOf(this.progress.guide) < GUIDE_ORDER.indexOf('forge')) this.progress.advance('forge');
+  }
+
+  /**
+   * What outlives the match: marks against this rival, a champion for a won match, and today's
+   * order when this match plays it and the round or match fulfils it.
+   */
+  private trackComeBack(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
+    const cause = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? this.lastShape.kind : null;
+    const ko = loser.finish === 'pocket' || loser.finish === 'over' || loser.finish === 'burst';
+    if (won) this.progress.mark(this.rival.name, (matchWon ? MARK.beaten : 0) | (ko ? MARK.knockout : 0) | (cause ? MARK.shape : 0));
+    if (matchWon) this.progress.recordChampion(this.myBuild);
+    const o = this.order;
+    if (!this.orderMatch || !o || this.progress.hasOrder(o.date)) return;
+    const met = orderMet(o, {
+      rival: this.rival.name,
+      arena: this.arena.layout.name,
+      wonRound: won,
+      finish: loser.finish,
+      cause,
+      wellInRound: this.wellInRound,
+      matchWon,
+      shutout: matchWon && this.theirPoints === 0,
+      role: roleOf(specFromBuild(this.myBuild)),
+      perfectInMatch: this.perfectInMatch,
+    });
+    if (!met) return;
+    const before = this.progress.level;
+    const a = this.progress.completeOrder(o.date);
+    console.log(`[ORDER] done: ${o.text} -> ${this.progress.stamps} stamps${a.unlocked.length ? `, unlocked ${a.unlocked.join(', ')}` : ''}`);
+    this.reveals.unshift(`stamp:${this.progress.stamps}`);
+    this.reveals.push(...a.unlocked);
+    if (a.levels.length && !this.levelUpText) {
+      playLevelUp();
+      this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
+    }
   }
 
   /** Shows a level-up, then each new unlock spinning over the arena before it flies off. */
@@ -1230,7 +1312,7 @@ export class MatchSystem extends createSystem({
       this.stage.add(obj);
       this.reveal = { obj, t: 0 };
       playUnlock();
-      this.label.set(`NEW!\n${unlockName(key)}`);
+      this.label.set(revealText(key));
       // Keep the result up while it shows.
       this.resultTimer = Math.max(this.resultTimer, 2.8);
     }
@@ -1321,9 +1403,20 @@ export class MatchSystem extends createSystem({
 }
 
 /** A readable name for an unlock key. */
+/** The card shown while an unlock (or an order stamp) spins over the arena. */
+function revealText(key: string): string {
+  const [kind, id] = key.split(':');
+  if (kind === 'rival') return `NEW RIVAL!\n${id} · ${RIVALS.find((r) => r.name === id)?.style ?? ''}`;
+  if (kind === 'stamp') return `ORDER DONE!\nStamp ${id} in your ledger`;
+  return `NEW!\n${unlockName(key)}`;
+}
+
 function unlockName(key: string): string {
   const [kind, id] = key.split(':');
   if (kind === 'paint') return 'New paint';
+  if (kind === 'emblem') return `${EMBLEM_NAMES[Number(id)]} emblem glow`;
+  if (kind === 'ledger') return 'Gilded ledger';
+  if (kind === 'rival') return `${id} rival`;
   if (kind === 'arena') return `${id} arena`;
   const name = kind === 'ring' ? RINGS.find((r) => r.id === id)?.name : kind === 'tip' ? TIPS.find((t) => t.id === id)?.name : id;
   return `${name} ${kind}`;
@@ -1333,6 +1426,19 @@ function unlockName(key: string): string {
 function unlockModel(key: string, arenas: ArenaLayout[]): Object3D {
   const [kind, id] = key.split(':');
   if (kind === 'arena') return miniArena(arenas.find((a) => a.name === id) ?? arenas[0], true);
+  if (kind === 'rival') {
+    const r = RIVALS.find((x) => x.name === id);
+    if (r) return new TopView(r.build, OPPONENT_COLOR).root;
+  }
+  if (kind === 'emblem' || kind === 'stamp' || kind === 'ledger') {
+    // A struck medallion: the glow's color, the stamp's orange, or the ledger's gold.
+    const color = kind === 'emblem' ? EMBLEM_COLORS[Number(id)] : kind === 'stamp' ? 0xff8a2a : 0xffd34a;
+    const g = new Group();
+    const coin = new Mesh(new CylinderGeometry(0.02, 0.02, 0.004, 32), new MeshBasicMaterial({ color }));
+    coin.rotation.x = Math.PI / 2;
+    g.add(coin);
+    return g;
+  }
   for (const [, items] of ROWS) for (const item of items) if (itemKey(item) === key) return itemModel(item);
   return new Group();
 }

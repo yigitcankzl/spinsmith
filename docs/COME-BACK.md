@@ -175,3 +175,25 @@ backend), push notifications, punishing streaks, energy timers, new parts or are
   guarding against.
 - **Hub clutter:** the review just asked for fewer words at home; the slip and ledger are engraved
   metal like the level plate, small, and show their text only when pointed at after the first time.
+
+---
+
+## 6. Status (Oct 7, 2026): steps 1-8 done
+
+| Step | Result |
+|---|---|
+| 1 New rivals | `RIVAL_UNLOCKS` (Lv 4, 6, 9, 12) are unlock keys: the rival spins over the arena as **NEW RIVAL!** with its style, in order with the other rewards |
+| 2 Orders | `orders.ts`: a seed from the local date picks a rival the player can meet, an unlocked arena (one where knockouts happen for a knockout order, your own for an own-arena order) and one of seven goals. `check:sim` section 12: the same date gives the same order over 120 days, every order is playable, knockouts and bursts happen in simulated rounds on the arenas used |
+| 3 Tracking | The order, the marks and the champions are updated from each round (`trackComeBack`); the well goal counts a well set during the round, since a spin finish comes too late for the cause window. Stamps, marks, champions and today's order are saved with the progress |
+| 4 Board | `board.ts`: one engraved plate over the far rim's left with today's order, the rivals and the ledger; pinch it to play the order. Doing it shows **ORDER DONE!** and strikes a stamp |
+| 5 Rival marks | Three notches per medallion (beaten, knocked out, by your shape); a full medallion gets a gold rim |
+| 6 Levels 14-20 | Paints 4 and 5 (the forge's Style drawer now has all six) and emblem glows at 15, 17, 18 (gold, with *Legend*) and 19, and the gilded ledger at 20. Emblem glows replaced the plan's rim trim and engraving: one mechanism, chosen in the forge with a glow token that steps through the glows you own, and shown on every top |
+| 7 Champions | The last three tops that won a match stand on small stands along the left rim; pointing shows their wins, pinching makes one your top |
+| 8 Way back in | `public/manifest.webmanifest` and icons; the storyboard shows the board and a stamp |
+
+Found while testing: a level-up during the day changed the order (new rivals changed the seeded
+pick); the order is now kept for its date once made, and a test covers it.
+
+Played through in the emulator: pinch the board → the match against Iron Keep in Ember Ring →
+a perfect rip and a win → **ORDER DONE!**, stamp 1, LEVEL 4, the 3-50 core, **NEW RIVAL! Leech**,
+in that order, none overwritten. Draw calls at home: 210 with a champion (was 186).

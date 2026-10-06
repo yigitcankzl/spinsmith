@@ -33,7 +33,7 @@ import type { Progress } from './progress.js';
 import { ORANGE, TEXT_DIM } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import type { HandState } from './hands.js';
-import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
+import { buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
 import { ANVIL_FACE, anvilModel } from './hub.js';
 import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js';
@@ -56,7 +56,7 @@ export function loadBuild(): TopBuild {
   return { ...PRESETS[0].build };
 }
 
-function saveBuild(b: TopBuild) {
+export function saveBuild(b: TopBuild) {
   localStorage.setItem(STORE_KEY, JSON.stringify(b));
 }
 
@@ -65,6 +65,7 @@ export type Item =
   | { kind: 'tip'; id: TopBuild['tip']; name: string; blurb: string }
   | { kind: 'spin'; value: 1 | -1; name: string; blurb: string }
   | { kind: 'color'; value: number; name: string; blurb: string }
+  | { kind: 'emblem'; name: string; blurb: string }
   | { kind: 'preset'; build: TopBuild; name: string; blurb: string };
 
 export type Drawer = 'ring' | 'core' | 'tip' | 'style';
@@ -79,7 +80,8 @@ export const ROWS: [string, Item[], number][] = [
     [
       { kind: 'spin', value: 1, name: 'Right spin', blurb: 'Spins clockwise' },
       { kind: 'spin', value: -1, name: 'Left spin', blurb: 'Steals spin from right spinners' },
-      ...TOP_COLORS.slice(0, 4).map((value) => ({ kind: 'color' as const, value, name: 'Paint', blurb: 'Dip your top or tap the pot' })),
+      ...TOP_COLORS.map((value) => ({ kind: 'color' as const, value, name: 'Paint', blurb: 'Dip your top or tap the pot' })),
+      { kind: 'emblem' as const, name: 'Emblem glow', blurb: 'Tap to step through the glows you have earned' },
     ],
     0.05,
   ],
@@ -254,6 +256,7 @@ export class Forge {
     if (!open(`tip:${out.tip}`)) out.tip = PRESETS[0].build.tip;
     const paint = TOP_COLORS.indexOf(out.color);
     if (paint >= 0 && !open(`paint:${paint}`)) out.color = TOP_COLORS[0];
+    if (out.emblem && !this.progress.isUnlocked(`emblem:${out.emblem}`)) out.emblem = 0;
     return out;
   }
 
@@ -549,6 +552,8 @@ export class Forge {
         return b.spin === item.value;
       case 'color':
         return b.color === item.value;
+      case 'emblem':
+        return (b.emblem ?? 0) > 0;
       default:
         return b.ring === item.build.ring && b.core === item.build.core && b.tip === item.build.tip;
     }
@@ -563,6 +568,12 @@ export class Forge {
     } else if (item.kind === 'color') {
       this.build = { ...this.build, color: item.value };
       this.say('Painted');
+    } else if (item.kind === 'emblem') {
+      // The next glow you have earned (the forge's orange is always yours).
+      const owned = EMBLEM_COLORS.map((_, i) => i).filter((i) => i === 0 || this.progress.isUnlocked(`emblem:${i}`));
+      const emblem = owned[(owned.indexOf(this.build.emblem ?? 0) + 1) % owned.length];
+      this.build = { ...this.build, emblem };
+      this.say(owned.length > 1 ? `Emblem glow: ${EMBLEM_NAMES[emblem]}` : 'Earn more glows: levels 15-19 and order stamps');
     } else {
       const next = this.withItem(item)!;
       const w = weightOf(next);
@@ -794,6 +805,16 @@ export function itemModel(item: Item): Object3D {
     const paint = new Mesh(new CircleGeometry(0.0125, 20).rotateX(-Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', item.value) }));
     paint.position.y = 0.0186;
     g.add(pot, paint);
+  } else if (item.kind === 'emblem') {
+    // A coin with a ring of glows: the emblem's color.
+    const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x5d6068) }));
+    g.add(coin);
+    EMBLEM_COLORS.slice(0, 4).forEach((c, i) => {
+      const a = (i / 4) * Math.PI * 2;
+      const dot = new Mesh(new CylinderGeometry(0.0045, 0.0045, 0.002, 12), new MeshBasicMaterial({ color: c }));
+      dot.position.set(Math.cos(a) * 0.009, 0.003, Math.sin(a) * 0.009);
+      g.add(dot);
+    });
   } else if (item.kind === 'preset') {
     const view = new TopView(item.build, item.build.color);
     g.add(view.root);

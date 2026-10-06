@@ -42,7 +42,7 @@ import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
 import { Arena, Top } from './sim.js';
 import { FONT, glass, ORANGE, TEXT } from './ui.js';
-import { coreOf, ringOf } from './parts.js';
+import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
 /**
@@ -505,7 +505,7 @@ export class TopView {
   private bases: number[] = [];
   private shadow: Mesh;
   private readonly hot = new Color(0xff5a14);
-  private readonly cool = new Color(0xffb347);
+  private readonly cool: Color;
   private fall = 0;
   private fallX = 1;
   private fallZ = 0;
@@ -517,6 +517,8 @@ export class TopView {
     const ratchet = coreMesh(core);
     ratchet.position.y += tipHeight(build.tip);
     const base = tipHeight(build.tip) + core.height;
+    // The emblem's glow at rest: the build's chosen glow (the forge's orange unless earned otherwise).
+    this.cool = new Color(EMBLEM_COLORS[build.emblem ?? 0] ?? EMBLEM_COLORS[0]);
     this.core = new MeshBasicMaterial({ color: this.cool.clone() });
     const ringParts = ringMeshes(ring, color, base, this.core);
     this.parts = [...ringParts, ratchet, bit];

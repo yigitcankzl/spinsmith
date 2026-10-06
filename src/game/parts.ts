@@ -172,7 +172,13 @@ export interface TopBuild {
   spin: 1 | -1;
   /** Body color (hex). */
   color: number;
+  /** Emblem glow (index into EMBLEM_COLORS); unset is the first. */
+  emblem?: number;
 }
+
+/** Emblem glows: the forge's orange first; the rest are earned (levels 15-19, order stamps). Never cyan, the rival's color. */
+export const EMBLEM_COLORS = [0xffb347, 0xf4f1ea, 0xb07cff, 0xffd34a, 0x6fe36f, 0xff5a5a, 0x4a72ff, 0xff8fc8];
+export const EMBLEM_NAMES = ['Forge orange', 'White heat', 'Violet', 'Gold', 'Green', 'Red', 'Blue', 'Rose'];
 
 /** The three classic tops as builds; the simulation's ATTACK, DEFENSE and STAMINA are made from these. */
 export const PRESETS: { name: string; build: TopBuild }[] = [
