@@ -40,9 +40,7 @@
       "physics": false,
       "sceneUnderstanding": true,
       "environmentRaycast": true,
-      "spatialUI": {
-        "kit": "horizon"
-      }
+      "spatialUI": false
     }
   },
   "dev": {

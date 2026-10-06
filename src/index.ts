@@ -1,9 +1,8 @@
-import { World } from '@iwsdk/core';
+import { VisibilityState, World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { MatchSystem } from './game/match-system.js';
 import { loadFonts } from './game/ui.js';
 import { demoSave, freshSave } from './game/demo-save.js';
-import { PanelSystem } from './panel.js';
 
 // For shared headsets: ?fresh starts as a new player (the first session again), ?demo as a prepared
 // level-8 smith. The flag is then dropped from the address, so a reload keeps the progress made.
@@ -22,7 +21,10 @@ loadFonts()
   .then(() => World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions))
   .then((world) => {
     world.registerSystem(MatchSystem);
-    world.registerSystem(PanelSystem);
+    // The landing page (index.html): Enter starts the session; the page hides while in XR.
+    const landing = document.getElementById('landing');
+    document.getElementById('enter')?.addEventListener('click', () => world.launchXR());
+    world.visibilityState.subscribe((v) => landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive));
     // Emulator helper: move one hand at a time with the mouse (dev builds only).
     if (import.meta.env.DEV) void import('./dev-hands.js').then((m) => m.installDevHands());
   });
