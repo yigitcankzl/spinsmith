@@ -242,11 +242,12 @@ const TRAY: [string, Piece[]][] = [
 /** Spacing of the pieces in the menu row (m) and how much larger than life they are shown. */
 const ITEM_GAP = 0.046;
 const ITEM_SCALE = 1.6;
-/** The menu stands this far behind the arena's far rim and this high above the arena (m). */
-const MENU_BEHIND = 0.04;
-const MENU_HEIGHT = 0.16;
+/** The menu board stands at the arena rack, left of the arena, this high above the arena (m). */
+const MENU_AT_X = -0.37;
+const MENU_AT_Z = -0.07;
+const MENU_HEIGHT = 0.2;
 /** It is farther from the eyes than a hand-held menu, so it is drawn larger. */
-const MENU_SCALE = 1.7;
+const MENU_SCALE = 1.5;
 
 interface Slot {
   piece: Piece;
@@ -680,12 +681,11 @@ export class Builder {
   }
 
   /**
-   * Stands the menu across the arena, behind its far rim and above it, facing the player, so the
-   * pieces are picked from the board opposite and carried over the arena. All arguments are
-   * arena-local (the arena center is the origin, +Z toward the player).
+   * Stands the menu board at the arena rack on the left, facing the player; pieces are carried
+   * from it onto the arena. The head is arena-local (arena center at the origin, +Z toward the player).
    */
-  placeMenu(head: Vector3, arenaRadius: number) {
-    this.q.set(0, MENU_HEIGHT, -arenaRadius - MENU_BEHIND);
+  placeMenu(head: Vector3) {
+    this.q.set(MENU_AT_X, MENU_HEIGHT, MENU_AT_Z);
     this.tray.position.copy(this.q);
     // Face the eyes upright: +Z toward the head, +Y up.
     const z = this.depth.copy(head).sub(this.tray.position).normalize();

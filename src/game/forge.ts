@@ -1,6 +1,6 @@
 /**
  * The forge: build your own top from parts. A board across the arena holds the parts by tab
- * (Ring, Core, Tip, Style, Presets); your top stands big on a spindle over the arena's middle with
+ * (Ring, Core, Tip, Style, Presets), standing behind the anvil at the arena's right; your top stands big on the anvil with
  * a stats card beside it. Pinch a part and carry it onto the top (or just tap it) to fit it; a
  * core locks with one click per tooth. Builds over the weight limit are refused.
  */
@@ -25,6 +25,7 @@ import { Button, tag } from './builder.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
+import { ANVIL_AT, ANVIL_FACE, anvilModel } from './hub.js';
 import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js';
 
 const STORE_KEY = 'spinsmith.top.v1';
@@ -72,13 +73,12 @@ const TABS: [string, Item[]][] = [
 ];
 
 const ITEM_GAP = 0.04;
-/** The board stands this far behind the far rim and this high above the arena, drawn this much larger. */
-const BOARD_BEHIND = 0.04;
-const BOARD_HEIGHT = 0.16;
-const BOARD_SCALE = 1.7;
-/** Your top stands this high over the arena's middle, this much larger than life. */
-const DISPLAY_Y = 0.05;
-const DISPLAY_SCALE = 2.4;
+/** The board stands this far behind the anvil and this high above the arena, drawn this much larger. */
+const BOARD_BEHIND = 0.17;
+const BOARD_HEIGHT = 0.2;
+const BOARD_SCALE = 1.5;
+/** Your top on the anvil is this much larger than life. */
+const DISPLAY_SCALE = 1.8;
 /** A carried part fits when brought this close to the top (m). */
 const SNAP = 0.09;
 /** Pinch distances: touching a part, and a ray passing this close. */
@@ -179,16 +179,18 @@ export class Forge {
     this.status = tag('', 0.22, 34);
     this.status.position.set(0, 0.073, 0);
     this.board.add(this.status);
-    // The spindle your top stands on, over the arena's middle.
-    const spindle = new Mesh(new CylinderGeometry(0.002, 0.002, DISPLAY_Y, 8), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x6d6f78) }));
-    spindle.position.y = DISPLAY_Y / 2;
-    this.displayTilt.position.y = DISPLAY_Y;
+    // Your top stands on the anvil at the right of the arena; the parts board stands behind it.
+    const anvil = anvilModel();
+    anvil.position.copy(ANVIL_AT);
+    this.displayTilt.position.set(ANVIL_AT.x, ANVIL_FACE, ANVIL_AT.z);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
     // Tipped toward the player so both the profile and the top face show.
     this.displayTilt.rotation.x = 0.35;
     this.displayTilt.add(this.displayHolder);
-    this.card.mesh.position.set(0.2, DISPLAY_Y + 0.04, 0.04);
-    this.root.add(this.board, spindle, this.displayTilt, this.card.mesh);
+    // The stats card floats over the far side of the arena, where nothing else stands.
+    this.card.mesh.position.set(0.04, 0.25, -0.14);
+    this.card.mesh.scale.setScalar(1.5);
+    this.root.add(this.board, anvil, this.displayTilt, this.card.mesh);
     this.showTab(0, 0);
     this.rebuildDisplay();
     this.root.visible = false;
@@ -211,8 +213,8 @@ export class Forge {
   }
 
   /** Faces the board and the stats card toward the head (arena-local). */
-  place(head: Vector3, arenaRadius: number) {
-    this.board.position.set(0, BOARD_HEIGHT, -arenaRadius - BOARD_BEHIND);
+  place(head: Vector3) {
+    this.board.position.set(ANVIL_AT.x + 0.06, BOARD_HEIGHT, ANVIL_AT.z - BOARD_BEHIND);
     this.face(this.board, head);
     this.face(this.card.mesh, head);
   }

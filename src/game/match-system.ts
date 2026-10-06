@@ -7,6 +7,7 @@ import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, verdict } from './sim.js';
 import { Forge, loadBuild } from './forge.js';
+import { Hub } from './hub.js';
 import { allBuilds, PRESETS, roleOf, specFromBuild } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, Cord, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
@@ -94,9 +95,11 @@ export class MatchSystem extends createSystem({
   });
   /** A demo round (workshop Try it, forge Test): AI launches, no score, then back where it came from. */
   private demo = false;
+  private hubLogPending = false;
   private demoFrom: 'build' | 'forge' = 'build';
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
-  private hubButtons = [new Button('play', 0.09, 0.04), new Button('forge', 0.09, 0.04), new Button('workshop', 0.09, 0.04), new Button('arena', 0.14, 0.04)];
+  /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
+  private hub = new Hub();
   private menuButton = new Button('menu', 0.07, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
@@ -192,17 +195,7 @@ export class MatchSystem extends createSystem({
       this.sparks.points,
     );
     this.setBuilds(this.myBuild, this.theirBuild);
-    this.root.add(this.stage, this.label.mesh, this.builder.root, this.forge.root, this.menuButton.mesh, ...this.hubButtons.map((b) => b.mesh));
-    // Home buttons: a row above the near rim, tipped back toward the player.
-    const hubX = [-0.205, -0.1, 0.005, 0.14];
-    this.hubButtons.forEach((b, i) => {
-      b.mesh.position.set(hubX[i], 0.09, 0.2);
-      b.mesh.rotation.x = -0.35;
-      b.mesh.visible = false;
-    });
-    this.hubButtons[0].set('Play');
-    this.hubButtons[1].set('Forge');
-    this.hubButtons[2].set('Workshop');
+    this.root.add(this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
     this.menuButton.mesh.rotation.y = 0.4;
     this.menuButton.set('Menu');
@@ -281,14 +274,14 @@ export class MatchSystem extends createSystem({
         if (this.settle >= SETTLE) this.place();
         return;
       case 'hub':
-        this.updateHub();
+        this.updateHub(dt);
         break;
       case 'build':
         this.updateBuilder(dt);
         break;
       case 'forge':
         this.player.head.getWorldPosition(this.p);
-        this.forge.place(this.root.worldToLocal(this.p), this.arena.layout.radius);
+        this.forge.place(this.root.worldToLocal(this.p));
         this.forge.update(this.pointers, dt);
         break;
       case 'ready':
@@ -390,35 +383,42 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirBuild.spin);
     this.cord.set(null);
     this.menuButton.mesh.visible = false;
-    for (const b of this.hubButtons) b.mesh.visible = true;
-    this.hubButtons[3].set(`Arena: ${this.arena.layout.name} ▸`);
+    // Your top waits on its stand, not in the arena.
+    this.mine.state = 'out';
+    this.hub.show(this.arenas, this.arenaIndex, this.myBuild);
     this.label.set(`SpinSmith\n${this.arena.layout.name}`);
+    if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
-  private updateHub() {
-    switch (this.pickButton(this.hubButtons)) {
-      case 'play':
-        this.myPoints = 0;
-        this.theirPoints = 0;
-        this.typesPicked = false;
-        this.toReady();
-        break;
-      case 'forge':
-        this.openForge();
-        break;
-      case 'workshop':
-        this.openWorkshop();
-        break;
-      case 'arena':
-        this.nextArena();
-        this.toHub();
-        break;
+  private updateHub(dt: number) {
+    this.player.head.getWorldPosition(this.p);
+    if (import.meta.env.DEV && this.hubLogPending) {
+      this.hubLogPending = false;
+      console.log(`[HUB] ${this.hub.debugPositions()}`);
+    }
+    const action = this.hub.update(this.pointers, dt, this.p);
+    if (!action) return;
+    if (action.kind === 'play') {
+      this.hub.hide();
+      this.myPoints = 0;
+      this.theirPoints = 0;
+      this.typesPicked = false;
+      this.toReady();
+    } else if (action.kind === 'forge') {
+      this.hub.hide();
+      this.openForge();
+    } else if (action.kind === 'workshop') {
+      this.hub.hide();
+      this.openWorkshop();
+    } else {
+      this.arenaIndex = action.index;
+      this.setArena(this.arenas[this.arenaIndex]);
+      this.toHub();
     }
   }
 
   private openForge() {
     this.phase = 'forge';
-    for (const b of this.hubButtons) b.mesh.visible = false;
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.forge.open();
@@ -474,7 +474,6 @@ export class MatchSystem extends createSystem({
 
   private openWorkshop() {
     this.phase = 'build';
-    for (const b of this.hubButtons) b.mesh.visible = false;
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.builder.open(this.arena.layout);
@@ -484,7 +483,7 @@ export class MatchSystem extends createSystem({
   private updateBuilder(dt: number) {
     // The menu board stands across the arena, facing the head; positions are arena-local.
     this.player.head.getWorldPosition(this.p);
-    this.builder.placeMenu(this.root.worldToLocal(this.p), this.arena.layout.radius);
+    this.builder.placeMenu(this.root.worldToLocal(this.p));
     this.builder.update(this.pointers, dt);
   }
 
@@ -613,7 +612,6 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'placing') return;
     this.matchOver = false;
     this.phase = 'ready';
-    for (const b of this.hubButtons) b.mesh.visible = false;
     this.menuButton.mesh.visible = true;
     this.arena.reset();
     // Both tops wait upright at their spawn points.

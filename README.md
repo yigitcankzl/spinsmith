@@ -14,11 +14,12 @@ What works:
 - The arena is placed about 40 cm in front of the seated player, on a pedestal
   8 cm above the nearest detected table, or on a floating tray when there is no table or the
   table is far below the eyes (standing over a coffee table).
-- **Home screen:** once the arena is placed it waits with both tops and four big buttons in
-  front of it: *Play* starts a match, *Forge* builds your top, *Workshop* opens the arena
-  workshop, *Arena: … ▸*
-  switches to the next arena. Pinching here never launches. In a match, a small *Menu* button
-  beside the arena returns home, and the match ends back home after 4 points.
+- **Home is a smithy, no buttons** (`src/game/hub.ts`): around the arena stand things to pick
+  up. Your top waits on a stand at the near rim: carry it into the arena (or tap it) to play. An
+  arena rack on the left turns slowly with a miniature of every arena: carry one onto the arena
+  (or tap it) to switch; the rolled-up blueprint on the rack opens the arena workshop. An anvil
+  on the right holds your top: pinch it to forge. Pinching here never launches. In a match, a
+  small *Menu* button beside the arena returns home, and the match ends back home after 4 points.
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
   travelled and how fast it was still moving at release, so a rip that stops before letting
@@ -49,9 +50,9 @@ What works:
   their gear, Saw rings chip toward a burst. The classic Striker (attack), Anvil (defense)
   and Needle (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
   the opponent's cool teal; the opponent gets a random build each round.
-- **Forge:** pinch *Forge* on the home screen. A board across the arena holds the parts by tab
-  (Ring, Core, Tip, Style, Presets); your top stands large on a spindle over the arena's
-  middle with a stats card beside it (attack, defense, stamina, dash, burst resistance,
+- **Forge:** pinch the anvil. A board behind the anvil holds the parts by tab
+  (Ring, Core, Tip, Style, Presets); your top stands large on the anvil, with a stats card
+  floating over the far side of the arena (attack, defense, stamina, dash, burst resistance,
   weight). Pinch a part and carry it onto your top, or just tap it; a core locks with one click
   per tooth. Pointing at a part previews its effect on the card (green gains, red losses); an
   overweight build is refused. *Test* plays a round with your build, *Save* keeps it
@@ -59,8 +60,8 @@ What works:
   others and flags dominant builds and dead parts.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
-- **Arena workshop:** pinch *Workshop* on the home screen. A menu board stands across the
-  arena, above its far rim and facing you: tabs on top (Place, Shape, Floor, Wall, Theme,
+- **Arena workshop:** pinch the blueprint on the arena rack. A menu board stands at the rack,
+  left of the arena and facing you: tabs on top (Place, Shape, Floor, Wall, Theme,
   Extras), and the chosen category's pieces shown large in one row below, sliding in when the
   tab changes.
   The pieces: pockets, rails, pillars and bumpers to place; circle, oval and square plates;
