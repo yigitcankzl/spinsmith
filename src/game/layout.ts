@@ -120,7 +120,7 @@ export function validate(layout: ArenaLayout): string | null {
   if (layout.radius < MIN_RADIUS - 1e-6 || layout.radius > MAX_RADIUS + 1e-6) return 'Arena size is out of reach';
   if (layout.wall !== 'none') {
     const open = layout.pockets.reduce((sum, p) => sum + p.half * 2, 0);
-    if (open > Math.PI) return 'Too many pockets: more than half the rim is open';
+    if (open > Math.PI) return 'Too many slag pits: more than half the rim is open';
   }
   const spawn = spawnDistance(layout) / layout.radius;
   for (const p of layout.pillars) {

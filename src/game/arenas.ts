@@ -11,7 +11,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // The balanced learning arena.
     name: 'Forge Bowl',
-    rule: 'Balanced bowl: four pockets, four dash rails',
+    rule: 'Balanced bowl: four slag pits, four kick rails',
     theme: 'forge',
     radius: 0.15,
     shape: 'circle',
@@ -54,7 +54,7 @@ export const ARENAS: ArenaLayout[] = [
     floor: 'bowl',
     depth: 0.011,
     wall: 'standard',
-    pockets: [0, Math.PI].map((angle) => ({ angle, half: 0.17, points: 3 })),
+    pockets: [0, Math.PI].map((angle) => ({ angle, half: 0.17, points: 2 })),
     rails: [2 * Q, 6 * Q].map((angle) => ({ angle, half: 0.5 })),
     pillars: [],
     vortex: 0,
@@ -72,7 +72,7 @@ export const ARENAS: ArenaLayout[] = [
     floor: 'hill',
     depth: 0.009,
     wall: 'high',
-    pockets: [Q, 5 * Q].map((angle) => ({ angle, half: 0.18, points: 3 })),
+    pockets: [Q, 5 * Q].map((angle) => ({ angle, half: 0.18, points: 2 })),
     rails: [3 * Q, 7 * Q].map((angle) => ({ angle, half: 0.35 })),
     pillars: [Q, 3 * Q, 5 * Q, 7 * Q].map((a) => ({ x: Math.cos(a) * 0.55, z: Math.sin(a) * 0.55, r: 0.008, bumper: false })),
     vortex: 0,

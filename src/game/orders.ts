@@ -89,12 +89,12 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
   const arena = pick(pool.length ? pool : ctx.arenas).name;
   const role = goal === 'role' ? pick<Role>(['attack', 'defense', 'stamina']) : undefined;
   const text: Record<Goal, string> = {
-    rampKO: `Ramp ${rival} out: a pocket or over the wall`,
-    burst: `Burst ${rival}`,
+    rampKO: `Ramp ${rival} out: into a slag pit or over the wall`,
+    burst: `Shatter ${rival}`,
     wellSpin: `Outlast ${rival} from your well`,
     role: `Beat ${rival} with ${ROLE_WORD[role ?? 'attack']} top`,
-    perfect: `Beat ${rival} with a perfect rip in the match`,
-    sweep: `Beat ${rival} without losing a point`,
+    perfect: `Beat ${rival} with a white-hot pull in the match`,
+    sweep: `Beat ${rival} without giving up heat`,
     ownArena: `Beat ${rival} on your own arena`,
   };
   // No role key unless the goal has one, so a saved order reloads equal.

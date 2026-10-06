@@ -12,8 +12,8 @@ import { CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STA
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
-import { allBuilds, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
+import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -295,14 +295,14 @@ TUNING.grace = 0;
     assert.equal(fast.finish, 'over', 'no wall: leaving the edge is a ring-out');
   }
 
-  // A 3-point pocket scores 3.
+  // Every knockout is worth 2 heat, whatever pit it went into (even an old save's 3-point one).
   {
     const arena = arenaWith({ pockets: [{ angle: Math.PI / 2, half: 0.3, points: 3 }], rails: [] });
     const t = new Top(STAMINA);
     t.launch(0, 0.05, 0, 0.6, 1, 1);
     solo(arena, t, 1);
     assert.equal(t.finish, 'pocket');
-    assert.equal(finishPoints(t), 3);
+    assert.equal(finishPoints(t), 2);
   }
 
   // Embers drain spin outside the shrinking safe zone.
@@ -521,6 +521,22 @@ TUNING.grace = 0;
   assert.deepEqual(later, first, 'the order is kept for the day');
   assert.deepEqual(new Progress(st).orderFor('2026-10-07', () => dailyOrder('2026-10-07', { ...ctx, rivals: ['Leech'] })), first);
   assert.notDeepEqual(back.orderFor('2026-10-08', () => dailyOrder('2026-10-08', ctx)).date, first.date);
+}
+
+// 13. Original vocabulary and heat scoring: no numbered cores or borrowed tip names; outlasting
+// scores 1 heat, every knockout 2, first to 3; every built-in pit is worth the same.
+{
+  const borrowed = ['Flat', 'Rush', 'Taper', 'Ball', 'Needle', 'Orb'];
+  for (const c of CORES) assert.ok(!/^\d+-\d+$/.test(c.name), `core ${c.id} needs a name, not a number`);
+  for (const t of TIPS) assert.ok(!borrowed.includes(t.name), `tip ${t.id} needs an original name`);
+  for (const p of PRESETS) assert.ok(!borrowed.includes(p.name), `preset ${p.name} needs an original name`);
+  assert.equal(MATCH_HEAT, 3);
+  const t = new Top(ATTACK);
+  for (const [finish, heat] of [['spin', 1], ['over', 2], ['pocket', 2], ['burst', 2]] as const) {
+    t.finish = finish;
+    assert.equal(finishPoints(t), heat, `${finish} should score ${heat} heat`);
+  }
+  for (const a of ARENAS) for (const p of a.pockets) assert.equal(p.points, 2, `${a.name}: every pit is worth 2`);
 }
 
 console.log('sim-check: all passed');

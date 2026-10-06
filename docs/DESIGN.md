@@ -5,6 +5,9 @@ Meta VR Start Developer Competition 2026 · **Gaming – New Experience** · dea
 > The original design. Arena shaping has since become two verbs, the **ramp** (replacing the
 > bump and the wave) and the **well** (replacing the dent), with charges earned by clashing:
 > see [ARENA-SHAPING.md](ARENA-SHAPING.md).
+> Names and scoring have changed too: the parts, finishes and points are now SpinSmith's own
+> (cores Stub/Bolt/Clamp/Stilt, tips Chisel/Spur/Awl/Dome/Pin/Bead, SLAG/THROWN/SHATTER/OUTLAST,
+> heat, first to 3); see `docs/ACTION-PLAN.md` D2-D3.
 
 ---
 

@@ -94,8 +94,8 @@ export const CHAMPIONS = 3;
 export const QUEST_UNLOCKS: Record<string, { key: string; text: string }> = {
   // The first session's reward: every new player earns one part, win or lose.
   first: { key: 'tip:rush', text: 'Finish your first match' },
-  burst: { key: 'core:9-60', text: 'Win a round by BURST' },
-  knockout: { key: 'ring:hook', text: 'Win a round by pocket or over' },
+  burst: { key: 'core:9-60', text: 'Win a round by SHATTER' },
+  knockout: { key: 'ring:hook', text: 'Win a round by slag pit or throw' },
 };
 
 /** XP per round and match. */
@@ -227,7 +227,7 @@ export class Progress {
   /** XP for a round, with any level-ups and unlocks it brings. */
   award(r: RoundResult, bonus?: number): Award {
     let gained = bonus ?? (r.won ? XP.roundWin : XP.roundLoss);
-    if (r.won && r.finish) gained += XP[r.finish] + (r.finish === 'pocket' && (r.pocketPoints ?? 2) > 2 ? 10 : 0);
+    if (r.won && r.finish) gained += XP[r.finish];
     if (r.perfect) gained += XP.perfect;
     if (r.matchOver) gained += r.matchWon ? XP.matchWin : XP.matchLoss;
     const out: Award = { gained, levels: [], unlocked: [] };

@@ -650,11 +650,11 @@ export class Forge {
     const next = preview ? statsOf(spec) : null;
     const w = weightOf(shown);
     const dials: [keyof TopStats, string][] = [
-      ['attack', 'ATTACK'],
-      ['defense', 'DEFENSE'],
-      ['stamina', 'STAMINA'],
-      ['dash', 'DASH'],
-      ['burst', 'BURST RES'],
+      ['attack', 'HIT'],
+      ['defense', 'GUARD'],
+      ['stamina', 'ENDURE'],
+      ['dash', 'KICK'],
+      ['burst', 'HOLD'],
     ];
     this.stats.draw(
       buildName(shown),

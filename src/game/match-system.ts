@@ -5,7 +5,7 @@ import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import { Arena, ATTACK, DEFENSE, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
 import { GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -13,7 +13,7 @@ import { dailyOrder, localDate, orderMet } from './orders.js';
 import type { Order } from './orders.js';
 import { anvilModel, Hub, miniArena, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
-import { allBuilds, buildName, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, OPPONENT_COLOR, ShapeMarks, Sparks, TopView } from './visuals.js';
@@ -53,7 +53,7 @@ const SHAPE_GRAB = 0.05;
 const RESULT_TIME = 4;
 /** A finish this soon (s) after the player's shape is credited to it. */
 const CAUSE_WINDOW = 1.5;
-const FINISH_WORD: Record<string, string> = { pocket: 'POCKET', over: 'OVER', burst: 'BURST', spin: 'SPIN' };
+const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', burst: 'SHATTER', spin: 'OUTLAST' };
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
 /** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
@@ -68,7 +68,6 @@ const HIT_STOP = 0.045;
 /** A pointing ray this close to a button's center (m) presses it. */
 const BUTTON_REACH = 0.035;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
-const MATCH_POINTS = 4;
 /** Launch power at or above this is a perfect rip: extra starting spin. */
 const PERFECT = 0.92;
 const PERFECT_SPIN = 1.1;
@@ -194,7 +193,7 @@ export class MatchSystem extends createSystem({
   private sparks = new Sparks();
   private label = new Label();
   private round = 0;
-  /** Match score: first to MATCH_POINTS wins the match. */
+  /** Match score in heat: first to MATCH_HEAT wins the match. */
   private myPoints = 0;
   private theirPoints = 0;
   private elapsed = 0;
@@ -447,7 +446,7 @@ export class MatchSystem extends createSystem({
     this.sinceClashSound += dt;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
       const p = this.progress;
-      this.bar.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_POINTS, ['YOU', this.rival.name.toUpperCase()], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage, {
+      this.bar.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_HEAT, ['YOU', this.rival.name.toUpperCase()], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage, {
         level: p.level,
         rank: p.rank,
         fraction: p.fraction,
@@ -540,7 +539,7 @@ export class MatchSystem extends createSystem({
     const guide = this.progress.guide;
     if (guide === 'launch') this.label.set('Your top waits in its dock\nPut it in the arena to play');
     else if (guide === 'bump' || guide === 'match') this.label.set('Finish your first match\nPut your top in the arena');
-    else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Rush tip!\nPinch the small anvil to forge');
+    else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Spur tip!\nPinch the small anvil to forge');
     else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
     // Notes hang over the far rim, left of the arena shelf; the beacon marks the dock or the anvil.
     this.label.mesh.position.set(-0.16, LABEL_AT.y, LABEL_AT.z);
@@ -893,7 +892,7 @@ export class MatchSystem extends createSystem({
       this.pullEnd.copy(h.pinch);
       const power = this.pullPower();
       this.showCharge(power, dt);
-      this.label.set(power >= PERFECT ? `RIP IT! ${Math.round(power * 100)}%` : power > 0 ? `${Math.round(power * 100)}%` : 'Pull back and let go');
+      this.label.set(power >= PERFECT ? `WHITE HOT ${Math.round(power * 100)}%` : power > 0 ? `${Math.round(power * 100)}%` : 'Pull back and let go');
       this.lostFor = 0;
       if (dist < MAX_PULL) return;
     } else if (!h.tracked) {
@@ -979,7 +978,7 @@ export class MatchSystem extends createSystem({
     this.lastHardHit = -1;
     this.accumulator = 0;
     this.clashes = 0;
-    this.label.set(perfect ? 'Perfect rip!\nExtra spin' : '');
+    this.label.set(perfect ? 'White hot!\nExtra spin' : '');
     this.labelTimer = perfect ? 1.5 : 0;
     console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)}`);
   }
@@ -1155,12 +1154,12 @@ export class MatchSystem extends createSystem({
       // Workshop demo: say how it ended, no points.
       const loser = v === 1 ? this.theirs : this.mine;
       const winner = v === 1 ? this.mine : this.theirs;
-      this.label.set(v === 2 ? 'Draw' : `${winner.spec.name} won\n${loser.finish === 'spin' ? 'outspun' : loser.finish} after ${this.elapsed.toFixed(0)} s`);
+      this.label.set(v === 2 ? 'Draw' : `${winner.spec.name} won\n${FINISH_WORD[loser.finish ?? 'spin'].toLowerCase()} after ${this.elapsed.toFixed(0)} s`);
       this.resultTimer = 3;
       return;
     }
     const name = (t: Top) =>
-      t.finish === 'pocket' ? 'Pocket finish' : t.finish === 'over' ? 'Over finish' : t.finish === 'burst' ? 'BURST' : 'Spin finish';
+      FINISH_WORD[t.finish ?? 'spin'];
     for (const t of this.tops) {
       if (t.finish === 'pocket') playPocket();
       else if (t.finish === 'over') playOver();
@@ -1177,8 +1176,8 @@ export class MatchSystem extends createSystem({
       if (v === 1) this.myPoints += points;
       else this.theirPoints += points;
       this.barPoints = [this.myPoints, this.theirPoints];
-      const score = `You ${this.myPoints} - ${this.theirPoints}`;
-      const decided = this.myPoints >= MATCH_POINTS || this.theirPoints >= MATCH_POINTS;
+      const score = `Heat ${this.myPoints} - ${this.theirPoints}`;
+      const decided = this.myPoints >= MATCH_HEAT || this.theirPoints >= MATCH_HEAT;
       this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
       if (decided) {
         text = `${this.myPoints > this.theirPoints ? 'You win the match!' : 'You lose the match'}\n${score}`;
@@ -1186,7 +1185,7 @@ export class MatchSystem extends createSystem({
         this.theirPoints = 0;
         this.matchOver = true;
       } else {
-        text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points}\n${score}`;
+        text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points} heat\n${score}`;
       }
       // A finish within 1.5 s of the player's shape names it as the cause.
       const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? this.lastShape.kind.toUpperCase() : null;
@@ -1418,7 +1417,7 @@ function unlockName(key: string): string {
   if (kind === 'ledger') return 'Gilded ledger';
   if (kind === 'rival') return `${id} rival`;
   if (kind === 'arena') return `${id} arena`;
-  const name = kind === 'ring' ? RINGS.find((r) => r.id === id)?.name : kind === 'tip' ? TIPS.find((t) => t.id === id)?.name : id;
+  const name = kind === 'ring' ? RINGS.find((r) => r.id === id)?.name : kind === 'tip' ? TIPS.find((t) => t.id === id)?.name : kind === 'core' ? CORES.find((c) => c.id === id)?.name : id;
   return `${name} ${kind}`;
 }
 

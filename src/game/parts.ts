@@ -127,7 +127,7 @@ export const RINGS: Ring[] = [
     drain: 1,
     weight: 25,
     blades: 6,
-    blurb: 'Many small teeth: chips toward a burst',
+    blurb: 'Many small teeth: chips toward a shatter',
   },
   {
     id: 'cog',
@@ -146,19 +146,19 @@ export const RINGS: Ring[] = [
 ];
 
 export const CORES: Core[] = [
-  { id: '3-50', name: '3-50', height: 0.005, lock: 0.9, punch: 1, teeth: 3, weight: 4, blurb: 'Low: hits under, scrapes slopes' },
-  { id: '4-60', name: '4-60', height: 0.006, lock: 1, punch: 1, teeth: 4, weight: 5, blurb: 'Standard height and lock' },
-  { id: '9-60', name: '9-60', height: 0.006, lock: 1.35, punch: 0.93, teeth: 9, weight: 7, blurb: 'Tight lock: hard to burst' },
-  { id: '5-80', name: '5-80', height: 0.008, lock: 1, punch: 1, teeth: 5, weight: 6, blurb: 'Tall: dodges low hits' },
+  { id: '3-50', name: 'Stub', height: 0.005, lock: 0.9, punch: 1, teeth: 3, weight: 4, blurb: 'Low: hits under, scrapes slopes' },
+  { id: '4-60', name: 'Bolt', height: 0.006, lock: 1, punch: 1, teeth: 4, weight: 5, blurb: 'Standard height and lock' },
+  { id: '9-60', name: 'Clamp', height: 0.006, lock: 1.35, punch: 0.93, teeth: 9, weight: 7, blurb: 'Locked tight: hard to shatter' },
+  { id: '5-80', name: 'Stilt', height: 0.008, lock: 1, punch: 1, teeth: 5, weight: 6, blurb: 'Tall: rides over low hits' },
 ];
 
 export const TIPS: Tip[] = [
-  { id: 'flat', name: 'Flat', spinDrain: 0.0535, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
-  { id: 'rush', name: 'Rush', spinDrain: 0.0533, roam: 0.45, cruise: 0.58, drive: 2.6, maxSpeed: 1.9, seek: 4, center: 0, gear: 1.25, weight: 4, blurb: 'Aggressive, steers better' },
-  { id: 'taper', name: 'Taper', spinDrain: 0.0523, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
-  { id: 'ball', name: 'Ball', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.84, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
-  { id: 'needle', name: 'Needle', spinDrain: 0.0485, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
-  { id: 'orb', name: 'Orb', spinDrain: 0.0525, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
+  { id: 'flat', name: 'Chisel', spinDrain: 0.0535, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
+  { id: 'rush', name: 'Spur', spinDrain: 0.0533, roam: 0.45, cruise: 0.58, drive: 2.6, maxSpeed: 1.9, seek: 4, center: 0, gear: 1.25, weight: 4, blurb: 'Aggressive, steers better' },
+  { id: 'taper', name: 'Awl', spinDrain: 0.0523, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
+  { id: 'ball', name: 'Dome', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.84, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
+  { id: 'needle', name: 'Pin', spinDrain: 0.0485, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
+  { id: 'orb', name: 'Bead', spinDrain: 0.0525, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
 ];
 
 /** A build must stay at or under this many grams: heavy rings need light cores and tips. */
@@ -184,7 +184,7 @@ export const EMBLEM_NAMES = ['Forge orange', 'White heat', 'Violet', 'Gold', 'Gr
 export const PRESETS: { name: string; build: TopBuild }[] = [
   { name: 'Striker', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: 1, color: 0xd6784f } },
   { name: 'Anvil', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: 1, color: 0xd6784f } },
-  { name: 'Needle', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: 1, color: 0xd6784f } },
+  { name: 'Halo', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: 1, color: 0xd6784f } },
 ];
 
 export const ringOf = (b: TopBuild) => RINGS.find((r) => r.id === b.ring) ?? RINGS[0];
@@ -283,6 +283,6 @@ export const RIVALS: Rival[] = [
   { name: 'Drifter', style: 'stamina drifter', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
   { name: 'Leech', style: 'opposite-spin equalizer', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
   { name: 'Hookjaw', style: 'upper attacker, deadly on low walls', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
-  { name: 'Sawtooth', style: 'chips toward a burst', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
+  { name: 'Sawtooth', style: 'chips toward a shatter', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
   { name: 'Bastion', style: 'tall, locked and patient', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
 ];

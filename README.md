@@ -24,20 +24,20 @@ What works:
   (or tap it) to switch. In a match a fighting-game bar is set into the far rim
   (`src/game/match-bar.ts`: each top's spin draining as a health bar, points as pips, the
   round's result in the middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
-  the match ends back home after 4 points.
+  the match ends back home when a side reaches 3 heat.
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
   travelled and how fast it was still moving at release, so a rip that stops before letting
   go loses power and a hold without a pull does nothing. While ripping, the top spins up,
   the molten cord heats from white to orange to yellow, straightens, trembles and pulses
   toward the top, and a glow ring grows under the top. 92% or more is a
-  perfect rip with extra spin. A sideways rip aims like a slingshot; otherwise the top goes
+  white-hot pull with extra spin. A sideways rip aims like a slingshot; otherwise the top goes
   where your hand points on the floor. In the emulator's play mode, click and flick the
   mouse: the hands move with the view.
 - An AI top launches from the far side at the same time.
 - **Arenas are data** (`src/game/layout.ts`): size (12–18 cm), shape (circle, oval, square),
   floor (bowl, flat, hill, tornado ridge, two tiers), wall (low, standard, high and climbable,
-  none with a sumo berm), pockets with 2 or 3 points, dash rails, pillars and pinball bumpers,
+  none with a sumo berm), slag pits, kick rails, pillars and pinball bumpers,
   a center vortex, a turntable, a rocking dish that tips under the tops' weight, a ring of
   embers that closes in after 16 s, and a theme (forge, stone, clockwork, ice; ice is
   slippery).
@@ -47,13 +47,13 @@ What works:
   type matchup on every arena and reports round length, knockouts and type balance.
 - **Build your top from parts** (`src/game/parts.ts`, design in `docs/TOP-CUSTOMIZATION.md`):
   a Ring (contact style and mass: Striker, Hook, Anvil, Halo, Saw, Cog), a Core (height and
-  burst lock: 3-50, 4-60, 9-60, 5-80), a Tip (movement and rail gear: Flat, Rush, Taper,
-  Ball, Needle, Orb), spin direction and color, under a 40 g weight limit (136 legal builds).
+  shatter lock: Stub, Bolt, Clamp, Stilt), a Tip (movement and rail gear: Chisel, Spur, Awl,
+  Dome, Pin, Bead), spin direction and color, under a 40 g weight limit (136 legal builds).
   The parts change the fight: a lower top hits under a taller one, low tops scrape on steep
   slopes, upper rings lift tops over walls, opposite spins pass spin from the faster top to
   the slower (Cog rings much more), same spins grind each other down, tips dash on rails by
-  their gear, Saw rings chip toward a burst. The classic Striker (attack), Anvil (defense)
-  and Needle (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
+  their gear, Saw rings chip toward a shatter. The classic Striker (attack), Anvil (defense)
+  and Halo (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
   the opponent's cool teal; the opponent gets a random build each round.
 - **Forge, by hand** (`src/game/forge.ts`, `docs/FORGE-STADIUM.md`): pinch the small anvil and
   the arena turns into the forge: its floor sinks, an anvil rises at the near third of the bowl
@@ -73,15 +73,15 @@ What works:
   arena; the anvil, the arena shelf and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
   the rival where lifting would push it, until your first ramp. Finishing the first match, won or
-  lost, earns the Rush tip: the anvil appears and calls for it, the forge highlights only that
+  lost, earns the Spur tip: the anvil appears and calls for it, the forge highlights only that
   part, and after saving the dock calls you back for the rematch.
 - **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
-  burst, pocket or over finish, a perfect rip, and the match), filling levels 1-20 with ranks
+  knockout, a white-hot pull, and the match), filling levels 1-20 with ranks
   (Apprentice, Journeyman, Smith, Master Smith, Legend). Levels open options, never power: you
   start with the classic tops' parts, two paints and two arenas, and each level opens a part, a
   paint, an arena or a rival, and levels 14-20 give paints and emblem glows (cosmetic only),
-  ending in a gilded ledger; the 9-60 core comes from a first burst win and the Hook ring from a first
-  pocket or over win. Locked parts and arenas show dark with how they are earned. A match is
+  ending in a gilded ledger; the Clamp core comes from a first shatter win and the Hook ring from a
+  first slag or throw win. Locked parts and arenas show dark with how they are earned. A match is
   against one rival archetype that keeps its build and spin for every round (Rim Raider, Iron
   Keep and Drifter at first; Leech, Hookjaw, Sawtooth and Bastion join with levels, announced as
   NEW RIVAL); its name and style show at the start. Higher levels make rivals rip harder and aim steadier, never
@@ -92,15 +92,15 @@ What works:
 - **A reason to come back** (`src/game/orders.ts`, `src/game/board.ts`, `docs/COME-BACK.md`):
   once the first session is over, the Smith's board over the far rim shows **today's Smith
   Order**, made from the local date and what you have unlocked (the same all day): a rival, an
-  arena and one way of winning (ramp them out, burst them, outlast them from your well, win with
-  a given kind of top, with a perfect rip, without losing a point, on your own arena). Pinch the
+  arena and one way of winning (ramp them out, shatter them, outlast them from your well, win
+  with a given kind of top, with a white-hot pull, without giving up heat, on your own arena). Pinch the
   board to play it; doing it strikes a stamp into the ledger (stamps 5, 10 and 15 earn emblem
   glows). Missed days cost nothing. The board also shows the seven rivals as medallions with
   three notches each: beaten, knocked out, beaten by your own ramp or well. The last three tops
   that won a match stand as champions on the left rim with their record; pinch one to make it
   your top again. The hosted build has a web app manifest, so it can be added to the Quest
   library.
-- **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
+- **Shatter:** hard hits build up damage and a top can shatter, its parts flying and
   bouncing across the arena.
 - **Arena workshop** (`src/game/builder.ts`, `docs/ARENA-WORKSHOP-RIM.md`): pinch the
   blueprint and the arena turns into a drafting table: blueprint lines draw over its floor, brass
@@ -111,19 +111,20 @@ What works:
   front of a stamp slot set into the rim, and a plate on the far rim shows the draft's name and form with three dials: median round length,
   knockout rate and type balance. The draft is checked in a worker (`src/game/check-worker.ts`)
   after every change, so the dials follow your edits without stalling a frame.
-  The pieces: pockets, rails, pillars and bumpers to place; circle, oval and square plates;
+  The pieces: slag pits, kick rails, pillars and bumpers to place; circle, oval and square plates;
   miniature floors (bowl, flat, hill, ridge, tiers); wall rings (low, standard, high, none);
-  theme gems; and extras (vortex, turntable, rocking, embers). Pinch a piece, carry it over the arena and let go: pockets and rails snap to the
+  theme gems; and extras (vortex, turntable, rocking, embers). Pinch a piece, carry it over the arena and let go: pits and rails snap to the
   rim where you drop them, pillars and bumpers stand where you drop them, the others change
   the arena. Pieces on the arena can be picked up and moved, or dropped off the arena to
-  remove them; a quick tap on a pocket flips it between 2 and 3 points. Pinch the rim and
+  remove them. Pinch the rim and
   pull to resize; the rail steps away while a piece is carried. *Try* folds the tools away and
   plays an AI-vs-AI demo round in the draft (no points), then unfolds them; *Save* stores the
   arena in the browser, adds it to the rotation and starts a match in it.
-- **Points, first to 4:** pocket, over or burst finish +2, spin finish (the other top
-  stops first, or has less spin at the 45 s limit) +1. The score shows on the card.
+- **Heat, first to 3:** a knockout (SLAG into a pit, THROWN over the wall, SHATTER) scores 2
+  heat, OUTLAST (the other top stops first, or has less spin at the 45 s limit) scores 1. The
+  score shows on the match bar.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
-  slows, metal clashes, the cord's rising tension tone, launch, rail dash, pocket,
+  slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
   burst, topple and result jingles.
 - **Arena moves during the fight** (`docs/ARENA-SHAPING.md`): pinch the floor, lift and pull
   sideways to raise a ramp (lift sets its strength, the pull which way it throws a top); press a
@@ -131,7 +132,7 @@ What works:
   while pinching, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
   shape affects both tops. Two charges, shown as sparks on the near rim: a shape spends one, a
   strong clash or about 6 s refills one, a hand keeps one live shape, and nothing can be shaped
-  in the first 2.5 s. A finish within 1.5 s of your shape names it ("YOUR RAMP → POCKET").
+  in the first 2.5 s. A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on
   contact, lean into hits, wobble as spin drains, then topple.
 - **Far ramps:** point the hand ray at the floor during a fight and hold the pinch to
@@ -175,7 +176,7 @@ own rays rarely line up with what you are looking at.
 | `B` | Hold to grow a ramp where you are looking, aimed outward; release to set it (during a fight) |
 | `N` | Make a well where you are looking (during a fight) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
-| `K` | Burst the opponent now (during a fight) |
+| `K` | Shatter the opponent now (during a fight) |
 | `` ` `` | Start over as a new player: clears progress and the saved top, reloads |
 | hold `1` / `2` + mouse | Move only the left / right hand across the view (the head stays still); the wheel moves it nearer or farther |
 | `R` | Reset to the ready screen |

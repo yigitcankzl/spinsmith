@@ -403,7 +403,7 @@ export type Contact = 'smash' | 'upper' | 'absorb' | 'grind';
  */
 export const ATTACK: TopSpec = { ...specFromBuild(PRESETS[0].build), name: 'Striker' };
 export const DEFENSE: TopSpec = { ...specFromBuild(PRESETS[1].build), name: 'Anvil' };
-export const STAMINA: TopSpec = { ...specFromBuild(PRESETS[2].build), name: 'Needle' };
+export const STAMINA: TopSpec = { ...specFromBuild(PRESETS[2].build), name: 'Halo' };
 export const TYPES = [ATTACK, DEFENSE, STAMINA];
 
 export type Outcome = 'spinning' | 'out' | 'toppled';
@@ -758,8 +758,14 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
 }
 
 /** Points the winner scores: the pocket's value, 2 for over the wall or a burst, 1 out of spin. */
+/** Heat to win a match: first to this many. */
+export const MATCH_HEAT = 3;
+
+/**
+ * Heat the winner scores: 1 for outlasting the other top, 2 for any knockout (into a slag pit,
+ * thrown over the wall, or shattered). Every pit is worth the same.
+ */
 export function finishPoints(loser: Top): number {
-  if (loser.finish === 'pocket') return loser.pocketPoints;
   return loser.finish === 'spin' || loser.finish === null ? 1 : 2;
 }
 

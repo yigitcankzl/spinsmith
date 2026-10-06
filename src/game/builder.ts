@@ -36,7 +36,7 @@ import { makeMatcap } from './visuals.js';
  * reach. Pinch a piece, carry it over the arena and let go: a pocket is cut into the rim where you
  * drop it, a pillar stands where you drop it, a floor piece reshapes the floor, a gem changes the
  * theme. Pieces already on the arena can be picked up and moved, or dropped off the arena to throw
- * them away; a quick tap on a pocket switches it between 2 and 3 points. Pinch the rim and pull to
+ * them away. Pinch the rim and pull to
  * resize the arena. Works near (pinch) and far (point and pinch), so it is hands-first on a headset
  * and click-and-drag in the emulator.
  */
@@ -237,6 +237,8 @@ function pieceModel(p: Piece): Group {
 
 function pieceName(p: Piece, draft?: ArenaLayout): string {
   const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+  if (p.kind === 'pocket') return 'Slag pit';
+  if (p.kind === 'rail') return 'Kick rail';
   // The stepping pieces say what the draft has now.
   if (p.kind === 'wall') return draft ? `Wall: ${draft.wall}` : 'Wall';
   if (p.kind === 'theme') return draft ? `Theme: ${draft.theme}` : 'Theme';
@@ -576,11 +578,6 @@ export class Builder {
     this.tools.visible = true;
     this.root.remove(model);
     const tapped = this.time - held.start < TAP_TIME && h.pinch.distanceTo(held.startAt) < TAP_MOVE;
-    if (held.from === 'arena' && held.piece.kind === 'pocket' && tapped && at) {
-      // A quick tap on a pocket flips it between 2 and 3 points.
-      this.place(held.piece, at.x, at.z, held.pocketPoints >= 3 ? 2 : 3);
-      return;
-    }
     if (held.from === 'tray' && tapped && !PLACED.has(held.piece.kind)) return this.place(held.piece, 0, 0, 2);
     if (!at) {
       if (held.from === 'arena') {
@@ -599,14 +596,14 @@ export class Builder {
     const n = normRadius(L, x, z);
     switch (piece.kind) {
       case 'pocket':
-        if (n < 0.6) return this.reject('Drop pockets near the rim');
+        if (n < 0.6) return this.reject('Drop slag pits near the rim');
         L.pockets = L.pockets.filter((p) => angleGap(p.angle, a) > p.half + 0.2);
         L.rails = L.rails.filter((r) => angleGap(r.angle, a) > r.half + 0.2);
         L.pockets.push({ angle: a, half: 0.2, points: pocketPoints });
         break;
       case 'rail':
         if (n < 0.6) return this.reject('Drop rails near the rim');
-        if (L.pockets.some((p) => angleGap(p.angle, a) < p.half + 0.4)) return this.reject('Too close to a pocket');
+        if (L.pockets.some((p) => angleGap(p.angle, a) < p.half + 0.4)) return this.reject('Too close to a slag pit');
         L.rails = L.rails.filter((r) => angleGap(r.angle, a) > r.half + 0.3);
         L.rails.push({ angle: a, half: 0.4 });
         break;
@@ -775,7 +772,7 @@ export class Builder {
     if (!L) return;
     const r = this.report;
     const spread = r ? Math.max(...Object.values(r.typeWin)) - Math.min(...Object.values(r.typeWin)) : 0;
-    const form = `${pieceName({ kind: 'shape', value: L.shape })} · ${pieceName({ kind: 'floor', value: L.floor })} · ${L.wall} wall · ${L.pockets.length} pockets`;
+    const form = `${pieceName({ kind: 'shape', value: L.shape })} · ${pieceName({ kind: 'floor', value: L.floor })} · ${L.wall} wall · ${L.pockets.length} pits`;
     this.dial.draw(
       L.name,
       this.checking ? `${form} · checking` : form,

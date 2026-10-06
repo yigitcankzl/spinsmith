@@ -14,23 +14,23 @@ real table; everything you do in it, you do with your hands.
 
 **Forge.** Pinch the small anvil and the arena turns into a forge: the floor sinks, an anvil rises
 with your top on it and drawers slide out of the rim. There you build your top from three parts: a metal ring that decides how it
-hits, a core that sets its height and how hard it is to burst, and a tip that decides how it
+hits, a core that sets its height and how hard it is to shatter, and a tip that decides how it
 moves. Pinch a part from the drawer and press it onto the top; the stats change as it clicks in.
 Six rings, four cores and six tips make 136 legal builds, and each one plays differently:
-Striker smashes, Anvil absorbs, Needle outlasts.
+Striker smashes, Anvil absorbs, Halo outlasts.
 
 **Rip.** Place your top in the arena, pinch near it and pull back toward you like a rip cord. The
-harder and straighter the pull, the more spin it starts with. A perfect rip earns extra spin.
+harder and straighter the pull, the more spin it starts with. A white-hot pull earns extra spin.
 
 **Reshape.** This is what no other top game has. During the fight you shape the arena floor itself.
 Pinch the floor, lift and pull sideways to raise a ramp: lift sets how hard it throws, the pull
 which way. Press a fingertip in to sink a well that catches a top and holds it. Shapes affect both
 tops and relax back to flat in two or three seconds, so a well-placed ramp can throw your rival
-into a pocket, and a careless one can throw your own top out. Two charges keep it a decision,
+into a slag pit, and a careless one can throw your own top out. Two charges keep it a decision,
 not a reflex: clashing refills them. When a shape decides a round, the result says so: "YOUR
-RAMP → POCKET".
+RAMP → SLAG".
 
-**Read the arena.** Six arenas change the fight: a balanced bowl with pockets and dash rails, a
+**Read the arena.** Six arenas change the fight: a balanced bowl with slag pits and kick rails, a
 ring of embers that closes in, a dish that tips under weight, a walled spire with no ring-outs,
 an ice oval with a vortex, and a wall-less sumo square. Each says at the start who it favours.
 Rivals have their own styles: rim raiders, center holders and long drifters.
@@ -70,13 +70,13 @@ reshape the arena to win.*
 | 0:00-0:08 | Over the shoulder: a real table, the arena appears on it | Title: SpinSmith |
 | 0:08-0:18 | The arena transforms into the forge; hands pinch a tip from the drawer and press it onto the top | "Forge it by hand" |
 | 0:18-0:28 | Pinch and pull back; the top rips into the arena | "Rip it into your real table" |
-| 0:28-0:40 | Pinch the floor, lift and pull: a ramp throws the rival into a pocket | "Reshape the arena to win" · YOUR RAMP → POCKET |
+| 0:28-0:40 | Pinch the floor, lift and pull: a ramp throws the rival into a slag pit | "Reshape the arena to win" · YOUR RAMP → SLAG |
 | 0:40-0:45 | XP fills, LEVEL 2, a new part spins over the arena | Rematch |
 | 0:45-0:55 | Home: the Smith's board with today's order; pinch it, ramp the rival out, ORDER DONE and a stamp strikes the ledger | A new order every day |
 | 0:55-1:15 | The well: holding a stamina top in the middle against an attacker | Two verbs: ramp and well |
 | 1:15-1:45 | Three arenas in quick cuts: embers closing in, the tipping dish, the sumo square | Six arenas |
 | 1:45-2:15 | Forge close-ups: rings, cores, tips; stats changing as parts click in | 136 builds |
-| 2:15-2:40 | A full round from the rip to a burst finish | |
+| 2:15-2:40 | A full round from the pull to a shatter | |
 | 2:40-2:50 | End card: logo, "Play in the Quest browser", the link | |
 
 ## Still to do
