@@ -240,9 +240,8 @@ const TRAY: [string, Piece[]][] = [
   ['Extras', (['vortex', 'spinner', 'tilt', 'shrink'] as const).map((value) => ({ kind: 'extra', value }))],
 ];
 const CELL = 0.034;
-/** The tray floats this far in front of the eyes (m), and follows once it is this far off the gaze. */
+/** The tray is placed this far in front of the eyes (m). */
 const TRAY_DISTANCE = 0.4;
-const FOLLOW_ANGLE = 0.5;
 const TRAY_SCALE = 1.35;
 
 interface Slot {
@@ -291,11 +290,10 @@ export class Builder {
   private readonly depth = new Vector3();
   private readonly basis = new Matrix4();
   private trayPlaced = false;
-  private following = false;
 
   constructor(private readonly hooks: BuilderHooks) {
     this.root.name = 'arena-workshop';
-    // The tray is placed in front of the player's eyes each frame (see placeTray), a bit enlarged
+    // The tray is placed in front of the player's eyes when the workshop opens (see placeTray), a bit enlarged
     // so the pieces and their names read well at that distance.
     this.tray.scale.setScalar(TRAY_SCALE);
     const board = new Mesh(new BoxGeometry(CELL * 5 + 0.05, 0.004, CELL * TRAY.length + 0.05), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x5a463a) }));
@@ -641,30 +639,22 @@ export class Builder {
   }
 
   /**
-   * Keeps the tray in front of the eyes, facing them: about 40 cm ahead, a little below eye
-   * level and to the right of the gaze (the middle stays free for the arena). It stays put while the view moves a little and glides
-   * after the view when it drifts away (lazy follow), so it never has to be hunted for.
-   * head and forward are in arena-local space.
+   * Places the tray once, when the workshop opens: about 40 cm from the eyes toward the arena, at
+   * eye level (slightly below) and to the right of the arena, facing the player. It then stays where it is, so
+   * the player neither has to bend down to it nor chase it. head and forward are arena-local.
    */
-  placeTray(head: Vector3, forward: Vector3, dt: number) {
-    // Offsets are in view space (right of and below the gaze), so looking down at the arena
-    // does not slide the tray over it.
-    const right = this.q.set(-forward.z, 0, forward.x).normalize();
-    const up = this.up.crossVectors(right, forward).normalize();
-    const target = this.hit.copy(head).addScaledVector(forward, TRAY_DISTANCE).addScaledVector(right, 0.28).addScaledVector(up, -0.05);
-    const toTray = this.p.copy(this.tray.position).sub(head).normalize();
-    if (!this.trayPlaced || toTray.dot(forward) < Math.cos(FOLLOW_ANGLE) || this.tray.position.distanceTo(target) > 0.25) this.following = true;
-    if (this.following) {
-      const k = this.trayPlaced ? Math.min(1, dt * 5) : 1;
-      this.tray.position.lerp(target, k);
-      if (this.tray.position.distanceTo(target) < 0.01) this.following = false;
-      this.trayPlaced = true;
-    }
-    // Face the eyes without rolling: the board's up side (+Y) points at the head, its x axis
-    // along the view's right, so its first row (-Z) is at the top of the view.
+  placeTray(head: Vector3, forward: Vector3) {
+    if (this.trayPlaced) return;
+    this.trayPlaced = true;
+    // Level forward: looking down at the arena while opening must not put the tray down there.
+    const level = this.depth.set(forward.x, 0, forward.z).normalize();
+    const right = this.right.set(-level.z, 0, level.x);
+    this.tray.position.copy(head).addScaledVector(level, TRAY_DISTANCE).addScaledVector(right, 0.2);
+    this.tray.position.y -= 0.06;
+    // Face the eyes upright: the board's up side (+Y) toward the head, its x axis to the right.
     const toward = this.p.copy(head).sub(this.tray.position).normalize();
-    const x = this.right.copy(right).addScaledVector(toward, -right.dot(toward)).normalize();
-    const z = this.depth.crossVectors(x, toward);
+    const x = this.q.copy(right).addScaledVector(toward, -right.dot(toward)).normalize();
+    const z = this.up.crossVectors(x, toward);
     this.tray.quaternion.setFromRotationMatrix(this.basis.makeBasis(x, toward, z));
   }
 }

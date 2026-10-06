@@ -17,6 +17,8 @@ const TRAY_DROP = 0.42;
 const TABLE_MIN_H = 0.45;
 const TABLE_MAX_H = 1.15;
 const TABLE_MAX_DIST = 1.6;
+/** A table more than this far below the eyes is not used (m). Seated at a desk it is about 0.4-0.6. */
+const TABLE_MAX_BELOW_EYES = 0.75;
 /** Wait for planes to arrive before placing. */
 const SETTLE = 2;
 /** Cord pull that counts as a full-power rip (m) and full-power pull speed (m/s). */
@@ -334,10 +336,10 @@ export class MatchSystem extends createSystem({
     // The tray is placed relative to the head, in arena-local space.
     const head = this.player.head;
     head.getWorldPosition(this.p);
-    head.getWorldDirection(this.fwd).negate();
     const local = this.root.worldToLocal(this.p);
-    this.fwd.transformDirection(this.rootInverse.copy(this.root.matrixWorld).invert());
-    this.builder.placeTray(local, this.fwd, dt);
+    // Toward the arena (its center is the local origin), not wherever the player happened to look.
+    this.fwd.set(-local.x, 0, -local.z).normalize();
+    this.builder.placeTray(local, this.fwd);
     this.builder.update(this.pointers, dt);
   }
 
@@ -457,6 +459,9 @@ export class MatchSystem extends createSystem({
       if (plane?.orientation !== 'horizontal' || !/table|desk/.test(plane.semanticLabel ?? '')) continue;
       e.object3D!.getWorldPosition(this.local);
       if (this.local.y < TABLE_MIN_H || this.local.y > TABLE_MAX_H) continue;
+      // A table far below the eyes (standing over a coffee table) would mean bending over it:
+      // use the floating tray at a comfortable height instead.
+      if (this.head.y - this.local.y > TABLE_MAX_BELOW_EYES) continue;
       const d = Math.hypot(this.local.x - this.head.x, this.local.z - this.head.z);
       if (d < bestDist) {
         bestDist = d;

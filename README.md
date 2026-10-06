@@ -12,7 +12,8 @@ Design document: [docs/DESIGN.md](docs/DESIGN.md).
 What works:
 
 - The arena is placed about 40 cm in front of the seated player, on a pedestal
-  8 cm above the nearest detected table (or on a floating tray when no table is found).
+  8 cm above the nearest detected table, or on a floating tray when there is no table or the
+  table is far below the eyes (standing over a coffee table).
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
   travelled and how fast it was still moving at release, so a rip that stops before letting
@@ -40,9 +41,8 @@ What works:
   the opponent's is random.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
-- **Arena workshop:** pinch *Build arena* next to the arena. A tray of little 3D pieces floats
-  in front of you, to the right of your gaze and facing you, and glides after your view when
-  you look away, so it never has to be found: pockets, rails, pillars and bumpers to place;
+- **Arena workshop:** pinch *Build arena* next to the arena. A tray of little 3D pieces appears
+  at eye level to the right of the arena, facing you, and stays there: pockets, rails, pillars and bumpers to place;
   circle, oval and square plates; miniature floors (bowl, flat, hill, ridge, tiers); wall
   rings (low, standard, high, none); theme gems; and extras (vortex, turntable, rocking,
   embers). Pinch a piece, carry it over the arena and let go: pockets and rails snap to the
