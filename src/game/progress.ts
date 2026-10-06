@@ -36,23 +36,24 @@ export const STARTERS = [
 
 /** What each level opens. */
 export const LEVEL_UNLOCKS: Record<number, string> = {
-  2: 'tip:rush',
-  3: 'arena:Zero-G Dish',
+  2: 'arena:Zero-G Dish',
+  3: 'paint:2',
   4: 'core:3-50',
   5: 'ring:saw',
-  6: 'paint:2',
-  7: 'tip:taper',
-  8: 'arena:Clockwork Spire',
-  9: 'core:5-80',
-  10: 'ring:cog',
-  11: 'tip:orb',
-  12: 'arena:Frost Oval',
-  13: 'paint:3',
-  14: 'arena:Sumo Square',
+  6: 'tip:taper',
+  7: 'arena:Clockwork Spire',
+  8: 'core:5-80',
+  9: 'ring:cog',
+  10: 'tip:orb',
+  11: 'arena:Frost Oval',
+  12: 'paint:3',
+  13: 'arena:Sumo Square',
 };
 
 /** Parts earned by a deed rather than a level. */
 export const QUEST_UNLOCKS: Record<string, { key: string; text: string }> = {
+  // The first session's reward: every new player earns one part, win or lose.
+  first: { key: 'tip:rush', text: 'Finish your first match' },
   burst: { key: 'core:9-60', text: 'Win a round by BURST' },
   knockout: { key: 'ring:hook', text: 'Win a round by pocket or over' },
 };
@@ -76,6 +77,14 @@ export function unlockHint(key: string): string | null {
   for (const q of Object.values(QUEST_UNLOCKS)) if (q.key === key) return q.text;
   return null;
 }
+
+/**
+ * The first-session guide, in order: show how to launch; point at one arena move; after the first
+ * match, send the player to the anvil; in the forge, have them fit the new part; then invite the
+ * rematch; done.
+ */
+export type Guide = 'launch' | 'bump' | 'match' | 'forge' | 'fit' | 'rematch' | 'done';
+export const GUIDE_ORDER: Guide[] = ['launch', 'bump', 'match', 'forge', 'fit', 'rematch', 'done'];
 
 export interface RoundResult {
   won: boolean;
@@ -108,6 +117,10 @@ export class Progress {
   level = 1;
   /** XP into the current level. */
   xp = 0;
+  /** Matches finished. */
+  matches = 0;
+  /** Where the first-session guide is (see Guide). */
+  guide: Guide = 'launch';
   private unlocked = new Set(STARTERS);
   private quests = new Set<string>();
   private readonly storage: Storage | null;
@@ -117,7 +130,10 @@ export class Progress {
     try {
       const raw = storage?.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[] };
+        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide };
+        this.matches = s.matches ?? 0;
+        // Saves from before the guide existed skip it.
+        this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
         this.level = Math.min(MAX_LEVEL, Math.max(1, s.level | 0));
         this.xp = Math.max(0, s.xp | 0);
         for (const k of s.unlocked) this.unlocked.add(k);
@@ -141,6 +157,15 @@ export class Progress {
     return this.unlocked.has(key);
   }
 
+  /** The next level unlock ahead of you: its key and level, or null when all are open. */
+  get next(): { key: string; level: number } | null {
+    for (let lv = this.level + 1; lv <= MAX_LEVEL; lv++) {
+      const key = LEVEL_UNLOCKS[lv];
+      if (key && !this.unlocked.has(key)) return { key, level: lv };
+    }
+    return null;
+  }
+
   /** How a locked key is earned ('Lv 6', or a deed), or null when it is open. */
   lockText(key: string): string | null {
     return this.unlocked.has(key) ? null : unlockHint(key);
@@ -154,11 +179,13 @@ export class Progress {
     if (r.matchOver) gained += r.matchWon ? XP.matchWin : XP.matchLoss;
     const out: Award = { gained, levels: [], unlocked: [] };
     // Deeds.
-    const deed = r.won && r.finish === 'burst' ? 'burst' : r.won && (r.finish === 'pocket' || r.finish === 'over') ? 'knockout' : null;
-    if (deed && !this.quests.has(deed)) {
+    const deeds = [r.won && r.finish === 'burst' ? 'burst' : r.won && (r.finish === 'pocket' || r.finish === 'over') ? 'knockout' : null, r.matchOver ? 'first' : null];
+    for (const deed of deeds) {
+      if (!deed || this.quests.has(deed)) continue;
       this.quests.add(deed);
       this.unlock(QUEST_UNLOCKS[deed].key, out);
     }
+    if (r.matchOver) this.matches++;
     // Levels.
     this.xp += gained;
     while (this.level < MAX_LEVEL && this.xp >= xpToNext(this.level)) {
@@ -179,7 +206,14 @@ export class Progress {
     out.unlocked.push(key);
   }
 
+  /** Moves the first-session guide on (only forward) and saves. */
+  advance(to: Guide) {
+    if (GUIDE_ORDER.indexOf(to) <= GUIDE_ORDER.indexOf(this.guide)) return;
+    this.guide = to;
+    this.save();
+  }
+
   private save() {
-    this.storage?.setItem(KEY, JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests] }));
+    this.storage?.setItem(KEY, JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide }));
   }
 }

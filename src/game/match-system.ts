@@ -1,4 +1,4 @@
-import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -7,7 +7,7 @@ import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, verdict } from './sim.js';
 import { Forge, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
-import { Progress } from './progress.js';
+import { GUIDE_ORDER, Progress } from './progress.js';
 import { Hub, miniArena } from './hub.js';
 import { Wall } from './wall.js';
 import type { WallPlane } from './wall.js';
@@ -105,6 +105,7 @@ export class MatchSystem extends createSystem({
   /** The forge: build your own top from parts. */
   private forge = new Forge({
     done: (build) => this.leaveForge(build),
+    fitted: () => this.progress.advance('rematch'),
   }, this.wall, this.progress);
   /** A demo round from the workshop's Try it: AI launches, no score, then back to the workshop. */
   private demo = false;
@@ -123,6 +124,10 @@ export class MatchSystem extends createSystem({
   private hitStop = 0;
   private lastHardHit = -1;
   private impacts = new Impacts();
+  /** First-session hints: arrows teaching the rip, and a marker where a bump would pay off. */
+  private ripArrows = new Group();
+  private bumpMark = new Mesh(new RingGeometry(0.012, 0.016, 32).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffd28a, transparent: true, depthWrite: false }));
+  private bumpHintShown = false;
   /** Unlocks waiting to be shown over the arena, and the one showing. */
   private reveals: string[] = [];
   private reveal: { obj: Object3D; t: number } | null = null;
@@ -224,6 +229,8 @@ export class MatchSystem extends createSystem({
       this.arenaView.root,
       this.sparks.points,
       this.impacts.root,
+      this.ripArrows,
+      this.bumpMark,
     );
     this.myBuild = this.forge.allowed(this.myBuild);
     this.setBuilds(this.myBuild, this.theirBuild);
@@ -252,6 +259,12 @@ export class MatchSystem extends createSystem({
         if (e.repeat) return;
         this.keys.add(e.code);
         if (e.code === 'KeyR') this.toReady();
+        // Start over as a new player: progress and the saved top are cleared.
+        if (e.code === 'Backquote') {
+          localStorage.removeItem('spinsmith.progress.v1');
+          localStorage.removeItem('spinsmith.top.v1');
+          location.reload();
+        }
         if (e.code === 'KeyP') this.phase = 'placing';
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
         if (e.code === 'KeyK' && this.phase === 'fight') {
@@ -367,6 +380,7 @@ export class MatchSystem extends createSystem({
     this.theirView.sync(this.theirs, this.arena, this.time, dt);
     this.sparks.update(dt);
     this.impacts.update(dt);
+    this.updateGuide();
     this.updateRewards(dt);
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
@@ -431,6 +445,11 @@ export class MatchSystem extends createSystem({
     this.hub.show(this.arenas, this.arenaIndex, this.myBuild, this.progress);
     this.label.set('');
     this.wall.setMode('home');
+    // The first session says where to reach next.
+    const guide = this.progress.guide;
+    if (guide === 'launch') this.label.set('Your top is on the stand\nPut it in the arena to play');
+    else if (guide === 'forge') this.label.set('New part: Rush tip!\nPinch the anvil to fit it');
+    else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
@@ -445,6 +464,7 @@ export class MatchSystem extends createSystem({
     if (!action) return;
     if (action.kind === 'play') {
       this.hub.hide();
+      if (this.progress.guide === 'rematch') this.progress.advance('done');
       this.rival = this.pickRival();
       this.myPoints = 0;
       this.theirPoints = 0;
@@ -473,7 +493,10 @@ export class MatchSystem extends createSystem({
     // The forge is its own place: the arena hides while you build.
     this.stage.visible = false;
     this.wall.setMode('forge');
-    this.forge.open();
+    // The first session's forge visit is about one part: the one just earned.
+    const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:rush' : null;
+    this.progress.advance('fit');
+    this.forge.open(focus);
   }
 
   /** Back home from the forge; a saved build becomes your top. */
@@ -806,6 +829,7 @@ export class MatchSystem extends createSystem({
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
     this.lastPerfect = perfect;
+    if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
     const mh = this.mine.hand;
     const th = this.theirs.hand;
@@ -846,9 +870,11 @@ export class MatchSystem extends createSystem({
         if (!held && h.justPinched) {
           if (this.arena.inside(l.x, l.z) && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
             held = this.shaping[side] = { x: l.x, z: l.z, y0: l.y, t: 0, far: false };
+            this.progress.advance('match');
           } else if (this.rayFloor(h)) {
             // Far bump: point at the floor and pinch; it rises while the pinch is held.
             held = this.shaping[side] = { x: this.rayHit.x, z: this.rayHit.z, y0: l.y, t: 0, far: true };
+            this.progress.advance('match');
           }
         }
         if (held) {
@@ -975,6 +1001,46 @@ export class MatchSystem extends createSystem({
     }
   }
 
+  /**
+   * The first session's hints. Ready: arrows run from your top toward you (pull the cord this
+   * way). Fight: a ring breathes on the floor just inside the rival, where lifting the floor pushes
+   * it toward the rim, until you make your first move.
+   */
+  private updateGuide() {
+    const g = this.progress.guide;
+    const ready = g === 'launch' && this.phase === 'ready' && !this.demo;
+    this.ripArrows.visible = ready;
+    if (ready) {
+      if (this.ripArrows.children.length === 0) {
+        for (let i = 0; i < 3; i++) {
+          this.ripArrows.add(new Mesh(new ConeGeometry(0.008, 0.012, 3).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, depthWrite: false })));
+        }
+      }
+      const y = this.arena.height(0, this.SPAWN) + 0.006;
+      this.ripArrows.children.forEach((c, i) => {
+        const k = (this.time * 0.8 + i / 3) % 1;
+        c.position.set(0, y, this.SPAWN + 0.03 + k * 0.08);
+        ((c as Mesh).material as MeshBasicMaterial).opacity = Math.sin(k * Math.PI);
+      });
+      this.label.set('Pinch near your top and pull back toward you\nthen let go');
+    }
+    const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > 3 && this.theirs.alive;
+    this.bumpMark.visible = bump;
+    if (bump) {
+      const r = Math.hypot(this.theirs.x, this.theirs.z) || 1;
+      const x = this.theirs.x - (this.theirs.x / r) * 0.035;
+      const z = this.theirs.z - (this.theirs.z / r) * 0.035;
+      this.bumpMark.position.set(x, this.arena.height(x, z) + 0.002, z);
+      this.bumpMark.scale.setScalar(1 + 0.3 * Math.sin(this.time * 6));
+      this.label.set('Pinch the floor at the ring and lift\nthe slope pushes the rival');
+      this.bumpHintShown = true;
+    } else if (this.bumpHintShown && g !== 'bump') {
+      // The first move is made: the hint goes.
+      this.bumpHintShown = false;
+      this.label.set('');
+    }
+  }
+
   /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */
   private earn(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
     const before = this.progress.level;
@@ -988,6 +1054,8 @@ export class MatchSystem extends createSystem({
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
     }
     this.reveals.push(...award.unlocked);
+    // The first match is over: the anvil appears and calls for the new part.
+    if (matchOver && GUIDE_ORDER.indexOf(this.progress.guide) < GUIDE_ORDER.indexOf('forge')) this.progress.advance('forge');
   }
 
   /** Shows a level-up, then each new unlock spinning over the arena before it flies off. */
@@ -1040,7 +1108,10 @@ export class MatchSystem extends createSystem({
     }
     if (this.phase !== 'fight' || !this.gazeHit.ok) return;
     const { x, z } = this.gazeHit;
-    if (this.keys.has('KeyB')) this.arena.stamp(x, z, 0.03);
+    if (this.keys.has('KeyB')) {
+      this.arena.stamp(x, z, 0.03);
+      this.progress.advance('match');
+    }
     if (this.keys.has('KeyN')) this.arena.stamp(x, z, -0.025);
   }
 

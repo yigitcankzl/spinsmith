@@ -143,6 +143,8 @@ const FRAME_ON = new Color(ORANGE);
 export interface ForgeHooks {
   /** Save the build and go back. */
   done(build: TopBuild): void;
+  /** The first session's new part was fitted. */
+  fitted?(): void;
 }
 
 type Target = { kind: 'slot'; slot: Slot } | { kind: 'top' } | { kind: 'bucket' };
@@ -170,6 +172,8 @@ export class Forge {
   /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
   private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion } | null = null;
   private explode = 0;
+  /** The part the first session asks the player to fit, if any. */
+  private focus: Slot | null = null;
   /** The halo flares when a part is fitted. */
   private glow = 0;
   private readonly white = new Color(0xffffff);
@@ -226,13 +230,15 @@ export class Forge {
     return out;
   }
 
-  open() {
+  /** Opens the forge; with a focus key (the first session's new part) only that part is called out. */
+  open(focus: string | null = null) {
     this.floatSet = false;
     this.build = this.allowed(loadBuild());
     this.rebuildDisplay();
     this.root.visible = true;
     this.dropAll();
-    this.say('Pick up your top, or bring it a part from the shelf');
+    this.focus = focus ? (this.slots.find((s) => s.key === focus) ?? null) : null;
+    this.say(this.focus ? `Your new part: bring the ${this.focus.item.name} ${this.focus.item.kind} to your top` : 'Pick up your top, or bring it a part from the shelf');
     this.logPending = true;
   }
 
@@ -319,6 +325,8 @@ export class Forge {
       s.frame.color.copy(fitted ? FRAME_ON : on ? FRAME_HOVER : FRAME_IDLE);
       // A part just fitted flashes white and pulses.
       if (s.flash > 0) s.frame.color.lerp(this.white, s.flash / 0.8);
+      // The first session's new part breathes until it is fitted.
+      if (s === this.focus) s.frame.color.copy(FRAME_ON).lerp(this.white, 0.5 + 0.5 * Math.sin(this.time * 5));
       const pulse = s.flash > 0 ? 1 + 0.25 * Math.sin((s.flash / 0.8) * Math.PI) : 1;
       s.model.position.set(s.home.x, s.home.y, s.home.z + (on ? 0.03 + 0.005 * Math.sin(this.time * 8) : 0));
       s.model.scale.setScalar(s.size * (on ? 1.15 : 1) * pulse * (locked ? 0.55 : 1));
@@ -469,7 +477,7 @@ export class Forge {
       const w = weightOf(next);
       if (w > WEIGHT_LIMIT) {
         playRemove();
-        this.say(`Too heavy: ${w} g of ${WEIGHT_LIMIT} g. Pick a lighter part`);
+        this.say(`Too heavy by ${w - WEIGHT_LIMIT} g. ${this.lighterFix(next, item.kind)}`);
         return;
       }
       this.build = next;
@@ -485,7 +493,32 @@ export class Forge {
     if (slot && JSON.stringify(this.build) !== before) {
       slot.flash = 0.8;
       this.glow = 1;
+      if (slot === this.focus) {
+        this.focus = null;
+        this.say('Fitted! Dunk your top in the bucket to save it, then play');
+        this.hooks.fitted?.();
+      }
     }
+  }
+
+  /**
+   * The smallest change that brings an overweight build under the limit: the unlocked part, in
+   * one of the other two slots, that changes the weight least while fitting.
+   */
+  private lighterFix(b: TopBuild, keep: string): string {
+    const open = (key: string) => this.progress.isUnlocked(key) || unlockHint(key) === null;
+    let best: { text: string; cost: number } | null = null;
+    const consider = (kind: 'ring' | 'core' | 'tip', id: string, name: string, weight: number, current: number) => {
+      if (kind === keep || !open(`${kind}:${id}`)) return;
+      const total = weightOf(b) - current + weight;
+      if (total > WEIGHT_LIMIT) return;
+      const cost = current - weight;
+      if (cost > 0 && (!best || cost < best.cost)) best = { text: `Try the ${name} ${kind} instead`, cost };
+    };
+    for (const r of RINGS) consider('ring', r.id, r.name, r.weight, RINGS.find((x) => x.id === b.ring)!.weight);
+    for (const c of CORES) consider('core', c.id, c.name, c.weight, CORES.find((x) => x.id === b.core)!.weight);
+    for (const t of TIPS) consider('tip', t.id, t.name, t.weight, TIPS.find((x) => x.id === b.tip)!.weight);
+    return (best as { text: string } | null)?.text ?? 'Pick a lighter part';
   }
 
   private save() {

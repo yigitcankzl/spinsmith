@@ -383,6 +383,10 @@ TUNING.grace = 0;
   assert.deepEqual(levels, [2, 3, 4, 5]);
   assert.ok(q.isUnlocked(LEVEL_UNLOCKS[5]) && !q.isUnlocked(LEVEL_UNLOCKS[6]), 'level 5 opens its part, not level 6');
   assert.ok(total > 0);
+  // The first finished match opens the first-session part, win or lose.
+  const first = new Progress();
+  const r = first.award({ won: false, finish: null, perfect: false, matchOver: true, matchWon: false });
+  assert.ok(r.unlocked.includes('tip:rush') && first.matches === 1, 'the first match should open the Rush tip');
 }
 
 console.log('sim-check: all passed');

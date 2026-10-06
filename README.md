@@ -67,6 +67,13 @@ What works:
   home. A stats card floating to the right of your top shows the build, previews a part's effect (green gains, red losses) and says what
   just happened. `npm run report:tops` plays every build against the others and flags dominant
   builds and dead parts.
+- **First session** (docs/GAMEPLAY-DIRECTION.md, section 12): until the first match is
+  finished the home is just your top on its stand (a breathing ring calls you to it) and the
+  arena; the anvil, the arena shelf and the workshop come after. The first launch shows arrows
+  running toward you and how to rip; the first fight puts a breathing ring on the floor beside
+  the rival where lifting would push it, until your first bump. Finishing the first match, won or
+  lost, earns the Rush tip: the anvil appears and calls for it, the forge highlights only that
+  part, and after saving the stand calls you back for the rematch.
 - **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
   burst, pocket or over finish, a perfect rip, and the match), filling levels 1-20 with ranks
   (Apprentice, Journeyman, Smith, Master Smith, Legend). Levels open options, never power: you
@@ -147,6 +154,7 @@ own rays rarely line up with what you are looking at.
 | `N` | Hold to press a dent where you are looking (during a fight) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Burst the opponent now (during a fight) |
+| `` ` `` | Start over as a new player: clears progress and the saved top, reloads |
 | hold `1` / `2` + mouse | Move only the left / right hand across the view (the head stays still); the wheel moves it nearer or farther |
 | `R` | Reset to the ready screen |
 | `P` | Re-place the arena in front of the current head pose |

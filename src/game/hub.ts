@@ -18,6 +18,7 @@ import {
   MeshMatcapMaterial,
   Object3D,
   PlaneGeometry,
+  RingGeometry,
   SRGBColorSpace,
   TorusGeometry,
   Vector3,
@@ -85,6 +86,8 @@ export class Hub {
   private standHolder = new Group();
   private items: Pickable[] = [];
   private labels: Mesh[] = [];
+  /** A breathing ring of light that shows where to reach next during the first session. */
+  private beacon = new Mesh(new RingGeometry(0.028, 0.034, 40), new MeshBasicMaterial({ color: ORANGE, transparent: true, depthWrite: false }));
   private rankCanvas = document.createElement('canvas');
   private rankTex!: CanvasTexture;
   private rankKey = '';
@@ -110,7 +113,8 @@ export class Hub {
     // space is twice as large as the world).
     this.shelf.position.set(0, 0.13, -0.26);
     this.shelf.scale.setScalar(0.5);
-    this.root.add(this.anvil, this.stand, this.shelf);
+    this.beacon.rotation.x = -Math.PI / 2;
+    this.root.add(this.anvil, this.stand, this.shelf, this.beacon);
     this.root.visible = false;
   }
 
@@ -118,7 +122,15 @@ export class Hub {
   show(arenas: ArenaLayout[], current: number, build: TopBuild, progress: Progress) {
     this.drawRank(progress);
     this.root.visible = true;
-    this.shelf.visible = true;
+    // Before the first match the smithy is just your top and the arena: the anvil, the arena
+    // shelf and the workshop come once the player knows a fight.
+    const first = progress.matches === 0;
+    this.shelf.visible = !first;
+    this.anvil.visible = !first;
+    // The guide's beacon: on the stand to start (and for the rematch), on the anvil for the new part.
+    this.beacon.visible = progress.guide === 'launch' || progress.guide === 'rematch' || progress.guide === 'forge';
+    const onAnvil = progress.guide === 'forge';
+    this.beacon.position.set(onAnvil ? ANVIL_AT.x : STAND_AT.x, TABLE_Y + (onAnvil ? ANVIL_FACE + 0.01 : 0.1), onAnvil ? ANVIL_AT.z : STAND_AT.z);
     const topKey = JSON.stringify(build);
     if (topKey !== this.topKey) {
       this.topKey = topKey;
@@ -150,6 +162,10 @@ export class Hub {
   /** One frame: hover, pinch, carry, drop. Returns what the player chose, if anything. */
   update(pointers: HandState[], dt: number, head: Vector3): HubAction | null {
     this.time += dt;
+    // The beacon breathes.
+    const k = 0.5 + 0.5 * Math.sin(this.time * 4);
+    this.beacon.scale.setScalar(1 + 0.35 * k);
+    (this.beacon.material as MeshBasicMaterial).opacity = 0.35 + 0.5 * (1 - k);
     if (this.standTop) this.standTop.root.rotation.y += dt * 0.8;
     if (this.anvilTop) this.anvilTop.root.rotation.y -= dt * 0.4;
     // Station names turn to face the player.
@@ -223,6 +239,7 @@ export class Hub {
     let best: Pickable | null = null;
     let bestD = Infinity;
     for (const it of this.items) {
+      if (!shown(it.model)) continue;
       it.model.getWorldPosition(this.p);
       const d = this.distance(h, this.p);
       if (d < bestD) {
@@ -311,11 +328,12 @@ export class Hub {
   /** A short brass stand at the near rim holding your top: carry it into the arena to play. */
   /** Your smith level beside the stand: level, rank and the bar toward the next level. */
   private drawRank(progress: Progress) {
-    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}`;
+    const next = progress.next;
+    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}`;
     if (key === this.rankKey) return;
     this.rankKey = key;
     const g = this.rankCanvas.getContext('2d')!;
-    glass(g, 512, 150, ORANGE);
+    glass(g, 512, 200, ORANGE);
     g.fillStyle = TEXT;
     g.textBaseline = 'middle';
     g.font = '800 54px system-ui, sans-serif';
@@ -327,16 +345,20 @@ export class Hub {
     g.fillRect(28, 100, 456, 20);
     g.fillStyle = UI_STEEL;
     g.fillRect(28, 100, 456 * progress.fraction, 20);
+    // Where progress leads next.
+    g.fillStyle = TEXT;
+    g.font = '600 28px system-ui, sans-serif';
+    g.fillText(next ? `Next: ${unlockLabel(next.key)} at Lv ${next.level}` : 'Every part is yours', 28, 160);
     this.rankTex.needsUpdate = true;
   }
 
   private buildStand() {
     this.stand.position.set(STAND_AT.x, TABLE_Y, STAND_AT.z);
     this.rankCanvas.width = 512;
-    this.rankCanvas.height = 150;
+    this.rankCanvas.height = 200;
     this.rankTex = new CanvasTexture(this.rankCanvas);
     this.rankTex.colorSpace = SRGBColorSpace;
-    const rank = new Mesh(new PlaneGeometry(0.1, 0.029), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
+    const rank = new Mesh(new PlaneGeometry(0.1, 0.039), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
     rank.position.set(0, 0.21, 0);
     rank.rotation.x = -0.3;
     this.stand.add(rank);
@@ -433,4 +455,18 @@ function softShadow(size: number): Mesh {
   const m = new Mesh(new PlaneGeometry(size, size).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, opacity: 0.55, depthWrite: false }));
   m.position.y = 0.0005;
   return m;
+}
+
+/** 'ring:saw' -> 'Saw ring', 'arena:Frost Oval' -> 'Frost Oval', 'paint:2' -> 'a new paint'. */
+export function unlockLabel(key: string): string {
+  const [kind, id] = key.split(':');
+  if (kind === 'paint') return 'a new paint';
+  if (kind === 'arena') return id;
+  return `${id.charAt(0).toUpperCase()}${id.slice(1)} ${kind}`;
+}
+
+/** True when the object and all its parents are visible. */
+function shown(o: Object3D): boolean {
+  for (let p: Object3D | null = o; p; p = p.parent) if (!p.visible) return false;
+  return true;
 }
