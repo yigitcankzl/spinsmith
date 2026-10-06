@@ -64,7 +64,7 @@ What works:
   goes and that slot pulses; let go to fit it with a clack (tapping a part fits it too). A core
   locks with one click per tooth; overweight builds are refused. Tap a paint pot or dip the top
   in it to paint it; spin tokens set the spin direction. Dunk the top in the quench bucket to save and go
-  home. A stats card on the wall shows the build, previews a part's effect (green gains, red losses) and says what
+  home. A stats card floating to the right of your top shows the build, previews a part's effect (green gains, red losses) and says what
   just happened. `npm run report:tops` plays every build against the others and flags dominant
   builds and dead parts.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
