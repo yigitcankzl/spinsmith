@@ -8,16 +8,20 @@ import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, verdict } from './sim.js';
 import { Forge, loadBuild } from './forge.js';
 import { Hub } from './hub.js';
+import { Wall } from './wall.js';
+import type { WallPlane } from './wall.js';
 import { allBuilds, PRESETS, roleOf, specFromBuild } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, Cord, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
 const PEDESTAL = 0.08;
+/** The arena (and everything on the table) is drawn this much larger than its simulation size. */
+const ARENA_SCALE = 2;
 /** How far in front of the seated player's head the arena goes (m, horizontal). */
-const REACH = 0.42;
+const REACH = 0.55;
 /** Without a table the arena floats on a tray this far below the head. */
-const TRAY_DROP = 0.42;
+const TRAY_DROP = 0.5;
 const TABLE_MIN_H = 0.45;
 const TABLE_MAX_H = 1.15;
 const TABLE_MAX_DIST = 1.6;
@@ -71,7 +75,7 @@ export class MatchSystem extends createSystem({
   private hands = new HandInput();
   private root = new Group();
   private arena = new Arena();
-  private arenaView = new ArenaView(PEDESTAL);
+  private arenaView = new ArenaView(PEDESTAL / ARENA_SCALE);
   /** Everything that tilts with a rocking dish: the arena and what is on it. */
   private stage = new Group();
   /** Arenas in rotation (built-ins plus the player's own) and the one in play. */
@@ -87,18 +91,20 @@ export class MatchSystem extends createSystem({
     toLocal: (world, out) => this.root.worldToLocal(out.copy(world)),
     floorHeight: (n) => this.arena.floorHeight(n),
   });
+  /** The smithy wall on the real wall ahead: tool panel, scoreboard, arena shelf. */
+  private wall = new Wall();
   /** The forge: build your own top from parts. */
   private forge = new Forge({
     done: (build) => this.leaveForge(build),
     test: (build) => this.testBuild(build),
-  });
+  }, this.wall);
   /** A demo round (workshop Try it, forge Test): AI launches, no score, then back where it came from. */
   private demo = false;
   private hubLogPending = false;
   private demoFrom: 'build' | 'forge' = 'build';
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
-  private hub = new Hub();
+  private hub = new Hub(this.wall);
   private menuButton = new Button('menu', 0.07, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
@@ -212,6 +218,8 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
     this.world.createTransformEntity(this.cord.line);
+    this.world.createTransformEntity(this.wall.root);
+    this.builder.hangOn(this.wall.tools);
 
     if (import.meta.env.DEV) {
       const onKey = (e: KeyboardEvent) => {
@@ -386,7 +394,8 @@ export class MatchSystem extends createSystem({
     // Your top waits on its stand, not in the arena.
     this.mine.state = 'out';
     this.hub.show(this.arenas, this.arenaIndex, this.myBuild);
-    this.label.set(`SpinSmith\n${this.arena.layout.name}`);
+    this.label.set('');
+    this.wall.score(['SpinSmith', this.arena.layout.name, 'Put your top in the arena to play']);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
@@ -476,6 +485,7 @@ export class MatchSystem extends createSystem({
     this.phase = 'build';
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
+    this.forge.showShelf(false);
     this.builder.open(this.arena.layout);
   }
 
@@ -483,7 +493,7 @@ export class MatchSystem extends createSystem({
   private updateBuilder(dt: number) {
     // The menu board stands across the arena, facing the head; positions are arena-local.
     this.player.head.getWorldPosition(this.p);
-    this.builder.placeMenu(this.root.worldToLocal(this.p));
+    this.builder.placeMenu();
     this.builder.update(this.pointers, dt);
   }
 
@@ -547,6 +557,7 @@ export class MatchSystem extends createSystem({
     this.arenas.push(layout);
     this.arenaIndex = this.arenas.length - 1;
     this.builder.close();
+    this.forge.showShelf(true);
     this.setArena(layout);
     this.myPoints = 0;
     this.theirPoints = 0;
@@ -556,6 +567,7 @@ export class MatchSystem extends createSystem({
 
   private leaveBuilder() {
     this.builder.close();
+    this.forge.showShelf(true);
     this.setArena(this.arenas[this.arenaIndex]);
     this.toHub();
   }
@@ -581,11 +593,28 @@ export class MatchSystem extends createSystem({
     const table = this.findTable();
     center.y = table !== null ? table + PEDESTAL : this.head.y - TRAY_DROP;
     this.root.position.copy(center);
+    this.root.scale.setScalar(ARENA_SCALE);
+    this.wall.place(this.head, this.fwd, this.findWalls());
     // Local +Z points back at the player.
     this.root.rotation.set(0, Math.atan2(this.head.x - center.x, this.head.z - center.z), 0);
     this.root.visible = true;
     console.log(`[MATCH] arena on ${table !== null ? 'table' : 'tray'} at ${center.toArray().map((v) => v.toFixed(2)).join(',')}`);
     this.toHub();
+  }
+
+  /** Detected wall planes (center and normal, world space). */
+  private findWalls(): WallPlane[] {
+    const out: WallPlane[] = [];
+    for (const e of this.queries.planes.entities) {
+      const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
+      if (plane?.orientation !== 'vertical' || !/wall/.test(plane.semanticLabel ?? 'wall')) continue;
+      const o = e.object3D!;
+      const center = o.getWorldPosition(new Vector3());
+      // A plane's surface lies in its local x-z, so its normal is the local +y.
+      const normal = new Vector3(0, 1, 0).applyQuaternion(o.getWorldQuaternion(new Quaternion()));
+      out.push({ center, normal });
+    }
+    return out;
   }
 
   /** Height of the nearest table/desk plane within reach, or null. */
@@ -622,9 +651,9 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirs.hand);
     this.puller = null;
     this.cord.set(null);
-    this.label.set(
-      `${this.describe(this.mine.spec)} vs ${this.describe(this.theirs.spec)}\n${this.arena.layout.name} · You ${this.myPoints} - ${this.theirPoints} · first to ${MATCH_POINTS}`,
-    );
+    // The scoreboard on the wall shows the match; the card over the arena only the round's messages.
+    this.label.set('');
+    this.wall.score([`You ${this.myPoints} - ${this.theirPoints} Rival`, `${this.mine.spec.name} vs ${this.theirs.spec.name}`, `${this.arena.layout.name} · first to ${MATCH_POINTS}`]);
   }
 
   private toLocal(world: Vector3) {
@@ -859,6 +888,7 @@ export class MatchSystem extends createSystem({
       }
     }
     this.label.set(text);
+    this.wall.score(text.split('\n'));
     console.log(`[MATCH] ${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
     if (v !== 2) {
       this.round++;

@@ -14,12 +14,16 @@ What works:
 - The arena is placed about 40 cm in front of the seated player, on a pedestal
   8 cm above the nearest detected table, or on a floating tray when there is no table or the
   table is far below the eyes (standing over a coffee table).
-- **Home is a smithy, no buttons** (`src/game/hub.ts`): around the arena stand things to pick
-  up. Your top waits on a stand at the near rim: carry it into the arena (or tap it) to play. An
-  arena rack on the left turns slowly with a miniature of every arena: carry one onto the arena
-  (or tap it) to switch; the rolled-up blueprint on the rack opens the arena workshop. An anvil
-  on the right holds your top: pinch it to forge. Pinching here never launches. In a match, a
-  small *Menu* button beside the arena returns home, and the match ends back home after 4 points.
+- **The room is the smithy** (`src/game/wall.ts`, `src/game/hub.ts`): the arena sits on your
+  table, drawn twice its simulation size (about 60 cm across). The smithy wall hangs on the
+  real wall straight ahead (a detected wall plane, or a virtual wall 1.6 m ahead), larger the
+  farther it is: a SPINSMITH sign, the forge's tool panel on the left, a scoreboard on the right
+  and the arena shelf below it. Point at anything on the wall and pinch: it flies to your hand.
+  On the table, your top waits on a stand at the arena's left (carry it into the arena or tap it
+  to play) and an anvil at its right holds your top (pinch it to forge). Carry an arena miniature
+  from the wall onto the arena (or tap it) to switch; the blueprint opens the workshop, whose
+  board hangs on the wall's tool panel. In a match, a small *Menu* button beside the arena
+  returns home, and the match ends back home after 4 points.
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
   travelled and how fast it was still moving at release, so a rip that stops before letting
@@ -51,14 +55,14 @@ What works:
   and Needle (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
   the opponent's cool teal; the opponent gets a random build each round.
 - **Forge, by hand** (`src/game/forge.ts`): pinch the anvil. Your top stands on the anvil; the
-  parts lie on a stepped wooden shelf behind it (tips, cores, rings, style, presets). Pinch your
+  parts hang on the wall's tool panel (tips, cores, rings, style, presets) and fly to your hand. Pinch your
   top to pick it up: it follows your hand and turns with it. Pinch a part on the shelf and bring
   it to the top (on the anvil or in your other hand): the top comes apart to show where the part
   goes and that slot pulses; let go to fit it with a clack (tapping a part fits it too). A core
   locks with one click per tooth; overweight builds are refused. Tap a paint pot or dip the top
   in it to paint it; spin tokens set the spin direction. Drop the top into the arena to test it
-  in a round; dunk it in the quench bucket to save and go home. A stats card over the far side
-  of the arena shows the build, previews a part's effect (green gains, red losses) and says what
+  in a round; dunk it in the quench bucket to save and go home. A stats card on the wall (over the
+  scoreboard) shows the build, previews a part's effect (green gains, red losses) and says what
   just happened. `npm run report:tops` plays every build against the others and flags dominant
   builds and dead parts.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and

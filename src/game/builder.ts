@@ -8,6 +8,7 @@ import {
   Group,
   LatheGeometry,
   Matrix4,
+  Object3D,
   Mesh,
   MeshBasicMaterial,
   MeshMatcapMaterial,
@@ -242,12 +243,9 @@ const TRAY: [string, Piece[]][] = [
 /** Spacing of the pieces in the menu row (m) and how much larger than life they are shown. */
 const ITEM_GAP = 0.046;
 const ITEM_SCALE = 1.6;
-/** The menu board stands at the arena rack, left of the arena, this high above the arena (m). */
-const MENU_AT_X = -0.37;
-const MENU_AT_Z = -0.07;
-const MENU_HEIGHT = 0.2;
-/** It is farther from the eyes than a hand-held menu, so it is drawn larger. */
-const MENU_SCALE = 1.5;
+
+/** The board hangs on the smithy wall, far from the eyes, so it is drawn this much larger (world). */
+const MENU_SCALE = 3.2;
 
 interface Slot {
   piece: Piece;
@@ -365,6 +363,7 @@ export class Builder {
     this.draft = cloneLayout(from);
     this.draft.name = 'My Arena';
     this.root.visible = true;
+    this.tray.visible = true;
     this.held = null;
     this.say('Pinch a piece and drop it on the arena');
     this.hooks.preview(this.draft);
@@ -373,6 +372,7 @@ export class Builder {
 
   close() {
     this.root.visible = false;
+    this.tray.visible = false;
     if (this.held?.mode === 'piece') this.root.remove(this.held.model);
     this.held = null;
   }
@@ -680,18 +680,15 @@ export class Builder {
     if (direction !== 0) playPick();
   }
 
-  /**
-   * Stands the menu board at the arena rack on the left, facing the player; pieces are carried
-   * from it onto the arena. The head is arena-local (arena center at the origin, +Z toward the player).
-   */
-  placeMenu(head: Vector3) {
-    this.q.set(MENU_AT_X, MENU_HEIGHT, MENU_AT_Z);
-    this.tray.position.copy(this.q);
-    // Face the eyes upright: +Z toward the head, +Y up.
-    const z = this.depth.copy(head).sub(this.tray.position).normalize();
-    const x = this.right.crossVectors(this.up.set(0, 1, 0), z).normalize();
-    const y = this.up.crossVectors(z, x);
-    this.tray.quaternion.setFromRotationMatrix(this.basis.makeBasis(x, y, z));
+  /** Hangs the menu board on the smithy wall's tool panel. */
+  hangOn(panel: Object3D) {
+    panel.add(this.tray);
+    this.tray.position.set(0, 0, 0.03);
+    this.tray.visible = false;
+  }
+
+  /** Dev: piece and button positions once the board is in place, for the emulator CLI. */
+  placeMenu() {
     if (import.meta.env.DEV && !this.logged) {
       // Piece and button positions once the menu is in place, for driving the workshop from the emulator CLI.
       this.logged = true;

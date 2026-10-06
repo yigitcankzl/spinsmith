@@ -1,6 +1,7 @@
 /**
  * The forge: build your top with your hands. Your top stands on the anvil at the arena's right;
- * the parts lie on a stepped wooden shelf behind it (tips, cores, rings, style, presets).
+ * the parts hang on the tool panel of the smithy wall (tips, cores, rings, style, presets). Point
+ * at a part and pinch: it flies to your hand.
  * - Pinch your top to pick it up: it follows your hand and turns with it, to look at from any side.
  *   Let go and it settles back on the anvil.
  * - Pinch a part on the shelf and bring it to your top (on the anvil or in your other hand): the
@@ -33,6 +34,7 @@ import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
 import { ANVIL_AT, ANVIL_FACE, anvilModel } from './hub.js';
+import type { Wall } from './wall.js';
 import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js';
 
 const STORE_KEY = 'spinsmith.top.v1';
@@ -80,24 +82,23 @@ const ROWS: [string, Item[], number][] = [
   ],
   ['PRESETS', PRESETS.map((p) => ({ kind: 'preset' as const, build: p.build, name: p.name, blurb: `A classic ${roleOf(specFromBuild(p.build))} top` })), 0.08],
 ];
-/** Each shelf row steps up and back by this much (m). */
-const ROW_RISE = 0.04;
-const ROW_DEPTH = 0.05;
-/** The shelf stands behind the anvil (arena-local). */
-const SHELF_AT = new Vector3(ANVIL_AT.x + 0.02, 0.05, ANVIL_AT.z - 0.12);
-const SHELF_WIDTH = 0.36;
-/** The quench bucket stands in front of the anvil, toward the player. */
-const BUCKET_AT = new Vector3(ANVIL_AT.x + 0.12, 0, ANVIL_AT.z + 0.13);
+/** Tool panel rows (wall space, m): row spacing, and how much larger than on the table parts hang. */
+const ROW_GAP = 0.165;
+const WALL_SCALE = 2.2;
+/** The quench bucket stands beside the anvil, toward the player (arena-local). */
+const BUCKET_AT = new Vector3(ANVIL_AT.x - 0.05, 0, ANVIL_AT.z + 0.12);
 /** Your top on the anvil is this much larger than life. */
 const DISPLAY_SCALE = 1.8;
-/** A carried part makes the top come apart within this distance, and fits within SNAP (m). */
-const EXPLODE_R = 0.16;
-const SNAP = 0.08;
-/** A carried top dipped this close to a paint pot is painted; this close to the bucket, saved. */
-const DIP = 0.06;
-/** Pinch distances: touching a thing, and a pointing ray passing this close. */
-const GRAB_NEAR = 0.045;
-const GRAB_RAY = 0.03;
+/** A carried part makes the top come apart within this distance, and fits within SNAP (world m). */
+const EXPLODE_R = 0.3;
+const SNAP = 0.15;
+/** A carried top dipped this close to a paint pot is painted; this close to the bucket, saved (world m). */
+const DIP = 0.12;
+/** Pinch distances (world m): touching a thing, and a pointing ray passing this close. */
+const GRAB_NEAR = 0.07;
+const GRAB_RAY = 0.06;
+/** A part picked from afar flies to the hand in this many seconds. */
+const FLY_TIME = 0.3;
 /** A part let go where it was picked up (a tap) fits straight away. */
 const TAP_MOVE = 0.03;
 
@@ -130,7 +131,7 @@ export class Forge {
   private card = new StatsCard();
   private cardKey = '';
   private message = '';
-  private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3 } | null = null;
+  private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3; from: Vector3; fly: number } | null = null;
   /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
   private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion } | null = null;
   private explode = 0;
@@ -153,18 +154,23 @@ export class Forge {
   private readonly depth = new Vector3();
   private readonly basis = new Matrix4();
 
-  constructor(private readonly hooks: ForgeHooks) {
+  constructor(
+    private readonly hooks: ForgeHooks,
+    private readonly wall: Wall,
+  ) {
     this.root.name = 'top-forge';
     this.buildShelf();
+    this.wall.tools.add(this.shelf);
     this.buildBucket();
     const anvil = anvilModel();
     anvil.position.copy(ANVIL_AT);
     this.displayHolder.position.copy(this.anvilSpot);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
-    // The stats card floats over the far side of the arena, where nothing else stands.
-    this.card.mesh.position.set(0.04, 0.25, -0.14);
-    this.card.mesh.scale.setScalar(1.5);
-    this.root.add(this.shelf, this.bucket, anvil, this.displayHolder, this.card.mesh);
+    // The stats card hangs on the wall over the scoreboard while forging.
+    this.card.mesh.scale.setScalar(4.5);
+    this.card.mesh.visible = false;
+    this.wall.cardSpot.add(this.card.mesh);
+    this.root.add(this.bucket, anvil, this.displayHolder);
     this.rebuildDisplay();
     this.root.visible = false;
   }
@@ -173,6 +179,8 @@ export class Forge {
     this.build = loadBuild();
     this.rebuildDisplay();
     this.root.visible = true;
+    this.card.mesh.visible = true;
+    this.wall.showScore(false);
     this.dropAll();
     this.say('Pick up your top, or bring it a part from the shelf');
     this.logPending = true;
@@ -180,6 +188,8 @@ export class Forge {
 
   close() {
     this.root.visible = false;
+    this.card.mesh.visible = false;
+    this.wall.showScore(true);
     this.dropAll();
   }
 
@@ -191,10 +201,13 @@ export class Forge {
     this.displayHolder.quaternion.identity();
   }
 
-  /** Turns the shelf, the bucket sign and the stats card toward the head (arena-local). */
+  /** The parts on the wall's tool panel hide while the workshop hangs its board there. */
+  showShelf(on: boolean) {
+    this.shelf.visible = on;
+  }
+
+  /** Turns the bucket and its sign toward the head (arena-local). */
   place(head: Vector3) {
-    this.face(this.shelf, head);
-    this.face(this.card.mesh, head);
     this.face(this.bucket, head);
   }
 
@@ -226,7 +239,7 @@ export class Forge {
       }
     }
     this.updateTop(dt);
-    this.updatePart();
+    this.updatePart(dt);
     // Hover: shelf items under a free pointer lift and turn.
     let hovered: Slot | null = null;
     for (const h of pointers) {
@@ -236,8 +249,8 @@ export class Forge {
     }
     for (const s of this.slots) {
       const on = s === hovered;
-      s.model.position.set(s.home.x, s.home.y + (on ? 0.008 + 0.002 * Math.sin(this.time * 8) : 0), s.home.z);
-      s.model.rotation.y = on ? this.time * 2 : 0;
+      s.model.position.set(s.home.x, s.home.y, s.home.z + (on ? 0.03 + 0.005 * Math.sin(this.time * 8) : 0));
+      s.model.scale.setScalar(WALL_SCALE * (on ? 1.15 : 1));
     }
     if (!this.heldPart) this.showCard(hovered ? this.withItem(hovered.item) : null);
   }
@@ -255,7 +268,9 @@ export class Forge {
     const item = target.slot.item;
     const model = itemModel(item);
     this.root.add(model);
-    this.heldPart = { item, model, hand: h, startAt: this.pointAt(h, new Vector3()) };
+    // From the wall the part flies to the hand.
+    const from = target.slot.model.getWorldPosition(new Vector3());
+    this.heldPart = { item, model, hand: h, startAt: this.pointAt(h, new Vector3()), from, fly: h.pinch.distanceTo(from) > 0.3 ? 0 : 1 };
     playPick();
     this.say(`${item.name}: ${item.blurb}`);
   }
@@ -283,8 +298,8 @@ export class Forge {
     this.heldTop = null;
     this.bucket.getWorldPosition(this.p);
     if (at.distanceTo(this.p) < DIP * 1.5) return this.save();
-    this.root.localToWorld(this.q.set(0, 0, 0));
-    if (Math.hypot(at.x - this.q.x, at.z - this.q.z) < 0.17 && at.distanceTo(this.root.localToWorld(this.p.copy(this.anvilSpot))) > 0.12) {
+    const local = this.root.worldToLocal(this.q.copy(at));
+    if (Math.hypot(local.x, local.z) < 0.17 && local.distanceTo(this.anvilSpot) > 0.1) {
       playPlace();
       this.hooks.test(this.build);
       return;
@@ -293,7 +308,7 @@ export class Forge {
   }
 
   /** A carried part: follows the pointer; near the top, the top comes apart to show its slot. */
-  private updatePart() {
+  private updatePart(dt: number) {
     const held = this.heldPart;
     this.displayHolder.getWorldPosition(this.topAt);
     if (!held) {
@@ -303,7 +318,9 @@ export class Forge {
     }
     const h = held.hand;
     const at = this.pointAt(h, this.at);
-    this.root.worldToLocal(held.model.position.copy(at));
+    held.fly = Math.min(1, held.fly + dt / FLY_TIME);
+    const k = 1 - (1 - held.fly) ** 3;
+    this.root.worldToLocal(held.model.position.copy(held.from).lerp(at, k));
     held.model.rotation.y = this.time * 2;
     const d = at.distanceTo(this.topAt);
     const slotKind = held.item.kind === 'ring' || held.item.kind === 'core' || held.item.kind === 'tip' ? held.item.kind : null;
@@ -324,7 +341,7 @@ export class Forge {
   /** Where a pointer is: the pinch itself when the hand is near the forge, else along its ray. */
   private pointAt(h: HandState, out: Vector3): Vector3 {
     this.root.localToWorld(this.q.copy(this.anvilSpot));
-    if (h.pinch.distanceTo(this.q) < 0.6 || !h.hasRay) return out.copy(h.pinch);
+    if (h.pinch.distanceTo(this.q) < 0.9 || !h.hasRay) return out.copy(h.pinch);
     // Along the ray, as far out as the anvil is.
     const d = this.q.distanceTo(h.rayOrigin);
     return out.copy(h.rayDir).multiplyScalar(d).add(h.rayOrigin);
@@ -403,7 +420,7 @@ export class Forge {
         best = t;
       }
     };
-    if (!this.heldTop) consider(this.displayHolder, { kind: 'top' }, GRAB_NEAR * 1.3);
+    if (!this.heldTop) consider(this.displayHolder, { kind: 'top' }, GRAB_NEAR * 1.5);
     for (const slot of this.slots) consider(slot.model, { kind: 'slot', slot });
     consider(this.bucket, { kind: 'bucket' });
     return best;
@@ -435,36 +452,29 @@ export class Forge {
     o.quaternion.setFromRotationMatrix(this.basis.makeBasis(x, y, z));
   }
 
-  /** A stepped wooden shelf with a row of parts on each step and its name on the front edge. */
+  /** The tool panel on the wall: a row of parts on pegs per kind, its name above the row. */
   private buildShelf() {
-    this.shelf.position.copy(SHELF_AT);
-    const wood = new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x7a4f30) });
+    const iron = new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x5d6068) });
     ROWS.forEach(([label, items, gap], r) => {
-      const y = r * ROW_RISE;
-      const z = -r * ROW_DEPTH;
-      const plank = new Mesh(new BoxGeometry(SHELF_WIDTH, 0.006, ROW_DEPTH * 0.9), wood);
-      plank.position.set(0, y - 0.004, z);
-      const riser = new Mesh(new BoxGeometry(SHELF_WIDTH, y + 0.05, 0.004), wood);
-      riser.position.set(0, (y - 0.05) / 2 - 0.004, z - ROW_DEPTH * 0.45);
-      const name = tag(label, 0.07, 44);
-      name.position.set(-SHELF_WIDTH / 2 + 0.035, y - 0.0, z + ROW_DEPTH * 0.46);
-      name.rotation.x = -0.5;
-      name.scale.setScalar(0.8);
-      this.shelf.add(plank, riser, name);
+      const y = 0.33 - r * ROW_GAP;
+      const name = tag(label, 0.16, 44);
+      name.position.set(-0.32, y + 0.065, 0.005);
+      this.shelf.add(name);
       items.forEach((item, c) => {
-        const home = new Vector3((c - (items.length - 1) / 2) * gap + 0.02, y + 0.008, z);
-        const model = itemModel(item);
+        const home = new Vector3((c - (items.length - 1) / 2) * gap * WALL_SCALE * 0.9 + 0.03, y, 0.04);
+        const peg = new Mesh(new CylinderGeometry(0.004, 0.004, 0.04, 8).rotateX(Math.PI / 2), iron);
+        peg.position.set(home.x, y + 0.01, 0.02);
+        // Each part hangs tipped toward the player, so its top face shows.
+        const model = new Group();
+        const inner = itemModel(item);
+        inner.rotation.x = 1.1;
+        model.add(inner);
         model.position.copy(home);
-        this.shelf.add(model);
+        model.scale.setScalar(WALL_SCALE);
+        this.shelf.add(peg, model);
         this.slots.push({ item, model, home });
       });
     });
-    // Posts at both ends.
-    for (const side of [-1, 1]) {
-      const post = new Mesh(new BoxGeometry(0.01, 0.06 + ROWS.length * ROW_RISE, 0.01), wood);
-      post.position.set((side * SHELF_WIDTH) / 2, (ROWS.length * ROW_RISE) / 2 - 0.02, -((ROWS.length - 1) * ROW_DEPTH) / 2);
-      this.shelf.add(post);
-    }
   }
 
   /** The quench bucket: dunk your top in it to save and go home. */
@@ -476,8 +486,8 @@ export class Forge {
     hoop.position.y = 0.05;
     const water = new Mesh(new CircleGeometry(0.033, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x3f8fb8, transparent: true, opacity: 0.8 }));
     water.position.y = 0.042;
-    const sign = tag('SAVE', 0.08, 48);
-    sign.position.set(0, 0.085, 0);
+    const sign = tag('SAVE', 0.1, 48);
+    sign.position.set(0, 0.09, 0);
     this.bucket.add(wall, hoop, water, sign);
   }
 
