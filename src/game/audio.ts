@@ -6,6 +6,8 @@
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noise: AudioBuffer | null = null;
+/** While paused, no sound may wake the context back up. */
+let pausedAudio = false;
 
 function audio(): AudioContext | null {
   if (!ctx) {
@@ -22,8 +24,15 @@ function audio(): AudioContext | null {
     const d = noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
-  if (ctx.state === 'suspended') void ctx.resume();
+  if (ctx.state === 'suspended' && !pausedAudio) void ctx.resume();
   return ctx;
+}
+
+/** Pauses (suspends) or resumes every sound at once, for the headset menu. */
+export function setAudioPaused(paused: boolean) {
+  pausedAudio = paused;
+  if (!ctx) return;
+  void (paused ? ctx.suspend() : ctx.resume());
 }
 
 /** A short decaying tone. */

@@ -1,5 +1,5 @@
 import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
+import { CordTone, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -122,6 +122,7 @@ export class MatchSystem extends createSystem({
   private lastPerfect = false;
   private levelUpText = '';
   private perfTimer = 0;
+  private paused = false;
   /** Seconds left of the simulation-only pause after a hard hit. */
   private hitStop = 0;
   private lastHardHit = -1;
@@ -326,6 +327,14 @@ export class MatchSystem extends createSystem({
     const ref = xr.getReferenceSpace();
     const session = xr.getSession();
     if (!frame || !ref || !session || this.world.visibilityState.peek() === VisibilityState.NonImmersive) return;
+    // The headset menu (or anything that hides or blurs the session) pauses the game: the fight
+    // and every sound stop until the player is back, and the paused time is not simulated.
+    const paused = this.world.visibilityState.peek() !== VisibilityState.Visible;
+    if (paused !== this.paused) {
+      this.paused = paused;
+      setAudioPaused(paused);
+    }
+    if (paused) return;
     const dt = Math.min(delta, 0.05);
     this.frameDt = dt;
     this.time += dt;
