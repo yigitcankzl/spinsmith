@@ -63,7 +63,7 @@ export const RINGS: Ring[] = [
     id: 'striker',
     name: 'Striker',
     radius: 0.024,
-    punch: 0.87,
+    punch: 0.874,
     knockback: 0.84,
     burstResist: 1,
     contact: 'smash',
@@ -92,7 +92,7 @@ export const RINGS: Ring[] = [
     name: 'Anvil',
     radius: 0.03,
     punch: 0.84,
-    knockback: 0.57,
+    knockback: 0.587,
     burstResist: 1.28,
     contact: 'absorb',
     chip: 1,
@@ -106,7 +106,7 @@ export const RINGS: Ring[] = [
     name: 'Halo',
     radius: 0.027,
     punch: 0.7,
-    knockback: 0.99,
+    knockback: 1.006,
     burstResist: 0.92,
     contact: 'absorb',
     chip: 1,
@@ -153,12 +153,12 @@ export const CORES: Core[] = [
 ];
 
 export const TIPS: Tip[] = [
-  { id: 'flat', name: 'Flat', spinDrain: 0.0544, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3.43, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
+  { id: 'flat', name: 'Flat', spinDrain: 0.0544, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3.19, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
   { id: 'rush', name: 'Rush', spinDrain: 0.0533, roam: 0.45, cruise: 0.58, drive: 2.6, maxSpeed: 1.9, seek: 4, center: 0, gear: 1.25, weight: 4, blurb: 'Aggressive, steers better' },
   { id: 'taper', name: 'Taper', spinDrain: 0.0523, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
-  { id: 'ball', name: 'Ball', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.38, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
-  { id: 'needle', name: 'Needle', spinDrain: 0.0263, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
-  { id: 'orb', name: 'Orb', spinDrain: 0.052, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
+  { id: 'ball', name: 'Ball', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.86, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
+  { id: 'needle', name: 'Needle', spinDrain: 0.042, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
+  { id: 'orb', name: 'Orb', spinDrain: 0.048, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
 ];
 
 /** A build must stay at or under this many grams: heavy rings need light cores and tips. */

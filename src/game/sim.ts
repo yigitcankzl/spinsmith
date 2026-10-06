@@ -18,11 +18,6 @@ import { PRESETS, specFromBuild } from './parts.ts';
 /** Floor dips toward a pocket over this outer band of the radius. */
 const POCKET_BAND = 0.25;
 const POCKET_DEPTH = 0.003;
-/**
- * A top only drops into a pocket when it is driven outward at least this fast (m/s): cruising
- * along the rim passes over the mouth, a hit or a bump sends it in.
- */
-export const POCKET_SPEED = 0.2;
 /** Outward speed (m/s) that carries a top over each kind of wall; high walls are never cleared. */
 const WALL_ESCAPE = { low: 0.7, standard: 1.1, high: Infinity, none: 0 };
 const WALL_BOUNCE = { low: 0.5, standard: 0.55, high: 0.8, none: 0 };
@@ -65,13 +60,22 @@ export const TUNING = {
   /** Bounciness of the bodies (0..1). */
   restitution: 0.77,
   /** Spinning rims kick each other apart on contact (m/s at full spin). */
-  recoil: 0.27,
+  recoil: 0.225,
   /** Spin lost per unit of impulse. */
-  spinHit: 0.046,
+  spinHit: 0.03,
   /** Burst damage per unit of impulse (before the top's burst resistance). */
-  burst: 0.37,
+  burst: 0.244,
   /** How strongly a spinning tip turns radial motion into an orbit around the center (1/s). */
   orbit: 1.44,
+  /** Scales every top's spin drain: sets how long rounds last. */
+  drain: 0.57,
+  /**
+   * How much of the difference between tops' drains is kept (1 = all). Long rounds magnify
+   * stamina's edge, so it is narrowed around a typical drain.
+   */
+  drainSpread: 0.57,
+  /** Outward speed (m/s) a top needs to drop into a pocket. */
+  pocket: 0.27,
 };
 /** Height rule: a height gap this large (m) gives the lower top its full lift on the taller one. */
 const HEIGHT_GAP = 0.002;
@@ -90,6 +94,8 @@ const GRIND_SHARE = 0.12;
 /** Same-direction rims grind against each other: extra recoil and spin lost. */
 const SAME_SPIN_RECOIL = 1.25;
 const SAME_SPIN_COST = 0.012;
+/** A typical top's spin drain (1/s), the middle that drainSpread narrows toward. */
+const DRAIN_MID = 0.05;
 /** Fixed simulation step. */
 export const STEP = 1 / 120;
 /** Below this spin a top topples. */
@@ -452,7 +458,7 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.x += t.vx * dt;
   t.z += t.vz * dt;
   // Spin drains on its own, faster while scraping across the floor, much faster in the embers.
-  t.spin -= (s.spinDrain + v * 0.02) * dt;
+  t.spin -= (DRAIN_MID + (s.spinDrain - DRAIN_MID) * TUNING.drainSpread + v * 0.02) * TUNING.drain * dt;
   // A low ring scrapes the floor on steep slopes (the bumps the player raises, steep bowls).
   if (s.height < LOW_HEIGHT) {
     const steep = Math.hypot(slopeTmp.x, slopeTmp.z) - SCRAPE_SLOPE;
@@ -528,7 +534,7 @@ function wall(arena: Arena, t: Top) {
   const outward = t.vx * nx + t.vz * nz;
   const pocket = pocketAt(L, angle);
   const ease = t.lifted > 0 ? LIFT_ESCAPE : 1;
-  if (pocket && outward > POCKET_SPEED * ease) {
+  if (pocket && outward > TUNING.pocket * ease) {
     t.state = 'out';
     t.finish = 'pocket';
     t.pocketPoints = pocket.points;

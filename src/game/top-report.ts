@@ -74,13 +74,16 @@ export function reportTops(opponents = 24, arenas = [ARENAS[0], ARENAS[3]]): Top
   };
 }
 
-/** Problems worth fixing: a build that wins too often, or a part no strong build uses. */
+/**
+ * The balance gates from docs/GAMEPLAY-DIRECTION.md: no part averaging below 40% or above 60%,
+ * no build above about 65% (67% allows for sampling noise).
+ */
 export function topWarnings(r: TopReport): string[] {
   const out: string[] = [];
   const best = r.builds[0];
-  if (best.win > 0.78) out.push(`${buildName(best.build)} wins ${(best.win * 100).toFixed(0)}% of its rounds`);
-  const top = r.builds.slice(0, 20).map((x) => x.build);
-  for (const ring of RINGS) if (!top.some((b) => b.ring === ring.id)) out.push(`ring ${ring.name} is in no top-20 build`);
-  for (const tip of TIPS) if (!top.some((b) => b.tip === tip.id)) out.push(`tip ${tip.name} is in no top-20 build`);
+  if (best.win > 0.67) out.push(`${buildName(best.build)} wins ${(best.win * 100).toFixed(0)}% of its rounds`);
+  for (const [part, win] of Object.entries(r.parts)) {
+    if (win < 0.4 || win > 0.6) out.push(`${part} averages ${(win * 100).toFixed(0)}%`);
+  }
   return out;
 }
