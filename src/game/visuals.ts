@@ -38,6 +38,7 @@ import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena
 import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
 import { Arena, Top } from './sim.js';
+import { glass, ORANGE, TEXT } from './ui.js';
 import { coreOf, ringOf } from './parts.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
@@ -115,7 +116,7 @@ const BRASS = makeMatcap('metal', 0xe2b866);
  * the tip. Every part is generated here from the part's numbers.
  */
 const CHROME = makeMatcap('chrome', 0xe8eef8);
-const RATCHET = makeMatcap('clay', 0x2c2e34);
+const RATCHET = makeMatcap('metal', 0x5c626e);
 /** Bit: the tip below a gear ring that catches the rails. */
 const GEAR_H = 0.003;
 const GEAR_R = 0.0088;
@@ -1007,11 +1008,8 @@ export class Label {
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, 512, 160);
     if (!text) return;
-    g.fillStyle = 'rgba(30, 24, 20, 0.78)';
-    g.beginPath();
-    g.roundRect(4, 4, 504, 152, 36);
-    g.fill();
-    g.fillStyle = '#fff4e2';
+    glass(g, 512, 160, ORANGE);
+    g.fillStyle = TEXT;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const lines = text.split('\n');

@@ -32,6 +32,7 @@ import {
 } from '@iwsdk/core';
 import { playPick, playPlace, playRemove } from './audio.js';
 import { tag } from './builder.js';
+import { CYAN, glass, GLASS_LIGHT, ORANGE, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
@@ -122,9 +123,9 @@ interface Slot {
 }
 
 /** Tile frame colors: idle, pointed at, on your top. */
-const FRAME_IDLE = new Color(0x4a3a30);
-const FRAME_HOVER = new Color(0xc9a27a);
-const FRAME_ON = new Color(0xff9a3c);
+const FRAME_IDLE = new Color(0x2a3446);
+const FRAME_HOVER = new Color(0xdfe8f5);
+const FRAME_ON = new Color(ORANGE);
 
 export interface ForgeHooks {
   /** Save the build and go back. */
@@ -522,20 +523,20 @@ export class Forge {
   private buildShelf() {
     ROWS.forEach(([label, items, gap], r) => {
       const y = 0.33 - r * ROW_GAP;
-      const name = tag(label, 0.14, 44);
-      name.position.set(-0.36, y + 0.0, 0.005);
+      const name = tag(label, 0.1, 44);
+      name.position.set(-0.385, y, 0.005);
       this.shelf.add(name);
       const step = gap * WALL_SCALE * 0.9;
       items.forEach((item, c) => {
         // Tips and cores stand up from their base, so they sit lower on the card.
         const low = item.kind === 'tip' || item.kind === 'core';
-        const home = new Vector3((c - (items.length - 1) / 2) * step + 0.06, y + (low ? -0.028 : 0.008), 0.04);
+        const home = new Vector3((c - (items.length - 1) / 2) * step + 0.085, y + (low ? -0.028 : 0.008), 0.04);
         // A card behind each part: a lit frame, a lighter face, the part's name below.
         const w = Math.min(step - 0.01, 0.15);
         const frame = new MeshBasicMaterial({ color: FRAME_IDLE.clone() });
         const border = new Mesh(new PlaneGeometry(w, ROW_GAP - 0.012), frame);
         border.position.set(home.x, y, 0.004);
-        const face = new Mesh(new PlaneGeometry(w - 0.008, ROW_GAP - 0.02), new MeshBasicMaterial({ color: 0x5b4a3e }));
+        const face = new Mesh(new PlaneGeometry(w - 0.008, ROW_GAP - 0.02), new MeshBasicMaterial({ color: 0x111824 }));
         face.position.set(home.x, y, 0.005);
         const label = tag(item.name, w * 0.95, 40);
         label.position.set(home.x, y - ROW_GAP / 2 + 0.022, 0.007);
@@ -641,21 +642,17 @@ class StatsCard {
   /** Draws the build; a preview build shows as gains (green) and losses (red) on each bar. */
   draw(build: TopBuild, preview: TopBuild | null, message: string) {
     const g = this.canvas.getContext('2d')!;
-    g.clearRect(0, 0, 512, 470);
-    g.fillStyle = 'rgba(30, 24, 20, 0.88)';
-    g.beginPath();
-    g.roundRect(4, 4, 504, 462, 30);
-    g.fill();
+    glass(g, 512, 470, CYAN, GLASS_LIGHT);
     const spec = specFromBuild(build);
     const now = statsOf(spec);
     const next = preview ? statsOf(specFromBuild(preview)) : null;
-    g.fillStyle = '#fff4e2';
+    g.fillStyle = TEXT;
     g.textBaseline = 'middle';
-    g.font = 'bold 38px system-ui, sans-serif';
+    g.font = '800 38px system-ui, sans-serif';
     g.fillText(buildName(preview ?? build), 26, 44);
     g.font = '28px system-ui, sans-serif';
     const w = weightOf(preview ?? build);
-    g.fillStyle = w > WEIGHT_LIMIT ? '#e0574a' : '#d8c8b4';
+    g.fillStyle = w > WEIGHT_LIMIT ? '#ff5a4a' : TEXT_DIM;
     g.fillText(`${roleOf(specFromBuild(preview ?? build))} · ${build.spin === 1 ? 'right' : 'left'} spin · ${w} / ${WEIGHT_LIMIT} g`, 26, 88);
     const rows: [keyof TopStats, string][] = [
       ['attack', 'Attack'],
@@ -666,16 +663,19 @@ class StatsCard {
     ];
     rows.forEach(([key, label], i) => {
       const y = 140 + i * 54;
-      g.fillStyle = '#fff4e2';
-      g.font = 'bold 28px system-ui, sans-serif';
+      g.fillStyle = TEXT;
+      g.font = '700 28px system-ui, sans-serif';
       g.fillText(label, 26, y);
       const x0 = 190;
       const width = 290;
-      g.fillStyle = 'rgba(255,255,255,0.12)';
+      g.fillStyle = 'rgba(255,255,255,0.08)';
       g.fillRect(x0, y - 14, width, 28);
       const a = now[key] / 100;
       const b = next ? next[key] / 100 : a;
-      g.fillStyle = '#ff9a3c';
+      const fill = g.createLinearGradient(x0, 0, x0 + width, 0);
+      fill.addColorStop(0, '#ff6a1a');
+      fill.addColorStop(1, '#ffb347');
+      g.fillStyle = fill;
       g.fillRect(x0, y - 14, width * Math.min(a, b), 28);
       if (b > a) {
         g.fillStyle = '#6fd36f';
@@ -686,7 +686,7 @@ class StatsCard {
       }
     });
     // What just happened, or what to do next.
-    g.fillStyle = '#ffcf8a';
+    g.fillStyle = CYAN;
     let size = 26;
     do g.font = `${size--}px system-ui, sans-serif`;
     while (g.measureText(message).width > 470 && size > 14);

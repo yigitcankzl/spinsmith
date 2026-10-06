@@ -6,8 +6,8 @@
  * - match: just a fighting-game bar, each top's spin draining as a health bar, the points below;
  * - home: nothing.
  */
-import { BoxGeometry, CanvasTexture, Group, Mesh, MeshBasicMaterial, MeshMatcapMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from '@iwsdk/core';
-import { makeMatcap } from './visuals.js';
+import { CanvasTexture, Group, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from '@iwsdk/core';
+import { CYAN, glass, GLASS_LIGHT, glassMesh, ORANGE, TEXT, TEXT_DIM, titleMesh } from './ui.js';
 
 /** Wall board size (m). */
 const WIDTH = 1.7;
@@ -50,24 +50,10 @@ export class Wall {
 
   constructor() {
     this.root.name = 'smithy-wall';
-    const wood = new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x5a3a24) });
-    const iron = new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x5d6068) });
-    // The back: dark planks with an iron frame.
-    const back = new Mesh(new BoxGeometry(WIDTH, HEIGHT, 0.02), wood);
-    back.position.z = -0.01;
-    const frame = [
-      [0, HEIGHT / 2, WIDTH, 0.03],
-      [0, -HEIGHT / 2, WIDTH, 0.03],
-      [-WIDTH / 2, 0, 0.03, HEIGHT],
-      [WIDTH / 2, 0, 0.03, HEIGHT],
-      [0.05, -0.05, 0.02, HEIGHT - 0.2],
-    ].map(([x, y, w, h]) => {
-      const m = new Mesh(new BoxGeometry(w, h, 0.03), iron);
-      m.position.set(x, y, 0.005);
-      return m;
-    });
-    const sign = signMesh('S P I N S M I T H', 1.1, 0.13);
-    sign.position.set(0, HEIGHT / 2 - 0.1, 0.02);
+    // The back: one tinted glass panel; the title floats on it.
+    const back = glassMesh(WIDTH, HEIGHT, ORANGE, 2048);
+    const sign = titleMesh('SPINSMITH', 0.9, 0.12);
+    sign.position.set(0, HEIGHT / 2 - 0.1, 0.01);
     this.tools.position.set(-WIDTH / 4 - 0.02, -0.07, 0.02);
     this.cardSpot.position.set(WIDTH / 4 + 0.03, 0.12, 0.03);
     // The scoreboard: a slate in the right half.
@@ -77,7 +63,7 @@ export class Wall {
     this.tex.colorSpace = SRGBColorSpace;
     this.board = new Mesh(new PlaneGeometry(0.72, 0.295), new MeshBasicMaterial({ map: this.tex, transparent: true }));
     this.board.position.set(WIDTH / 4 + 0.03, 0.12, 0.021);
-    this.panel.add(back, ...frame, sign, this.board, this.tools, this.cardSpot);
+    this.panel.add(back, sign, this.board, this.tools, this.cardSpot);
     this.hudCanvas.width = 1400;
     this.hudCanvas.height = 260;
     this.hudTex = new CanvasTexture(this.hudCanvas);
@@ -121,18 +107,11 @@ export class Wall {
     if (lines.join('\n') === this.lines.join('\n')) return;
     this.lines = lines;
     const g = this.canvas.getContext('2d')!;
-    g.clearRect(0, 0, 1024, 420);
-    g.fillStyle = '#1b1714';
-    g.beginPath();
-    g.roundRect(6, 6, 1012, 408, 28);
-    g.fill();
-    g.strokeStyle = '#a0662e';
-    g.lineWidth = 8;
-    g.stroke();
+    glass(g, 1024, 420, CYAN, GLASS_LIGHT);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     lines.forEach((line, i) => {
-      g.fillStyle = i === 0 ? '#ffd28a' : '#f3e6d3';
+      g.fillStyle = i === 0 ? TEXT : TEXT_DIM;
       let size = i === 0 ? 110 : 52;
       do g.font = `bold ${size--}px system-ui, sans-serif`;
       while (g.measureText(line).width > 960 && size > 16);
@@ -165,25 +144,21 @@ export class Wall {
     this.hudKey = key;
     const g = this.hudCanvas.getContext('2d')!;
     const W = 1400;
-    g.clearRect(0, 0, W, 260);
-    g.fillStyle = 'rgba(20, 16, 14, 0.85)';
-    g.beginPath();
-    g.roundRect(4, 4, W - 8, 252, 30);
-    g.fill();
+    glass(g, W, 260, ORANGE);
     const barW = 560;
     const barY = 90;
     const side = (x0: number, dir: 1 | -1, value: number, color: string, name: string, points: number) => {
       // Frame, then the fill anchored at the outer end, draining toward the middle.
-      g.fillStyle = '#3a2e27';
+      g.fillStyle = 'rgba(255,255,255,0.08)';
       g.fillRect(dir === 1 ? x0 : x0 - barW, barY, barW, 56);
       g.fillStyle = value > 25 ? color : '#e0574a';
       const w = (barW * value) / 100;
       g.fillRect(dir === 1 ? x0 + barW - w : x0 - barW, barY, w, 56);
-      g.strokeStyle = '#f3e6d3';
-      g.lineWidth = 4;
+      g.strokeStyle = 'rgba(200, 220, 245, 0.6)';
+      g.lineWidth = 3;
       g.strokeRect(dir === 1 ? x0 : x0 - barW, barY, barW, 56);
-      g.fillStyle = '#f3e6d3';
-      g.font = 'bold 40px system-ui, sans-serif';
+      g.fillStyle = TEXT;
+      g.font = '800 40px system-ui, sans-serif';
       g.textAlign = dir === 1 ? 'left' : 'right';
       g.textBaseline = 'middle';
       g.fillText(name, dir === 1 ? x0 : x0, 50);
@@ -191,13 +166,13 @@ export class Wall {
         g.beginPath();
         const px = dir === 1 ? x0 + 26 + i * 54 : x0 - 26 - i * 54;
         g.arc(px, 196, 18, 0, Math.PI * 2);
-        g.fillStyle = i < points ? '#ffd28a' : 'rgba(255,255,255,0.18)';
+        g.fillStyle = i < points ? ORANGE : 'rgba(255,255,255,0.14)';
         g.fill();
       }
     };
     side(40, 1, a, '#ff9a3c', names[0], myPoints);
-    side(W - 40, -1, b, '#4fc3d6', names[1], theirPoints);
-    g.fillStyle = '#ffd28a';
+    side(W - 40, -1, b, CYAN, names[1], theirPoints);
+    g.fillStyle = TEXT;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     let size = 64;
@@ -206,27 +181,4 @@ export class Wall {
     g.fillText(message, W / 2, 120);
     this.hudTex.needsUpdate = true;
   }
-}
-
-/** A forged sign: glowing letters on a dark plate. */
-function signMesh(text: string, width: number, height: number): Mesh {
-  const c = document.createElement('canvas');
-  c.width = 1024;
-  c.height = Math.round((1024 * height) / width);
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#211a15';
-  g.fillRect(0, 0, c.width, c.height);
-  g.strokeStyle = '#8a5a2a';
-  g.lineWidth = 10;
-  g.strokeRect(5, 5, c.width - 10, c.height - 10);
-  g.fillStyle = '#ff9a3c';
-  g.shadowColor = '#ff6a1a';
-  g.shadowBlur = 24;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.font = `bold ${Math.round(c.height * 0.62)}px system-ui, sans-serif`;
-  g.fillText(text, c.width / 2, c.height / 2 + 4);
-  const t = new CanvasTexture(c);
-  t.colorSpace = SRGBColorSpace;
-  return new Mesh(new PlaneGeometry(width, height), new MeshBasicMaterial({ map: t }));
 }

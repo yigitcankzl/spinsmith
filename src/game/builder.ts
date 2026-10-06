@@ -21,6 +21,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { arenaWarning, reportArena } from './arena-report.js';
+import { chamfer, CYAN, GLASS_LIGHT, glassMesh, ORANGE, TEXT } from './ui.js';
 import { playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
@@ -97,11 +98,13 @@ export class Button {
     const g = this.canvas.getContext('2d')!;
     const { width: w, height: h } = this.canvas;
     g.clearRect(0, 0, w, h);
-    g.fillStyle = lit ? 'rgba(255, 140, 50, 0.95)' : 'rgba(30, 24, 20, 0.85)';
-    g.beginPath();
-    g.roundRect(3, 3, w - 6, h - 6, 18);
+    chamfer(g, 3, 3, w - 6, h - 6, h * 0.25);
+    g.fillStyle = lit ? ORANGE : GLASS_LIGHT;
     g.fill();
-    g.fillStyle = '#fff4e2';
+    g.strokeStyle = lit ? '#ffd2a8' : 'rgba(160, 190, 230, 0.45)';
+    g.lineWidth = 2;
+    g.stroke();
+    g.fillStyle = TEXT;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     let size = Math.round(h * 0.5);
@@ -126,7 +129,7 @@ export function tag(text: string, width: number, size = 40) {
   c.width = 256;
   c.height = 64;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#fff4e2';
+  g.fillStyle = TEXT;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   let s = size;
@@ -311,7 +314,7 @@ export class Builder {
     // Panel-local axes: x right, y up, +z toward the eyes.
     this.tray.scale.setScalar(MENU_SCALE);
     // Opaque, so it never blends over the tabs and pieces in front of it.
-    const back = new Mesh(new PlaneGeometry(0.24, 0.17), new MeshBasicMaterial({ color: 0x241c17 }));
+    const back = glassMesh(0.24, 0.17, CYAN);
     back.position.z = -0.004;
     this.tray.add(back);
     TRAY.forEach(([label], t) => {
