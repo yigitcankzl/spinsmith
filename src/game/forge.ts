@@ -30,9 +30,8 @@ import {
 import { playDrawer, playLocked, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
-import { tag } from './builder.js';
 import { ORANGE, TEXT_DIM } from './ui.js';
-import { DialPlate, popIn, RimTabs, rowSpots } from './rim.js';
+import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
@@ -108,8 +107,8 @@ const TAB_Y = 0.006;
 const TAB_W = 0.058;
 const TAB_GAP = 0.066;
 const TAB_H = 0.024;
-/** The quench slot, beside the anvil on the right. */
-const QUENCH_AT = new Vector3(0.19, 0, 0.05);
+/** The quench slot, set into the right rim beside the anvil. */
+const QUENCH_AT = new Vector3(0.205, -0.006, 0.06);
 /** The stats plate stands on the far rim. */
 const STATS_AT = new Vector3(0, 0.1, -0.2);
 /** Your top on the anvil is this much larger than in the arena. */
@@ -400,7 +399,8 @@ export class Forge {
     this.tray.visible = slide > 0.01;
     this.tray.scale.setScalar(Math.max(0.001, slide));
     this.tray.position.set(WORK.x * (1 - slide), 0, WORK.z * (1 - slide));
-    this.quench.scale.setScalar(Math.max(0.001, slide));
+    // The slot breathes while your top is carried, so it is easy to find.
+    this.quench.scale.setScalar(Math.max(0.001, slide) * (this.heldTop ? 1.1 + 0.08 * Math.sin(this.time * 6) : 1));
     const up = ease((k - 0.2) / 0.6);
     this.stats.mesh.position.set(STATS_AT.x, STATS_AT.y - 0.08 * (1 - up), STATS_AT.z);
     this.stats.mesh.visible = up > 0.01;
@@ -744,18 +744,10 @@ export class Forge {
     this.tray.add(this.pads);
   }
 
-  /** The quench slot beside the anvil: drop your top in to save it and go home. */
+  /** The quench slot, set into the right rim: drop your top in to save it and go home. */
   private buildQuench() {
     this.quench.position.copy(QUENCH_AT);
-    const wall = new Mesh(new CylinderGeometry(0.03, 0.026, 0.035, 8, 1, true), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57), side: 2 }));
-    wall.position.y = 0.0175;
-    const lip = new Mesh(new TorusGeometry(0.03, 0.003, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xe2b866) }));
-    lip.position.y = 0.035;
-    const water = new Mesh(new CircleGeometry(0.028, 8).rotateX(-Math.PI / 2).rotateY(Math.PI / 8), new MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0.85 }));
-    water.position.y = 0.03;
-    const sign = tag('QUENCH TO SAVE', 0.1, 40);
-    sign.position.set(0, 0.06, 0);
-    this.quench.add(wall, lip, water, sign);
+    this.quench.add(rimSlot());
   }
 
   /** Dev: world positions of the top, the tabs, the open drawer's parts and the quench slot. */

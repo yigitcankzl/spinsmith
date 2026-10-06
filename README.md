@@ -18,7 +18,8 @@ What works:
   table, drawn twice its simulation size (about 60 cm across), and everything else is built into
   it. At home, your top waits in its dock on the near rim's left (carry it into the arena or tap
   it to play), a small anvil on the near rim's right opens the forge, a blueprint beside it opens
-  the arena workshop, your level sits on a plate between them, and a row of arena miniatures
+  the arena workshop, your level sits on a plate between them; their names show during the
+  first session and afterwards only while pointed at, and a row of arena miniatures
   floats behind the arena: point at one and pinch, it flies to your hand; drop it on the arena
   (or tap it) to switch. In a match a fighting-game bar is set into the far rim
   (`src/game/match-bar.ts`: each top's spin draining as a health bar, points as pips, the
@@ -63,7 +64,7 @@ What works:
   fit it with a clack (tapping a part fits it too). A core locks with one click per tooth;
   overweight builds are refused. Pinch your top to pick it up and turn it; let go and it settles
   back on the anvil. Tap a paint pot or dip the top in it to paint it; spin tokens set the spin
-  direction. Drop the top in the quench slot beside the anvil to save: the forge folds back into
+  direction. Drop the top in the quench slot set into the right rim to save: the forge folds back into
   the arena. The stats plate shows the build, one dial per stat with a second needle previewing
   a part (green gain, red loss), and what just happened. `npm run report:tops` plays every build against the others and flags dominant
   builds and dead parts.
@@ -91,10 +92,11 @@ What works:
   bouncing across the arena.
 - **Arena workshop** (`src/game/builder.ts`, `docs/ARENA-WORKSHOP-RIM.md`): pinch the
   blueprint and the arena turns into a drafting table: blueprint lines draw over its floor, brass
-  knobs mark the rim, six drawer tabs fold out along the near rim's arc (Place, Shape, Floor,
-  Wall, Theme, Extras), a brass rail across the near rim holds the open drawer's pieces with
-  their names engraved below, Back sits at the rail's left end and Try and Save at its right, and
-  a plate on the far rim shows the draft's name and form with three dials: median round length,
+  knobs mark the rim, four drawer tabs fold out in a row on the near rim as in the forge
+  (Pieces; Floor; Form: circle, oval, square, and one wall and one theme piece that step on each
+  tap; Extras), a brass rail no wider than the arena holds the open drawer's pieces (at most five)
+  with their names engraved below, Back sits on the left rim, Try and Save on the right, Save in
+  front of a stamp slot set into the rim, and a plate on the far rim shows the draft's name and form with three dials: median round length,
   knockout rate and type balance. The draft is checked in a worker (`src/game/check-worker.ts`)
   after every change, so the dials follow your edits without stalling a frame.
   The pieces: pockets, rails, pillars and bumpers to place; circle, oval and square plates;

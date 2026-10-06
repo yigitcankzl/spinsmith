@@ -3,7 +3,8 @@
  * rims. Tabs and buttons engraved on metal plates along the near rim, the staggered pop of a
  * drawer's items, and the dial plate on the far rim.
  */
-import { BufferAttribute, BufferGeometry, CanvasTexture, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from '@iwsdk/core';
+import { BufferAttribute, BufferGeometry, CanvasTexture, CylinderGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, MeshMatcapMaterial, PlaneGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from '@iwsdk/core';
+import { makeMatcap, mergeByMaterial } from './visuals.js';
 import { engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
 
 /** Where a drawer's i-th item is in its pop-in, 0..1, t seconds after the drawer opened. */
@@ -21,20 +22,6 @@ export interface TabSpot {
 /** Tab centers in a straight row across the near rim (x spaced by gap, at z and y). */
 export function rowSpots(n: number, gap: number, z: number, y: number): TabSpot[] {
   return Array.from({ length: n }, (_, i) => ({ at: new Vector3((i - (n - 1) / 2) * gap, y, z), yaw: 0 }));
-}
-
-/**
- * Tab centers along the near rim's arc: radius r, spanning `span` radians centered on +Z, each
- * turned to face the seated player at arena-local z = viewer (so the ends still read).
- */
-export function arcSpots(n: number, r: number, span: number, y: number, viewer = 0.32): TabSpot[] {
-  return Array.from({ length: n }, (_, i) => {
-    // From the player's left (-X) to the right (+X).
-    const a = Math.PI / 2 + span / 2 - (span * i) / Math.max(1, n - 1);
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r;
-    return { at: new Vector3(x, y, z), yaw: Math.atan2(-x, viewer - z) };
-  });
 }
 
 export interface TabLook {
@@ -220,4 +207,20 @@ export class DialPlate {
     engrave(g, message, W / 2, H - 50, STEEL);
     this.tex.needsUpdate = true;
   }
+}
+
+/**
+ * A slot set into the rim: an octagonal graphite block, flush with the rim, a brass lip and a
+ * glowing orange well. Its top is at y = 0; the forge quenches your top in it, the workshop
+ * stamps a saved arena into it.
+ */
+export function rimSlot(): Group {
+  const g = new Group();
+  const block = new Mesh(new CylinderGeometry(0.03, 0.033, 0.03, 8).rotateY(Math.PI / 8).translate(0, -0.015, 0), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57) }));
+  const lip = new Mesh(new TorusGeometry(0.026, 0.0028, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xe2b866) }));
+  const well = new Mesh(new CylinderGeometry(0.024, 0.024, 0.002, 8).rotateY(Math.PI / 8).translate(0, -0.004, 0), new MeshBasicMaterial({ color: 0xff7a2a }));
+  g.add(block, lip, well);
+  const out = new Group();
+  out.add(mergeByMaterial(g));
+  return out;
 }

@@ -127,3 +127,25 @@ About 5.5 days. After it, every activity happens on the one machine on the table
 | 7 Gates | Typecheck, build (the worker is its own chunk), `check:sim`; draw calls workshop 118 → 96, hub 192, forge 162, fight 112; flows tested: place a pocket, change the floor, Try and back, Save & play, Back |
 
 Screenshots: `docs/review/home.png`, `docs/review/workshop.png`.
+
+## 7. Review pass (Oct 7, 2026)
+
+A review scored the workshop 5/10 (fight 8, forge 7, home 6): six tabs, the rail, the actions
+and the plate crowded the front. Changes:
+
+- **Four drawers, at most five pieces each,** in a straight row like the forge's tabs: Pieces
+  (pocket, rail, pillar, bumper), Floor (bowl, flat, hill, ridge, tiers), Form (circle, oval,
+  square, a wall piece that steps low → standard → high → none, a theme piece that steps through
+  the four themes) and Extras. Pieces that change the whole arena apply on a tap on the rail too.
+  (The review's three drawers would have lost Shape and Tiers and put twelve pieces in Style.)
+- **The rail is no wider than the arena** and 3.5 cm lower; names shrink to fit under their piece.
+- **Floor pieces read without names:** their relief is exaggerated to full height; Flat (a very
+  shallow dish in play) is drawn as a plate with only a lip; they hang nearly side-on.
+- **Back on the left rim, Try and Save on the right;** Save sits in front of a stamp slot set into
+  the rim (`rimSlot()` in `rim.ts`), which also saves when pinched.
+- **The forge's quench** became the same slot set into the right rim (no bucket, no label); it
+  breathes while your top is carried.
+- **Home:** the PLAY, FORGE and BUILD names show during the first session, afterwards only while
+  pointed at.
+
+Draw calls: hub 186, forge 160, workshop 90.

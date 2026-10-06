@@ -24,7 +24,7 @@ import {
 import { arenaWarning } from './arena-report.js';
 import type { ArenaReport } from './arena-report.js';
 import { engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
-import { arcSpots, DialPlate, popIn, RimTabs } from './rim.js';
+import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import { playDrawer, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
@@ -54,8 +54,8 @@ type Piece =
   | { kind: 'pocket' | 'rail' | 'pillar' | 'bumper' }
   | { kind: 'shape'; value: Shape }
   | { kind: 'floor'; value: Floor }
-  | { kind: 'wall'; value: Wall }
-  | { kind: 'theme'; value: Theme }
+  | { kind: 'wall' }
+  | { kind: 'theme' }
   | { kind: 'extra'; value: 'vortex' | 'spinner' | 'tilt' | 'shrink' };
 
 /** Saved player arenas from this browser. */
@@ -197,21 +197,32 @@ function pieceModel(p: Piece): Group {
       break;
     }
     case 'floor': {
-      // A miniature of the floor profile: a little bowl, hill, ridge or step.
+      // A miniature of the floor profile, its relief exaggerated so each reads without a name:
+      // a deep bowl, a thin flat plate, a dome, a sharp ridge, two steps.
       const probe = new Arena({ ...MINI, floor: p.value, depth: FLOOR_DEPTH[p.value] });
-      const pts: Vector2[] = [new Vector2(0, 0), new Vector2(0.0125, 0)];
-      for (let i = 12; i >= 0; i--) pts.push(new Vector2(0.0125 * (i / 12), 0.002 + probe.floorHeight(i / 12) * 0.6));
+      // Flat plays as a very shallow dish; its piece is a plate with only a lip, so it never reads as the bowl.
+      const hs = Array.from({ length: 25 }, (_, i) => (p.value === 'flat' ? (i > 21 ? (i - 21) / 3 : 0) : probe.floorHeight(i / 24)));
+      const lo = Math.min(...hs);
+      const span = Math.max(...hs) - lo;
+      const R = 0.0125;
+      const pts: Vector2[] = [new Vector2(0, 0), new Vector2(R, 0)];
+      for (let i = 24; i >= 0; i--) pts.push(new Vector2(R * (i / 24), 0.0015 + (span > 1e-6 ? ((hs[i] - lo) / span) * 0.011 : 0)));
       m(new LatheGeometry(pts, 28), clay(0xd8c9b0));
       break;
     }
     case 'wall': {
-      const h = { low: 0.005, standard: 0.009, high: 0.018, none: 0.0015 }[p.value];
-      m(new CylinderGeometry(0.012, 0.012, h, 28, 1, true), steel).position.y = h / 2;
+      // A wall ring: tap or drop it to step low, standard, high, none.
+      m(new CylinderGeometry(0.012, 0.012, 0.009, 28, 1, true), steel).position.y = 0.0045;
+      m(new TorusGeometry(0.012, 0.0012, 6, 28).rotateX(Math.PI / 2), brass).position.y = 0.009;
       m(new CircleGeometry(0.0115, 24).rotateX(-Math.PI / 2), clay(0xe9dfd0)).position.y = 0.0005;
       break;
     }
     case 'theme':
-      m(new OctahedronGeometry(0.009), new MeshMatcapMaterial({ matcap: makeMatcap('metal', THEME_COLOR[p.value]) })).position.y = 0.01;
+      // One gem per theme in a cluster: tap or drop it to step to the next theme.
+      (['forge', 'stone', 'clockwork', 'ice'] as Theme[]).forEach((t, i) => {
+        const a = (i / 4) * Math.PI * 2;
+        m(new OctahedronGeometry(0.0055), new MeshMatcapMaterial({ matcap: makeMatcap('metal', THEME_COLOR[t]) })).position.set(Math.cos(a) * 0.006, 0.007, Math.sin(a) * 0.006);
+      });
       break;
     case 'extra': {
       const c = { vortex: 0x8fe8ff, spinner: 0xe2b866, tilt: 0xc8ccd6, shrink: 0xff4a12 }[p.value];
@@ -224,34 +235,44 @@ function pieceModel(p: Piece): Group {
   return g;
 }
 
-function pieceName(p: Piece): string {
+function pieceName(p: Piece, draft?: ArenaLayout): string {
   const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+  // The stepping pieces say what the draft has now.
+  if (p.kind === 'wall') return draft ? `Wall: ${draft.wall}` : 'Wall';
+  if (p.kind === 'theme') return draft ? `Theme: ${draft.theme}` : 'Theme';
   if (!('value' in p)) return cap(p.kind);
   if (p.kind === 'extra') return { vortex: 'Vortex', spinner: 'Turntable', tilt: 'Rocking', shrink: 'Embers' }[p.value];
   return cap(p.value);
 }
 
 /** The tray: rows of pieces by category. */
+/** The drawers: at most five pieces each. Wall and Theme are one piece each that steps on a tap. */
 const TRAY: [string, Piece[]][] = [
-  ['Place', [{ kind: 'pocket' }, { kind: 'rail' }, { kind: 'pillar' }, { kind: 'bumper' }]],
-  ['Shape', (['circle', 'oval', 'square'] as Shape[]).map((value) => ({ kind: 'shape', value }))],
+  ['Pieces', [{ kind: 'pocket' }, { kind: 'rail' }, { kind: 'pillar' }, { kind: 'bumper' }]],
   ['Floor', (['bowl', 'flat', 'hill', 'ridge', 'tiers'] as Floor[]).map((value) => ({ kind: 'floor', value }))],
-  ['Wall', (['low', 'standard', 'high', 'none'] as Wall[]).map((value) => ({ kind: 'wall', value }))],
-  ['Theme', (['forge', 'stone', 'clockwork', 'ice'] as Theme[]).map((value) => ({ kind: 'theme', value }))],
+  ['Form', [...(['circle', 'oval', 'square'] as Shape[]).map((value) => ({ kind: 'shape' as const, value })), { kind: 'wall' }, { kind: 'theme' }]],
   ['Extras', (['vortex', 'spinner', 'tilt', 'shrink'] as const).map((value) => ({ kind: 'extra', value }))],
 ];
+const WALLS: Wall[] = ['low', 'standard', 'high', 'none'];
+const THEMES: Theme[] = ['forge', 'stone', 'clockwork', 'ice'];
+/** Pieces that land somewhere on the arena; the others change the whole arena, so a tap on the rail applies them. */
+const PLACED = new Set(['pocket', 'rail', 'pillar', 'bumper']);
 /** Arena-local layout of the drafting table (the arena center is the origin, +Z toward the player). */
-/** The drawer tabs along the near rim's arc, and the actions at the rail's ends. */
+/** The drawer tabs in a row on the near rim (as in the forge), and the actions on the side rims. */
 const PLATES = [...TRAY.map(([label]) => label.toUpperCase()), 'BACK', 'TRY', 'SAVE'];
 const DRAWERS = TRAY.length;
-const PLATE_R = 0.228;
-const PLATE_SPAN = 1.42;
-const PLATE_Y = -0.014;
-const PLATE_W = 0.04;
-const PLATE_H = 0.021;
-/** The tool rail across the near rim: its pieces this far apart, this much larger than life. */
+const PLATE_GAP = 0.066;
+const PLATE_Z = 0.232;
+const PLATE_Y = -0.012;
+const PLATE_W = 0.058;
+const PLATE_H = 0.024;
+/** Back on the left rim, Try and Save on the right; Save's plate sits in front of its stamp slot. */
+const SAVE_AT = new Vector3(0.205, -0.006, 0.0);
+const ACTIONS_AT = [new Vector3(-0.205, 0.004, 0.1), new Vector3(0.205, 0.004, 0.1), new Vector3(0.215, 0.004, 0.045)];
+/** The tool rail across the near rim, no wider than the arena: its pieces this far apart, this much larger than life. */
 const RAIL_Z = 0.2;
-const RAIL_Y = 0.065;
+const RAIL_Y = 0.03;
+const RAIL_W = 0.27;
 const ITEM_GAP = 0.046;
 const ITEM_SCALE = 0.95;
 /** The check's plate stands on the far rim, past the largest arena. */
@@ -310,14 +331,16 @@ export class Builder {
   private namesCanvas = document.createElement('canvas');
   private namesTex: CanvasTexture;
   private namesKey = '';
-  private plates = new RimTabs(PLATES.slice(0, DRAWERS), arcSpots(DRAWERS, PLATE_R, PLATE_SPAN, PLATE_Y), PLATE_W, PLATE_H);
+  private plates = new RimTabs(PLATES.slice(0, DRAWERS), rowSpots(DRAWERS, PLATE_GAP, PLATE_Z, PLATE_Y), PLATE_W, PLATE_H);
   private actions = new RimTabs(
     PLATES.slice(DRAWERS),
-    [-0.16, 0.14, 0.185].map((x) => ({ at: new Vector3(x, RAIL_Y, RAIL_Z), yaw: 0 })),
-    PLATE_W,
+    ACTIONS_AT.map((at) => ({ at, yaw: Math.atan2(-at.x, 0.32 - at.z) })),
+    0.05,
     PLATE_H,
-    0.6,
+    0.9,
   );
+  /** Save: a stamp slot set into the right rim; pinch it to save and play. */
+  private saveSlot = rimSlot();
   private plateGroup = new Group();
   private dial = new DialPlate();
   private guides = new Group();
@@ -342,13 +365,13 @@ export class Builder {
     this.root.name = 'arena-workshop';
     // The rail: a brass bar across the near rim; the open drawer's pieces stand on it, their
     // names engraved on a strip below.
-    const bar = new Mesh(new CylinderGeometry(0.003, 0.003, 0.37, 12).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
+    const bar = new Mesh(new CylinderGeometry(0.003, 0.003, RAIL_W, 12).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
     bar.position.set(0, RAIL_Y - 0.004, RAIL_Z);
     this.namesCanvas.width = 1400;
     this.namesCanvas.height = 100;
     this.namesTex = new CanvasTexture(this.namesCanvas);
     this.namesTex.colorSpace = SRGBColorSpace;
-    this.names = new Mesh(new PlaneGeometry(ITEM_GAP * 4.4, 0.012), new MeshBasicMaterial({ map: this.namesTex, transparent: true, depthWrite: false }));
+    this.names = new Mesh(new PlaneGeometry(RAIL_W, 0.012), new MeshBasicMaterial({ map: this.namesTex, transparent: true, depthWrite: false }));
     this.names.position.set(0, RAIL_Y - 0.021, RAIL_Z + 0.012);
     this.names.rotation.x = -0.7;
     this.tools.add(bar, this.names, this.items);
@@ -356,15 +379,15 @@ export class Builder {
       pieces.forEach((piece, c) => {
         const home = new Vector3((c - (pieces.length - 1) / 2) * ITEM_GAP, RAIL_Y, RAIL_Z);
         const model = pieceModel(piece);
-        // Tipped toward the eyes so the top of each piece shows.
-        model.rotation.x = 0.6;
+        // Tipped toward the eyes so the top of each piece shows; floors nearly side-on, so their profile does.
+        model.rotation.x = piece.kind === 'floor' ? 0.2 : 0.6;
         model.position.copy(home);
         this.items.add(model);
         this.slots.push({ piece, tab: t, model, home });
       });
     });
-    this.plateGroup.add(this.plates.mesh);
-    this.tools.add(this.actions.mesh);
+    this.saveSlot.position.copy(SAVE_AT);
+    this.plateGroup.add(this.plates.mesh, this.actions.mesh, this.saveSlot);
     this.dial.mesh.name = 'workshop-check';
     this.dial.mesh.position.copy(PLATE_AT);
     this.dial.mesh.rotation.x = -0.3;
@@ -387,6 +410,7 @@ export class Builder {
     this.say('Pinch a piece and drop it on the arena');
     this.hooks.preview(this.draft);
     this.rebuildGuides();
+    this.drawNames();
     this.check();
     this.logged = false;
   }
@@ -415,7 +439,7 @@ export class Builder {
       this.logged = true;
       this.root.updateWorldMatrix(true, true);
       const fmt = (v: Vector3) => v.toArray().map((x) => x.toFixed(3)).join(',');
-      console.log(`[BUILD] ${this.slots.filter((s) => s.tab === this.tab).map((s) => `${pieceName(s.piece)}@${fmt(s.model.getWorldPosition(new Vector3()))}`).join(' ')} ${PLATES.map((l, i) => `${l.toLowerCase()}@${fmt(this.root.localToWorld([...this.plates.spots, ...this.actions.spots][i].at.clone()))}`).join(' ')}`);
+      console.log(`[BUILD] ${this.slots.filter((s) => s.tab === this.tab).map((s) => `${pieceName(s.piece)}@${fmt(s.model.getWorldPosition(new Vector3()))}`).join(' ')} ${PLATES.map((l, i) => `${l.toLowerCase()}@${fmt(this.root.localToWorld([...this.plates.spots, ...this.actions.spots][i].at.clone()))}`).join(' ')} save@${fmt(this.root.localToWorld(SAVE_AT.clone()))}`);
     }
     if (this.opened < 1 || this.folding) return;
     if (this.held) {
@@ -440,8 +464,9 @@ export class Builder {
       s.model.scale.setScalar(ITEM_SCALE * pop * (on ? 1.2 : 1));
     }
     this.plates.draw((i) => ({ on: i === this.tab, hover: i === hoveredPlate }));
-    this.actions.draw((i) => ({ hover: i + DRAWERS === hoveredPlate, hot: i > 0 }));
-    this.hint(hovered ? pieceName(hovered.piece) : null);
+    this.actions.draw((i) => ({ hover: i + DRAWERS === hoveredPlate || (i === 2 && hoveredPlate === PLATES.length), hot: i > 0 }));
+    this.saveSlot.scale.setScalar(hoveredPlate >= PLATES.length - 1 ? 1.15 : 1);
+    this.hint(hovered ? pieceName(hovered.piece, this.draft) : null);
 
     // A new pinch: a plate, a rail piece, a piece on the arena, or the rim to resize. A hand
     // touching a plate or piece goes first, so a ray or the dev gaze can't take its pinch.
@@ -556,6 +581,7 @@ export class Builder {
       this.place(held.piece, at.x, at.z, held.pocketPoints >= 3 ? 2 : 3);
       return;
     }
+    if (held.from === 'tray' && tapped && !PLACED.has(held.piece.kind)) return this.place(held.piece, 0, 0, 2);
     if (!at) {
       if (held.from === 'arena') {
         playRemove();
@@ -597,10 +623,10 @@ export class Builder {
         L.depth = FLOOR_DEPTH[piece.value];
         break;
       case 'wall':
-        L.wall = piece.value;
+        L.wall = WALLS[(WALLS.indexOf(L.wall) + 1) % WALLS.length];
         break;
       case 'theme':
-        L.theme = piece.value;
+        L.theme = THEMES[(THEMES.indexOf(L.theme) + 1) % THEMES.length];
         break;
       case 'extra':
         if (piece.value === 'vortex') L.vortex = L.vortex > 0 ? 0 : 0.6;
@@ -669,9 +695,9 @@ export class Builder {
   private plateUnder(h: HandState, touchOnly = false): number {
     let best = -1;
     let bestD = Infinity;
-    [...this.plates.spots, ...this.actions.spots].forEach((s, i) => {
+    [...this.plates.spots, ...this.actions.spots, { at: SAVE_AT, yaw: 0 }].forEach((s, i) => {
+      // The slot itself counts as the Save plate.
       this.root.localToWorld(this.p.copy(s.at));
-      if (i >= DRAWERS) this.p.y += this.tools.position.y;
       const d = this.distance(h, this.p, GRAB_NEAR * 1.6, touchOnly ? 0 : GRAB_RAY * 1.6);
       if (d < bestD) {
         bestD = d;
@@ -698,6 +724,7 @@ export class Builder {
       return;
     }
     if (PLATES[i] === 'BACK') return this.fold('in', () => this.hooks.exit());
+    // TRY, or past the plates: the save slot.
     const problem = validate(this.draft);
     if (problem) return this.reject(problem);
     if (PLATES[i] === 'TRY') {
@@ -718,6 +745,7 @@ export class Builder {
     this.say(text ?? validate(this.draft) ?? 'Pinch TRY to watch a round');
     this.hooks.preview(this.draft);
     this.rebuildGuides();
+    this.drawNames();
     this.check();
     const L = this.draft;
     if (import.meta.env.DEV) console.log(`[BUILD] draft ${L.shape} ${L.floor} ${L.wall} ${L.theme} r=${L.radius} pockets=${L.pockets.length} rails=${L.rails.length} pillars=${L.pillars.length}`);
@@ -834,7 +862,7 @@ export class Builder {
   /** The names under the rail's pieces, engraved on one strip. */
   private drawNames() {
     const shown = this.slots.filter((s) => s.tab === this.tab);
-    const key = shown.map((s) => pieceName(s.piece)).join('|');
+    const key = shown.map((s) => pieceName(s.piece, this.draft)).join('|');
     if (key === this.namesKey) return;
     this.namesKey = key;
     const g = this.namesCanvas.getContext('2d')!;
@@ -843,9 +871,15 @@ export class Builder {
     metalPlate(g, W, H);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.font = `700 54px ${FONT}`;
-    const k = W / (ITEM_GAP * 4.4);
-    for (const s of shown) engrave(g, pieceName(s.piece).toUpperCase(), W / 2 + s.home.x * k, H / 2 + 2, UI_STEEL);
+    const k = W / RAIL_W;
+    for (const s of shown) {
+      // Each name fits the space under its own piece.
+      const name = pieceName(s.piece, this.draft).toUpperCase();
+      let size = 54;
+      do g.font = `700 ${size--}px ${FONT}`;
+      while (g.measureText(name).width > ITEM_GAP * k * 0.94 && size > 20);
+      engrave(g, name, W / 2 + s.home.x * k, H / 2 + 2, UI_STEEL);
+    }
     this.namesTex.needsUpdate = true;
   }
 }

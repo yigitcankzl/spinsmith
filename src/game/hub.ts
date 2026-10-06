@@ -84,6 +84,8 @@ interface Pickable {
   homeParent?: Object3D;
   /** How a locked thing is earned; locked things cannot be picked up. */
   locked?: string;
+  /** Its name over it: shown during the first session, afterwards only while pointed at. */
+  name?: Mesh;
   /** The thing itself, and its spot to return to (both in its parent's space). */
   model: Object3D;
   home: Vector3;
@@ -109,6 +111,8 @@ export class Hub {
   private arenasKey = '';
   private held: { item: Pickable; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   private time = 0;
+  /** The first session: every station shows its name. */
+  private teaching = true;
   private readonly p = new Vector3();
   private readonly q = new Vector3();
   private readonly hit = new Vector3();
@@ -141,6 +145,7 @@ export class Hub {
     this.anvil.visible = !first;
     // Every unfinished guide step points somewhere: the dock to play, the anvil for the new part.
     this.beacon.visible = progress.guide !== 'done';
+    this.teaching = progress.guide !== 'done';
     const onAnvil = progress.guide === 'forge' || progress.guide === 'fit';
     const at = onAnvil ? FORGE_AT : DOCK_AT;
     this.beacon.position.set(at.x, TABLE_Y + DOCK_TOP + 0.003, at.z);
@@ -185,6 +190,7 @@ export class Hub {
     for (const h of pointers) if (h.tracked) hovered ??= this.under(h);
     for (const it of this.items) {
       const on = it === hovered;
+      if (it.name) it.name.visible = this.teaching || on;
       const k = (on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1) * (it.homeParent ? WALL_MINI_SCALE : 1);
       it.model.scale.setScalar(k);
       if (it.carry) it.model.position.set(it.home.x, it.home.y + (on ? 0.01 : 0), it.home.z);
@@ -277,11 +283,12 @@ export class Hub {
     return off < GRAB_RAY ? off + 0.05 : Infinity;
   }
 
-  private label(text: string, parent: Object3D, y: number) {
+  private label(text: string, parent: Object3D, y: number): Mesh {
     const l = tag(text, 0.08, 46);
     l.position.y = y;
     parent.add(l);
     this.labels.push(l);
+    return l;
   }
 
   /** The arena shelf behind the arena: a glowing ledge under each row of miniatures. */
@@ -316,7 +323,7 @@ export class Hub {
     build.position.set(home.x, home.y + 0.035, home.z);
     this.labels.push(build);
     this.root.add(cradle, holder, build);
-    this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home });
+    this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home, name: build });
   }
 
   private fillRack(arenas: ArenaLayout[], current: number, locks: (string | null)[]) {
@@ -352,8 +359,8 @@ export class Hub {
     model.rotation.y = -0.6;
     body.add(model);
     this.anvil.add(body);
-    this.label('FORGE', this.anvil, ANVIL_FACE * RIM_SCALE + 0.035);
-    this.items.push({ action: { kind: 'forge' }, carry: false, model: body, home: new Vector3() });
+    const name = this.label('FORGE', this.anvil, ANVIL_FACE * RIM_SCALE + 0.035);
+    this.items.push({ action: { kind: 'forge' }, carry: false, model: body, home: new Vector3(), name });
   }
 
   /** A short brass stand at the near rim holding your top: carry it into the arena to play. */
@@ -398,10 +405,10 @@ export class Hub {
     const dock = standModel();
     dock.scale.setScalar(RIM_SCALE);
     this.stand.add(dock);
-    this.label('PLAY', this.stand, DOCK_TOP + 0.06);
+    const name = this.label('PLAY', this.stand, DOCK_TOP + 0.06);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
-    this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3() });
+    this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3(), name });
   }
 
   /** Dev: world positions of the things to pick, for driving the hub from the emulator CLI. */
