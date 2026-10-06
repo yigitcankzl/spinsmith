@@ -39,6 +39,9 @@ import { makeMatcap, SOFT_SHADOW, TopView } from './visuals.js';
 
 export type HubAction = { kind: 'play' } | { kind: 'arena'; index: number } | { kind: 'forge' } | { kind: 'workshop' } | { kind: 'locked'; text: string };
 
+/** A hand lost this long (s) cancels a carry instead of dropping (same as the match's rip). */
+const HAND_LOSS_GRACE = 0.1;
+
 /** Table stations (arena-local): the anvil at the right, the stand at the left, both near the player. */
 export const ANVIL_AT = new Vector3(0.24, 0, 0.06);
 const STAND_AT = new Vector3(-0.23, 0, 0.06);
@@ -101,7 +104,7 @@ export class Hub {
   private anvilTop: TopView | null = null;
   private topKey = '';
   private arenasKey = '';
-  private held: { item: Pickable; hand: HandState; startAt: Vector3; from: Vector3; fly: number } | null = null;
+  private held: { item: Pickable; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   private time = 0;
   private readonly p = new Vector3();
   private readonly q = new Vector3();
@@ -201,7 +204,7 @@ export class Hub {
       // Carried things move into the arena's space; from afar they fly to the hand first.
       const from = it.model.getWorldPosition(new Vector3());
       if (it.homeParent) this.root.attach(it.model);
-      this.held = { item: it, hand: h, startAt: this.pointAt(h, new Vector3()), from, fly: h.pinch.distanceTo(from) > 0.3 ? 0 : 1 };
+      this.held = { item: it, hand: h, startAt: this.pointAt(h, new Vector3()), from, fly: h.pinch.distanceTo(from) > 0.3 ? 0 : 1, lost: 0 };
       return null;
     }
     return null;
@@ -215,7 +218,17 @@ export class Hub {
     const k = 1 - (1 - held.fly) ** 3;
     item.model.parent!.worldToLocal(item.model.position.copy(held.from).lerp(at, k));
     item.model.rotation.y += 0.05;
-    if (hand.pinching && hand.tracked) return null;
+    if (hand.pinching && hand.tracked) {
+      held.lost = 0;
+      return null;
+    }
+    // A lost hand is not a release: after a moment the thing goes back where it was, nothing happens.
+    if (!hand.tracked) {
+      if ((held.lost += dt) < HAND_LOSS_GRACE) return null;
+      this.held = null;
+      this.returnHome(item);
+      return null;
+    }
     this.held = null;
     const local = this.root.worldToLocal(this.center.copy(at));
     const over = Math.hypot(local.x, local.z) < DROP_R;

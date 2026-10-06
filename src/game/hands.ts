@@ -75,6 +75,8 @@ export class HandInput {
       h.justPinched = false;
       h.pinching = false;
       h.tracked = false;
+      // No stale ray (or reticle) from where the hand was last seen.
+      h.hasRay = false;
     }
   }
 

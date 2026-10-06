@@ -50,6 +50,8 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
+/** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
+const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
 const LABEL_AT = new Vector3(0, 0.1, -0.2);
 /** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
@@ -123,6 +125,8 @@ export class MatchSystem extends createSystem({
   private levelUpText = '';
   private perfTimer = 0;
   private paused = false;
+  /** Seconds the pulling hand has been untracked. */
+  private lostFor = 0;
   /** Seconds left of the simulation-only pause after a hard hit. */
   private hitStop = 0;
   private lastHardHit = -1;
@@ -836,7 +840,21 @@ export class MatchSystem extends createSystem({
       const power = this.pullPower();
       this.showCharge(power, dt);
       this.label.set(power >= PERFECT ? `RIP IT! ${Math.round(power * 100)}%` : power > 0 ? `${Math.round(power * 100)}%` : 'Pull back and let go');
+      this.lostFor = 0;
       if (dist < MAX_PULL) return;
+    } else if (!h.tracked) {
+      // Tracking lost mid-pull. A fast rip often loses the hand right at release, so a clear rip
+      // still launches; anything else waits briefly for the hand, then cancels without a launch.
+      const ripping = this.peakSpeed > 0.6 * FULL_SPEED && this.maxPull >= MIN_PULL;
+      if (!ripping) {
+        if ((this.lostFor += dt) < HAND_LOSS_GRACE) return;
+        this.lostFor = 0;
+        this.cord.set(null);
+        this.cordTone.update(null);
+        this.chargeRing.visible = false;
+        this.toReady();
+        return;
+      }
     }
 
     this.cord.set(null);
@@ -1136,6 +1154,13 @@ export class MatchSystem extends createSystem({
     r.obj.scale.setScalar(1.6 * grow * (1 - leave));
     if (leave >= 1) {
       r.obj.removeFromParent();
+      // Its own geometry and materials (shared textures stay).
+      r.obj.traverse((o) => {
+        const m = o as Mesh;
+        if (!m.isMesh) return;
+        m.geometry.dispose();
+        (m.material as MeshBasicMaterial).dispose();
+      });
       this.reveal = null;
     }
   }

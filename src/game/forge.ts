@@ -108,6 +108,8 @@ const GRAB_NEAR = 0.07;
 const GRAB_RAY = 0.06;
 /** A part picked from afar flies to the hand in this many seconds. */
 const FLY_TIME = 0.3;
+/** A hand lost this long (s) cancels a carry instead of releasing it (same as the match and home). */
+const HAND_LOSS_GRACE = 0.1;
 /** A part let go where it was picked up (a tap) fits straight away. */
 const TAP_MOVE = 0.03;
 
@@ -168,9 +170,9 @@ export class Forge {
   private card = new StatsCard();
   private cardKey = '';
   private message = '';
-  private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3; from: Vector3; fly: number } | null = null;
+  private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
-  private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion } | null = null;
+  private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion; lost: number } | null = null;
   private explode = 0;
   /** The part the first session asks the player to fit, if any. */
   private focus: Slot | null = null;
@@ -338,7 +340,7 @@ export class Forge {
     if (target.kind === 'bucket') return this.save();
     if (target.kind === 'top') {
       if (this.heldTop) return;
-      this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone() };
+      this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone(), lost: 0 };
       playPick();
       this.say('Move it anywhere and let go: it stays. Dunk it in the bucket to save');
       return;
@@ -354,7 +356,7 @@ export class Forge {
     this.root.add(model);
     // From the wall the part flies to the hand.
     const from = target.slot.model.getWorldPosition(new Vector3());
-    this.heldPart = { item, model, hand: h, startAt: this.pointAt(h, new Vector3()), from, fly: h.pinch.distanceTo(from) > 0.3 ? 0 : 1 };
+    this.heldPart = { item, model, hand: h, startAt: this.pointAt(h, new Vector3()), from, fly: h.pinch.distanceTo(from) > 0.3 ? 0 : 1, lost: 0 };
     playPick();
     this.say(`${item.name}: ${item.blurb}`);
   }
@@ -380,7 +382,16 @@ export class Forge {
     const pot = this.slots.find((s) => s.item.kind === 'color' && s.model.getWorldPosition(this.p).distanceTo(at) < DIP) ?? null;
     if (pot && pot !== this.dippedIn) this.fit(pot.item);
     this.dippedIn = pot;
-    if (h.pinching && h.tracked) return;
+    if (h.pinching && h.tracked) {
+      held.lost = 0;
+      return;
+    }
+    // A lost hand is not a release: after a moment the top floats back to its spot, unsaved.
+    if (!h.tracked) {
+      if ((held.lost += dt) < HAND_LOSS_GRACE) return;
+      this.heldTop = null;
+      return;
+    }
     this.heldTop = null;
     this.bucket.getWorldPosition(this.p);
     if (at.distanceTo(this.p) < DIP * 1.5) return this.save();
@@ -410,7 +421,17 @@ export class Forge {
     this.explode += (target - this.explode) * 0.25;
     this.display.explode(this.explode, slotKind, this.time);
     this.showCard(this.withItem(held.item));
-    if (h.pinching && h.tracked) return;
+    if (h.pinching && h.tracked) {
+      held.lost = 0;
+      return;
+    }
+    // A lost hand is not a release: after a moment the part goes back to the wall, unfitted.
+    if (!h.tracked) {
+      if ((held.lost += dt) < HAND_LOSS_GRACE) return;
+      this.root.remove(held.model);
+      this.heldPart = null;
+      return;
+    }
     this.root.remove(held.model);
     this.heldPart = null;
     if (d < SNAP || at.distanceTo(held.startAt) < TAP_MOVE) this.fit(held.item);
