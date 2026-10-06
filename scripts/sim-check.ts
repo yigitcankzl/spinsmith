@@ -422,4 +422,26 @@ TUNING.grace = 0;
   assert.ok(r.unlocked.includes('tip:rush') && first.matches === 1, 'the first match should open the Rush tip');
 }
 
+// 11. The first-session guide only moves forward and survives a save and reload.
+{
+  const store = new Map<string, string>();
+  const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+  const p = new Progress(storage);
+  assert.equal(p.guide, 'launch', 'a new player starts at the launch step');
+  p.advance('bump');
+  p.advance('launch');
+  assert.equal(p.guide, 'bump', 'the guide never goes back');
+  p.advance('fit');
+  p.award({ won: false, finish: null, perfect: false, matchOver: true, matchWon: false });
+  const again = new Progress(storage);
+  assert.equal(again.guide, 'fit', 'the guide resumes where it was after a reload');
+  assert.equal(again.matches, 1);
+  assert.ok(again.isUnlocked('tip:rush'));
+  again.advance('done');
+  assert.equal(new Progress(storage).guide, 'done');
+  // Saves from before the guide existed skip it once the player has played.
+  const old = new Map([['spinsmith.progress.v1', JSON.stringify({ level: 3, xp: 10, unlocked: [], quests: [] })]]);
+  assert.equal(new Progress({ getItem: (k: string) => old.get(k) ?? null, setItem: () => {} }).guide, 'done');
+}
+
 console.log('sim-check: all passed');

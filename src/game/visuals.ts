@@ -1278,6 +1278,7 @@ export class Label {
   set(text: string) {
     if (text === this.text) return;
     this.text = text;
+    if (import.meta.env.DEV && text) console.log(`[LABEL] ${text.replace('\n', ' / ')}`);
     this.mesh.visible = text.length > 0;
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, 512, 160);

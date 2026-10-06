@@ -58,7 +58,7 @@ const INTRO_TIME = 2.5;
 /** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
 const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
-const LABEL_AT = new Vector3(0, 0.1, -0.2);
+const LABEL_AT = new Vector3(0, 0.1, -0.21);
 /** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
@@ -146,6 +146,7 @@ export class MatchSystem extends createSystem({
   /** Unlocks waiting to be shown over the arena, and the one showing. */
   private reveals: string[] = [];
   private reveal: { obj: Object3D; t: number } | null = null;
+  private rewardHold = 0;
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
   private hub = new Hub();
@@ -254,7 +255,7 @@ export class MatchSystem extends createSystem({
     this.root.visible = false;
     // Messages hang small over the arena's far rim, never between the eyes and the tops.
     this.label.mesh.position.copy(LABEL_AT);
-    this.label.mesh.scale.setScalar(1);
+    this.label.mesh.scale.setScalar(1.25);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
     this.stage.add(
@@ -527,8 +528,9 @@ export class MatchSystem extends createSystem({
     else if (guide === 'bump' || guide === 'match') this.label.set('Finish your first match\nPut your top in the arena');
     else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Rush tip!\nPinch the anvil to fit it');
     else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
-    if (guide === 'forge' || guide === 'fit') this.label.mesh.position.set(ANVIL_AT.x, 0.27, ANVIL_AT.z - 0.02);
-    else this.label.mesh.position.set(-0.23, 0.27, 0.04);
+    // Over the anvil for the new part; otherwise over the far rim (the stand's beacon marks it).
+    if (guide === 'forge' || guide === 'fit') this.label.mesh.position.set(ANVIL_AT.x, 0.24, ANVIL_AT.z - 0.02);
+    else this.label.mesh.position.copy(LABEL_AT);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
@@ -1243,8 +1245,12 @@ export class MatchSystem extends createSystem({
     if (this.levelUpText && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
       this.label.set(this.levelUpText);
       this.levelUpText = '';
+      // The level-up reads before the first unlock replaces it.
+      this.rewardHold = 1.4;
+      this.resultTimer = Math.max(this.resultTimer, 1.4 + 2.8);
     }
-    if (!this.reveal && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+    if (this.rewardHold > 0) this.rewardHold -= dt;
+    else if (!this.reveal && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
       const key = this.reveals.shift()!;
       const obj = unlockModel(key, this.arenas);
       this.stage.add(obj);
@@ -1272,6 +1278,8 @@ export class MatchSystem extends createSystem({
         (m.material as MeshBasicMaterial).dispose();
       });
       this.reveal = null;
+      // The result waits for every queued unlock.
+      if (this.reveals.length) this.resultTimer = Math.max(this.resultTimer, 0.2);
     }
   }
 
