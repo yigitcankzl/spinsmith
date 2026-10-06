@@ -104,48 +104,88 @@ const LIGHT_STEEL = makeMatcap('metal', 0xc8ccd6);
 const BRASS = makeMatcap('metal', 0xe2b866);
 const STRIPES = stripeTexture();
 
-export interface TopLook {
-  body: number;
-  /** Body silhouette as (radius, height) pairs from the tip up, before the tip cone. */
+/** A top's shape: body silhouette and tip, per type. Color comes from the owner (player or opponent). */
+export interface TopShape {
+  /** Body silhouette as (radius, height) pairs from the tip up. */
   profile: [number, number][];
+  tip: 'flat' | 'ball' | 'needle';
   tipMetal: DataTexture;
   ringMetal: DataTexture;
 }
 
-export const WIDE_LOOK: TopLook = {
-  body: 0xd6784f,
+/** Striker (attack): low and wide with a flat tip that grips and charges. */
+export const STRIKER_SHAPE: TopShape = {
   profile: [
-    [0.006, 0.008],
-    [0.022, 0.012],
-    [0.03, 0.016],
-    [0.029, 0.021],
-    [0.016, 0.024],
-    [0.015, 0.03],
-    [0, 0.03],
+    [0.008, 0.006],
+    [0.02, 0.009],
+    [0.024, 0.013],
+    [0.022, 0.017],
+    [0.012, 0.02],
+    [0.011, 0.026],
+    [0, 0.026],
   ],
+  tip: 'flat',
+  tipMetal: LIGHT_STEEL,
+  ringMetal: LIGHT_STEEL,
+};
+
+/** Anvil (defense): heavy and thick-walled on a ball tip that holds its ground. */
+export const ANVIL_SHAPE: TopShape = {
+  profile: [
+    [0.01, 0.008],
+    [0.026, 0.011],
+    [0.03, 0.016],
+    [0.03, 0.022],
+    [0.02, 0.026],
+    [0.016, 0.031],
+    [0, 0.031],
+  ],
+  tip: 'ball',
+  tipMetal: BRASS,
+  ringMetal: BRASS,
+};
+
+/** Needle (stamina): tall, mass out on a wide ring, spinning on a needle point. */
+export const NEEDLE_SHAPE: TopShape = {
+  profile: [
+    [0.003, 0.012],
+    [0.012, 0.016],
+    [0.025, 0.022],
+    [0.027, 0.026],
+    [0.014, 0.032],
+    [0.012, 0.04],
+    [0, 0.04],
+  ],
+  tip: 'needle',
   tipMetal: LIGHT_STEEL,
   ringMetal: BRASS,
 };
 
-export const NARROW_LOOK: TopLook = {
-  body: 0x5aaaa0,
-  profile: [
-    [0.004, 0.01],
-    [0.014, 0.016],
-    [0.021, 0.024],
-    [0.02, 0.031],
-    [0.012, 0.036],
-    [0.011, 0.042],
-    [0, 0.042],
-  ],
-  tipMetal: BRASS,
-  ringMetal: LIGHT_STEEL,
-};
+export const PLAYER_COLOR = 0xd6784f;
+export const OPPONENT_COLOR = 0x4f9fb0;
 
-/** A spinning top: tilts with wobble, spins its body, heats its core as spin drains. */
+const GRAVITY = 9.81;
+const DEBRIS_LIFE = 2.5;
+
+interface Debris {
+  mesh: Mesh;
+  vel: Vector3;
+  spin: Vector3;
+}
+
+/**
+ * A spinning top: tilts with travel, hits and wobble, spins its body, heats its core as spin drains,
+ * topples over, and bursts into flying parts on a burst finish.
+ */
 export class TopView {
   readonly root = new Group();
+  /** Burst parts fly in arena space, next to the top rather than inside it. */
+  readonly debris = new Group();
   private spinner = new Group();
+  private parts: Mesh[] = [];
+  private flying: Debris[] = [];
+  private debrisAge = 0;
+  private burst = false;
   private core: MeshBasicMaterial;
   private shadow: Mesh;
   private readonly hot = new Color(0xff5a14);
@@ -154,29 +194,41 @@ export class TopView {
   private fallX = 1;
   private fallZ = 0;
 
-  constructor(look: TopLook, spec: TopSpec) {
-    const tipHeight = look.profile[0][1];
-    const body = new LatheGeometry(
-      look.profile.map(([r, h]) => new Vector2(r, h)),
-      40,
+  constructor(shape: TopShape, spec: TopSpec, color: number) {
+    const tipHeight = shape.profile[0][1];
+    const body = new Mesh(
+      new LatheGeometry(shape.profile.map(([r, h]) => new Vector2(r, h)), 40),
+      new MeshMatcapMaterial({ matcap: makeMatcap('clay', color), map: STRIPES }),
     );
-    const bodyMat = new MeshMatcapMaterial({ matcap: makeMatcap('clay', look.body), map: STRIPES });
-    const tip = new Mesh(new ConeGeometry(look.profile[0][0] + 0.002, tipHeight, 20).rotateX(Math.PI), new MeshMatcapMaterial({ matcap: look.tipMetal }));
+    const tipMat = new MeshMatcapMaterial({ matcap: shape.tipMetal });
+    const tipR = shape.profile[0][0] + 0.002;
+    let tip: Mesh;
+    if (shape.tip === 'flat') tip = new Mesh(new CylinderGeometry(tipR, tipR * 0.8, tipHeight, 20), tipMat);
+    else if (shape.tip === 'ball') tip = new Mesh(new SphereGeometry(tipHeight / 2, 16, 12), tipMat);
+    else tip = new Mesh(new ConeGeometry(tipR + 0.002, tipHeight, 20).rotateX(Math.PI), tipMat);
     tip.position.y = tipHeight / 2;
     // Metal ring around the widest part of the body.
-    const widest = look.profile.reduce((a, b) => (b[0] > a[0] ? b : a));
-    const ring = new Mesh(new TorusGeometry(widest[0], 0.0028, 8, 40).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: look.ringMetal }));
+    const widest = shape.profile.reduce((a, b) => (b[0] > a[0] ? b : a));
+    const ring = new Mesh(new TorusGeometry(widest[0], 0.0028, 8, 40).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: shape.ringMetal }));
     ring.position.y = widest[1];
     this.core = new MeshBasicMaterial({ color: this.cool.clone() });
-    const top = look.profile[look.profile.length - 1][1];
-    const core = new Mesh(new CircleGeometry(look.profile[look.profile.length - 2][0] * 0.55, 24).rotateX(-Math.PI / 2), this.core);
+    const top = shape.profile[shape.profile.length - 1][1];
+    const core = new Mesh(new CircleGeometry(shape.profile[shape.profile.length - 2][0] * 0.55, 24).rotateX(-Math.PI / 2), this.core);
     core.position.y = top + 0.0005;
-    this.spinner.add(new Mesh(body, bodyMat), tip, ring, core);
+    this.parts = [body, tip, ring, core];
+    this.spinner.add(...this.parts);
     this.root.add(this.spinner);
     this.shadow = new Mesh(
       new CircleGeometry(spec.radius * 1.15, 24).rotateX(-Math.PI / 2),
       new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false }),
     );
+    // One flying copy per part, sharing geometry and materials.
+    for (const p of this.parts) {
+      const m = new Mesh(p.geometry, p.material);
+      m.visible = false;
+      this.flying.push({ mesh: m, vel: new Vector3(), spin: new Vector3() });
+      this.debris.add(m);
+    }
   }
 
   /** The shadow lives on the arena floor, not on the tilting top. */
@@ -184,7 +236,20 @@ export class TopView {
     return this.shadow;
   }
 
+  /** Hides everything (when this view's type is not in play). */
+  hide() {
+    this.root.visible = false;
+    this.shadow.visible = false;
+    for (const d of this.flying) d.mesh.visible = false;
+  }
+
   sync(top: Top, arena: Arena, time: number, dt: number) {
+    if (top.finish === 'burst') {
+      this.updateBurst(top, arena, dt);
+      return;
+    }
+    this.burst = false;
+    for (const d of this.flying) d.mesh.visible = false;
     const visible = top.state !== 'out';
     this.root.visible = visible;
     this.shadow.visible = visible && top.state === 'spinning';
@@ -202,8 +267,8 @@ export class TopView {
       this.fall = 0;
       // Lean: into the direction of travel, away from the last hit, plus the precessing wobble.
       const lean = 0.03 + 0.4 * top.wobble * top.wobble;
-      const ax = top.vz * 1.2 + top.kickZ * top.kick * 0.35 + Math.cos(time * 9) * lean;
-      const az = -(top.vx * 1.2 + top.kickX * top.kick * 0.35) + Math.sin(time * 9) * lean;
+      const ax = top.vz * 0.25 + top.kickZ * top.kick * 0.35 + Math.cos(time * 9) * lean;
+      const az = -(top.vx * 0.25 + top.kickX * top.kick * 0.35) + Math.sin(time * 9) * lean;
       this.root.rotation.set(ax, 0, az);
       // Remember which way it was leaning, to fall that way.
       const l = Math.hypot(ax, az) || 1;
@@ -211,6 +276,51 @@ export class TopView {
       this.fallX = -az / l;
     }
     this.core.color.copy(this.cool).lerp(this.hot, top.wobble);
+  }
+
+  /** Burst: the parts fly apart, tumble, bounce on the floor and fade out. */
+  private updateBurst(top: Top, arena: Arena, dt: number) {
+    if (!this.burst) {
+      this.burst = true;
+      this.debrisAge = 0;
+      this.root.updateMatrixWorld(true);
+      this.flying.forEach((d, i) => {
+        const p = this.parts[i];
+        d.mesh.position.set(top.x, arena.height(top.x, top.z) + p.position.y, top.z);
+        d.mesh.rotation.copy(this.root.rotation);
+        const a = Math.random() * Math.PI * 2;
+        const out = 0.25 + Math.random() * 0.35;
+        d.vel.set(Math.cos(a) * out + top.vx * 0.5, 0.35 + Math.random() * 0.4, Math.sin(a) * out + top.vz * 0.5);
+        d.spin.set((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+        d.mesh.visible = true;
+      });
+    }
+    this.root.visible = false;
+    this.shadow.visible = false;
+    this.debrisAge += dt;
+    for (const d of this.flying) {
+      if (this.debrisAge > DEBRIS_LIFE) {
+        d.mesh.visible = false;
+        continue;
+      }
+      d.vel.y -= GRAVITY * dt;
+      d.mesh.position.addScaledVector(d.vel, dt);
+      d.mesh.rotation.x += d.spin.x * dt;
+      d.mesh.rotation.y += d.spin.y * dt;
+      d.mesh.rotation.z += d.spin.z * dt;
+      // Bounce on the arena floor while still over it.
+      const p = d.mesh.position;
+      if (Math.hypot(p.x, p.z) < ARENA_RADIUS) {
+        const floor = arena.height(p.x, p.z) + 0.003;
+        if (p.y < floor) {
+          p.y = floor;
+          d.vel.y = Math.abs(d.vel.y) * 0.35;
+          d.vel.x *= 0.6;
+          d.vel.z *= 0.6;
+          d.spin.multiplyScalar(0.6);
+        }
+      }
+    }
   }
 }
 
@@ -509,7 +619,11 @@ export class Label {
     g.textBaseline = 'middle';
     const lines = text.split('\n');
     lines.forEach((line, i) => {
-      g.font = i === 0 ? 'bold 56px system-ui, sans-serif' : '34px system-ui, sans-serif';
+      // Shrink each line until it fits the card.
+      let size = i === 0 ? 56 : 34;
+      const weight = i === 0 ? 'bold ' : '';
+      do g.font = `${weight}${size--}px system-ui, sans-serif`;
+      while (g.measureText(line).width > 470 && size > 12);
       g.fillText(line, 256, 80 + (i - (lines.length - 1) / 2) * 58);
     });
     this.tex.needsUpdate = true;

@@ -1,0 +1,190 @@
+/**
+ * All game sound is synthesized with WebAudio: no audio files, no licensing, tiny download.
+ * The context starts on first use; entering XR is a user gesture, so it is allowed to play.
+ */
+
+let ctx: AudioContext | null = null;
+let master: GainNode | null = null;
+let noise: AudioBuffer | null = null;
+
+function audio(): AudioContext | null {
+  if (!ctx) {
+    try {
+      ctx = new AudioContext();
+    } catch {
+      return null;
+    }
+    master = ctx.createGain();
+    master.gain.value = 0.7;
+    master.connect(ctx.destination);
+    // One second of white noise, reused by every noisy sound.
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (ctx.state === 'suspended') void ctx.resume();
+  return ctx;
+}
+
+/** A short decaying tone. */
+function tone(freq: number, gain: number, decay: number, type: OscillatorType = 'sine', at = 0, slideTo?: number) {
+  const a = audio();
+  if (!a || !master) return;
+  const t = a.currentTime + at;
+  const o = a.createOscillator();
+  const g = a.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + decay);
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+  o.connect(g).connect(master);
+  o.start(t);
+  o.stop(t + decay + 0.02);
+}
+
+/** A filtered noise burst; the band can sweep from f0 to f1. */
+function hiss(gain: number, decay: number, f0: number, f1 = f0, q = 1, at = 0) {
+  const a = audio();
+  if (!a || !master || !noise) return;
+  const t = a.currentTime + at;
+  const src = a.createBufferSource();
+  src.buffer = noise;
+  const f = a.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = q;
+  f.frequency.setValueAtTime(f0, t);
+  f.frequency.exponentialRampToValueAtTime(f1, t + decay);
+  const g = a.createGain();
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+  src.connect(f).connect(g).connect(master);
+  src.start(t, Math.random() * 0.5);
+  src.stop(t + decay + 0.02);
+}
+
+/** Metal-on-metal clash: a noisy crack plus inharmonic ringing partials. */
+export function playClash(strength: number) {
+  const s = Math.min(1, Math.max(0.15, strength));
+  hiss(0.5 * s, 0.06, 4000, 2500, 0.8);
+  const base = 1500 + Math.random() * 400;
+  tone(base, 0.12 * s, 0.25, 'triangle');
+  tone(base * 1.47, 0.08 * s, 0.18, 'sine');
+  tone(base * 2.13, 0.05 * s, 0.12, 'sine');
+}
+
+/** Rail dash: a rising zip. */
+export function playDash() {
+  hiss(0.35, 0.3, 800, 5000, 3);
+  tone(300, 0.08, 0.3, 'sawtooth', 0, 900);
+}
+
+/** Launch whoosh scaled by power; a perfect rip adds a bright ping. */
+export function playLaunch(power: number, perfect: boolean) {
+  hiss(0.25 + 0.35 * power, 0.35, 600, 2500, 1);
+  if (perfect) tone(1760, 0.15, 0.4, 'sine');
+}
+
+/** Dropping into a pocket: a hollow thunk and a falling tone. */
+export function playPocket() {
+  tone(140, 0.4, 0.3, 'sine', 0, 55);
+  hiss(0.2, 0.15, 900, 300, 2);
+}
+
+/** Over the wall: a whoosh off into the distance. */
+export function playOver() {
+  hiss(0.35, 0.5, 3000, 400, 2);
+}
+
+/** Burst: an explosive crack and scattering clinks of the parts. */
+export function playBurst() {
+  hiss(0.7, 0.4, 2500, 300, 0.6);
+  tone(90, 0.5, 0.35, 'sine', 0, 40);
+  for (let i = 0; i < 6; i++) tone(2000 + Math.random() * 2500, 0.06, 0.12, 'triangle', 0.05 + i * 0.07 + Math.random() * 0.04);
+}
+
+/** Running out of spin: the clatter of a toppling top. */
+export function playTopple() {
+  for (let i = 0; i < 4; i++) tone(700 + Math.random() * 500, 0.05, 0.08, 'triangle', i * (0.09 - i * 0.015));
+}
+
+/** Round result jingle. */
+export function playResult(won: boolean) {
+  const notes = won ? [523, 659, 784, 1047] : [392, 330, 262];
+  // Starts after the finish sound has landed.
+  notes.forEach((f, i) => tone(f, 0.12, 0.3, 'triangle', 0.45 + i * 0.12));
+}
+
+/**
+ * A continuous spinning hum per top. Pitch follows spin (it drops and wavers as the top
+ * slows), loudness follows spin and speed. Silent when stopped.
+ */
+export class SpinHum {
+  private osc: OscillatorNode | null = null;
+  private osc2: OscillatorNode | null = null;
+  private gain: GainNode | null = null;
+  private filter: BiquadFilterNode | null = null;
+
+  constructor(private readonly base: number) {}
+
+  private start(a: AudioContext) {
+    this.osc = a.createOscillator();
+    this.osc2 = a.createOscillator();
+    this.osc.type = 'sawtooth';
+    this.osc2.type = 'triangle';
+    this.filter = a.createBiquadFilter();
+    this.filter.type = 'lowpass';
+    this.filter.Q.value = 4;
+    this.gain = a.createGain();
+    this.gain.gain.value = 0;
+    this.osc.connect(this.filter);
+    this.osc2.connect(this.filter);
+    this.filter.connect(this.gain).connect(master!);
+    this.osc.start();
+    this.osc2.start();
+  }
+
+  /** spin 0..1 (0 = silent), speed in m/s, wobble 0..1. */
+  update(spin: number, speed: number, wobble: number, time: number) {
+    const a = audio();
+    if (!a) return;
+    if (!this.osc) this.start(a);
+    const t = a.currentTime;
+    const waver = 1 + wobble * 0.08 * Math.sin(time * 18);
+    const f = (this.base * (0.45 + 0.75 * spin)) * waver;
+    this.osc!.frequency.setTargetAtTime(f, t, 0.05);
+    this.osc2!.frequency.setTargetAtTime(f * 2.01, t, 0.05);
+    this.filter!.frequency.setTargetAtTime(400 + 2600 * spin, t, 0.05);
+    const loud = spin > 0 ? 0.025 + 0.05 * spin + 0.04 * Math.min(1, speed) : 0;
+    this.gain!.gain.setTargetAtTime(loud, t, 0.08);
+  }
+}
+
+/** The rip cord's tension: a tone that rises with power while pulling. */
+export class CordTone {
+  private osc: OscillatorNode | null = null;
+  private gain: GainNode | null = null;
+
+  update(power: number | null) {
+    const a = audio();
+    if (!a) return;
+    if (!this.osc) {
+      this.osc = a.createOscillator();
+      this.osc.type = 'square';
+      this.gain = a.createGain();
+      this.gain.gain.value = 0;
+      const f = a.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 1200;
+      this.osc.connect(f).connect(this.gain).connect(master!);
+      this.osc.start();
+    }
+    const t = a.currentTime;
+    if (power === null) {
+      this.gain!.gain.setTargetAtTime(0, t, 0.03);
+      return;
+    }
+    this.osc.frequency.setTargetAtTime(110 + 330 * power, t, 0.03);
+    this.gain!.gain.setTargetAtTime(0.03 + 0.05 * power, t, 0.03);
+  }
+}

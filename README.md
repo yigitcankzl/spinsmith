@@ -27,8 +27,18 @@ What works:
   dips toward them) and glowing brass dash rails on the rim between them. A top touching a
   rail shoots along it and back into the middle; a top driven outward into a pocket drops
   in; a very hard hit sends a top over the wall; anything else bounces off the wall.
-- **Points, first to 4:** pocket finish or over finish +2, spin finish (the other top
+- **Three top types** in a rock-paper-scissors loop: Striker (attack) hunts the opponent,
+  Anvil (defense) is heavy and holds the middle, Needle (stamina) spins longest. Attack
+  beats stamina, defense beats attack, stamina beats defense. Shape and tip show the
+  type; your tops are warm orange, the opponent's cool teal. Your type cycles each round,
+  the opponent's is random.
+- **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
+  bouncing across the arena.
+- **Points, first to 4:** pocket, over or burst finish +2, spin finish (the other top
   stops first, or has less spin at the 45 s limit) +1. The score shows on the card.
+- **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
+  slows, metal clashes, the cord's rising tension tone, launch, rail dash, pocket,
+  burst, topple and result jingles.
 - **Arena moves during the fight:** pinch the floor and lift to raise a bump
   (it glows warm); press a fingertip into the floor to make a dent. Shapes relax
   back to flat in 2–3 seconds and affect both tops.
@@ -41,8 +51,8 @@ What works:
 - Result card with the finish and score, then pinch again for the next round. Your top alternates
   between the wide (orange) and the narrow (teal) shape each round.
 
-Not in the prototype yet: top shaping, parts, energy, table-tap waves, sound,
-pause, persistence (see the phase plan in the design document).
+Not in the prototype yet: top shaping, parts, energy, table-tap waves, pause,
+persistence (see the phase plan in the design document).
 
 ## Run
 
@@ -69,6 +79,7 @@ with the mouse; a small blue reticle marks where you look on the arena floor.
 | `B` | Hold to raise a bump where you are looking (during a fight) |
 | `N` | Hold to press a dent where you are looking (during a fight) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
+| `K` | Burst the opponent now (during a fight) |
 | `R` | Reset to the ready screen |
 | `P` | Re-place the arena in front of the current head pose |
 
@@ -89,7 +100,8 @@ The console logs `[MATCH]` lines for placement, launches and results.
 ```
 src/game/sim.ts            Fight simulation (no three.js): heightmap arena, tops, collisions, verdict
 src/game/hands.ts          Pinch and fingertip input from WebXR hand joints
-src/game/visuals.ts        Generated matcaps, top and arena meshes, sparks, launcher, text card
+src/game/visuals.ts        Generated matcaps, top shapes per type, burst debris, arena, sparks, cord, text card
+src/game/audio.ts          Synthesized sound effects and the spin hum
 src/game/match-system.ts   Placement, rip-cord launch, arena moves, AI launch, match flow
 scripts/sim-check.ts       Headless simulation check
 docs/DESIGN.md             Game design document

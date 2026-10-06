@@ -4,7 +4,7 @@
  * bumps steer, fights end, verdict rules hold).
  */
 import assert from 'node:assert/strict';
-import { Arena, ARENA_RADIUS, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, POCKET_HALF, POCKETS, RAIL_HALF, RAILS, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { Arena, ARENA_RADIUS, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, POCKET_HALF, POCKETS, RAIL_HALF, RAILS, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import type { TopSpec } from '../src/game/sim.ts';
 
 function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
@@ -174,8 +174,13 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
       const b = new Top(y);
       const pa = 0.5 + rnd() * 0.5;
       const pb = 0.5 + rnd() * 0.5;
-      a.launch(0, 0.108, (rnd() - 0.5) * 0.2, -LAUNCH_SPEED * (0.5 + 0.5 * pa), 0.55 + 0.45 * pa, 1);
-      b.launch(0, -0.108, (rnd() - 0.5) * 0.2, LAUNCH_SPEED * (0.5 + 0.5 * pb), 0.55 + 0.45 * pb, -1);
+      // Launched the way the game launches: angled into the orbit, with some aim spread.
+      const da = LAUNCH_TILT + (rnd() - 0.5) * 0.6;
+      const db = LAUNCH_TILT + (rnd() - 0.5) * 0.6;
+      const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa);
+      const sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
+      a.launch(0, 0.108, Math.sin(da) * sa, -Math.cos(da) * sa, 0.55 + 0.45 * pa, 1);
+      b.launch(0, -0.108, -Math.sin(db) * sb, Math.cos(db) * sb, 0.55 + 0.45 * pb, -1);
       let t = 0;
       while (verdict(a, b, t) === 0) {
         step(arena, a, b);

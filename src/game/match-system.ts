@@ -1,7 +1,8 @@
 import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { CordTone, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
-import { Arena, ARENA_RADIUS, finishPoints, LAUNCH_SPEED, NARROW, step, STEP, Top, verdict, WIDE } from './sim.js';
-import { ArenaView, Label, Cord, NARROW_LOOK, Sparks, TopView, WIDE_LOOK } from './visuals.js';
+import { Arena, ARENA_RADIUS, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TYPES, verdict } from './sim.js';
+import { ANVIL_SHAPE, ArenaView, Cord, Label, NEEDLE_SHAPE, OPPONENT_COLOR, PLAYER_COLOR, Sparks, STRIKER_SHAPE, TopView } from './visuals.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
 const PEDESTAL = 0.08;
@@ -42,6 +43,9 @@ const PERFECT_SPIN = 1.1;
 /** Far bumps grow at this rate (m/s) while the pinch is held. */
 const RAY_BUMP_RATE = 0.05;
 
+const SHAPES = [STRIKER_SHAPE, ANVIL_SHAPE, NEEDLE_SHAPE];
+const TYPE_ROLE = ['attack', 'defense', 'stamina'];
+
 type Phase = 'placing' | 'ready' | 'pulling' | 'fight' | 'result';
 
 type RawPlane = { orientation?: string; semanticLabel?: string };
@@ -59,11 +63,19 @@ export class MatchSystem extends createSystem({
   private root = new Group();
   private arena = new Arena();
   private arenaView = new ArenaView(PEDESTAL);
-  private wide = new Top(WIDE);
-  private narrow = new Top(NARROW);
-  private tops = [this.wide, this.narrow];
-  private wideView = new TopView(WIDE_LOOK, WIDE);
-  private narrowView = new TopView(NARROW_LOOK, NARROW);
+  /** The player's top and the opponent's; their type (spec) changes between rounds. */
+  private mine = new Top(TYPES[0]);
+  private theirs = new Top(TYPES[1]);
+  private tops = [this.mine, this.theirs];
+  private hums = [new SpinHum(230), new SpinHum(190)];
+  private cordTone = new CordTone();
+  /** Seconds since the last clash sound, to keep grinding contacts from machine-gunning. */
+  private sinceClashSound = 1;
+  /** Types for the coming round are chosen once per round, not on every reset. */
+  private typesPicked = false;
+  /** One view per type for each side: shape from the type, color from the owner. */
+  private myViews = TYPES.map((t, i) => new TopView(SHAPES[i], t, PLAYER_COLOR));
+  private theirViews = TYPES.map((t, i) => new TopView(SHAPES[i], t, OPPONENT_COLOR));
   private cord = new Cord();
   private sparks = new Sparks();
   private label = new Label();
@@ -115,8 +127,10 @@ export class MatchSystem extends createSystem({
     this.root.name = 'spinsmith-arena';
     this.reticle.visible = false;
     this.root.visible = false;
-    this.wideView.root.name = 'top-wide';
-    this.narrowView.root.name = 'top-narrow';
+    TYPES.forEach((t, i) => {
+      this.myViews[i].root.name = `my-${t.name}`;
+      this.theirViews[i].root.name = `their-${t.name}`;
+    });
     this.label.mesh.position.set(0, 0.17, -0.03);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
@@ -124,10 +138,7 @@ export class MatchSystem extends createSystem({
       this.chargeRing,
       this.reticle,
       this.arenaView.root,
-      this.wideView.root,
-      this.narrowView.root,
-      this.wideView.shadowMesh,
-      this.narrowView.shadowMesh,
+      ...[...this.myViews, ...this.theirViews].flatMap((v) => [v.root, v.shadowMesh, v.debris]),
       this.sparks.points,
       this.label.mesh,
     );
@@ -142,6 +153,11 @@ export class MatchSystem extends createSystem({
         if (e.code === 'KeyR') this.toReady();
         if (e.code === 'KeyP') this.phase = 'placing';
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
+        if (e.code === 'KeyK' && this.phase === 'fight') {
+          // Burst the opponent now, to see the burst finish.
+          this.theirs.state = 'out';
+          this.theirs.finish = 'burst';
+        }
       };
       const onKeyUp = (e: KeyboardEvent) => {
         this.keys.delete(e.code);
@@ -198,19 +214,32 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) this.devControls(dt);
     this.updateReticle();
     this.arenaView.sync(this.arena);
-    this.wideView.sync(this.wide, this.arena, this.time, dt);
-    this.narrowView.sync(this.narrow, this.arena, this.time, dt);
+    const live = this.phase === 'fight';
+    this.tops.forEach((t, i) => this.hums[i].update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time));
+    this.sinceClashSound += dt;
+    this.syncViews(this.myViews, this.mine, dt);
+    this.syncViews(this.theirViews, this.theirs, dt);
     this.sparks.update(dt);
     this.arenaView.update(dt);
   }
 
   /** Player's top this round (alternates so both shapes get played). */
-  private get mine() {
-    return this.round % 2 === 0 ? this.wide : this.narrow;
+  /** Shows the view for the top's current type and hides the others. */
+  private syncViews(views: TopView[], top: Top, dt: number) {
+    views.forEach((v, i) => (TYPES[i] === top.spec ? v.sync(top, this.arena, this.time, dt) : v.hide()));
   }
 
-  private get theirs() {
-    return this.round % 2 === 0 ? this.narrow : this.wide;
+  /**
+   * Picks this round's types: the player cycles through all three so each gets played,
+   * the opponent is random.
+   */
+  private pickTypes() {
+    this.mine.spec = TYPES[this.round % TYPES.length];
+    this.theirs.spec = TYPES[Math.floor(Math.random() * TYPES.length)];
+  }
+
+  private describe(t: TopSpec) {
+    return `${t.name} (${TYPE_ROLE[TYPES.indexOf(t)]})`;
   }
 
   private place() {
@@ -256,11 +285,13 @@ export class MatchSystem extends createSystem({
     this.phase = 'ready';
     this.arena.clear();
     // Both tops wait upright at their spawn points.
+    if (!this.typesPicked) this.pickTypes();
+    this.typesPicked = true;
     this.mine.launch(0, SPAWN, 0, 0, 1, 1);
     this.theirs.launch(0, -SPAWN, 0, 0, 1, -1);
     this.puller = null;
     this.cord.set(null);
-    this.label.set(`You ${this.myPoints} - ${this.theirPoints}  ·  first to ${MATCH_POINTS}\nPinch anywhere, pull back, let go`);
+    this.label.set(`${this.describe(this.mine.spec)} vs ${this.describe(this.theirs.spec)}\nYou ${this.myPoints} - ${this.theirPoints} · first to ${MATCH_POINTS} · pinch, pull, let go`);
   }
 
   private toLocal(world: Vector3) {
@@ -318,6 +349,7 @@ export class MatchSystem extends createSystem({
     }
 
     this.cord.set(null);
+    this.cordTone.update(null);
     this.chargeRing.visible = false;
     const power = this.pullPower();
     if (power < MIN_POWER) {
@@ -344,6 +376,7 @@ export class MatchSystem extends createSystem({
     const y = this.arena.height(this.mine.x, this.mine.z);
     this.root.localToWorld(this.cordStart.set(this.mine.x, y + 0.03, this.mine.z));
     this.cord.set(this.cordStart, this.hands[this.puller!].pinch, power, dt);
+    this.cordTone.update(power);
     this.mine.angle += (6 + 70 * power) * dt;
     this.chargeRing.visible = power > 0;
     this.chargeRing.position.set(this.mine.x, y + 0.001, this.mine.z);
@@ -356,12 +389,15 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'result') this.toReady();
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
-    this.mine.launch(0, SPAWN, Math.sin(aim) * speed, -Math.cos(aim) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, 1);
+    playLaunch(power, perfect);
+    const dir = aim + LAUNCH_TILT;
+    this.mine.launch(0, SPAWN, Math.sin(dir) * speed, -Math.cos(dir) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, 1);
     this.sparks.burst(0, this.arena.height(0, SPAWN), SPAWN, perfect ? 1 : power * 0.6);
     const aiPower = 0.6 + Math.random() * 0.35;
     const aiAim = (Math.random() - 0.5) * 1.0;
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
-    this.theirs.launch(0, -SPAWN, Math.sin(aiAim) * aiSpeed, Math.cos(aiAim) * aiSpeed, 0.55 + 0.45 * aiPower, -1);
+    const aiDir = aiAim + LAUNCH_TILT;
+    this.theirs.launch(0, -SPAWN, -Math.sin(aiDir) * aiSpeed, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, -1);
     this.phase = 'fight';
     this.elapsed = 0;
     this.accumulator = 0;
@@ -422,14 +458,20 @@ export class MatchSystem extends createSystem({
       if (clash) {
         this.clashes++;
         this.sparks.burst(clash.x, this.arena.height(clash.x, clash.z), clash.z, clash.strength);
+        if (this.sinceClashSound > 0.06) {
+          playClash(clash.strength);
+          this.sinceClashSound = 0;
+        }
       }
       for (const t of this.tops) {
         if (t.sinceDash !== 0) continue;
         this.arenaView.flashRail(t.x, t.z);
+        playDash();
         this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.8);
       }
       const v = verdict(this.mine, this.theirs, this.elapsed);
       if (v !== 0) {
+        for (const t of this.tops) if (t.finish === 'burst') this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
         this.finish(v);
         return;
       }
@@ -439,7 +481,15 @@ export class MatchSystem extends createSystem({
   private finish(v: -1 | 1 | 2) {
     this.phase = 'result';
     this.resultTimer = RESULT_TIME;
-    const name = (t: Top) => (t.finish === 'pocket' ? 'Pocket finish' : t.finish === 'over' ? 'Over finish' : 'Spin finish');
+    const name = (t: Top) =>
+      t.finish === 'pocket' ? 'Pocket finish' : t.finish === 'over' ? 'Over finish' : t.finish === 'burst' ? 'BURST' : 'Spin finish';
+    for (const t of this.tops) {
+      if (t.finish === 'pocket') playPocket();
+      else if (t.finish === 'over') playOver();
+      else if (t.finish === 'burst') playBurst();
+      else if (t.finish === 'spin') playTopple();
+    }
+    if (v !== 2) playResult(v === 1);
     let text: string;
     if (v === 2) {
       text = 'Draw\nReplay the round';
@@ -459,7 +509,10 @@ export class MatchSystem extends createSystem({
     }
     this.label.set(text);
     console.log(`[MATCH] ${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
-    if (v !== 2) this.round++;
+    if (v !== 2) {
+      this.round++;
+      this.typesPicked = false;
+    }
   }
 
   /** A small dot where the pointing hand's ray (or, in dev, the gaze) meets the floor. */

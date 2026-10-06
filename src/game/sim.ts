@@ -53,17 +53,17 @@ const GRAVITY = 9.81;
 /** Global feel knobs (tuned with scripts/sim-check.ts and on device). */
 export const TUNING = {
   /** Bounciness of the bodies (0..1). */
-  restitution: 0.53,
+  restitution: 0.77,
   /** Spinning rims kick each other apart on contact (m/s at full spin). */
-  recoil: 0.19,
+  recoil: 0.27,
   /** Spin lost per unit of impulse. */
-  spinHit: 0.036,
+  spinHit: 0.046,
   /** Burst damage per unit of impulse (before the top's burst resistance). */
-  burst: 0.29,
+  burst: 0.37,
   /** Bowl rise at the rim (m): tops roll toward the center, so they meet. */
-  bowl: 0.019,
+  bowl: 0.011,
   /** How strongly a spinning tip turns radial motion into an orbit around the center (1/s). */
-  orbit: 2.24,
+  orbit: 1.44,
 };
 /** Fixed simulation step. */
 export const STEP = 1 / 120;
@@ -73,6 +73,11 @@ const TOPPLE_SPIN = 0.06;
 export const TIME_LIMIT = 45;
 /** Launch speed (m/s) at full power. */
 export const LAUNCH_SPEED = 0.5;
+/**
+ * Launches leave at this angle (radians) off straight-at-center, in the orbit direction, so tops
+ * spiral into the bowl like a real angled launch instead of meeting head-on in the first half second.
+ */
+export const LAUNCH_TILT = 0.75;
 
 export class Arena {
   /** Player-made shape layer, added on top of the bowl. */
@@ -182,14 +187,14 @@ export interface TopSpec {
 export const ATTACK: TopSpec = {
   name: 'Striker',
   radius: 0.024,
-  punch: 1.33,
-  knockback: 1.02,
-  spinDrain: 0.062,
+  punch: 0.87,
+  knockback: 0.84,
+  spinDrain: 0.064,
   roam: 0.6,
-  cruise: 0.55,
+  cruise: 0.66,
   drive: 3,
   maxSpeed: 2,
-  seek: 0.84,
+  seek: 3.43,
   center: 0,
   burstResist: 1,
 };
@@ -197,31 +202,31 @@ export const ATTACK: TopSpec = {
 export const DEFENSE: TopSpec = {
   name: 'Anvil',
   radius: 0.03,
-  punch: 1.2,
-  knockback: 0.75,
+  punch: 0.84,
+  knockback: 0.57,
   spinDrain: 0.06,
   roam: 0.1,
-  cruise: 0.23,
+  cruise: 0.29,
   drive: 1.5,
   maxSpeed: 1.6,
   seek: 0,
-  center: 4.3,
-  burstResist: 1.41,
+  center: 7.38,
+  burstResist: 1.28,
 };
 
 export const STAMINA: TopSpec = {
   name: 'Needle',
   radius: 0.027,
-  punch: 0.9,
-  knockback: 1.07,
-  spinDrain: 0.036,
+  punch: 0.7,
+  knockback: 0.99,
+  spinDrain: 0.023,
   roam: 0.2,
-  cruise: 0.19,
+  cruise: 0.44,
   drive: 1.5,
   maxSpeed: 1.8,
   seek: 0,
   center: 0,
-  burstResist: 1.17,
+  burstResist: 0.92,
 };
 
 export const TYPES = [ATTACK, DEFENSE, STAMINA];
