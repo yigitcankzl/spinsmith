@@ -473,7 +473,11 @@ export const PLAYER_COLOR = 0xd6784f;
 export const OPPONENT_COLOR = 0x4f9fb0;
 
 const GRAVITY = 9.81;
-const DEBRIS_LIFE = 2.5;
+const DEBRIS_LIFE = 4;
+/** The real table under the arena (arena-local): thrown tops and shattered parts land here. */
+const TABLE_LEVEL = -0.04;
+/** A thrown top travels at most this far past the rim before it lands and stops (arena-local). */
+const THROW_REACH = 0.12;
 
 interface Debris {
   mesh: Mesh;
@@ -507,6 +511,11 @@ export class TopView {
   private readonly hot = new Color(0xff5a14);
   private readonly cool: Color;
   private fall = 0;
+  /** Seconds since the top went out (-1 while in play), and its flight when thrown over the wall. */
+  private outT = -1;
+  private throwPos = new Vector3();
+  private throwVel = new Vector3();
+  private landed = false;
   private fallX = 1;
   private fallZ = 0;
 
@@ -598,6 +607,11 @@ export class TopView {
     }
     this.burst = false;
     for (const d of this.flying) d.mesh.visible = false;
+    if (top.state === 'out' && (top.finish === 'over' || top.finish === 'pocket')) {
+      this.updateOut(top, arena, dt);
+      return;
+    }
+    this.outT = -1;
     const visible = top.state !== 'out';
     this.root.visible = visible;
     this.shadow.visible = visible && top.state === 'spinning';
@@ -634,6 +648,60 @@ export class TopView {
     this.explode(0.35 * risk * (0.85 + 0.15 * Math.sin(time * 30)), null, time);
   }
 
+  /**
+   * Out of the fight. Thrown over the wall, it flies off the rim, lands on the real table beside
+   * the arena, skids and falls over; into a slag pit, it sinks out of sight.
+   */
+  private updateOut(top: Top, arena: Arena, dt: number) {
+    if (this.outT < 0) {
+      this.outT = 0;
+      this.landed = false;
+      this.fall = 0;
+      this.throwPos.set(top.x, arena.height(top.x, top.z), top.z);
+      this.throwVel.set(top.vx, 0.3, top.vz);
+    }
+    this.outT += dt;
+    this.shadow.visible = false;
+    if (top.finish === 'pocket') {
+      const k = Math.min(1, this.outT / 0.3);
+      this.root.visible = k < 1;
+      this.root.position.set(this.throwPos.x, this.throwPos.y - 0.03 * k * k, this.throwPos.z);
+      return;
+    }
+    this.root.visible = true;
+    const p = this.throwPos;
+    const v = this.throwVel;
+    if (!this.landed) {
+      v.y -= GRAVITY * dt;
+      p.addScaledVector(v, dt);
+      // Never farther than a short throw past the rim.
+      const r = Math.hypot(p.x, p.z);
+      const max = arena.radius + THROW_REACH;
+      if (r > max) {
+        p.x *= max / r;
+        p.z *= max / r;
+        v.x = 0;
+        v.z = 0;
+      }
+      if (p.y <= TABLE_LEVEL) {
+        p.y = TABLE_LEVEL;
+        this.landed = true;
+      }
+    } else {
+      // Skids to a stop, then falls over.
+      v.multiplyScalar(Math.exp(-dt * 6));
+      p.x += v.x * dt;
+      p.z += v.z * dt;
+      this.fall = Math.min(1, this.fall + dt * 2.2);
+    }
+    this.root.position.copy(p);
+    this.spinner.rotation.y += dt * 8 * (1 - this.fall);
+    const f = this.fall * this.fall;
+    this.root.rotation.set(1.25 * f * this.fallZ, 0, -1.25 * f * this.fallX);
+    this.shadow.visible = this.landed;
+    this.shadow.position.set(p.x, TABLE_LEVEL + 0.0008, p.z);
+  }
+
   /** Burst: the parts fly apart, tumble, bounce on the floor and fade out. */
   private updateBurst(top: Top, arena: Arena, dt: number) {
     if (!this.burst) {
@@ -664,10 +732,10 @@ export class TopView {
       d.mesh.rotation.x += d.spin.x * dt;
       d.mesh.rotation.y += d.spin.y * dt;
       d.mesh.rotation.z += d.spin.z * dt;
-      // Bounce on the arena floor while still over it.
+      // Bounce on the arena floor while over it, else on the real table beside it.
       const p = d.mesh.position;
-      if (arena.inside(p.x, p.z)) {
-        const floor = arena.height(p.x, p.z) + 0.003;
+      {
+        const floor = arena.inside(p.x, p.z) ? arena.height(p.x, p.z) + 0.003 : TABLE_LEVEL + 0.003;
         if (p.y < floor) {
           p.y = floor;
           d.vel.y = Math.abs(d.vel.y) * 0.35;

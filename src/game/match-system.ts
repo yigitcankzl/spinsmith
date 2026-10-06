@@ -351,6 +351,15 @@ export class MatchSystem extends createSystem({
           this.theirs.state = 'out';
           this.theirs.finish = 'burst';
         }
+        if (e.code === 'KeyO' && this.phase === 'fight') {
+          // Throw the opponent over the wall now, outward from the center, to see it land on the table.
+          const t = this.theirs;
+          const r = Math.hypot(t.x, t.z) || 1;
+          t.vx = (t.x / r) * 0.8;
+          t.vz = (t.z / r) * 0.8;
+          t.state = 'out';
+          t.finish = 'over';
+        }
       };
       const onKeyUp = (e: KeyboardEvent) => {
         this.keys.delete(e.code);
