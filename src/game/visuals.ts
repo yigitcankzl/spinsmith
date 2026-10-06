@@ -409,10 +409,10 @@ const tops = new Map<string, number>();
 export function ringMeshes(ring: Ring, color: number, base: number, glow = new MeshBasicMaterial({ color: 0xffb347 })): Mesh[] {
   const d = ringDesign(ring);
   const steps = 240;
-  const sample = (f: (a: number) => number): [number, number][] => {
+  const sample = (f: (a: number) => number, n = steps): [number, number][] => {
     const pts: [number, number][] = [];
-    for (let i = 0; i < steps; i++) {
-      const a = (i / steps) * Math.PI * 2;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
       const r = f(a);
       pts.push([Math.cos(a) * r, Math.sin(a) * r]);
     }
@@ -434,8 +434,8 @@ export function ringMeshes(ring: Ring, color: number, base: number, glow = new M
   const top = d.thick + d.tierThick;
   // The plastic layer's one detail language: a metal inlay line just inside its edge and three
   // bolts tying it to the blade, merged into the blade (no extra draw call).
-  const inlay = new Shape(sample((a) => d.layer(a) - 0.0009).map(([x, z]) => new Vector2(x, -z)));
-  inlay.holes.push(new Path(sample((a) => d.layer(a) - 0.0016).map(([x, z]) => new Vector2(x, -z)).reverse()));
+  const inlay = new Shape(sample((a) => d.layer(a) - 0.0009, 96).map(([x, z]) => new Vector2(x, -z)));
+  inlay.holes.push(new Path(sample((a) => d.layer(a) - 0.0016, 96).map(([x, z]) => new Vector2(x, -z)).reverse()));
   const metal = [bladeGeo, tierGeo, new ExtrudeGeometry(inlay, { depth: 0.0005, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(0, top + 0.0028, 0)];
   let inner = Infinity;
   for (let i = 0; i < 24; i++) inner = Math.min(inner, d.layer((i / 24) * Math.PI * 2));
