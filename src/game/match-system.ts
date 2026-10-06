@@ -2,7 +2,8 @@ import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, M
 import { CordTone, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
-import { spawnDistance } from './layout.js';
+import { Builder, Button, loadArenas } from './builder.js';
+import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TYPES, verdict } from './sim.js';
 import { ANVIL_SHAPE, ArenaView, Cord, Label, NEEDLE_SHAPE, OPPONENT_COLOR, PLAYER_COLOR, Sparks, STRIKER_SHAPE, TopView } from './visuals.js';
@@ -48,7 +49,7 @@ const RAY_BUMP_RATE = 0.05;
 const SHAPES = [STRIKER_SHAPE, ANVIL_SHAPE, NEEDLE_SHAPE];
 const TYPE_ROLE = ['attack', 'defense', 'stamina'];
 
-type Phase = 'placing' | 'ready' | 'pulling' | 'fight' | 'result';
+type Phase = 'placing' | 'ready' | 'pulling' | 'fight' | 'result' | 'build';
 
 type RawPlane = { orientation?: string; semanticLabel?: string };
 
@@ -68,8 +69,16 @@ export class MatchSystem extends createSystem({
   /** Everything that tilts with a rocking dish: the arena and what is on it. */
   private stage = new Group();
   /** Arenas in rotation (built-ins plus the player's own) and the one in play. */
-  private arenas: ArenaLayout[] = [...ARENAS];
+  private arenas: ArenaLayout[] = [...ARENAS, ...loadArenas()];
   private arenaIndex = 0;
+  /** The arena builder and the button that opens it. */
+  private builder = new Builder({
+    preview: (layout) => this.showLayout(layout),
+    play: (layout) => this.playBuilt(layout),
+    exit: () => this.leaveBuilder(),
+  });
+  private buildButton = new Button('build', 0.09, 0.022);
+  private builderHands: HandState[] = [];
   /** The player's top and the opponent's; their type (spec) changes between rounds. */
   private mine = new Top(TYPES[0]);
   private theirs = new Top(TYPES[1]);
@@ -150,7 +159,14 @@ export class MatchSystem extends createSystem({
       ...[...this.myViews, ...this.theirViews].flatMap((v) => [v.root, v.shadowMesh, v.debris]),
       this.sparks.points,
     );
-    this.root.add(this.stage, this.label.mesh);
+    this.root.add(this.stage, this.label.mesh, this.builder.panel, this.buildButton.mesh);
+    // The builder panel stands to the player's left of the arena, turned toward them.
+    this.builder.panel.position.set(-0.31, 0.26, 0.04);
+    this.builder.panel.rotation.y = 0.5;
+    this.buildButton.mesh.position.set(0.2, 0.05, 0.14);
+    this.buildButton.mesh.rotation.y = -0.4;
+    this.buildButton.set('Build arena');
+    this.builderHands = [this.hands.left, this.hands.right];
     this.setArena(this.arenas[this.arenaIndex]);
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
@@ -208,8 +224,12 @@ export class MatchSystem extends createSystem({
         this.settle += dt;
         if (this.settle >= SETTLE) this.place();
         return;
+      case 'build':
+        this.updateBuilder();
+        break;
       case 'ready':
       case 'result':
+        if (this.pressedBuild()) break;
         if (this.phase === 'result') {
           this.resultTimer -= dt;
           if (this.resultTimer <= 0) this.toReady();
@@ -254,6 +274,75 @@ export class MatchSystem extends createSystem({
   private nextArena() {
     this.arenaIndex = (this.arenaIndex + 1) % this.arenas.length;
     this.setArena(this.arenas[this.arenaIndex]);
+  }
+
+  /** Shows a layout in the arena without changing the rotation (builder preview). */
+  private showLayout(layout: ArenaLayout) {
+    this.arena.reset(layout);
+    this.arenaView.build(layout);
+  }
+
+  /** Ready/result: a pinch on the Build button opens the builder. */
+  private pressedBuild(): boolean {
+    this.buildButton.mesh.visible = true;
+    for (const h of this.builderHands) {
+      if (!h.tracked || !h.justPinched) continue;
+      this.buildButton.mesh.getWorldPosition(this.p);
+      const near = h.pinch.distanceTo(this.p) < 0.04;
+      const t = this.local.copy(this.p).sub(h.rayOrigin).dot(h.rayDir);
+      const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < 0.02;
+      if (!near && !far) continue;
+      this.phase = 'build';
+      this.buildButton.mesh.visible = false;
+      this.label.set('');
+      for (const top of this.tops) top.state = 'out';
+      this.builder.open(this.arena.layout);
+      return true;
+    }
+    return false;
+  }
+
+  /** Builder: panel buttons first; otherwise a pinch on the arena edits it with the current tool. */
+  private updateBuilder() {
+    if (this.builder.update(this.builderHands)) return;
+    for (const h of this.builderHands) {
+      if (!h.tracked || !h.justPinched) continue;
+      const hit = this.arenaPoint(h);
+      if (hit) this.builder.edit(hit.x, hit.z, normRadius(this.arena.layout, hit.x, hit.z));
+    }
+  }
+
+  /** Where a hand points at the arena (near pinch first, else its ray), including just past the rim. */
+  private arenaPoint(h: HandState): { x: number; z: number } | null {
+    const l = this.toLocal(h.pinch);
+    const L = this.arena.layout;
+    if (normRadius(L, l.x, l.z) < 1.3 && Math.abs(l.y - this.arena.floorHeight(Math.min(1, normRadius(L, l.x, l.z)))) < 0.04) return { x: l.x, z: l.z };
+    if (!h.hasRay) return null;
+    const o = this.root.worldToLocal(this.rayLocalO.copy(h.rayOrigin));
+    const d = this.rayLocalD.copy(h.rayDir).transformDirection(this.rootInverse.copy(this.root.matrixWorld).invert());
+    for (let t = 0.02; t < 2; t += 0.004) {
+      const x = o.x + d.x * t;
+      const z = o.z + d.z * t;
+      const n = normRadius(L, x, z);
+      if (o.y + d.y * t <= this.arena.floorHeight(Math.min(1, n))) return n < 1.3 ? { x, z } : null;
+    }
+    return null;
+  }
+
+  private playBuilt(layout: ArenaLayout) {
+    this.arenas.push(layout);
+    this.arenaIndex = this.arenas.length - 1;
+    this.builder.close();
+    this.setArena(layout);
+    this.phase = 'ready';
+    this.toReady();
+  }
+
+  private leaveBuilder() {
+    this.builder.close();
+    this.setArena(this.arenas[this.arenaIndex]);
+    this.phase = 'ready';
+    this.toReady();
   }
 
   /** Shows the view for the top's current type and hides the others. */
@@ -424,6 +513,7 @@ export class MatchSystem extends createSystem({
 
   /** Launches both tops. aim: radians off straight-at-center for the player's top. */
   private launch(power: number, aim: number) {
+    this.buildButton.mesh.visible = false;
     if (this.phase === 'result') this.toReady();
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;

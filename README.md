@@ -40,6 +40,13 @@ What works:
   the opponent's is random.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
+- **Arena builder:** pinch *Build arena* next to the arena. A panel to its left sets size,
+  shape, floor, wall, theme and the vortex, turntable, rocking and ember toggles; four tools
+  place things by pinching the arena (near, or point and pinch): *Pocket* on the rim adds a
+  pocket, pinching it again makes it 3 points, then removes it; *Rail* on the rim adds or
+  removes a rail; *Pillar* and *Bumper* on the floor add or remove one. Every change shows
+  live. *Test* simulates the arena and says how it plays; *Save & play* stores it in the
+  browser, adds it to the arena rotation and starts a match in it.
 - **Points, first to 4:** pocket, over or burst finish +2, spin finish (the other top
   stops first, or has less spin at the 45 s limit) +1. The score shows on the card.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
@@ -58,7 +65,7 @@ What works:
   between the wide (orange) and the narrow (teal) shape each round.
 
 Not in the prototype yet: top shaping, parts, energy, table-tap waves, pause,
-persistence (see the phase plan in the design document).
+saving progress (only built arenas are saved) (see the phase plan in the design document).
 
 ## Run
 
@@ -109,6 +116,7 @@ The console logs `[MATCH]` lines for placement, launches and results.
 src/game/layout.ts         Arena layout data, rim shapes, validation
 src/game/arenas.ts         The built-in arenas
 src/game/arena-report.ts   Simulated play report for a layout
+src/game/builder.ts        Arena builder panel, placement tools, saved arenas
 src/game/sim.ts            Fight simulation (no three.js): arena from a layout, tops, collisions, verdict
 src/game/hands.ts          Pinch and fingertip input from WebXR hand joints
 src/game/visuals.ts        Generated matcaps, top shapes per type, burst debris, arena, sparks, cord, text card
