@@ -55,7 +55,8 @@ What works:
   and Needle (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
   the opponent's cool teal; the opponent gets a random build each round.
 - **Forge, by hand** (`src/game/forge.ts`): pinch the anvil. The forge is its own place: the arena hides and your top
-  floats large in the air in front of you, tipped toward you, over a ring of light; the
+  floats large in the air ahead and to your right, clear of the wall, tipped toward you, over a
+  ring of light; carry it anywhere and let go, it stays there. The
   parts hang on the wall's tool panel (tips, cores, rings, style, presets) and fly to your hand. Pinch your
   top to pick it up: it follows your hand and turns with it. Pinch a part on the wall and bring
   it to the top (floating or in your other hand): the top comes apart to show where the part

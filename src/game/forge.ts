@@ -91,9 +91,10 @@ const WALL_SCALE = 2.2;
 const BUCKET_AT = new Vector3(ANVIL_AT.x - 0.05, 0, ANVIL_AT.z + 0.12);
 /** Your top floats this much larger than life (arena-local; the arena is drawn larger still). */
 const DISPLAY_SCALE = 1.8;
-/** It floats this far (world m) in front of the eyes and this far below them. */
-const FLOAT_AHEAD = 0.42;
-const FLOAT_BELOW = 0.12;
+/** It first floats this far (world m) ahead of the eyes, to the right and below them, clear of the wall. */
+const FLOAT_AHEAD = 0.35;
+const FLOAT_RIGHT = 0.22;
+const FLOAT_BELOW = 0.2;
 /** The TEST ring on the table: a top released inside it, this low, starts a test round (arena-local). */
 const TEST_R = 0.15;
 const TEST_HEIGHT = 0.14;
@@ -134,8 +135,9 @@ export class Forge {
   private bucket = new Group();
   private display!: TopView;
   /** The top's resting spot on the anvil, and the holder that is carried around. */
-  /** Where your top floats (arena-local), set from the head in place(). */
+  /** Where your top floats (arena-local): first set from the head, then wherever you leave it. */
   private floatSpot = new Vector3(0, 0.2, 0.05);
+  private floatSet = false;
   private halo: Mesh;
   /** Tips the floating top toward the eyes so its face shows; it spins about its own axis inside. */
   private displayTilt = new Group();
@@ -198,6 +200,7 @@ export class Forge {
   }
 
   open() {
+    this.floatSet = false;
     this.build = loadBuild();
     this.rebuildDisplay();
     this.root.visible = true;
@@ -228,10 +231,15 @@ export class Forge {
     this.shelf.visible = on;
   }
 
-  /** Sets where the top floats, in front of the eyes, and turns the bucket toward the head (arena-local). */
+  /** Sets where the top first floats and turns the bucket toward the head (arena-local). */
   place(head: Vector3) {
-    const k = 1 / this.root.parent!.getWorldScale(this.p).x;
-    this.floatSpot.set(head.x * 0.4, head.y - FLOAT_BELOW * k, head.z - FLOAT_AHEAD * k);
+    if (!this.floatSet) {
+      // Once, when the forge opens: ahead and to the right, below the line of sight to the wall.
+      this.floatSet = true;
+      const k = 1 / this.root.parent!.getWorldScale(this.p).x;
+      this.floatSpot.set(head.x + FLOAT_RIGHT * k, head.y - FLOAT_BELOW * k, head.z - FLOAT_AHEAD * k);
+      this.displayHolder.position.copy(this.floatSpot);
+    }
     this.halo.position.set(this.floatSpot.x, this.floatSpot.y - 0.03, this.floatSpot.z);
     this.halo.scale.setScalar(1 + 0.04 * Math.sin(this.time * 3));
     this.face(this.bucket, head);
@@ -287,7 +295,7 @@ export class Forge {
       if (this.heldTop) return;
       this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone() };
       playPick();
-      this.say('Turn it in your hand. Lower it into the TEST ring to test, dunk it in the bucket to save');
+      this.say('Move it anywhere and let go: it stays. TEST ring to test, bucket to save');
       return;
     }
     if (this.heldPart) return;
@@ -332,6 +340,8 @@ export class Forge {
       this.hooks.test(this.build);
       return;
     }
+    // Left anywhere else, it floats right there.
+    this.floatSpot.copy(this.displayHolder.position);
     playPlace();
   }
 
