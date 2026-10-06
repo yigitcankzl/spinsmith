@@ -297,7 +297,26 @@ playable throughout. Step 4 is where the player sees it.
 **Recommended submission scope:** steps 1-5 with 4 rings, 3 cores and 4 tips (48 combos).
 The rest are additions after the core loop feels right.
 
-## 7. Open questions
+## 7. What is built (Oct 6, 2026)
+
+Steps 1-5 of the plan, with the full first set of parts (6 rings, 4 cores, 6 tips, 136 legal
+builds under 40 g):
+
+- `src/game/parts.ts`: part tables, `specFromBuild`, weight, box-style stats. The simulation's
+  three classic types are now presets built from these parts.
+- `src/game/sim.ts`: height, scraping, upper lift, spin direction (sharing and grinding), gear
+  dash, saw chip. Covered by `npm run check:sim`.
+- `npm run report:tops`: the parts were tuned with it to 44-57% average per part, best build
+  71%, while keeping the type loop. Hook and Ball are in no top-20 build yet; Needle wins 80%
+  on Zero-G Dish. Both are for on-device tuning.
+- `src/game/forge.ts`: the forge station (board, spindle, stats card with previews, tap or
+  carry to fit, core lock clicks, weight refusal, Test, Save).
+- Opponents get a random build each round (a classic preset half the time), mostly left spin.
+
+Not built yet: twist-to-lock with the wrist (the core clicks in by itself), engraving,
+the inspection stand, unlocks and several saved builds.
+
+## 8. Open questions
 
 - Should the opponent always pick a counter to your build (harder, more strategic) or a random
   build (easier to learn)? Probably counter only in later matches.

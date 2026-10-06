@@ -14,8 +14,9 @@ What works:
 - The arena is placed about 40 cm in front of the seated player, on a pedestal
   8 cm above the nearest detected table, or on a floating tray when there is no table or the
   table is far below the eyes (standing over a coffee table).
-- **Home screen:** once the arena is placed it waits with both tops and three big buttons in
-  front of it: *Play* starts a match, *Workshop* opens the arena workshop, *Arena: … ▸*
+- **Home screen:** once the arena is placed it waits with both tops and four big buttons in
+  front of it: *Play* starts a match, *Forge* builds your top, *Workshop* opens the arena
+  workshop, *Arena: … ▸*
   switches to the next arena. Pinching here never launches. In a match, a small *Menu* button
   beside the arena returns home, and the match ends back home after 4 points.
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
@@ -38,11 +39,24 @@ What works:
   Ember Ring, Zero-G Dish, Clockwork Spire, Frost Oval and Sumo Square. Pick the arena on the home
   screen. `npm run report:arenas` simulates every
   type matchup on every arena and reports round length, knockouts and type balance.
-- **Three top types** in a rock-paper-scissors loop: Striker (attack) hunts the opponent,
-  Anvil (defense) is heavy and holds the middle, Needle (stamina) spins longest. Attack
-  beats stamina, defense beats attack, stamina beats defense. Shape and tip show the
-  type; your tops are warm orange, the opponent's cool teal. Your type cycles each round,
-  the opponent's is random.
+- **Build your top from parts** (`src/game/parts.ts`, design in `docs/TOP-CUSTOMIZATION.md`):
+  a Ring (contact style and mass: Striker, Hook, Anvil, Halo, Saw, Cog), a Core (height and
+  burst lock: 3-50, 4-60, 9-60, 5-80), a Tip (movement and rail gear: Flat, Rush, Taper,
+  Ball, Needle, Orb), spin direction and color, under a 40 g weight limit (136 legal builds).
+  The parts change the fight: a lower top hits under a taller one, low tops scrape on steep
+  slopes, upper rings lift tops over walls, opposite spins pass spin from the faster top to
+  the slower (Cog rings much more), same spins grind each other down, tips dash on rails by
+  their gear, Saw rings chip toward a burst. The classic Striker (attack), Anvil (defense)
+  and Needle (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
+  the opponent's cool teal; the opponent gets a random build each round.
+- **Forge:** pinch *Forge* on the home screen. A board across the arena holds the parts by tab
+  (Ring, Core, Tip, Style, Presets); your top stands large on a spindle over the arena's
+  middle with a stats card beside it (attack, defense, stamina, dash, burst resistance,
+  weight). Pinch a part and carry it onto your top, or just tap it; a core locks with one click
+  per tooth. Pointing at a part previews its effect on the card (green gains, red losses); an
+  overweight build is refused. *Test* plays a round with your build, *Save* keeps it
+  (saved in the browser) and goes home. `npm run report:tops` plays every build against the
+  others and flags dominant builds and dead parts.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
 - **Arena workshop:** pinch *Workshop* on the home screen. A menu board stands across the
@@ -85,6 +99,7 @@ npm install
 npm run dev          # dev server + managed Chromium with the Quest emulator (https://localhost:8081)
 npm run check:sim    # headless sanity check of the fight simulation
 npm run report:arenas # how each built-in arena plays, by simulation
+npm run report:tops  # how every top build plays against the others, by simulation
 npm run typecheck
 npm run build
 ```

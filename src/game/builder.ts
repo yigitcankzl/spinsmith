@@ -120,7 +120,7 @@ export class Button {
 }
 
 /** A small floating text tag (piece names, row names, the status line). */
-function tag(text: string, width: number, size = 40) {
+export function tag(text: string, width: number, size = 40) {
   const c = document.createElement('canvas');
   c.width = 256;
   c.height = 64;

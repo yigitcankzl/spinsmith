@@ -5,8 +5,11 @@ import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { Arena, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TYPES, verdict } from './sim.js';
-import { ANVIL_SHAPE, ArenaView, Cord, Label, NEEDLE_SHAPE, OPPONENT_COLOR, PLAYER_COLOR, Sparks, STRIKER_SHAPE, TopView } from './visuals.js';
+import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, verdict } from './sim.js';
+import { Forge, loadBuild } from './forge.js';
+import { allBuilds, PRESETS, roleOf, specFromBuild } from './parts.js';
+import type { TopBuild } from './parts.js';
+import { ArenaView, Cord, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
 const PEDESTAL = 0.08;
@@ -50,10 +53,8 @@ const PERFECT_SPIN = 1.1;
 /** Far bumps grow at this rate (m/s) while the pinch is held. */
 const RAY_BUMP_RATE = 0.05;
 
-const SHAPES = [STRIKER_SHAPE, ANVIL_SHAPE, NEEDLE_SHAPE];
-const TYPE_ROLE = ['attack', 'defense', 'stamina'];
 
-type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build';
+type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build' | 'forge';
 
 type RawPlane = { orientation?: string; semanticLabel?: string };
 
@@ -85,10 +86,17 @@ export class MatchSystem extends createSystem({
     toLocal: (world, out) => this.root.worldToLocal(out.copy(world)),
     floorHeight: (n) => this.arena.floorHeight(n),
   });
-  /** A demo round from the workshop's Try it: two AI tops, no score, back to the workshop after. */
+  /** The forge: build your own top from parts. */
+  private forge = new Forge({
+    done: (build) => this.leaveForge(build),
+    exit: () => this.leaveForge(null),
+    test: (build) => this.testBuild(build),
+  });
+  /** A demo round (workshop Try it, forge Test): AI launches, no score, then back where it came from. */
   private demo = false;
+  private demoFrom: 'build' | 'forge' = 'build';
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
-  private hubButtons = [new Button('play', 0.11, 0.04), new Button('workshop', 0.11, 0.04), new Button('arena', 0.15, 0.04)];
+  private hubButtons = [new Button('play', 0.09, 0.04), new Button('forge', 0.09, 0.04), new Button('workshop', 0.09, 0.04), new Button('arena', 0.14, 0.04)];
   private menuButton = new Button('menu', 0.07, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
@@ -105,20 +113,23 @@ export class MatchSystem extends createSystem({
     hasRay: false,
   };
   /** The player's top and the opponent's; their type (spec) changes between rounds. */
-  private mine = new Top(TYPES[0]);
-  private theirs = new Top(TYPES[1]);
+  private mine = new Top(ATTACK);
+  private theirs = new Top(DEFENSE);
   private tops = [this.mine, this.theirs];
   private hums = [new SpinHum(230), new SpinHum(190)];
   private cordTone = new CordTone();
   /** Seconds since the last clash sound, to keep grinding contacts from machine-gunning. */
   private sinceClashSound = 1;
-  /** Types for the coming round are chosen once per round, not on every reset. */
+  /** Builds for the coming round are chosen once per round, not on every reset. */
   private typesPicked = false;
   /** A match just ended: the next ready screen moves on to the next arena. */
   private matchOver = false;
-  /** One view per type for each side: shape from the type, color from the owner. */
-  private myViews = TYPES.map((t, i) => new TopView(SHAPES[i], t, PLAYER_COLOR));
-  private theirViews = TYPES.map((t, i) => new TopView(SHAPES[i], t, OPPONENT_COLOR));
+  /** Your build (from the forge) and the opponent's; each side's view is rebuilt when its build changes. */
+  private myBuild: TopBuild = loadBuild();
+  private theirBuild: TopBuild = { ...PRESETS[1].build, spin: -1 };
+  private myView!: TopView;
+  private theirView!: TopView;
+  private viewKeys = ['', ''];
   private cord = new Cord();
   private sparks = new Sparks();
   private label = new Label();
@@ -171,10 +182,6 @@ export class MatchSystem extends createSystem({
     this.root.name = 'spinsmith-arena';
     this.reticle.visible = false;
     this.root.visible = false;
-    TYPES.forEach((t, i) => {
-      this.myViews[i].root.name = `my-${t.name}`;
-      this.theirViews[i].root.name = `their-${t.name}`;
-    });
     this.label.mesh.position.set(0, 0.17, -0.03);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
@@ -182,18 +189,20 @@ export class MatchSystem extends createSystem({
       this.chargeRing,
       this.reticle,
       this.arenaView.root,
-      ...[...this.myViews, ...this.theirViews].flatMap((v) => [v.root, v.shadowMesh, v.debris]),
       this.sparks.points,
     );
-    this.root.add(this.stage, this.label.mesh, this.builder.root, this.menuButton.mesh, ...this.hubButtons.map((b) => b.mesh));
+    this.setBuilds(this.myBuild, this.theirBuild);
+    this.root.add(this.stage, this.label.mesh, this.builder.root, this.forge.root, this.menuButton.mesh, ...this.hubButtons.map((b) => b.mesh));
     // Home buttons: a row above the near rim, tipped back toward the player.
+    const hubX = [-0.205, -0.1, 0.005, 0.14];
     this.hubButtons.forEach((b, i) => {
-      b.mesh.position.set((i - 1) * 0.135, 0.09, 0.2);
+      b.mesh.position.set(hubX[i], 0.09, 0.2);
       b.mesh.rotation.x = -0.35;
       b.mesh.visible = false;
     });
     this.hubButtons[0].set('Play');
-    this.hubButtons[1].set('Workshop');
+    this.hubButtons[1].set('Forge');
+    this.hubButtons[2].set('Workshop');
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
     this.menuButton.mesh.rotation.y = 0.4;
     this.menuButton.set('Menu');
@@ -271,6 +280,11 @@ export class MatchSystem extends createSystem({
       case 'build':
         this.updateBuilder(dt);
         break;
+      case 'forge':
+        this.player.head.getWorldPosition(this.p);
+        this.forge.place(this.root.worldToLocal(this.p), this.arena.layout.radius);
+        this.forge.update(this.pointers, dt);
+        break;
       case 'ready':
       case 'result':
         if (this.phase === 'result') {
@@ -304,8 +318,8 @@ export class MatchSystem extends createSystem({
     const live = this.phase === 'fight';
     this.tops.forEach((t, i) => this.hums[i].update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time));
     this.sinceClashSound += dt;
-    this.syncViews(this.myViews, this.mine, dt);
-    this.syncViews(this.theirViews, this.theirs, dt);
+    this.myView.sync(this.mine, this.arena, this.time, dt);
+    this.theirView.sync(this.theirs, this.arena, this.time, dt);
     this.sparks.update(dt);
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
@@ -365,12 +379,13 @@ export class MatchSystem extends createSystem({
     this.matchOver = false;
     this.arena.reset(this.arenas[this.arenaIndex]);
     this.arenaView.build(this.arena.layout);
-    this.mine.launch(0, this.SPAWN, 0, 0, 1, 1);
-    this.theirs.launch(0, -this.SPAWN, 0, 0, 1, -1);
+    this.setBuilds(this.myBuild, this.theirBuild);
+    this.mine.launch(0, this.SPAWN, 0, 0, 1, this.myBuild.spin);
+    this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirBuild.spin);
     this.cord.set(null);
     this.menuButton.mesh.visible = false;
     for (const b of this.hubButtons) b.mesh.visible = true;
-    this.hubButtons[2].set(`Arena: ${this.arena.layout.name} ▸`);
+    this.hubButtons[3].set(`Arena: ${this.arena.layout.name} ▸`);
     this.label.set(`SpinSmith\n${this.arena.layout.name}`);
   }
 
@@ -382,6 +397,9 @@ export class MatchSystem extends createSystem({
         this.typesPicked = false;
         this.toReady();
         break;
+      case 'forge':
+        this.openForge();
+        break;
       case 'workshop':
         this.openWorkshop();
         break;
@@ -390,6 +408,62 @@ export class MatchSystem extends createSystem({
         this.toHub();
         break;
     }
+  }
+
+  private openForge() {
+    this.phase = 'forge';
+    for (const b of this.hubButtons) b.mesh.visible = false;
+    this.label.set('');
+    for (const top of this.tops) top.state = 'out';
+    this.forge.open();
+  }
+
+  /** Back home from the forge; a saved build becomes your top. */
+  private leaveForge(build: TopBuild | null) {
+    this.forge.close();
+    if (build) this.myBuild = { ...build };
+    this.toHub();
+  }
+
+  /** Forge Test: your build against a random one, launched by the AI; back to the forge after. */
+  private testBuild(build: TopBuild) {
+    this.forge.root.visible = false;
+    this.demo = true;
+    this.demoFrom = 'forge';
+    this.setBuilds(build, this.randomBuild());
+    this.launch(0.6 + Math.random() * 0.35, (Math.random() - 0.5) * 0.6);
+  }
+
+  /** Builds both sides' fight stats and views (views only rebuild when a build changed). */
+  private setBuilds(mine: TopBuild, theirs: TopBuild) {
+    this.mine.spec = specFromBuild(mine);
+    this.theirs.spec = specFromBuild(theirs);
+    this.mine.hand = mine.spin;
+    this.theirs.hand = theirs.spin;
+    this.theirBuild = theirs;
+    const sides: [TopBuild, number, 0 | 1][] = [
+      [mine, mine.color, 0],
+      [theirs, OPPONENT_COLOR, 1],
+    ];
+    for (const [build, color, i] of sides) {
+      const key = JSON.stringify([build.ring, build.core, build.tip, color]);
+      if (key === this.viewKeys[i]) continue;
+      this.viewKeys[i] = key;
+      const old = i === 0 ? this.myView : this.theirView;
+      old?.dispose();
+      const view = new TopView(build, color);
+      view.root.name = i === 0 ? 'my-top' : 'their-top';
+      this.stage.add(view.root, view.shadowMesh, view.debris);
+      if (i === 0) this.myView = view;
+      else this.theirView = view;
+    }
+  }
+
+  /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
+  private randomBuild(): TopBuild {
+    const pool = Math.random() < 0.5 ? PRESETS.map((p) => p.build) : allBuilds();
+    const b = pool[Math.floor(Math.random() * pool.length)];
+    return { ...b, spin: Math.random() < 0.7 ? -1 : 1, color: OPPONENT_COLOR };
   }
 
   private openWorkshop() {
@@ -413,18 +487,19 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.visible = false;
     this.arena.reset(layout);
     this.demo = true;
-    this.mine.spec = TYPES[Math.floor(Math.random() * TYPES.length)];
-    this.theirs.spec = TYPES[Math.floor(Math.random() * TYPES.length)];
+    this.demoFrom = 'build';
+    this.setBuilds(this.randomBuild(), this.randomBuild());
     this.launch(0.6 + Math.random() * 0.35, (Math.random() - 0.5) * 0.6);
   }
 
-  /** Back to the workshop after a demo round. */
+  /** Back to the workshop or the forge after a demo round. */
   private endDemo() {
     this.demo = false;
-    this.phase = 'build';
+    this.phase = this.demoFrom;
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.arena.reset();
+    if (this.demoFrom === 'forge') this.forge.root.visible = true;
   }
 
   /**
@@ -479,22 +554,13 @@ export class MatchSystem extends createSystem({
     this.toHub();
   }
 
-  /** Shows the view for the top's current type and hides the others. */
-  private syncViews(views: TopView[], top: Top, dt: number) {
-    views.forEach((v, i) => (TYPES[i] === top.spec ? v.sync(top, this.arena, this.time, dt) : v.hide()));
-  }
-
-  /**
-   * Picks this round's types: the player cycles through all three so each gets played,
-   * the opponent is random.
-   */
-  private pickTypes() {
-    this.mine.spec = TYPES[this.round % TYPES.length];
-    this.theirs.spec = TYPES[Math.floor(Math.random() * TYPES.length)];
+  /** This round: your build against a fresh opponent. */
+  private pickBuilds() {
+    this.setBuilds(this.myBuild, this.randomBuild());
   }
 
   private describe(t: TopSpec) {
-    return `${t.name} (${TYPE_ROLE[TYPES.indexOf(t)]})`;
+    return `${t.name} (${roleOf(t)})`;
   }
 
   private place() {
@@ -545,10 +611,10 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.visible = true;
     this.arena.reset();
     // Both tops wait upright at their spawn points.
-    if (!this.typesPicked) this.pickTypes();
+    if (!this.typesPicked) this.pickBuilds();
     this.typesPicked = true;
-    this.mine.launch(0, this.SPAWN, 0, 0, 1, 1);
-    this.theirs.launch(0, -this.SPAWN, 0, 0, 1, -1);
+    this.mine.launch(0, this.SPAWN, 0, 0, 1, this.mine.hand);
+    this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirs.hand);
     this.puller = null;
     this.cord.set(null);
     this.label.set(
@@ -654,14 +720,17 @@ export class MatchSystem extends createSystem({
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
     playLaunch(power, perfect);
-    const dir = aim + LAUNCH_TILT;
-    this.mine.launch(0, this.SPAWN, Math.sin(dir) * speed, -Math.cos(dir) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, 1);
+    const mh = this.mine.hand;
+    const th = this.theirs.hand;
+    // The launch angles into each top's own orbit direction (mirrored for left spin); aim stays as pulled.
+    const dir = aim + LAUNCH_TILT * mh;
+    this.mine.launch(0, this.SPAWN, Math.sin(dir) * speed, -Math.cos(dir) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, mh);
     this.sparks.burst(0, this.arena.height(0, this.SPAWN), this.SPAWN, perfect ? 1 : power * 0.6);
     const aiPower = 0.6 + Math.random() * 0.35;
     const aiAim = (Math.random() - 0.5) * 1.0;
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
     const aiDir = aiAim + LAUNCH_TILT;
-    this.theirs.launch(0, -this.SPAWN, -Math.sin(aiDir) * aiSpeed, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, -1);
+    this.theirs.launch(0, -this.SPAWN, Math.sin(aiDir) * aiSpeed * th, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, th);
     this.phase = 'fight';
     this.elapsed = 0;
     this.accumulator = 0;

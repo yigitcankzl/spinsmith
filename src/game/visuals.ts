@@ -1,6 +1,7 @@
 import {
   AdditiveBlending,
   BufferAttribute,
+  BoxGeometry,
   BufferGeometry,
   CanvasTexture,
   CatmullRomCurve3,
@@ -34,7 +35,9 @@ import {
 import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena-shell.scene-asset.js';
 import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
-import { Arena, Top, TopSpec } from './sim.js';
+import { Arena, Top } from './sim.js';
+import { coreOf, ringOf } from './parts.js';
+import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
 /**
  * Visual style: matte clay bodies, light metal parts, a glowing core.
@@ -110,62 +113,100 @@ const LIGHT_STEEL = makeMatcap('metal', 0xc8ccd6);
 const BRASS = makeMatcap('metal', 0xe2b866);
 const STRIPES = stripeTexture();
 
-/** A top's shape: body silhouette and tip, per type. Color comes from the owner (player or opponent). */
-export interface TopShape {
-  /** Body silhouette as (radius, height) pairs from the tip up. */
-  profile: [number, number][];
-  tip: 'flat' | 'ball' | 'needle';
-  tipMetal: DataTexture;
-  ringMetal: DataTexture;
+/** Tip height (m); the core band sits on the tip and the ring on the core. */
+const TIP_H = 0.005;
+const NEEDLE_H = 0.008;
+const DARK_STEEL = makeMatcap('metal', 0x6d6f78);
+
+/** Merges geometries (positions and normals only) into one, so a part stays one mesh. */
+function merge(parts: BufferGeometry[]): BufferGeometry {
+  const flat = parts.map((g) => (g.index ? g.toNonIndexed() : g));
+  const count = flat.reduce((n, g) => n + g.getAttribute('position').count, 0);
+  const pos = new Float32Array(count * 3);
+  const nor = new Float32Array(count * 3);
+  let o = 0;
+  for (const g of flat) {
+    pos.set(g.getAttribute('position').array as Float32Array, o);
+    nor.set(g.getAttribute('normal').array as Float32Array, o);
+    o += g.getAttribute('position').count * 3;
+  }
+  const out = new BufferGeometry();
+  out.setAttribute('position', new BufferAttribute(pos, 3));
+  out.setAttribute('normal', new BufferAttribute(nor, 3));
+  return out;
 }
 
-/** Striker (attack): low and wide with a flat tip that grips and charges. */
-export const STRIKER_SHAPE: TopShape = {
-  profile: [
-    [0.008, 0.006],
-    [0.02, 0.009],
-    [0.024, 0.013],
-    [0.022, 0.017],
-    [0.012, 0.02],
-    [0.011, 0.026],
-    [0, 0.026],
-  ],
-  tip: 'flat',
-  tipMetal: LIGHT_STEEL,
-  ringMetal: LIGHT_STEEL,
-};
+export function tipHeight(tip: TipShape) {
+  return tip === 'needle' ? NEEDLE_H : TIP_H;
+}
 
-/** Anvil (defense): heavy and thick-walled on a ball tip that holds its ground. */
-export const ANVIL_SHAPE: TopShape = {
-  profile: [
-    [0.01, 0.008],
-    [0.026, 0.011],
-    [0.03, 0.016],
-    [0.03, 0.022],
-    [0.02, 0.026],
-    [0.016, 0.031],
-    [0, 0.031],
-  ],
-  tip: 'ball',
-  tipMetal: BRASS,
-  ringMetal: BRASS,
-};
+/** The tip, standing on y = 0. */
+export function tipMesh(tip: TipShape): Mesh {
+  const h = tipHeight(tip);
+  const mat = new MeshMatcapMaterial({ matcap: tip === 'ball' || tip === 'orb' ? BRASS : LIGHT_STEEL });
+  let g: BufferGeometry;
+  if (tip === 'flat') g = new CylinderGeometry(0.008, 0.0065, h, 20);
+  else if (tip === 'rush') g = new CylinderGeometry(0.0075, 0.0045, h, 20);
+  else if (tip === 'taper') g = new CylinderGeometry(0.0075, 0.0025, h, 20);
+  else if (tip === 'ball') g = new SphereGeometry(h / 2 + 0.0005, 16, 12);
+  else if (tip === 'orb') g = new SphereGeometry(h / 2 + 0.0018, 16, 12);
+  else g = new ConeGeometry(0.006, h, 20).rotateX(Math.PI);
+  const m = new Mesh(g, mat);
+  m.position.y = h / 2;
+  return m;
+}
 
-/** Needle (stamina): tall, mass out on a wide ring, spinning on a needle point. */
-export const NEEDLE_SHAPE: TopShape = {
-  profile: [
-    [0.003, 0.012],
-    [0.012, 0.016],
-    [0.025, 0.022],
-    [0.027, 0.026],
-    [0.014, 0.032],
-    [0.012, 0.04],
-    [0, 0.04],
-  ],
-  tip: 'needle',
-  tipMetal: LIGHT_STEEL,
-  ringMetal: BRASS,
-};
+/** The core band: a dark steel collar whose height is the core's, with one notch per lock tooth. */
+export function coreMesh(core: Core): Mesh {
+  const r = 0.0095;
+  const parts: BufferGeometry[] = [new CylinderGeometry(r, r, core.height, 24)];
+  for (let i = 0; i < core.teeth; i++) {
+    const a = (i / core.teeth) * Math.PI * 2;
+    parts.push(new BoxGeometry(0.002, core.height * 0.7, 0.0025).translate(r, 0, 0).rotateY(a));
+  }
+  const m = new Mesh(merge(parts), new MeshMatcapMaterial({ matcap: DARK_STEEL }));
+  m.position.y = core.height / 2;
+  return m;
+}
+
+/** Contact blades around the ring, shaped by the contact style. */
+function bladesGeometry(ring: Ring, base: number): BufferGeometry | null {
+  if (ring.blades === 0) return null;
+  const widest = ring.profile.reduce((a, b) => (b[0] > a[0] ? b : a));
+  const r = widest[0];
+  const y = base + widest[1];
+  const out: BufferGeometry[] = [];
+  for (let i = 0; i < ring.blades; i++) {
+    const a = (i / ring.blades) * Math.PI * 2;
+    let g: BufferGeometry;
+    if (ring.contact === 'grind') g = new BoxGeometry(0.003, 0.004, 0.003).translate(r + 0.001, 0, 0);
+    else if (ring.id === 'saw') g = new ConeGeometry(0.0022, 0.005, 4).rotateZ(-Math.PI / 2).translate(r + 0.002, 0, 0);
+    else {
+      // A fin: sloped down for smash, up for upper.
+      g = new BoxGeometry(0.008, 0.0025, 0.007)
+        .rotateZ(ring.contact === 'upper' ? 0.45 : -0.45)
+        .translate(r + 0.002, 0, 0);
+    }
+    out.push(g.rotateY(a).translate(0, y, 0));
+  }
+  return merge(out);
+}
+
+/** The ring's meshes (body, metal band, blades), with its bottom at y = base. */
+export function ringMeshes(ring: Ring, color: number, base: number): Mesh[] {
+  const body = new Mesh(
+    new LatheGeometry(ring.profile.map(([r, h]) => new Vector2(r, h + base)), 40),
+    new MeshMatcapMaterial({ matcap: makeMatcap('clay', color), map: STRIPES }),
+  );
+  const metal = new MeshMatcapMaterial({ matcap: ring.contact === 'absorb' ? BRASS : LIGHT_STEEL });
+  const widest = ring.profile.reduce((a, b) => (b[0] > a[0] ? b : a));
+  const band = new Mesh(new TorusGeometry(widest[0], 0.0028, 8, 40).rotateX(Math.PI / 2), metal);
+  band.position.y = base + widest[1];
+  const out: Mesh[] = [body, band];
+  const blades = bladesGeometry(ring, base);
+  if (blades) out.push(new Mesh(blades, metal));
+  return out;
+}
 
 export const PLAYER_COLOR = 0xd6784f;
 export const OPPONENT_COLOR = 0x4f9fb0;
@@ -200,32 +241,23 @@ export class TopView {
   private fallX = 1;
   private fallZ = 0;
 
-  constructor(shape: TopShape, spec: TopSpec, color: number) {
-    const tipHeight = shape.profile[0][1];
-    const body = new Mesh(
-      new LatheGeometry(shape.profile.map(([r, h]) => new Vector2(r, h)), 40),
-      new MeshMatcapMaterial({ matcap: makeMatcap('clay', color), map: STRIPES }),
-    );
-    const tipMat = new MeshMatcapMaterial({ matcap: shape.tipMetal });
-    const tipR = shape.profile[0][0] + 0.002;
-    let tip: Mesh;
-    if (shape.tip === 'flat') tip = new Mesh(new CylinderGeometry(tipR, tipR * 0.8, tipHeight, 20), tipMat);
-    else if (shape.tip === 'ball') tip = new Mesh(new SphereGeometry(tipHeight / 2, 16, 12), tipMat);
-    else tip = new Mesh(new ConeGeometry(tipR + 0.002, tipHeight, 20).rotateX(Math.PI), tipMat);
-    tip.position.y = tipHeight / 2;
-    // Metal ring around the widest part of the body.
-    const widest = shape.profile.reduce((a, b) => (b[0] > a[0] ? b : a));
-    const ring = new Mesh(new TorusGeometry(widest[0], 0.0028, 8, 40).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: shape.ringMetal }));
-    ring.position.y = widest[1];
+  constructor(build: TopBuild, color: number) {
+    const ring = ringOf(build);
+    const core = coreOf(build);
+    const tip = tipMesh(build.tip);
+    const collar = coreMesh(core);
+    collar.position.y += tipHeight(build.tip);
+    const base = tipHeight(build.tip) + core.height;
+    const [body, band, ...blades] = ringMeshes(ring, color, base);
     this.core = new MeshBasicMaterial({ color: this.cool.clone() });
-    const top = shape.profile[shape.profile.length - 1][1];
-    const core = new Mesh(new CircleGeometry(shape.profile[shape.profile.length - 2][0] * 0.55, 24).rotateX(-Math.PI / 2), this.core);
-    core.position.y = top + 0.0005;
-    this.parts = [body, tip, ring, core];
+    const top = base + ring.profile[ring.profile.length - 1][1];
+    const glow = new Mesh(new CircleGeometry(ring.profile[ring.profile.length - 2][0] * 0.55, 24).rotateX(-Math.PI / 2), this.core);
+    glow.position.y = top + 0.0005;
+    this.parts = [body, tip, collar, band, glow, ...blades];
     this.spinner.add(...this.parts);
     this.root.add(this.spinner);
     this.shadow = new Mesh(
-      new CircleGeometry(spec.radius * 1.15, 24).rotateX(-Math.PI / 2),
+      new CircleGeometry(ring.radius * 1.15, 24).rotateX(-Math.PI / 2),
       new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false }),
     );
     // One flying copy per part, sharing geometry and materials.
@@ -235,6 +267,18 @@ export class TopView {
       this.flying.push({ mesh: m, vel: new Vector3(), spin: new Vector3() });
       this.debris.add(m);
     }
+  }
+
+  /** Frees the GPU buffers when the top is rebuilt with other parts. */
+  dispose() {
+    for (const p of [...this.parts, this.shadow]) {
+      p.geometry.dispose();
+      (p.material as MeshBasicMaterial).map?.dispose?.();
+      (p.material as MeshBasicMaterial).dispose();
+    }
+    this.root.removeFromParent();
+    this.shadow.removeFromParent();
+    this.debris.removeFromParent();
   }
 
   /** The shadow lives on the arena floor, not on the tilting top. */
