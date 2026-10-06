@@ -172,7 +172,7 @@ export class Hub {
   }
 
   /** Refreshes what the stations show: your top, and one miniature per arena. */
-  show(arenas: ArenaLayout[], current: number, build: TopBuild, progress: Progress, order: Order | null) {
+  show(arenas: ArenaLayout[], current: number, build: TopBuild, progress: Progress, order: Order | null, tomorrow: Order | null = null) {
     this.drawRank(progress);
     this.root.visible = true;
     // Before the first match the smithy is just your top and the arena: the anvil, the arena
@@ -192,6 +192,7 @@ export class Hub {
       this.board.draw({
         order,
         done: order ? progress.hasOrder(order.date) : false,
+        tomorrow,
         stamps: progress.stamps,
         nextGlow: next,
         rivals: RIVALS.map((r) => ({ name: r.name, level: r.level, met: r.level <= progress.level, marks: progress.marksOf(r.name) })),

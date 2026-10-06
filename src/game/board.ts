@@ -19,6 +19,8 @@ export interface BoardRival {
 export interface BoardState {
   order: Order | null;
   done: boolean;
+  /** Tomorrow's order, teased once today's is done. */
+  tomorrow: Order | null;
   stamps: number;
   /** Stamps needed for the next glow, or null when all are earned. */
   nextGlow: number | null;
@@ -68,7 +70,8 @@ export class SmithBoard {
       while (g.measureText(s.order.text).width > W - 100 && size > 24);
       engrave(g, s.order.text, W / 2, 132, TEXT);
       g.font = `600 36px ${FONT}`;
-      engrave(g, `${s.order.arena} · ${s.done ? 'DONE: a new order comes tomorrow' : 'pinch the board to take it'}`, W / 2, 192, s.done ? '#6fd36f' : STEEL);
+      const next = s.tomorrow ? `DONE · tomorrow: ${s.tomorrow.rival} on ${s.tomorrow.arena}` : 'DONE: a new order comes tomorrow';
+      engrave(g, s.done ? next : `${s.order.arena} · pinch the board to take it`, W / 2, 192, s.done ? '#6fd36f' : STEEL);
     }
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(60, 236, W - 120, 3);

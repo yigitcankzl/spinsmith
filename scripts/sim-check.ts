@@ -479,6 +479,15 @@ TUNING.grace = 0;
     goals.add(o.goal);
   }
   assert.ok(goals.size >= 6, `orders should vary over days (got ${[...goals].join(', ')})`);
+  // Tomorrow's teaser differs from today's order on most days.
+  let differs = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = (k: number) => localDate(new Date(2026, 9, 10 + i + k));
+    const a = dailyOrder(d(0), ctx);
+    const b = dailyOrder(d(1), ctx);
+    if (a.rival !== b.rival || a.arena !== b.arena || a.goal !== b.goal) differs++;
+  }
+  assert.ok(differs >= 6, `tomorrow's order should differ from today's (${differs} of 7)`);
   assert.equal(localDate(new Date(2026, 0, 5)), '2026-01-05');
   // Feasible in play: knockouts and bursts actually happen in simulated rounds on these arenas.
   for (const a of ARENAS) {
