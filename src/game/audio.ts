@@ -8,6 +8,24 @@ let master: GainNode | null = null;
 let noise: AudioBuffer | null = null;
 /** While paused, no sound may wake the context back up. */
 let pausedAudio = false;
+/** Where the next sounds sit left to right (-1..1), set around an event by at(). */
+let panNow = 0;
+
+/** Plays `fn`'s sounds from an arena-local x (the arena is about 0.15-0.18 across a half). */
+function at(x: number, fn: () => void) {
+  panNow = Math.max(-1, Math.min(1, x / 0.18)) * 0.7;
+  fn();
+  panNow = 0;
+}
+
+/** Where a sound goes: the master bus, through a stereo panner when it sits to one side. */
+function out(a: AudioContext): AudioNode {
+  if (panNow === 0 || !a.createStereoPanner) return master!;
+  const p = a.createStereoPanner();
+  p.pan.value = panNow;
+  p.connect(master!);
+  return p;
+}
 
 function audio(): AudioContext | null {
   if (!ctx) {
@@ -54,7 +72,7 @@ function tone(freq: number, gain: number, decay: number, type: OscillatorType = 
   if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + decay);
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-  o.connect(g).connect(master);
+  o.connect(g).connect(out(a));
   o.start(t);
   o.stop(t + decay + 0.02);
 }
@@ -74,13 +92,17 @@ function hiss(gain: number, decay: number, f0: number, f1 = f0, q = 1, at = 0) {
   const g = a.createGain();
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-  src.connect(f).connect(g).connect(master);
+  src.connect(f).connect(g).connect(out(a));
   src.start(t, Math.random() * 0.5);
   src.stop(t + decay + 0.02);
 }
 
 /** Metal-on-metal clash: a noisy crack plus inharmonic ringing partials. */
-export function playClash(strength: number) {
+export function playClash(strength: number, x = 0) {
+  at(x, () => clash(strength));
+}
+
+function clash(strength: number) {
   const s = Math.min(1, Math.max(0.15, strength));
   hiss(0.5 * s, 0.06, 4000, 2500, 0.8);
   const base = 1500 + Math.random() * 400;
@@ -90,9 +112,11 @@ export function playClash(strength: number) {
 }
 
 /** Rail dash: a rising zip. */
-export function playDash() {
-  hiss(0.35, 0.3, 800, 5000, 3);
-  tone(300, 0.08, 0.3, 'sawtooth', 0, 900);
+export function playDash(x = 0) {
+  at(x, () => {
+    hiss(0.35, 0.3, 800, 5000, 3);
+    tone(300, 0.08, 0.3, 'sawtooth', 0, 900);
+  });
 }
 
 /** Launch whoosh scaled by power; a perfect rip adds a bright ping. */
@@ -102,21 +126,25 @@ export function playLaunch(power: number, perfect: boolean) {
 }
 
 /** Dropping into a pocket: a hollow thunk and a falling tone. */
-export function playPocket() {
-  tone(140, 0.4, 0.3, 'sine', 0, 55);
-  hiss(0.2, 0.15, 900, 300, 2);
+export function playPocket(x = 0) {
+  at(x, () => {
+    tone(140, 0.4, 0.3, 'sine', 0, 55);
+    hiss(0.2, 0.15, 900, 300, 2);
+  });
 }
 
 /** Over the wall: a whoosh off into the distance. */
-export function playOver() {
-  hiss(0.35, 0.5, 3000, 400, 2);
+export function playOver(x = 0) {
+  at(x, () => hiss(0.35, 0.5, 3000, 400, 2));
 }
 
 /** Burst: an explosive crack and scattering clinks of the parts. */
-export function playBurst() {
-  hiss(0.7, 0.4, 2500, 300, 0.6);
-  tone(90, 0.5, 0.35, 'sine', 0, 40);
-  for (let i = 0; i < 6; i++) tone(2000 + Math.random() * 2500, 0.06, 0.12, 'triangle', 0.05 + i * 0.07 + Math.random() * 0.04);
+export function playBurst(x = 0) {
+  at(x, () => {
+    hiss(0.7, 0.4, 2500, 300, 0.6);
+    tone(90, 0.5, 0.35, 'sine', 0, 40);
+    for (let i = 0; i < 6; i++) tone(2000 + Math.random() * 2500, 0.06, 0.12, 'triangle', 0.05 + i * 0.07 + Math.random() * 0.04);
+  });
 }
 
 /** Running out of spin: the clatter of a toppling top. */
@@ -269,4 +297,60 @@ export function playMachine() {
 export function playDrawer() {
   hiss(0.14, 0.08, 2500, 1200, 1);
   tone(700, 0.06, 0.05, 'triangle', 0.13);
+}
+
+/**
+ * A quiet forge loop under home, the forge and the workshop: a low bellows drone and a hammer
+ * on the anvil every other beat, ducked under a fight. Synthesized and scheduled a beat ahead.
+ */
+export class ForgeLoop {
+  private bus: GainNode | null = null;
+  private drone: OscillatorNode | null = null;
+  private next = 0;
+  private beat = 0;
+
+  /** level 0..1; call every frame. */
+  update(level: number) {
+    const a = audio();
+    if (!a || !master) return;
+    if (!this.bus) {
+      this.bus = a.createGain();
+      this.bus.gain.value = 0;
+      this.bus.connect(master);
+      const f = a.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 180;
+      this.drone = a.createOscillator();
+      this.drone.type = 'sawtooth';
+      this.drone.frequency.value = 55;
+      const g = a.createGain();
+      g.gain.value = 0.05;
+      this.drone.connect(f).connect(g).connect(this.bus);
+      this.drone.start();
+      this.next = a.currentTime + 0.1;
+    }
+    this.bus.gain.setTargetAtTime(level, a.currentTime, 0.4);
+    // Schedule the coming beat (0.75 s): a hammer ring on even beats, a soft tap on odd ones.
+    while (this.next < a.currentTime + 0.2) {
+      const t = this.next;
+      const even = this.beat % 2 === 0;
+      const ring = (freq: number, gain: number, decay: number) => {
+        const o = a.createOscillator();
+        const g = a.createGain();
+        o.type = 'triangle';
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(gain, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+        o.connect(g).connect(this.bus!);
+        o.start(t);
+        o.stop(t + decay + 0.02);
+      };
+      if (even) {
+        ring(1320, 0.05, 0.5);
+        ring(1320 * 2.76, 0.02, 0.3);
+      } else ring(880, 0.02, 0.15);
+      this.beat++;
+      this.next += 0.75;
+    }
+  }
 }

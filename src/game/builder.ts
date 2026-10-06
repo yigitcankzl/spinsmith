@@ -721,7 +721,10 @@ export class Builder {
       if (i !== this.tab) this.showTab(i, true);
       return;
     }
-    if (PLATES[i] === 'BACK') return this.fold('in', () => this.hooks.exit());
+    if (PLATES[i] === 'BACK') {
+      playDrawer();
+      return this.fold('in', () => this.hooks.exit());
+    }
     // TRY, or past the plates: the save slot.
     const problem = validate(this.draft);
     if (problem) return this.reject(problem);

@@ -1,5 +1,5 @@
 import { AdditiveBlending, CircleGeometry, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, playCrunch, playLocked, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
+import { CordTone, ForgeLoop, playCrunch, playLocked, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -239,6 +239,8 @@ export class MatchSystem extends createSystem({
   private charges = new ShapingCharges();
   /** Rivals from level 6 shape too: their own charges, their last ramp, and its cyan marks. */
   private rivalCharges = new ShapingCharges();
+  /** The quiet forge loop: up at home and in the workshops, ducked under a fight. */
+  private loop = new ForgeLoop();
   private rivalShapeAt = -9;
   private rivalMarks = new ShapeMarks(0x4fd1ff);
   /** After a finish your shape caused, the visuals play slowly for a moment (real seconds left). */
@@ -441,6 +443,7 @@ export class MatchSystem extends createSystem({
       this.placeRoot();
     }
     this.easeToTable(dt);
+    this.loop.update(this.phase === 'hub' || this.phase === 'forge' || this.phase === 'build' ? 0.6 : this.phase === 'ready' ? 0.3 : 0.1);
     this.handle.visible = this.phase === 'hub';
     switch (this.phase) {
       case 'placing':
@@ -1315,20 +1318,20 @@ export class MatchSystem extends createSystem({
           this.accumulator = 0;
         }
         if (this.sinceClashSound > 0.06) {
-          playClash(clash.strength);
+          playClash(clash.strength, clash.x);
           this.sinceClashSound = 0;
         }
       }
       for (const t of this.tops) {
         if (t.sinceBump === 0) {
           this.arenaView.flashBumper(t.x, t.z);
-          playClash(0.5);
+          playClash(0.5, t.x);
           this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.5);
         }
         if (t.sinceDash !== 0) continue;
         this.arenaView.flashRail(t.x, t.z);
         this.impacts.dash(t.x, this.arena.height(t.x, t.z), t.z, t.vx, t.vz);
-        playDash();
+        playDash(t.x);
         this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.8);
       }
       const v = verdict(this.mine, this.theirs, this.elapsed);
@@ -1354,9 +1357,9 @@ export class MatchSystem extends createSystem({
     const name = (t: Top) =>
       FINISH_WORD[t.finish ?? 'spin'];
     for (const t of this.tops) {
-      if (t.finish === 'pocket') playPocket();
-      else if (t.finish === 'over') playOver();
-      else if (t.finish === 'burst') playBurst();
+      if (t.finish === 'pocket') playPocket(t.x);
+      else if (t.finish === 'over') playOver(t.x);
+      else if (t.finish === 'burst') playBurst(t.x);
       else if (t.finish === 'spin') playTopple();
     }
     if (v !== 2) playResult(v === 1);
