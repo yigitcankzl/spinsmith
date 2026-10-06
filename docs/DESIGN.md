@@ -2,6 +2,10 @@
 
 Meta VR Start Developer Competition 2026 · **Gaming – New Experience** · deadline Nov 18, 2026, 12:00 PT (target Nov 17)
 
+> The original design. Arena shaping has since become two verbs, the **ramp** (replacing the
+> bump and the wave) and the **well** (replacing the dent), with charges earned by clashing:
+> see [ARENA-SHAPING.md](ARENA-SHAPING.md).
+
 ---
 
 ## 1. One sentence

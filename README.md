@@ -2,7 +2,7 @@
 
 A hands-first mixed reality spinning-top battler for Meta Quest, built with the
 Immersive Web SDK (IWSDK). Rip your top into an arena on your real table, then
-steer the fight by pulling bumps up out of the arena floor and pressing dents into it.
+steer the fight by pulling ramps up out of the arena floor and pressing wells into it.
 
 Entry for the Meta VR Start Developer Competition 2026 (Gaming – New Experience).
 Design document: [docs/DESIGN.md](docs/DESIGN.md).
@@ -72,7 +72,7 @@ What works:
   finished the home is just your top on its stand (a breathing ring calls you to it) and the
   arena; the anvil, the arena shelf and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
-  the rival where lifting would push it, until your first bump. Finishing the first match, won or
+  the rival where lifting would push it, until your first ramp. Finishing the first match, won or
   lost, earns the Rush tip: the anvil appears and calls for it, the forge highlights only that
   part, and after saving the stand calls you back for the rematch.
 - **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
@@ -108,13 +108,17 @@ What works:
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail dash, pocket,
   burst, topple and result jingles.
-- **Arena moves during the fight:** pinch the floor and lift to raise a bump
-  (it glows warm); press a fingertip into the floor to make a dent. Shapes relax
-  back to flat in 2–3 seconds and affect both tops.
+- **Arena moves during the fight** (`docs/ARENA-SHAPING.md`): pinch the floor, lift and pull
+  sideways to raise a ramp (lift sets its strength, the pull which way it throws a top); press a
+  fingertip into the floor to make a well that catches and slows a top. A ghost shows the ramp
+  while pinching, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
+  shape affects both tops. Two charges, shown as sparks on the near rim: a shape spends one, a
+  strong clash or about 6 s refills one, a hand keeps one live shape, and nothing can be shaped
+  in the first 2.5 s. A finish within 1.5 s of your shape names it ("YOUR RAMP → POCKET").
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on
   contact, lean into hits, wobble as spin drains, then topple.
-- **Far bumps:** point the hand ray at the floor during a fight and hold the pinch to
-  raise a bump there. A small blue dot marks where the ray meets the arena floor. In the
+- **Far ramps:** point the hand ray at the floor during a fight and hold the pinch to
+  raise a ramp there; its place locks when the pinch starts. A small blue dot marks where the ray meets the arena floor. In the
   emulator's play mode a left click is a pinch, so the game is playable by looking
   around with the mouse and click-holding.
 - Result card with the finish and score, then pinch again for the next round. Your top alternates
