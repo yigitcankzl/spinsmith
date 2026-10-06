@@ -135,7 +135,6 @@ own rays rarely line up with what you are looking at.
 | `N` | Hold to press a dent where you are looking (during a fight) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Burst the opponent now (during a fight) |
-| `A` | Switch to the next arena (outside a fight) |
 | hold `1` / `2` + mouse | Move only the left / right hand across the view (the head stays still); the wheel moves it nearer or farther |
 | `R` | Reset to the ready screen |
 | `P` | Re-place the arena in front of the current head pose |

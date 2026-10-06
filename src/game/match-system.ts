@@ -227,11 +227,6 @@ export class MatchSystem extends createSystem({
         this.keys.add(e.code);
         if (e.code === 'KeyR') this.toReady();
         if (e.code === 'KeyP') this.phase = 'placing';
-        if (e.code === 'KeyA' && (this.phase === 'hub' || this.phase === 'ready')) {
-          this.nextArena();
-          if (this.phase === 'hub') this.toHub();
-          else this.toReady();
-        }
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
         if (e.code === 'KeyK' && this.phase === 'fight') {
           // Burst the opponent now, to see the burst finish.
@@ -343,11 +338,6 @@ export class MatchSystem extends createSystem({
     this.arena.reset(layout);
     this.arenaView.build(layout);
     console.log(`[MATCH] arena ${layout.name}`);
-  }
-
-  private nextArena() {
-    this.arenaIndex = (this.arenaIndex + 1) % this.arenas.length;
-    this.setArena(this.arenas[this.arenaIndex]);
   }
 
   /** Shows a layout in the arena without changing the rotation (builder preview). */
