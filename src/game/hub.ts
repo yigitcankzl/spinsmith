@@ -1,9 +1,10 @@
 /**
- * The home screen as a smithy, with no buttons: things to pick up, on the table and on the wall.
+ * The home screen as one machine, with no buttons: things to pick up on the arena's near rim.
  * - Your top waits in its dock on the arena's near rim: carry it into the arena (or tap it) to play.
  * - A small anvil on the near rim's right opens the forge: the arena itself turns into it.
+ * - A blueprint on the near rim opens the arena workshop: the arena turns into a drafting table.
  * - A row of arena miniatures floats behind the arena: point at one and pinch, it flies to your
- *   hand; drop it on the arena (or tap it) to switch. The blueprint at the end opens the workshop.
+ *   hand; drop it on the arena (or tap it) to switch.
  * Table things are arena-local (arena center at the origin, +Z toward the player).
  */
 import {
@@ -45,9 +46,10 @@ const HAND_LOSS_GRACE = 0.1;
 /** Near-rim stations (arena-local): your top's dock at the left, the forge's anvil at the right. */
 export const FORGE_AT = new Vector3(0.14, 0, 0.15);
 const DOCK_AT = new Vector3(-0.14, 0, 0.15);
+const BLUEPRINT_AT = new Vector3(0.08, 0, 0.185);
 /** The anvil and the dock on the rim are small models of the full ones. */
 const RIM_SCALE = 0.42;
-/** Miniatures on the wall shelf: this much larger than on a table, this far apart, this many a row. */
+/** Miniatures on the arena shelf: this much larger than on a table, this far apart, this many a row. */
 const WALL_MINI_SCALE = 2.4;
 const WALL_MINI_GAP = 0.17;
 const WALL_ROW = 4;
@@ -118,6 +120,7 @@ export class Hub {
     this.buildShelf();
     this.buildAnvil();
     this.buildStand();
+    this.buildBlueprint();
     // The miniatures float in a row behind the arena's far rim, to the right of the notes (drawn at
     // wall size: the arena's space is twice as large as the world).
     this.shelf.position.set(0.2, 0.13, -0.28);
@@ -281,7 +284,7 @@ export class Hub {
     this.labels.push(l);
   }
 
-  /** The arena shelf on the wall: planks for the miniatures and the blueprint at the end. */
+  /** The arena shelf behind the arena: a glowing ledge under each row of miniatures. */
   private buildShelf() {
     const wood = new MeshMatcapMaterial({ matcap: GRAPHITE });
     for (let r = 0; r < 2; r++) {
@@ -293,17 +296,27 @@ export class Hub {
     const label = tag('ARENAS', 0.2, 46);
     label.position.set(-WALL_MINI_GAP * 1.5, 0.12, 0.01);
     this.shelf.add(label);
-    // The blueprint: a rolled-up plan at the end of the lower shelf opens the workshop.
+  }
+
+  /** The blueprint: a rolled-up plan on the near rim, between the level plate and the anvil. */
+  private buildBlueprint() {
     const blueprint = new Group();
-    const roll = new Mesh(new CylinderGeometry(0.02, 0.02, 0.15, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x5f8fc9) }));
-    const band = new Mesh(new CylinderGeometry(0.021, 0.021, 0.012, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
+    const roll = new Mesh(new CylinderGeometry(0.007, 0.007, 0.055, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x5f8fc9) }));
+    const band = new Mesh(new CylinderGeometry(0.0076, 0.0076, 0.007, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
     blueprint.add(roll, band);
-    const home = new Vector3(WALL_MINI_GAP * 1.5, -0.2 - 0.02, 0.05);
-    blueprint.position.copy(home);
-    const build = tag('Build arena', 0.16, 40);
-    build.position.set(home.x, home.y + 0.06, 0.06);
-    this.shelf.add(blueprint, build);
-    this.items.push({ action: { kind: 'workshop' }, carry: false, model: blueprint, home });
+    const holder = new Group();
+    holder.add(blueprint);
+    blueprint.rotation.y = -0.5;
+    const home = new Vector3(BLUEPRINT_AT.x, TABLE_Y + 0.0075 + 0.012, BLUEPRINT_AT.z);
+    holder.position.copy(home);
+    const cradle = new Mesh(new BoxGeometry(0.04, 0.012, 0.016).translate(0, 0.006, 0), new MeshMatcapMaterial({ matcap: GRAPHITE }));
+    cradle.position.set(BLUEPRINT_AT.x, TABLE_Y, BLUEPRINT_AT.z);
+    cradle.rotation.y = -0.5;
+    const build = tag('BUILD', 0.07, 46);
+    build.position.set(home.x, home.y + 0.035, home.z);
+    this.labels.push(build);
+    this.root.add(cradle, holder, build);
+    this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home });
   }
 
   private fillRack(arenas: ArenaLayout[], current: number, locks: (string | null)[]) {

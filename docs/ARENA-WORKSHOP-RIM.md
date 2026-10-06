@@ -111,3 +111,19 @@ About 5.5 days. After it, every activity happens on the one machine on the table
   `new Worker(new URL('./check-worker.ts', import.meta.url), { type: 'module' })`; the node report
   workers stay as they are.
 - **Real tables:** the tabs sit lowest; reach on a real table is a headset check, as for the forge.
+
+---
+
+## 6. Status (Oct 6, 2026): steps 1-7 done
+
+| Step | Result |
+|---|---|
+| 1 `rim.ts` | `RimTabs` (any number of engraved plates on a row or an arc, one mesh, one draw call), `popIn`, `DialPlate`; the forge uses them unchanged in look |
+| 2 Tabs and rail | Six drawer tabs on the near rim's arc, each turned to face the seated player so the ends still read; a brass rail across the near rim with the open drawer's pieces and an engraved name strip; the rail steps away while a piece is carried |
+| 3 Actions | Back at the rail's left end, Try and Save at its right end (the arc ends were hidden behind the rail in testing, so the actions moved onto it) |
+| 4 Far plate and worker | The draft's name and form, three dials (round length, KO rate, balance) and the warning or last message; `check-worker.ts` runs `reportArena` with one round per pair after every change, a change during a check queues one more |
+| 5 Drafting look | Blueprint rings and spokes over the floor (one line mesh) and four brass knobs on the rim; the tools fold out in 0.6 s, fold away for Try and when leaving, and unfold after the demo |
+| 6 Entry and the wall | The blueprint lies on the near rim beside the anvil; `wall.ts` is deleted, the match bar lives in `match-bar.ts` |
+| 7 Gates | Typecheck, build (the worker is its own chunk), `check:sim`; draw calls workshop 118 → 96, hub 192, forge 162, fight 112; flows tested: place a pocket, change the floor, Try and back, Save & play, Back |
+
+Screenshots: `docs/review/home.png`, `docs/review/workshop.png`.

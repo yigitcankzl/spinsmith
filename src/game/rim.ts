@@ -23,12 +23,17 @@ export function rowSpots(n: number, gap: number, z: number, y: number): TabSpot[
   return Array.from({ length: n }, (_, i) => ({ at: new Vector3((i - (n - 1) / 2) * gap, y, z), yaw: 0 }));
 }
 
-/** Tab centers along the near rim's arc: radius r, spanning `span` radians centered on +Z. */
-export function arcSpots(n: number, r: number, span: number, y: number): TabSpot[] {
+/**
+ * Tab centers along the near rim's arc: radius r, spanning `span` radians centered on +Z, each
+ * turned to face the seated player at arena-local z = viewer (so the ends still read).
+ */
+export function arcSpots(n: number, r: number, span: number, y: number, viewer = 0.32): TabSpot[] {
   return Array.from({ length: n }, (_, i) => {
     // From the player's left (-X) to the right (+X).
     const a = Math.PI / 2 + span / 2 - (span * i) / Math.max(1, n - 1);
-    return { at: new Vector3(Math.cos(a) * r, y, Math.sin(a) * r), yaw: Math.PI / 2 - a };
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    return { at: new Vector3(x, y, z), yaw: Math.atan2(-x, viewer - z) };
   });
 }
 

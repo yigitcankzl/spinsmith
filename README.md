@@ -14,18 +14,15 @@ What works:
 - The arena is placed about 40 cm in front of the seated player, on a pedestal
   8 cm above the nearest detected table, or on a floating tray when there is no table or the
   table is far below the eyes (standing over a coffee table).
-- **The room is the smithy** (`src/game/wall.ts`, `src/game/hub.ts`): the arena sits on your
-  table, drawn twice its simulation size (about 60 cm across). At home, your top waits in its dock
-  on the near rim's left (carry it into the arena or tap it to play), a small anvil on the near
-  rim's right opens the forge, your level sits on a plate between them, and a row of arena
-  miniatures floats behind the arena: point at
-  one and pinch, it flies to your hand; drop it on the arena (or tap it) to switch. The blueprint
-  at the end opens the workshop. The smithy wall hangs on the real wall straight ahead (a
-  detected wall plane, or a virtual wall 1.6 m ahead) only when it has a use: in the forge and
-  the workshop it is a board with the parts or pieces on the left (they fly to your hand too);
-  in a match the wall steps away and a compact fighting-game bar hangs just over the arena's far
-  rim (each top's spin draining as a health bar, points as pips, the round's result in the
-  middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
+- **One machine on the table** (`src/game/hub.ts`, `src/game/rim.ts`): the arena sits on your
+  table, drawn twice its simulation size (about 60 cm across), and everything else is built into
+  it. At home, your top waits in its dock on the near rim's left (carry it into the arena or tap
+  it to play), a small anvil on the near rim's right opens the forge, a blueprint beside it opens
+  the arena workshop, your level sits on a plate between them, and a row of arena miniatures
+  floats behind the arena: point at one and pinch, it flies to your hand; drop it on the arena
+  (or tap it) to switch. In a match a fighting-game bar is set into the far rim
+  (`src/game/match-bar.ts`: each top's spin draining as a health bar, points as pips, the
+  round's result in the middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
   the match ends back home after 4 points.
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
@@ -92,19 +89,23 @@ What works:
   Progress is saved in the browser.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
-- **Arena workshop:** pinch the blueprint on the arena rack. A menu board stands at the rack,
-  left of the arena and facing you: tabs on top (Place, Shape, Floor, Wall, Theme,
-  Extras), and the chosen category's pieces shown large in one row below, sliding in when the
-  tab changes.
+- **Arena workshop** (`src/game/builder.ts`, `docs/ARENA-WORKSHOP-RIM.md`): pinch the
+  blueprint and the arena turns into a drafting table: blueprint lines draw over its floor, brass
+  knobs mark the rim, six drawer tabs fold out along the near rim's arc (Place, Shape, Floor,
+  Wall, Theme, Extras), a brass rail across the near rim holds the open drawer's pieces with
+  their names engraved below, Back sits at the rail's left end and Try and Save at its right, and
+  a plate on the far rim shows the draft's name and form with three dials: median round length,
+  knockout rate and type balance. The draft is checked in a worker (`src/game/check-worker.ts`)
+  after every change, so the dials follow your edits without stalling a frame.
   The pieces: pockets, rails, pillars and bumpers to place; circle, oval and square plates;
   miniature floors (bowl, flat, hill, ridge, tiers); wall rings (low, standard, high, none);
   theme gems; and extras (vortex, turntable, rocking, embers). Pinch a piece, carry it over the arena and let go: pockets and rails snap to the
   rim where you drop them, pillars and bumpers stand where you drop them, the others change
   the arena. Pieces on the arena can be picked up and moved, or dropped off the arena to
   remove them; a quick tap on a pocket flips it between 2 and 3 points. Pinch the rim and
-  pull to resize. *Try it* plays an AI-vs-AI demo round in the draft (no points) and shows
-  how it played; *Save & play* stores the arena in the browser, adds it to the rotation and
-  starts a match in it.
+  pull to resize; the rail steps away while a piece is carried. *Try* folds the tools away and
+  plays an AI-vs-AI demo round in the draft (no points), then unfolds them; *Save* stores the
+  arena in the browser, adds it to the rotation and starts a match in it.
 - **Points, first to 4:** pocket, over or burst finish +2, spin finish (the other top
   stops first, or has less spin at the 45 s limit) +1. The score shows on the card.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
@@ -184,7 +185,10 @@ The console logs `[MATCH]` lines for placement, launches and results.
 src/game/layout.ts         Arena layout data, rim shapes, validation
 src/game/arenas.ts         The built-in arenas
 src/game/arena-report.ts   Simulated play report for a layout
-src/game/builder.ts        Arena workshop: piece tray, drag and drop, resize, saved arenas
+src/game/builder.ts        Arena workshop: drafting table, piece rail, drag and drop, resize, saved arenas
+src/game/check-worker.ts   The workshop's arena check, off the main thread
+src/game/rim.ts            The machine's shared tabs, pop-in and dial plate
+src/game/match-bar.ts      The match bar on the far rim
 src/game/sim.ts            Fight simulation (no three.js): arena from a layout, tops, collisions, verdict
 src/game/hands.ts          Pinch and fingertip input from WebXR hand joints
 src/game/visuals.ts        Generated matcaps, top shapes per type, burst debris, arena, sparks, cord, text card

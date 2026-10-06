@@ -19,6 +19,8 @@ export default defineConfig({
     rollupOptions: { input: './index.html' },
   },
   esbuild: { target: 'esnext' },
+  // The workshop's arena check runs in a module worker (src/game/check-worker.ts).
+  worker: { format: 'es' },
   // @drawcall/uikitml otherwise pulls a second three/@pmndrs/uikit graph
   // (three@0.185 vs app super-three@0.181). Duplicate Component classes break
   // instanceof checks → "Only pmndrs/uikit components can be added as children".

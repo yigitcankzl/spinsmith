@@ -5,10 +5,11 @@ import {
   CanvasTexture,
   CircleGeometry,
   CylinderGeometry,
+  Float32BufferAttribute,
   Group,
   LatheGeometry,
-  Matrix4,
-  Object3D,
+  LineBasicMaterial,
+  LineSegments,
   Mesh,
   MeshBasicMaterial,
   MeshMatcapMaterial,
@@ -20,9 +21,11 @@ import {
   Vector2,
   Vector3,
 } from '@iwsdk/core';
-import { arenaWarning, reportArena } from './arena-report.js';
-import { FONT, glass, GLASS_LIGHT, glassMesh, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
-import { playPick, playPlace, playRemove } from './audio.js';
+import { arenaWarning } from './arena-report.js';
+import type { ArenaReport } from './arena-report.js';
+import { engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
+import { arcSpots, DialPlate, popIn, RimTabs } from './rim.js';
+import { playDrawer, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
 import { Arena } from './sim.js';
@@ -237,19 +240,30 @@ const TRAY: [string, Piece[]][] = [
   ['Theme', (['forge', 'stone', 'clockwork', 'ice'] as Theme[]).map((value) => ({ kind: 'theme', value }))],
   ['Extras', (['vortex', 'spinner', 'tilt', 'shrink'] as const).map((value) => ({ kind: 'extra', value }))],
 ];
-/** Spacing of the pieces in the menu row (m) and how much larger than life they are shown. */
+/** Arena-local layout of the drafting table (the arena center is the origin, +Z toward the player). */
+/** The drawer tabs along the near rim's arc, and the actions at the rail's ends. */
+const PLATES = [...TRAY.map(([label]) => label.toUpperCase()), 'BACK', 'TRY', 'SAVE'];
+const DRAWERS = TRAY.length;
+const PLATE_R = 0.228;
+const PLATE_SPAN = 1.42;
+const PLATE_Y = -0.014;
+const PLATE_W = 0.04;
+const PLATE_H = 0.021;
+/** The tool rail across the near rim: its pieces this far apart, this much larger than life. */
+const RAIL_Z = 0.2;
+const RAIL_Y = 0.065;
 const ITEM_GAP = 0.046;
-const ITEM_SCALE = 1.6;
-
-/** The board hangs on the smithy wall, far from the eyes, so it is drawn this much larger (world). */
-const MENU_SCALE = 3.2;
+const ITEM_SCALE = 0.95;
+/** The check's plate stands on the far rim, past the largest arena. */
+const PLATE_AT = new Vector3(0, 0.1, -0.23);
+/** The tools fold out (and back for Try it) in this long (s). */
+const FOLD_TIME = 0.6;
 
 interface Slot {
   piece: Piece;
-  /** Index of its category tab. */
+  /** Index of its drawer. */
   tab: number;
   model: Group;
-  name: Mesh;
   home: Vector3;
 }
 
@@ -274,85 +288,88 @@ export interface BuilderHooks {
   floorHeight(n: number): number;
 }
 
+/**
+ * The arena workshop as a drafting table: the arena itself is the canvas. Drawer tabs and the
+ * Back, Try and Save plates follow the near rim's arc, the open drawer's pieces hang on a rail
+ * across the near rim, blueprint lines and brass knobs mark the draft, and a plate on the far rim
+ * shows how the draft plays (checked in a worker after every change).
+ */
 export class Builder {
   /** Lives in arena-local space (a child of the arena root). */
   readonly root = new Group();
   draft!: ArenaLayout;
-  private tray = new Group();
-  private slots: Slot[] = [];
-  private tabs: Button[] = [];
-  /** Tabs and action buttons together, for hit tests. */
-  private pressables: Button[] = [];
+  /** 0 folded .. 1 open. */
+  opened = 0;
+  private folding: 'in' | 'out' | null = null;
+  /** What happens once the tools have folded away. */
+  private afterFold: (() => void) | null = null;
+  private tools = new Group();
   private items = new Group();
+  private slots: Slot[] = [];
+  private names: Mesh;
+  private namesCanvas = document.createElement('canvas');
+  private namesTex: CanvasTexture;
+  private namesKey = '';
+  private plates = new RimTabs(PLATES.slice(0, DRAWERS), arcSpots(DRAWERS, PLATE_R, PLATE_SPAN, PLATE_Y), PLATE_W, PLATE_H);
+  private actions = new RimTabs(
+    PLATES.slice(DRAWERS),
+    [-0.16, 0.14, 0.185].map((x) => ({ at: new Vector3(x, RAIL_Y, RAIL_Z), yaw: 0 })),
+    PLATE_W,
+    PLATE_H,
+    0.6,
+  );
+  private plateGroup = new Group();
+  private dial = new DialPlate();
+  private guides = new Group();
   private tab = 0;
-  /** Sliding transition between tabs: current x offset of the piece row (m). */
-  private slide = 0;
+  private tabT = 1;
   private held: Held | null = null;
-  private buttons: Button[] = [];
-  private status: Mesh;
-  private statusText = '';
+  private message = '';
+  private hinted: string | null = null;
   private time = 0;
+  /** The draft's check: the worker, the latest report, and whether a newer draft waits. */
+  private worker: Worker | null = null;
+  private checkId = 0;
+  private checking = false;
+  private checkAgain = false;
+  private report: ArenaReport | null = null;
   private readonly p = new Vector3();
   private readonly q = new Vector3();
   private readonly hit = new Vector3();
-  private readonly up = new Vector3();
-  private readonly right = new Vector3();
-  private readonly depth = new Vector3();
-  private readonly basis = new Matrix4();
   private logged = true;
 
   constructor(private readonly hooks: BuilderHooks) {
     this.root.name = 'arena-workshop';
-    // A menu board standing across the arena, facing the player. Tabs on top pick a category; that
-    // category's pieces sit big in one row below; pinch one and carry it over the arena.
-    // Panel-local axes: x right, y up, +z toward the eyes.
-    this.tray.scale.setScalar(MENU_SCALE);
-    // Opaque, so it never blends over the tabs and pieces in front of it.
-    const back = glassMesh(0.24, 0.17, UI_STEEL);
-    back.position.z = -0.004;
-    this.tray.add(back);
-    TRAY.forEach(([label], t) => {
-      const b = new Button(`tab:${t}`, 0.036, 0.02);
-      b.set(label);
-      b.mesh.position.set((t - (TRAY.length - 1) / 2) * 0.038, 0.048, 0);
-      this.tabs.push(b);
-      this.tray.add(b.mesh);
-    });
-    this.tray.add(this.items);
+    // The rail: a brass bar across the near rim; the open drawer's pieces stand on it, their
+    // names engraved on a strip below.
+    const bar = new Mesh(new CylinderGeometry(0.003, 0.003, 0.37, 12).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
+    bar.position.set(0, RAIL_Y - 0.004, RAIL_Z);
+    this.namesCanvas.width = 1400;
+    this.namesCanvas.height = 100;
+    this.namesTex = new CanvasTexture(this.namesCanvas);
+    this.namesTex.colorSpace = SRGBColorSpace;
+    this.names = new Mesh(new PlaneGeometry(ITEM_GAP * 4.4, 0.012), new MeshBasicMaterial({ map: this.namesTex, transparent: true, depthWrite: false }));
+    this.names.position.set(0, RAIL_Y - 0.021, RAIL_Z + 0.012);
+    this.names.rotation.x = -0.7;
+    this.tools.add(bar, this.names, this.items);
     TRAY.forEach(([, pieces], t) => {
       pieces.forEach((piece, c) => {
-        const home = new Vector3((c - (pieces.length - 1) / 2) * ITEM_GAP, 0.002, 0.012);
+        const home = new Vector3((c - (pieces.length - 1) / 2) * ITEM_GAP, RAIL_Y, RAIL_Z);
         const model = pieceModel(piece);
-        model.scale.setScalar(ITEM_SCALE);
         // Tipped toward the eyes so the top of each piece shows.
         model.rotation.x = 0.6;
         model.position.copy(home);
-        const name = tag(pieceName(piece), 0.042, 34);
-        name.position.set(home.x, -0.026, 0.002);
-        this.items.add(model, name);
-        this.slots.push({ piece, tab: t, model, name, home });
+        this.items.add(model);
+        this.slots.push({ piece, tab: t, model, home });
       });
     });
-    // Actions along the bottom.
-    const actions: [string, string][] = [
-      ['try', 'Try it'],
-      ['play', 'Save & play'],
-      ['back', 'Back'],
-    ];
-    actions.forEach(([id, text], i) => {
-      const b = new Button(id, 0.064, 0.022);
-      b.set(text);
-      b.mesh.position.set((i - 1) * 0.07, -0.06, 0);
-      this.buttons.push(b);
-      this.tray.add(b.mesh);
-    });
-    // The status line along the top.
-    this.status = tag('', 0.22, 34);
-    this.status.position.set(0, 0.073, 0);
-    this.tray.add(this.status);
-    this.pressables = [...this.tabs, ...this.buttons];
-    this.showTab(0, 0);
-    this.root.add(this.tray);
+    this.plateGroup.add(this.plates.mesh);
+    this.tools.add(this.actions.mesh);
+    this.dial.mesh.name = 'workshop-check';
+    this.dial.mesh.position.copy(PLATE_AT);
+    this.dial.mesh.rotation.x = -0.3;
+    this.root.add(this.tools, this.plateGroup, this.dial.mesh, this.guides);
+    this.showTab(0, false);
     this.root.visible = false;
   }
 
@@ -362,70 +379,115 @@ export class Builder {
     // A built-in arena's rule does not describe the player's own.
     delete this.draft.rule;
     this.root.visible = true;
-    this.tray.visible = true;
     this.held = null;
+    this.tools.visible = true;
+    this.opened = 0;
+    this.fold('out');
+    playMachine();
     this.say('Pinch a piece and drop it on the arena');
     this.hooks.preview(this.draft);
+    this.rebuildGuides();
+    this.check();
     this.logged = false;
   }
 
   close() {
     this.root.visible = false;
-    this.tray.visible = false;
     if (this.held?.mode === 'piece') this.root.remove(this.held.model);
     this.held = null;
+    this.folding = null;
+    this.afterFold = null;
+  }
+
+  /** Folds the tools away (then runs `then`) or back out. */
+  fold(dir: 'in' | 'out', then: (() => void) | null = null) {
+    this.folding = dir;
+    this.afterFold = then;
+    if (dir === 'out') this.root.visible = true;
   }
 
   /** One frame of the workshop for all pointers. */
   update(pointers: HandState[], dt: number) {
     this.time += dt;
+    this.animate(dt);
+    if (import.meta.env.DEV && !this.logged && this.opened >= 1) {
+      // Piece and plate positions, for driving the workshop from the emulator CLI.
+      this.logged = true;
+      this.root.updateWorldMatrix(true, true);
+      const fmt = (v: Vector3) => v.toArray().map((x) => x.toFixed(3)).join(',');
+      console.log(`[BUILD] ${this.slots.filter((s) => s.tab === this.tab).map((s) => `${pieceName(s.piece)}@${fmt(s.model.getWorldPosition(new Vector3()))}`).join(' ')} ${PLATES.map((l, i) => `${l.toLowerCase()}@${fmt(this.root.localToWorld([...this.plates.spots, ...this.actions.spots][i].at.clone()))}`).join(' ')}`);
+    }
+    if (this.opened < 1 || this.folding) return;
     if (this.held) {
       this.updateHeld();
       return;
     }
-    // Slide the piece row in after a tab change.
-    this.slide *= Math.exp(-dt * 14);
-    this.items.position.x = this.slide;
-    // Hover feedback: pieces under a pointer lift and turn, buttons light up.
+    // Hover feedback: pieces under a pointer lift and turn, plates light up.
     let hovered: Slot | null = null;
-    let hoveredButton: Button | null = null;
+    let hoveredPlate = -1;
     for (const h of pointers) {
       if (!h.tracked) continue;
       hovered ??= this.slotUnder(h);
-      hoveredButton ??= this.buttonUnder(h);
+      if (hoveredPlate < 0) hoveredPlate = this.plateUnder(h);
     }
-    for (const s of this.slots) {
-      if (s.tab !== this.tab) continue;
-      const lift = s === hovered ? 0.006 + 0.002 * Math.sin(this.time * 8) : 0;
-      s.model.position.set(s.home.x, s.home.y + lift, s.home.z + lift);
-      s.model.rotation.y = s === hovered ? this.time * 2 : 0;
+    this.tabT += dt;
+    const shown = this.slots.filter((s) => s.tab === this.tab);
+    for (const s of shown) {
+      const on = s === hovered;
+      const pop = popIn(this.tabT, shown.indexOf(s));
+      s.model.position.set(s.home.x, s.home.y + (on ? 0.008 : 0) - 0.015 * (1 - pop), s.home.z);
+      s.model.rotation.y = on ? this.time * 2 : 0;
+      s.model.scale.setScalar(ITEM_SCALE * pop * (on ? 1.2 : 1));
     }
-    for (const b of this.buttons) b.highlight(b === hoveredButton);
-    for (const b of this.tabs) b.highlight(b === hoveredButton || b.id === `tab:${this.tab}`);
+    this.plates.draw((i) => ({ on: i === this.tab, hover: i === hoveredPlate }));
+    this.actions.draw((i) => ({ hover: i + DRAWERS === hoveredPlate, hot: i > 0 }));
+    this.hint(hovered ? pieceName(hovered.piece) : null);
 
-    // A new pinch: a button, a tray piece, a piece on the arena, or the rim to resize. A hand
-    // touching a button or piece goes first, so a ray or the dev gaze can't take its pinch.
-    for (const h of pointers) {
-      if (!h.tracked || !h.justPinched) continue;
-      const button = this.buttonUnder(h, true);
-      if (button) return this.press(button.id);
-      const slot = this.slotUnder(h, true);
-      if (slot) return this.grab(slot.piece, h, 'tray', 2);
-    }
-    for (const h of pointers) {
-      if (!h.tracked || !h.justPinched) continue;
-      const button = this.buttonUnder(h);
-      if (button) return this.press(button.id);
-      const slot = this.slotUnder(h);
-      if (slot) return this.grab(slot.piece, h, 'tray', 2);
-      const at = this.hooks.arenaPoint(h);
-      if (at && this.pickFromArena(at.x, at.z, h)) return;
-      if (at && this.isRim(at.x, at.z)) {
-        this.held = { mode: 'resize', hand: h };
-        this.say('Pull the rim out or in to resize');
-        return;
+    // A new pinch: a plate, a rail piece, a piece on the arena, or the rim to resize. A hand
+    // touching a plate or piece goes first, so a ray or the dev gaze can't take its pinch.
+    for (const touchOnly of [true, false]) {
+      for (const h of pointers) {
+        if (!h.tracked || !h.justPinched) continue;
+        const plate = this.plateUnder(h, touchOnly);
+        if (plate >= 0) return this.press(plate);
+        const slot = this.slotUnder(h, touchOnly);
+        if (slot) return this.grab(slot.piece, h, 'tray', 2);
+        if (touchOnly) continue;
+        const at = this.hooks.arenaPoint(h);
+        if (at && this.pickFromArena(at.x, at.z, h)) return;
+        if (at && this.isRim(at.x, at.z)) {
+          this.held = { mode: 'resize', hand: h };
+          this.say('Pull the rim out or in to resize');
+          return;
+        }
       }
     }
+  }
+
+  /** The transformation: plates and rail slide out of the near rim, the plate rises, the lines draw in. */
+  private animate(dt: number) {
+    if (this.folding === 'out') {
+      this.opened = Math.min(1, this.opened + dt / FOLD_TIME);
+      if (this.opened >= 1) this.folding = null;
+    } else if (this.folding === 'in') {
+      this.opened = Math.max(0, this.opened - dt / (FOLD_TIME / 2));
+      if (this.opened <= 0) {
+        this.folding = null;
+        const then = this.afterFold;
+        this.afterFold = null;
+        then?.();
+      }
+    }
+    const ease = (u: number) => 1 - (1 - Math.min(1, Math.max(0, u))) ** 3;
+    const k = ease(this.opened);
+    this.plateGroup.position.set(0, -0.02 * (1 - k), -0.03 * (1 - k));
+    this.plateGroup.visible = k > 0.01;
+    this.tools.position.y = -0.06 * (1 - ease((this.opened - 0.3) / 0.7));
+    this.items.visible = this.opened > 0.3;
+    this.dial.mesh.position.y = PLATE_AT.y - 0.08 * (1 - k);
+    this.dial.mesh.visible = k > 0.01;
+    this.guides.scale.set(Math.max(0.001, k), 1, Math.max(0.001, k));
+    this.guides.visible = k > 0.01;
   }
 
   private grab(piece: Piece, hand: HandState, from: 'tray' | 'arena', pocketPoints: number) {
@@ -433,6 +495,8 @@ export class Builder {
     model.scale.setScalar(1.4);
     this.root.add(model);
     this.held = { mode: 'piece', piece, model, hand, from, start: this.time, startAt: hand.pinch.clone(), pocketPoints };
+    // The rail lifts away while a piece is carried, so the near rim stays in view.
+    this.tools.visible = false;
     playPick();
     this.say(`${pieceName(piece)}: drop it on the arena${from === 'arena' ? ', or off it to remove' : ''}`);
   }
@@ -454,6 +518,7 @@ export class Builder {
       }
       if (!h.pinching || !h.tracked) {
         this.held = null;
+        this.rebuildGuides();
         playPlace();
         this.changed();
       }
@@ -483,6 +548,7 @@ export class Builder {
 
     // Released.
     this.held = null;
+    this.tools.visible = true;
     this.root.remove(model);
     const tapped = this.time - held.start < TAP_TIME && h.pinch.distanceTo(held.startAt) < TAP_MOVE;
     if (held.from === 'arena' && held.piece.kind === 'pocket' && tapped && at) {
@@ -590,7 +656,7 @@ export class Builder {
     for (const s of this.slots) {
       if (s.tab !== this.tab) continue;
       s.model.getWorldPosition(this.p);
-      const d = this.distance(h, this.p, GRAB_NEAR * MENU_SCALE, touchOnly ? 0 : GRAB_RAY * MENU_SCALE);
+      const d = this.distance(h, this.p, GRAB_NEAR, touchOnly ? 0 : GRAB_RAY);
       if (d < bestD) {
         bestD = d;
         best = s;
@@ -599,12 +665,20 @@ export class Builder {
     return best;
   }
 
-  private buttonUnder(h: HandState, touchOnly = false): Button | null {
-    for (const b of this.pressables) {
-      b.mesh.getWorldPosition(this.p);
-      if (this.distance(h, this.p, 0.03 * MENU_SCALE, touchOnly ? 0 : (b.height / 2) * MENU_SCALE) < Infinity) return b;
-    }
-    return null;
+  /** The plate under a pointer (index into PLATES), or -1. */
+  private plateUnder(h: HandState, touchOnly = false): number {
+    let best = -1;
+    let bestD = Infinity;
+    [...this.plates.spots, ...this.actions.spots].forEach((s, i) => {
+      this.root.localToWorld(this.p.copy(s.at));
+      if (i >= DRAWERS) this.p.y += this.tools.position.y;
+      const d = this.distance(h, this.p, GRAB_NEAR * 1.6, touchOnly ? 0 : GRAB_RAY * 1.6);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
   }
 
   /** Near pinch distance, or ray distance (+ a small bias), or Infinity when out of reach. */
@@ -618,29 +692,33 @@ export class Builder {
     return off < ray ? off + 0.05 : Infinity;
   }
 
-  private press(id: string) {
-    if (id.startsWith('tab:')) return this.showTab(Number(id.slice(4)), id === `tab:${this.tab}` ? 0 : 1);
-    if (id === 'back') return this.hooks.exit();
+  private press(i: number) {
+    if (i < DRAWERS) {
+      if (i !== this.tab) this.showTab(i, true);
+      return;
+    }
+    if (PLATES[i] === 'BACK') return this.fold('in', () => this.hooks.exit());
     const problem = validate(this.draft);
     if (problem) return this.reject(problem);
-    if (id === 'try') {
-      const r = reportArena(this.draft, 3);
-      this.say(arenaWarning(r) ?? `Plays well · rounds ~${r.median.toFixed(0)} s`);
-      return this.hooks.tryIt(this.draft);
+    if (PLATES[i] === 'TRY') {
+      playPick();
+      // The tools fold away so the round is in plain view; the match system unfolds them after.
+      return this.fold('in', () => this.hooks.tryIt(this.draft));
     }
-    if (id === 'play') {
-      const saved = loadArenas();
-      const layout = cloneLayout(this.draft);
-      layout.name = `My Arena ${saved.length + 1}`;
-      saved.push(layout);
-      saveArenas(saved);
-      this.hooks.play(layout);
-    }
+    const saved = loadArenas();
+    const layout = cloneLayout(this.draft);
+    layout.name = `My Arena ${saved.length + 1}`;
+    saved.push(layout);
+    saveArenas(saved);
+    playPlace();
+    this.fold('in', () => this.hooks.play(layout));
   }
 
   private changed(text?: string) {
-    this.say(text ?? validate(this.draft) ?? 'Pinch Try it to watch a round');
+    this.say(text ?? validate(this.draft) ?? 'Pinch TRY to watch a round');
     this.hooks.preview(this.draft);
+    this.rebuildGuides();
+    this.check();
     const L = this.draft;
     if (import.meta.env.DEV) console.log(`[BUILD] draft ${L.shape} ${L.floor} ${L.wall} ${L.theme} r=${L.radius} pockets=${L.pockets.length} rails=${L.rails.length} pillars=${L.pillars.length}`);
   }
@@ -651,49 +729,142 @@ export class Builder {
     this.hooks.preview(this.draft);
   }
 
-  /** Redraws the status line (only when the text changes). */
+  /** The message line on the far plate (the piece pointed at shows instead while pointed at). */
   private say(text: string) {
-    if (text === this.statusText) return;
-    this.statusText = text;
-    const old = this.status;
-    this.status = tag(text, 0.22, 34);
-    this.status.position.copy(old.position);
-    this.status.rotation.copy(old.rotation);
-    this.tray.remove(old);
-    old.geometry.dispose();
-    const mat = old.material as MeshBasicMaterial;
-    mat.map?.dispose();
-    mat.dispose();
-    this.tray.add(this.status);
+    this.message = text;
+    this.drawDial();
   }
 
-  /** Switches the piece row to a category; the new pieces slide in from the side. */
-  private showTab(t: number, direction: number) {
-    if (direction !== 0) this.slide = (t > this.tab ? 1 : -1) * 0.12;
+  private hint(text: string | null) {
+    if (text === this.hinted) return;
+    this.hinted = text;
+    this.drawDial();
+  }
+
+  /** The far plate: the draft's name and form, and three dials from the latest check. */
+  private drawDial() {
+    const L = this.draft;
+    if (!L) return;
+    const r = this.report;
+    const spread = r ? Math.max(...Object.values(r.typeWin)) - Math.min(...Object.values(r.typeWin)) : 0;
+    const form = `${pieceName({ kind: 'shape', value: L.shape })} · ${pieceName({ kind: 'floor', value: L.floor })} · ${L.wall} wall · ${L.pockets.length} pockets`;
+    this.dial.draw(
+      L.name,
+      this.checking ? `${form} · checking` : form,
+      [
+        { label: r ? `ROUND ${r.median.toFixed(0)} S` : 'ROUND', value: r ? (r.median / 30) * 100 : 0 },
+        { label: r ? `KO ${Math.round(r.knockout * 100)}%` : 'KO', value: r ? r.knockout * 100 : 0 },
+        { label: r ? `BALANCE ${Math.round((1 - spread) * 100)}` : 'BALANCE', value: r ? (1 - spread) * 100 : 0 },
+      ],
+      this.hinted ?? (r && arenaWarning(r)) ?? this.message,
+      r && arenaWarning(r) ? '#ff8a5a' : undefined,
+    );
+  }
+
+  /** Checks the draft in the worker; a change while it runs is checked when it answers. */
+  private check() {
+    if (this.checking) {
+      this.checkAgain = true;
+      return;
+    }
+    if (!this.worker) {
+      this.worker = new Worker(new URL('./check-worker.ts', import.meta.url), { type: 'module' });
+      this.worker.onmessage = (e: MessageEvent<{ id: number; report: ArenaReport }>) => {
+        this.checking = false;
+        if (e.data.id === this.checkId) this.report = e.data.report;
+        if (this.checkAgain) {
+          this.checkAgain = false;
+          this.check();
+        } else this.drawDial();
+      };
+    }
+    this.checking = true;
+    this.worker.postMessage({ id: ++this.checkId, layout: cloneLayout(this.draft) });
+    this.drawDial();
+  }
+
+  /** Blueprint lines over the draft's floor (rings and spokes) and brass knobs on its rim. */
+  private rebuildGuides() {
+    for (const c of [...this.guides.children]) {
+      c.removeFromParent();
+      (c as Mesh).geometry.dispose();
+    }
+    const L = this.draft;
+    const pts: number[] = [];
+    const at = (a: number, n: number) => {
+      const r = rimRadius(L, a) * n;
+      pts.push(Math.cos(a) * r, this.hooks.floorHeight(n) + 0.0015, Math.sin(a) * r);
+    };
+    for (const n of [0.25, 0.5, 0.75, 0.97]) {
+      for (let i = 0; i < 48; i++) {
+        at((i / 48) * Math.PI * 2, n);
+        at(((i + 1) / 48) * Math.PI * 2, n);
+      }
+    }
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      for (let i = 0; i < 8; i++) {
+        at(a, 0.12 + (0.85 * i) / 8);
+        at(a, 0.12 + (0.85 * (i + 1)) / 8);
+      }
+    }
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new Float32BufferAttribute(pts, 3));
+    this.guides.add(new LineSegments(geo, GUIDE_LINE));
+    // Four brass knobs on the rim say it can be pulled.
+    const knobs: BufferGeometry[] = [];
+    for (let k = 0; k < 4; k++) {
+      const a = Math.PI / 4 + (k * Math.PI) / 2;
+      const r = rimRadius(L, a) + 0.008;
+      knobs.push(new SphereGeometry(0.005, 12, 8).translate(Math.cos(a) * r, 0.012, Math.sin(a) * r));
+    }
+    this.guides.add(new Mesh(mergePlain(knobs), KNOB));
+  }
+
+  /** Switches the rail to a drawer; its pieces pop up one after another. */
+  private showTab(t: number, sound: boolean) {
     this.tab = t;
-    for (const s of this.slots) {
-      const on = s.tab === t;
-      s.model.visible = on;
-      s.name.visible = on;
-    }
-    if (direction !== 0) playPick();
+    this.tabT = 0;
+    for (const s of this.slots) s.model.visible = s.tab === t;
+    this.drawNames();
+    if (sound) playDrawer();
+    this.logged = false;
   }
 
-  /** Hangs the menu board on the smithy wall's tool panel. */
-  hangOn(panel: Object3D) {
-    panel.add(this.tray);
-    this.tray.position.set(0, 0, 0.03);
-    this.tray.visible = false;
+  /** The names under the rail's pieces, engraved on one strip. */
+  private drawNames() {
+    const shown = this.slots.filter((s) => s.tab === this.tab);
+    const key = shown.map((s) => pieceName(s.piece)).join('|');
+    if (key === this.namesKey) return;
+    this.namesKey = key;
+    const g = this.namesCanvas.getContext('2d')!;
+    const W = this.namesCanvas.width;
+    const H = this.namesCanvas.height;
+    metalPlate(g, W, H);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `700 54px ${FONT}`;
+    const k = W / (ITEM_GAP * 4.4);
+    for (const s of shown) engrave(g, pieceName(s.piece).toUpperCase(), W / 2 + s.home.x * k, H / 2 + 2, UI_STEEL);
+    this.namesTex.needsUpdate = true;
   }
+}
 
-  /** Dev: piece and button positions once the board is in place, for the emulator CLI. */
-  placeMenu() {
-    if (import.meta.env.DEV && !this.logged) {
-      // Piece and button positions once the menu is in place, for driving the workshop from the emulator CLI.
-      this.logged = true;
-      this.root.updateWorldMatrix(true, true);
-      const at = (o: { getWorldPosition(v: Vector3): Vector3 }) => o.getWorldPosition(new Vector3()).toArray().map((v) => v.toFixed(3)).join(',');
-      console.log(`[BUILD] ${this.slots.map((s) => `${pieceName(s.piece)}@${at(s.model)}`).join(' ')} ${this.pressables.map((b) => `${b.id}@${at(b.mesh)}`).join(' ')}`);
-    }
+/** Blueprint lines: thin, light steel, see-through. */
+const GUIDE_LINE = new LineBasicMaterial({ color: 0xc9d3e0, transparent: true, opacity: 0.35, depthWrite: false });
+const KNOB = new MeshMatcapMaterial({ matcap: BRASS });
+
+/** Merges indexed or plain geometries with positions and normals only. */
+function mergePlain(parts: BufferGeometry[]): BufferGeometry {
+  const flat = parts.map((g) => (g.index ? g.toNonIndexed() : g));
+  const pos: number[] = [];
+  const nor: number[] = [];
+  for (const g of flat) {
+    pos.push(...(g.getAttribute('position').array as Float32Array));
+    nor.push(...(g.getAttribute('normal').array as Float32Array));
   }
+  const out = new BufferGeometry();
+  out.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new Float32BufferAttribute(nor, 3));
+  return out;
 }

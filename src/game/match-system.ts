@@ -10,8 +10,7 @@ import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
 import { GUIDE_ORDER, Progress } from './progress.js';
 import { anvilModel, Hub, miniArena, standModel } from './hub.js';
-import { Wall } from './wall.js';
-import type { WallPlane } from './wall.js';
+import { MatchBar } from './match-bar.js';
 import { allBuilds, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
@@ -109,8 +108,8 @@ export class MatchSystem extends createSystem({
   });
   /** Smith level, XP and unlocks, saved in the browser. */
   private progress = new Progress(typeof localStorage === 'undefined' ? null : localStorage);
-  /** The smithy wall on the real wall ahead: tool panel, scoreboard, arena shelf. */
-  private wall = new Wall();
+  /** The match bar on the far rim. */
+  private bar = new MatchBar();
   /** The forge: build your own top from parts. */
   private forge = new Forge({
     done: (build) => this.leaveForge(build),
@@ -119,7 +118,7 @@ export class MatchSystem extends createSystem({
   /** A demo round from the workshop's Try it: AI launches, no score, then back to the workshop. */
   private demo = false;
   private hubLogPending = false;
-  /** The word in the middle of the wall's match bar. */
+  /** The word in the middle of the match bar. */
   private barMessage = '';
   /** This match's rival: its build and spin stay for every round. */
   private rival: Rival = RIVALS[0];
@@ -288,14 +287,12 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
     this.world.createTransformEntity(this.cord.line);
-    this.world.createTransformEntity(this.wall.root);
     // The match bar: a metal strip set into the far rim, tipped back toward the player, under the
     // round messages, so score and fight share one view.
-    this.wall.hud.position.set(0, 0.03, -0.205);
-    this.wall.hud.rotation.x = -0.55;
-    this.wall.hud.scale.setScalar(0.17);
-    this.root.add(this.wall.hud);
-    this.builder.hangOn(this.wall.tools);
+    this.bar.mesh.position.set(0, 0.03, -0.205);
+    this.bar.mesh.rotation.x = -0.55;
+    this.bar.mesh.scale.setScalar(0.17);
+    this.root.add(this.bar.mesh);
 
     if (import.meta.env.DEV) {
       const onKey = (e: KeyboardEvent) => {
@@ -443,7 +440,7 @@ export class MatchSystem extends createSystem({
     this.sinceClashSound += dt;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
       const p = this.progress;
-      this.wall.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_POINTS, ['YOU', this.rival.name.toUpperCase()], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage, {
+      this.bar.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_POINTS, ['YOU', this.rival.name.toUpperCase()], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage, {
         level: p.level,
         rank: p.rank,
         fraction: p.fraction,
@@ -520,7 +517,7 @@ export class MatchSystem extends createSystem({
     this.mine.state = 'out';
     this.hub.show(this.arenas, this.arenaIndex, this.myBuild, this.progress);
     this.label.set('');
-    this.wall.setMode('home');
+    this.bar.mesh.visible = false;
     // The first session says where to reach next.
     const guide = this.progress.guide;
     if (guide === 'launch') this.label.set('Your top waits in its dock\nPut it in the arena to play');
@@ -566,7 +563,7 @@ export class MatchSystem extends createSystem({
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     // The forge is the arena transformed: the floor sinks, the anvil and the drawers rise.
-    this.wall.setMode('home');
+    this.bar.mesh.visible = false;
     // The first session's forge visit is about one part: the one just earned.
     const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:rush' : null;
     this.progress.advance('fit');
@@ -628,16 +625,12 @@ export class MatchSystem extends createSystem({
     this.phase = 'build';
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
-    this.wall.setMode('workshop');
-    this.wall.score(['Arena workshop', 'Pinch a piece on the wall and drop it on the arena', 'Try it, Save & play or Back on the board']);
+    this.bar.mesh.visible = false;
     this.builder.open(this.arena.layout);
   }
 
-  /** Workshop: pieces, the tray and the rim, all handled by the builder. */
+  /** Workshop: the rail, the plates and the rim, all handled by the builder. */
   private updateBuilder(dt: number) {
-    // The menu board stands across the arena, facing the head; positions are arena-local.
-    this.player.head.getWorldPosition(this.p);
-    this.builder.placeMenu();
     this.builder.update(this.pointers, dt);
   }
 
@@ -658,6 +651,7 @@ export class MatchSystem extends createSystem({
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.arena.reset();
+    this.builder.fold('out');
   }
 
   /**
@@ -751,27 +745,11 @@ export class MatchSystem extends createSystem({
     center.y = table !== null ? table + PEDESTAL : this.head.y - TRAY_DROP;
     this.root.position.copy(center);
     this.root.scale.setScalar(ARENA_SCALE);
-    this.wall.place(this.head, this.fwd, this.findWalls());
     // Local +Z points back at the player.
     this.root.rotation.set(0, Math.atan2(this.head.x - center.x, this.head.z - center.z), 0);
     this.root.visible = true;
     console.log(`[MATCH] arena on ${table !== null ? 'table' : 'tray'} at ${center.toArray().map((v) => v.toFixed(2)).join(',')}`);
     this.toHub();
-  }
-
-  /** Detected wall planes (center and normal, world space). */
-  private findWalls(): WallPlane[] {
-    const out: WallPlane[] = [];
-    for (const e of this.queries.planes.entities) {
-      const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
-      if (plane?.orientation !== 'vertical' || !/wall/.test(plane.semanticLabel ?? 'wall')) continue;
-      const o = e.object3D!;
-      const center = o.getWorldPosition(new Vector3());
-      // A plane's surface lies in its local x-z, so its normal is the local +y.
-      const normal = new Vector3(0, 1, 0).applyQuaternion(o.getWorldQuaternion(new Quaternion()));
-      out.push({ center, normal });
-    }
-    return out;
   }
 
   /** Height of the nearest table/desk plane within reach, or null. */
@@ -811,11 +789,11 @@ export class MatchSystem extends createSystem({
     this.cord.set(null);
     this.label.mesh.position.copy(LABEL_AT);
     this.label.mesh.scale.setScalar(1.25);
-    // The scoreboard on the wall shows the match; the card over the arena only the round's messages,
+    // The bar on the far rim shows the match; the card over it only the round's messages,
     // and at a match's start, who the rival is and how it plays.
     if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name} · ${this.rival.style}\n${this.arena.layout.rule ?? this.arena.layout.name}`);
     else this.label.set('');
-    this.wall.setMode('match');
+    this.bar.mesh.visible = true;
     this.barMessage = 'READY';
     this.barPoints = [this.myPoints, this.theirPoints];
   }
