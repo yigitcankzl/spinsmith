@@ -21,6 +21,8 @@ export interface HandState {
   /** Pointing ray (the system target ray), world space. */
   rayOrigin: Vector3;
   rayDir: Vector3;
+  /** Orientation of the pointing ray (for turning a held object with the hand). */
+  rayQuat: Quaternion;
   hasRay: boolean;
 }
 
@@ -34,6 +36,7 @@ const newHand = (): HandState => ({
   wrist: new Vector3(),
   rayOrigin: new Vector3(),
   rayDir: new Vector3(),
+  rayQuat: new Quaternion(),
   hasRay: false,
 });
 
@@ -113,6 +116,7 @@ export class HandInput {
     this.mat.fromArray(pose.transform.matrix).premultiply(player.matrixWorld);
     h.rayOrigin.setFromMatrixPosition(this.mat);
     this.quat.setFromRotationMatrix(this.mat);
+    h.rayQuat.copy(this.quat);
     h.rayDir.set(0, 0, -1).applyQuaternion(this.quat);
   }
 }

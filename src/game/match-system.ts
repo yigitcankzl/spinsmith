@@ -1,4 +1,4 @@
-import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -90,7 +90,6 @@ export class MatchSystem extends createSystem({
   /** The forge: build your own top from parts. */
   private forge = new Forge({
     done: (build) => this.leaveForge(build),
-    exit: () => this.leaveForge(null),
     test: (build) => this.testBuild(build),
   });
   /** A demo round (workshop Try it, forge Test): AI launches, no score, then back where it came from. */
@@ -113,6 +112,7 @@ export class MatchSystem extends createSystem({
     wrist: new Vector3(),
     rayOrigin: new Vector3(),
     rayDir: new Vector3(),
+    rayQuat: new Quaternion(),
     hasRay: false,
   };
   /** The player's top and the opponent's; their type (spec) changes between rounds. */
@@ -516,6 +516,7 @@ export class MatchSystem extends createSystem({
     const head = this.player.head;
     head.getWorldPosition(g.rayOrigin);
     head.getWorldDirection(g.rayDir).negate();
+    head.getWorldQuaternion(g.rayQuat);
     g.hasRay = true;
     g.tracked = true;
     g.pinch.set(0, -100, 0);

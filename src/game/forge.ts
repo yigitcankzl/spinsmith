@@ -1,11 +1,18 @@
 /**
- * The forge: build your own top from parts. A board across the arena holds the parts by tab
- * (Ring, Core, Tip, Style, Presets), standing behind the anvil at the arena's right; your top stands big on the anvil with
- * a stats card beside it. Pinch a part and carry it onto the top (or just tap it) to fit it; a
- * core locks with one click per tooth. Builds over the weight limit are refused.
+ * The forge: build your top with your hands. Your top stands on the anvil at the arena's right;
+ * the parts lie on a stepped wooden shelf behind it (tips, cores, rings, style, presets).
+ * - Pinch your top to pick it up: it follows your hand and turns with it, to look at from any side.
+ *   Let go and it settles back on the anvil.
+ * - Pinch a part on the shelf and bring it to your top (on the anvil or in your other hand): the
+ *   top comes apart to show where it goes and that slot pulses; let go to fit it with a clack. The
+ *   old part goes back to the shelf. Builds over the weight limit are refused.
+ * - Tap a paint pot (or dip the top into it) to paint the top; spin tokens set its spin direction.
+ * - Drop the top into the arena to test it in a round; dunk it in the quench bucket to save and go home.
  */
 import {
+  BoxGeometry,
   CanvasTexture,
+  CircleGeometry,
   ConeGeometry,
   CylinderGeometry,
   Group,
@@ -15,13 +22,13 @@ import {
   MeshMatcapMaterial,
   Object3D,
   PlaneGeometry,
-  SphereGeometry,
+  Quaternion,
   SRGBColorSpace,
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
 import { playPick, playPlace, playRemove } from './audio.js';
-import { Button, tag } from './builder.js';
+import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
@@ -57,72 +64,78 @@ type Item =
   | { kind: 'color'; value: number; name: string; blurb: string }
   | { kind: 'preset'; build: TopBuild; name: string; blurb: string };
 
-const TABS: [string, Item[]][] = [
-  ['Ring', RINGS.map((r) => ({ kind: 'ring' as const, id: r.id, name: r.name, blurb: r.blurb }))],
-  ['Core', CORES.map((c) => ({ kind: 'core' as const, id: c.id, name: c.name, blurb: c.blurb }))],
-  ['Tip', TIPS.map((t) => ({ kind: 'tip' as const, id: t.id, name: t.name, blurb: t.blurb }))],
+/** Shelf rows, front (low) to back (high): label, items, item spacing. */
+const ROWS: [string, Item[], number][] = [
+  ['TIPS', TIPS.map((t) => ({ kind: 'tip' as const, id: t.id, name: t.name, blurb: t.blurb })), 0.05],
+  ['CORES', CORES.map((c) => ({ kind: 'core' as const, id: c.id, name: c.name, blurb: c.blurb })), 0.06],
+  ['RINGS', RINGS.map((r) => ({ kind: 'ring' as const, id: r.id, name: r.name, blurb: r.blurb })), 0.058],
   [
-    'Style',
+    'STYLE',
     [
       { kind: 'spin', value: 1, name: 'Right spin', blurb: 'Spins clockwise' },
-      { kind: 'spin', value: -1, name: 'Left spin', blurb: 'Against right spinners: steals spin' },
-      ...TOP_COLORS.slice(0, 4).map((value) => ({ kind: 'color' as const, value, name: 'Color', blurb: 'Body color' })),
+      { kind: 'spin', value: -1, name: 'Left spin', blurb: 'Steals spin from right spinners' },
+      ...TOP_COLORS.slice(0, 4).map((value) => ({ kind: 'color' as const, value, name: 'Paint', blurb: 'Dip your top or tap the pot' })),
     ],
+    0.05,
   ],
-  ['Presets', PRESETS.map((p) => ({ kind: 'preset' as const, build: p.build, name: p.name, blurb: `${buildName(p.build)}, a classic ${roleOf(specFromBuild(p.build))} top` }))],
+  ['PRESETS', PRESETS.map((p) => ({ kind: 'preset' as const, build: p.build, name: p.name, blurb: `A classic ${roleOf(specFromBuild(p.build))} top` })), 0.08],
 ];
-
-const ITEM_GAP = 0.04;
-/** The board stands this far behind the anvil and this high above the arena, drawn this much larger. */
-const BOARD_BEHIND = 0.17;
-const BOARD_HEIGHT = 0.2;
-const BOARD_SCALE = 1.5;
+/** Each shelf row steps up and back by this much (m). */
+const ROW_RISE = 0.04;
+const ROW_DEPTH = 0.05;
+/** The shelf stands behind the anvil (arena-local). */
+const SHELF_AT = new Vector3(ANVIL_AT.x + 0.02, 0.05, ANVIL_AT.z - 0.12);
+const SHELF_WIDTH = 0.36;
+/** The quench bucket stands in front of the anvil, toward the player. */
+const BUCKET_AT = new Vector3(ANVIL_AT.x + 0.12, 0, ANVIL_AT.z + 0.13);
 /** Your top on the anvil is this much larger than life. */
 const DISPLAY_SCALE = 1.8;
-/** A carried part fits when brought this close to the top (m). */
-const SNAP = 0.09;
-/** Pinch distances: touching a part, and a ray passing this close. */
-const GRAB_NEAR = 0.035 * BOARD_SCALE;
-const GRAB_RAY = 0.022 * BOARD_SCALE;
+/** A carried part makes the top come apart within this distance, and fits within SNAP (m). */
+const EXPLODE_R = 0.16;
+const SNAP = 0.08;
+/** A carried top dipped this close to a paint pot is painted; this close to the bucket, saved. */
+const DIP = 0.06;
+/** Pinch distances: touching a thing, and a pointing ray passing this close. */
+const GRAB_NEAR = 0.045;
+const GRAB_RAY = 0.03;
 /** A part let go where it was picked up (a tap) fits straight away. */
 const TAP_MOVE = 0.03;
 
 interface Slot {
   item: Item;
-  tab: number;
   model: Object3D;
-  name: Mesh;
   home: Vector3;
 }
 
 export interface ForgeHooks {
   /** Save the build and go back. */
   done(build: TopBuild): void;
-  /** Leave without saving. */
-  exit(): void;
   /** Watch your build fight a round. */
   test(build: TopBuild): void;
 }
+
+type Target = { kind: 'slot'; slot: Slot } | { kind: 'top' } | { kind: 'bucket' };
 
 export class Forge {
   /** Lives in arena-local space (a child of the arena root). */
   readonly root = new Group();
   build: TopBuild = loadBuild();
-  private board = new Group();
-  private items = new Group();
+  private shelf = new Group();
   private slots: Slot[] = [];
-  private tabs: Button[] = [];
-  private buttons: Button[] = [];
-  private tab = 0;
-  private slide = 0;
-  private status: Mesh;
-  private statusText = '';
+  private bucket = new Group();
   private display!: TopView;
+  /** The top's resting spot on the anvil, and the holder that is carried around. */
+  private anvilSpot = new Vector3(ANVIL_AT.x, ANVIL_FACE, ANVIL_AT.z);
   private displayHolder = new Group();
-  private displayTilt = new Group();
   private card = new StatsCard();
   private cardKey = '';
-  private held: { item: Item; model: Object3D; hand: HandState; startAt: Vector3 } | null = null;
+  private message = '';
+  private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3 } | null = null;
+  /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
+  private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion } | null = null;
+  private explode = 0;
+  /** The paint pot the carried top is dipped in (so a dip paints once). */
+  private dippedIn: Slot | null = null;
   /** Lock clicks still to play after a core is fitted, and the time to the next one. */
   private clicks = 0;
   private clickTimer = 0;
@@ -133,6 +146,8 @@ export class Forge {
   private readonly q = new Vector3();
   private readonly hit = new Vector3();
   private readonly at = new Vector3();
+  private readonly topAt = new Vector3();
+  private readonly quat = new Quaternion();
   private readonly up = new Vector3();
   private readonly right = new Vector3();
   private readonly depth = new Vector3();
@@ -140,58 +155,16 @@ export class Forge {
 
   constructor(private readonly hooks: ForgeHooks) {
     this.root.name = 'top-forge';
-    this.board.scale.setScalar(BOARD_SCALE);
-    const back = new Mesh(new PlaneGeometry(0.24, 0.17), new MeshBasicMaterial({ color: 0x241c17 }));
-    back.position.z = -0.004;
-    this.board.add(back);
-    TABS.forEach(([label], t) => {
-      const b = new Button(`tab:${t}`, 0.044, 0.02);
-      b.set(label);
-      b.mesh.position.set((t - (TABS.length - 1) / 2) * 0.046, 0.048, 0);
-      this.tabs.push(b);
-      this.board.add(b.mesh);
-    });
-    this.board.add(this.items);
-    TABS.forEach(([, items], t) => {
-      items.forEach((item, c) => {
-        const home = new Vector3((c - (items.length - 1) / 2) * ITEM_GAP, 0.004, 0.012);
-        const model = itemModel(item);
-        model.position.copy(home);
-        const name = tag(item.name, 0.04, 34);
-        name.position.set(home.x, -0.026, 0.002);
-        this.items.add(model, name);
-        this.slots.push({ item, tab: t, model, name, home });
-      });
-    });
-    (
-      [
-        ['test', 'Test'],
-        ['done', 'Save'],
-        ['back', 'Back'],
-      ] as const
-    ).forEach(([id, text], i) => {
-      const b = new Button(id, 0.064, 0.022);
-      b.set(text);
-      b.mesh.position.set((i - 1) * 0.07, -0.06, 0);
-      this.buttons.push(b);
-      this.board.add(b.mesh);
-    });
-    this.status = tag('', 0.22, 34);
-    this.status.position.set(0, 0.073, 0);
-    this.board.add(this.status);
-    // Your top stands on the anvil at the right of the arena; the parts board stands behind it.
+    this.buildShelf();
+    this.buildBucket();
     const anvil = anvilModel();
     anvil.position.copy(ANVIL_AT);
-    this.displayTilt.position.set(ANVIL_AT.x, ANVIL_FACE, ANVIL_AT.z);
+    this.displayHolder.position.copy(this.anvilSpot);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
-    // Tipped toward the player so both the profile and the top face show.
-    this.displayTilt.rotation.x = 0.35;
-    this.displayTilt.add(this.displayHolder);
     // The stats card floats over the far side of the arena, where nothing else stands.
     this.card.mesh.position.set(0.04, 0.25, -0.14);
     this.card.mesh.scale.setScalar(1.5);
-    this.root.add(this.board, anvil, this.displayTilt, this.card.mesh);
-    this.showTab(0, 0);
+    this.root.add(this.shelf, this.bucket, anvil, this.displayHolder, this.card.mesh);
     this.rebuildDisplay();
     this.root.visible = false;
   }
@@ -200,23 +173,29 @@ export class Forge {
     this.build = loadBuild();
     this.rebuildDisplay();
     this.root.visible = true;
-    this.held = null;
-    this.cardKey = '';
-    this.say('Pinch a part and bring it to your top');
+    this.dropAll();
+    this.say('Pick up your top, or bring it a part from the shelf');
     this.logPending = true;
   }
 
   close() {
     this.root.visible = false;
-    if (this.held) this.root.remove(this.held.model);
-    this.held = null;
+    this.dropAll();
   }
 
-  /** Faces the board and the stats card toward the head (arena-local). */
+  private dropAll() {
+    if (this.heldPart) this.root.remove(this.heldPart.model);
+    this.heldPart = null;
+    this.heldTop = null;
+    this.displayHolder.position.copy(this.anvilSpot);
+    this.displayHolder.quaternion.identity();
+  }
+
+  /** Turns the shelf, the bucket sign and the stats card toward the head (arena-local). */
   place(head: Vector3) {
-    this.board.position.set(ANVIL_AT.x + 0.06, BOARD_HEIGHT, ANVIL_AT.z - BOARD_BEHIND);
-    this.face(this.board, head);
+    this.face(this.shelf, head);
     this.face(this.card.mesh, head);
+    this.face(this.bucket, head);
   }
 
   update(pointers: HandState[], dt: number) {
@@ -225,88 +204,128 @@ export class Forge {
       this.logPending = false;
       console.log(`[FORGE] ${this.debugPositions()}`);
     }
-    // Your top turns slowly on the spindle; a core lock clicks it round tooth by tooth.
+    // A core lock clicks the top round tooth by tooth.
     if (this.clicks > 0 && (this.clickTimer -= dt) <= 0) {
       this.clicks--;
       this.clickTimer = 0.07;
       this.twist += 0.35;
       playPick();
     }
-    this.displayHolder.rotation.y += dt * 0.5;
     if (this.twist > 0) {
       const step = Math.min(this.twist, dt * 6);
-      this.displayHolder.rotation.y += step;
+      this.display.root.rotation.y += step;
       this.twist -= step;
     }
-    this.slide *= Math.exp(-dt * 14);
-    this.items.position.x = this.slide;
-    if (this.held) {
-      this.updateHeld();
-      return;
-    }
-    let hovered: Slot | null = null;
-    let hoveredButton: Button | null = null;
-    for (const h of pointers) {
-      if (!h.tracked) continue;
-      hovered ??= this.slotUnder(h);
-      hoveredButton ??= this.buttonUnder(h);
-    }
-    for (const s of this.slots) {
-      if (s.tab !== this.tab) continue;
-      const lift = s === hovered ? 0.006 + 0.002 * Math.sin(this.time * 8) : 0;
-      s.model.position.set(s.home.x, s.home.y + lift, s.home.z + lift);
-      s.model.rotation.y = s === hovered ? this.time * 2 : 0;
-    }
-    for (const b of this.buttons) b.highlight(b === hoveredButton);
-    for (const b of this.tabs) b.highlight(b === hoveredButton || b.id === `tab:${this.tab}`);
-    this.showCard(hovered ? this.withItem(hovered.item) : null);
 
-    // A hand touching a part or button goes first, then pointing rays (and the dev gaze).
+    // New pinches: a hand touching something goes first, then pointing rays (and the dev gaze).
     for (const touchOnly of [true, false]) {
       for (const h of pointers) {
-        if (!h.tracked || !h.justPinched) continue;
-        const button = this.buttonUnder(h, touchOnly);
-        if (button) return this.press(button.id);
-        const slot = this.slotUnder(h, touchOnly);
-        if (slot) return this.grab(slot, h);
+        if (!h.tracked || !h.justPinched || h === this.heldPart?.hand || h === this.heldTop?.hand) continue;
+        const target = this.under(h, touchOnly);
+        if (target) this.pinch(target, h);
       }
     }
+    this.updateTop(dt);
+    this.updatePart();
+    // Hover: shelf items under a free pointer lift and turn.
+    let hovered: Slot | null = null;
+    for (const h of pointers) {
+      if (!h.tracked || h === this.heldPart?.hand || h === this.heldTop?.hand) continue;
+      const t = this.under(h, false);
+      if (t?.kind === 'slot') hovered ??= t.slot;
+    }
+    for (const s of this.slots) {
+      const on = s === hovered;
+      s.model.position.set(s.home.x, s.home.y + (on ? 0.008 + 0.002 * Math.sin(this.time * 8) : 0), s.home.z);
+      s.model.rotation.y = on ? this.time * 2 : 0;
+    }
+    if (!this.heldPart) this.showCard(hovered ? this.withItem(hovered.item) : null);
   }
 
-  private grab(slot: Slot, hand: HandState) {
-    const model = itemModel(slot.item);
+  private pinch(target: Target, h: HandState) {
+    if (target.kind === 'bucket') return this.save();
+    if (target.kind === 'top') {
+      if (this.heldTop) return;
+      this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone() };
+      playPick();
+      this.say('Turn it in your hand. Drop it in the arena to test, dunk it in the bucket to save');
+      return;
+    }
+    if (this.heldPart) return;
+    const item = target.slot.item;
+    const model = itemModel(item);
     this.root.add(model);
-    this.held = { item: slot.item, model, hand, startAt: this.pointAt(hand, new Vector3()) };
+    this.heldPart = { item, model, hand: h, startAt: this.pointAt(h, new Vector3()) };
     playPick();
-    this.say(`${slot.item.name}: ${slot.item.blurb}`);
+    this.say(`${item.name}: ${item.blurb}`);
   }
 
-  /** While carrying: the part follows the pointer; near your top it fits on release. */
-  private updateHeld() {
-    const held = this.held!;
+  /** The top: follows and turns with the hand holding it, else eases back onto the anvil. */
+  private updateTop(dt: number) {
+    const held = this.heldTop;
+    if (!held) {
+      this.displayHolder.position.lerp(this.anvilSpot, Math.min(1, dt * 10));
+      this.displayHolder.quaternion.slerp(this.quat.identity(), Math.min(1, dt * 8));
+      if (!this.heldPart) this.display.root.rotation.y += dt * 0.5;
+      return;
+    }
+    const h = held.hand;
+    const at = this.pointAt(h, this.at);
+    this.root.worldToLocal(this.displayHolder.position.copy(at));
+    // Turn with the hand: the hand's rotation since the pickup, applied to the top.
+    this.quat.copy(h.rayQuat).multiply(this.q2.copy(held.handQuat).invert());
+    this.displayHolder.quaternion.copy(this.quat).multiply(held.topQuat);
+    // Dipped into a paint pot: painted once per dip.
+    const pot = this.slots.find((s) => s.item.kind === 'color' && s.model.getWorldPosition(this.p).distanceTo(at) < DIP) ?? null;
+    if (pot && pot !== this.dippedIn) this.fit(pot.item);
+    this.dippedIn = pot;
+    if (h.pinching && h.tracked) return;
+    this.heldTop = null;
+    this.bucket.getWorldPosition(this.p);
+    if (at.distanceTo(this.p) < DIP * 1.5) return this.save();
+    this.root.localToWorld(this.q.set(0, 0, 0));
+    if (Math.hypot(at.x - this.q.x, at.z - this.q.z) < 0.17 && at.distanceTo(this.root.localToWorld(this.p.copy(this.anvilSpot))) > 0.12) {
+      playPlace();
+      this.hooks.test(this.build);
+      return;
+    }
+    playPlace();
+  }
+
+  /** A carried part: follows the pointer; near the top, the top comes apart to show its slot. */
+  private updatePart() {
+    const held = this.heldPart;
+    this.displayHolder.getWorldPosition(this.topAt);
+    if (!held) {
+      this.explode = Math.max(0, this.explode - 0.08);
+      this.display.explode(this.explode, null, this.time);
+      return;
+    }
     const h = held.hand;
     const at = this.pointAt(h, this.at);
     this.root.worldToLocal(held.model.position.copy(at));
     held.model.rotation.y = this.time * 2;
-    this.displayHolder.getWorldPosition(this.p);
-    const near = at.distanceTo(this.p) < SNAP;
-    // Your top swells a little when the part is close enough to fit.
-    this.displayHolder.scale.setScalar(DISPLAY_SCALE * (near ? 1.08 + 0.03 * Math.sin(this.time * 12) : 1));
+    const d = at.distanceTo(this.topAt);
+    const slotKind = held.item.kind === 'ring' || held.item.kind === 'core' || held.item.kind === 'tip' ? held.item.kind : null;
+    const target = slotKind && d < EXPLODE_R ? Math.min(1, (EXPLODE_R - d) / (EXPLODE_R - SNAP) ) : 0;
+    this.explode += (target - this.explode) * 0.25;
+    this.display.explode(this.explode, slotKind, this.time);
     this.showCard(this.withItem(held.item));
     if (h.pinching && h.tracked) return;
-    const tap = at.distanceTo(held.startAt) < TAP_MOVE;
     this.root.remove(held.model);
-    this.held = null;
-    this.displayHolder.scale.setScalar(DISPLAY_SCALE);
-    if (near || tap) this.fit(held.item);
-    else this.say('Bring the part to your top to fit it');
+    this.heldPart = null;
+    if (d < SNAP || at.distanceTo(held.startAt) < TAP_MOVE) this.fit(held.item);
+    else {
+      playRemove();
+      this.say('Bring the part to your top to fit it');
+    }
   }
 
   /** Where a pointer is: the pinch itself when the hand is near the forge, else along its ray. */
   private pointAt(h: HandState, out: Vector3): Vector3 {
-    this.displayHolder.getWorldPosition(this.q);
+    this.root.localToWorld(this.q.copy(this.anvilSpot));
     if (h.pinch.distanceTo(this.q) < 0.6 || !h.hasRay) return out.copy(h.pinch);
-    // Along the ray, as far out as the top is.
+    // Along the ray, as far out as the anvil is.
     const d = this.q.distanceTo(h.rayOrigin);
     return out.copy(h.rayDir).multiplyScalar(d).add(h.rayOrigin);
   }
@@ -328,7 +347,7 @@ export class Forge {
       this.say(item.value === 1 ? 'Right spin' : 'Left spin: steals spin from right spinners');
     } else if (item.kind === 'color') {
       this.build = { ...this.build, color: item.value };
-      this.say('New color');
+      this.say('Painted');
     } else {
       const next = this.withItem(item)!;
       const w = weightOf(next);
@@ -349,69 +368,45 @@ export class Forge {
     this.rebuildDisplay();
   }
 
-  private press(id: string) {
-    if (id.startsWith('tab:')) {
-      this.showTab(Number(id.slice(4)), 1);
-      this.logPending = true;
-      return;
-    }
-    if (id === 'back') return this.hooks.exit();
-    if (id === 'test') return this.hooks.test(this.build);
-    if (id === 'done') {
-      saveBuild(this.build);
-      playPlace();
-      return this.hooks.done(this.build);
-    }
+  private save() {
+    saveBuild(this.build);
+    playPlace();
+    this.dropAll();
+    this.hooks.done(this.build);
   }
 
   private rebuildDisplay() {
     this.display?.dispose();
     this.display = new TopView(this.build, this.build.color);
-    // Only the body: no floor shadow on the spindle.
     this.displayHolder.add(this.display.root);
+    this.explode = 0;
     this.cardKey = '';
     this.showCard(null);
   }
 
   private showCard(preview: TopBuild | null) {
-    const key = JSON.stringify([this.build, preview]);
+    const key = JSON.stringify([this.build, preview, this.message]);
     if (key === this.cardKey) return;
     this.cardKey = key;
-    this.card.draw(this.build, preview);
+    this.card.draw(this.build, preview, this.message);
   }
 
-  private showTab(t: number, direction: number) {
-    if (direction !== 0) this.slide = (t > this.tab ? 1 : -1) * 0.12;
-    this.tab = t;
-    for (const s of this.slots) {
-      const on = s.tab === t;
-      s.model.visible = on;
-      s.name.visible = on;
-    }
-    if (direction !== 0) playPick();
-  }
-
-  private slotUnder(h: HandState, touchOnly = false): Slot | null {
-    let best: Slot | null = null;
+  /** What a pointer would pinch: the top, a shelf item, or the bucket (nearest wins). */
+  private under(h: HandState, touchOnly: boolean): Target | null {
+    let best: Target | null = null;
     let bestD = Infinity;
-    for (const s of this.slots) {
-      if (s.tab !== this.tab) continue;
-      s.model.getWorldPosition(this.p);
-      const d = this.distance(h, this.p, GRAB_NEAR, touchOnly ? 0 : GRAB_RAY);
+    const consider = (o: Object3D, t: Target, near = GRAB_NEAR) => {
+      o.getWorldPosition(this.p);
+      const d = this.distance(h, this.p, near, touchOnly ? 0 : GRAB_RAY);
       if (d < bestD) {
         bestD = d;
-        best = s;
+        best = t;
       }
-    }
+    };
+    if (!this.heldTop) consider(this.displayHolder, { kind: 'top' }, GRAB_NEAR * 1.3);
+    for (const slot of this.slots) consider(slot.model, { kind: 'slot', slot });
+    consider(this.bucket, { kind: 'bucket' });
     return best;
-  }
-
-  private buttonUnder(h: HandState, touchOnly = false): Button | null {
-    for (const b of [...this.tabs, ...this.buttons]) {
-      b.mesh.getWorldPosition(this.p);
-      if (this.distance(h, this.p, 0.03 * BOARD_SCALE, touchOnly ? 0 : (b.height / 2) * BOARD_SCALE) < Infinity) return b;
-    }
-    return null;
   }
 
   /** Near pinch distance, or ray distance (+ a small bias), or Infinity when out of reach. */
@@ -419,24 +414,16 @@ export class Forge {
     const d = h.pinch.distanceTo(point);
     if (d < near) return d;
     if (!h.hasRay) return Infinity;
-    const t = this.q.copy(point).sub(h.rayOrigin).dot(h.rayDir);
+    const t = this.hit.copy(point).sub(h.rayOrigin).dot(h.rayDir);
     if (t <= 0) return Infinity;
     const off = this.hit.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(point);
     return off < ray ? off + 0.05 : Infinity;
   }
 
   private say(text: string) {
-    if (text === this.statusText) return;
-    this.statusText = text;
-    const old = this.status;
-    this.status = tag(text, 0.22, 34);
-    this.status.position.copy(old.position);
-    this.board.remove(old);
-    old.geometry.dispose();
-    const mat = old.material as MeshBasicMaterial;
-    mat.map?.dispose();
-    mat.dispose();
-    this.board.add(this.status);
+    this.message = text;
+    this.cardKey = '';
+    this.showCard(null);
     if (import.meta.env.DEV) console.log(`[FORGE] ${text} | ${buildName(this.build)} ${weightOf(this.build)} g spin ${this.build.spin}`);
   }
 
@@ -448,54 +435,101 @@ export class Forge {
     o.quaternion.setFromRotationMatrix(this.basis.makeBasis(x, y, z));
   }
 
-  /** Dev: board item and button positions (world), for driving the forge from the emulator CLI. */
+  /** A stepped wooden shelf with a row of parts on each step and its name on the front edge. */
+  private buildShelf() {
+    this.shelf.position.copy(SHELF_AT);
+    const wood = new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x7a4f30) });
+    ROWS.forEach(([label, items, gap], r) => {
+      const y = r * ROW_RISE;
+      const z = -r * ROW_DEPTH;
+      const plank = new Mesh(new BoxGeometry(SHELF_WIDTH, 0.006, ROW_DEPTH * 0.9), wood);
+      plank.position.set(0, y - 0.004, z);
+      const riser = new Mesh(new BoxGeometry(SHELF_WIDTH, y + 0.05, 0.004), wood);
+      riser.position.set(0, (y - 0.05) / 2 - 0.004, z - ROW_DEPTH * 0.45);
+      const name = tag(label, 0.07, 44);
+      name.position.set(-SHELF_WIDTH / 2 + 0.035, y - 0.0, z + ROW_DEPTH * 0.46);
+      name.rotation.x = -0.5;
+      name.scale.setScalar(0.8);
+      this.shelf.add(plank, riser, name);
+      items.forEach((item, c) => {
+        const home = new Vector3((c - (items.length - 1) / 2) * gap + 0.02, y + 0.008, z);
+        const model = itemModel(item);
+        model.position.copy(home);
+        this.shelf.add(model);
+        this.slots.push({ item, model, home });
+      });
+    });
+    // Posts at both ends.
+    for (const side of [-1, 1]) {
+      const post = new Mesh(new BoxGeometry(0.01, 0.06 + ROWS.length * ROW_RISE, 0.01), wood);
+      post.position.set((side * SHELF_WIDTH) / 2, (ROWS.length * ROW_RISE) / 2 - 0.02, -((ROWS.length - 1) * ROW_DEPTH) / 2);
+      this.shelf.add(post);
+    }
+  }
+
+  /** The quench bucket: dunk your top in it to save and go home. */
+  private buildBucket() {
+    this.bucket.position.copy(BUCKET_AT);
+    const wall = new Mesh(new CylinderGeometry(0.035, 0.03, 0.05, 24, 1, true), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x6b4a32), side: 2 }));
+    wall.position.y = 0.025;
+    const hoop = new Mesh(new TorusGeometry(0.035, 0.0025, 8, 32).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x8a8f99) }));
+    hoop.position.y = 0.05;
+    const water = new Mesh(new CircleGeometry(0.033, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x3f8fb8, transparent: true, opacity: 0.8 }));
+    water.position.y = 0.042;
+    const sign = tag('SAVE', 0.08, 48);
+    sign.position.set(0, 0.085, 0);
+    this.bucket.add(wall, hoop, water, sign);
+  }
+
+  /** Dev: world positions of the top, the shelf items and the bucket, for the emulator CLI. */
   debugPositions(): string {
     this.root.updateWorldMatrix(true, true);
     const at = (o: Object3D) => o.getWorldPosition(new Vector3()).toArray().map((v) => v.toFixed(3)).join(',');
     return [
-      // Item homes, not their current spot, so a tab's slide-in does not throw the numbers off.
-      ...this.slots.filter((s) => s.tab === this.tab).map((s) => `${s.item.name.replace(/ /g, '_')}@${this.board.localToWorld(s.home.clone()).toArray().map((v) => v.toFixed(3)).join(',')}`),
-      ...[...this.tabs, ...this.buttons].map((b) => `${b.id}@${at(b.mesh)}`),
       `top@${at(this.displayHolder)}`,
+      ...this.slots.map((s) => `${s.item.name.replace(/ /g, '_')}${s.item.kind === 'color' ? this.slots.indexOf(s) : ''}@${at(s.model)}`),
+      `bucket@${at(this.bucket)}`,
     ].join(' ');
   }
+
+  private readonly q2 = new Quaternion();
 }
 
-/** The model shown on the board for an item, sized to fit its slot. */
+/** The model of a shelf item, sized to be easy to grab. */
 function itemModel(item: Item): Object3D {
   const g = new Group();
   if (item.kind === 'ring') {
     const ring = RINGS.find((r) => r.id === item.id)!;
-    g.add(...ringMeshes(ring, 0xb9ada0, -0.01));
-    g.scale.setScalar(0.65);
+    g.add(...ringMeshes(ring, 0xb9ada0, 0));
+    g.scale.setScalar(1.05);
   } else if (item.kind === 'core') {
-    const m = coreMesh(CORES.find((c) => c.id === item.id)!);
-    m.position.y -= 0.004;
-    g.add(m);
-    g.scale.setScalar(1.9);
+    g.add(coreMesh(CORES.find((c) => c.id === item.id)!));
+    g.scale.setScalar(2);
   } else if (item.kind === 'tip') {
-    const m = tipMesh(item.id);
-    m.position.y -= 0.004;
-    g.add(m);
+    g.add(tipMesh(item.id));
     g.scale.setScalar(2.2);
   } else if (item.kind === 'spin') {
-    // A curved arrow showing the spin direction (seen from above, tipped toward the eyes).
+    // A token with a curved arrow showing the spin direction.
     const mat = new MeshBasicMaterial({ color: 0xffb347 });
-    const arc = new Mesh(new TorusGeometry(0.012, 0.0022, 6, 24, Math.PI * 1.5), mat);
-    const head = new Mesh(new ConeGeometry(0.004, 0.008, 12), mat);
-    head.position.set(0.012, -0.003, 0);
-    head.rotation.z = Math.PI;
+    const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x5d6068) }));
+    const arc = new Mesh(new TorusGeometry(0.01, 0.0018, 6, 24, Math.PI * 1.5).rotateX(-Math.PI / 2), mat);
+    arc.position.y = 0.003;
+    const head = new Mesh(new ConeGeometry(0.0035, 0.007, 12).rotateZ(-Math.PI / 2), mat);
+    head.position.set(0.0, 0.003, 0.01);
     if (item.value === -1) g.scale.x = -1;
-    g.add(arc, head);
+    g.add(coin, arc, head);
   } else if (item.kind === 'color') {
-    g.add(new Mesh(new SphereGeometry(0.011, 20, 14), new MeshMatcapMaterial({ matcap: makeMatcap('clay', item.value) })));
+    // A paint pot.
+    const pot = new Mesh(new CylinderGeometry(0.014, 0.012, 0.018, 20), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x7d828c) }));
+    pot.position.y = 0.009;
+    const paint = new Mesh(new CircleGeometry(0.0125, 20).rotateX(-Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', item.value) }));
+    paint.position.y = 0.0175;
+    g.add(pot, paint);
   } else if (item.kind === 'preset') {
     const view = new TopView(item.build, item.build.color);
-    view.root.position.y = -0.012;
     g.add(view.root);
-    g.scale.setScalar(0.45);
+    g.scale.setScalar(0.9);
   }
-  g.rotation.x = item.kind === 'spin' ? 0 : 0.6;
   return g;
 }
 
@@ -507,20 +541,20 @@ class StatsCard {
 
   constructor() {
     this.canvas.width = 512;
-    this.canvas.height = 400;
+    this.canvas.height = 470;
     this.tex = new CanvasTexture(this.canvas);
     this.tex.colorSpace = SRGBColorSpace;
-    this.mesh = new Mesh(new PlaneGeometry(0.16, 0.125), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
+    this.mesh = new Mesh(new PlaneGeometry(0.16, 0.147), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
     this.mesh.name = 'forge-stats';
   }
 
   /** Draws the build; a preview build shows as gains (green) and losses (red) on each bar. */
-  draw(build: TopBuild, preview: TopBuild | null) {
+  draw(build: TopBuild, preview: TopBuild | null, message: string) {
     const g = this.canvas.getContext('2d')!;
-    g.clearRect(0, 0, 512, 400);
+    g.clearRect(0, 0, 512, 470);
     g.fillStyle = 'rgba(30, 24, 20, 0.88)';
     g.beginPath();
-    g.roundRect(4, 4, 504, 392, 30);
+    g.roundRect(4, 4, 504, 462, 30);
     g.fill();
     const spec = specFromBuild(build);
     const now = statsOf(spec);
@@ -561,6 +595,12 @@ class StatsCard {
         g.fillRect(x0 + width * b, y - 14, width * (a - b), 28);
       }
     });
+    // What just happened, or what to do next.
+    g.fillStyle = '#ffcf8a';
+    let size = 26;
+    do g.font = `${size--}px system-ui, sans-serif`;
+    while (g.measureText(message).width > 470 && size > 14);
+    g.fillText(message, 26, 425);
     this.tex.needsUpdate = true;
   }
 }

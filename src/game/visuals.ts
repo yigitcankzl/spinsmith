@@ -333,6 +333,9 @@ export class TopView {
   private burst = false;
   private core: MeshBasicMaterial;
   private blur: Mesh;
+  /** Which part each mesh belongs to, and its resting height, for the exploded view. */
+  private kinds: ('ring' | 'core' | 'tip')[] = [];
+  private bases: number[] = [];
   private shadow: Mesh;
   private readonly hot = new Color(0xff5a14);
   private readonly cool = new Color(0xffb347);
@@ -350,6 +353,8 @@ export class TopView {
     this.core = new MeshBasicMaterial({ color: this.cool.clone() });
     const ringParts = ringMeshes(ring, color, base, this.core);
     this.parts = [...ringParts, ratchet, bit];
+    this.kinds = [...ringParts.map(() => 'ring' as const), 'core', 'tip'];
+    this.bases = this.parts.map((p) => p.position.y);
     // A blur halo in the body color at the blade's height, bright while spinning fast.
     this.blur = new Mesh(
       new RingGeometry(ring.radius * 0.5, ring.radius * 1.12, 48).rotateX(-Math.PI / 2),
@@ -370,6 +375,18 @@ export class TopView {
       this.flying.push({ mesh: m, vel: new Vector3(), spin: new Vector3() });
       this.debris.add(m);
     }
+  }
+
+  /**
+   * Exploded view (k 0..1): the ring lifts off and the bit drops away, so a part brought close
+   * shows where it goes; the slot it would replace pulses.
+   */
+  explode(k: number, focus: 'ring' | 'core' | 'tip' | null, time: number) {
+    this.parts.forEach((p, i) => {
+      const kind = this.kinds[i];
+      p.position.y = this.bases[i] + (kind === 'ring' ? 0.012 : kind === 'tip' ? -0.009 : 0) * k;
+      p.scale.setScalar(kind === focus ? 1 + 0.08 * k * (0.5 + 0.5 * Math.sin(time * 10)) : 1);
+    });
   }
 
   /** Frees the GPU buffers when the top is rebuilt with other parts. */

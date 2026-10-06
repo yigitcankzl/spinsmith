@@ -50,14 +50,17 @@ What works:
   their gear, Saw rings chip toward a burst. The classic Striker (attack), Anvil (defense)
   and Needle (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
   the opponent's cool teal; the opponent gets a random build each round.
-- **Forge:** pinch the anvil. A board behind the anvil holds the parts by tab
-  (Ring, Core, Tip, Style, Presets); your top stands large on the anvil, with a stats card
-  floating over the far side of the arena (attack, defense, stamina, dash, burst resistance,
-  weight). Pinch a part and carry it onto your top, or just tap it; a core locks with one click
-  per tooth. Pointing at a part previews its effect on the card (green gains, red losses); an
-  overweight build is refused. *Test* plays a round with your build, *Save* keeps it
-  (saved in the browser) and goes home. `npm run report:tops` plays every build against the
-  others and flags dominant builds and dead parts.
+- **Forge, by hand** (`src/game/forge.ts`): pinch the anvil. Your top stands on the anvil; the
+  parts lie on a stepped wooden shelf behind it (tips, cores, rings, style, presets). Pinch your
+  top to pick it up: it follows your hand and turns with it. Pinch a part on the shelf and bring
+  it to the top (on the anvil or in your other hand): the top comes apart to show where the part
+  goes and that slot pulses; let go to fit it with a clack (tapping a part fits it too). A core
+  locks with one click per tooth; overweight builds are refused. Tap a paint pot or dip the top
+  in it to paint it; spin tokens set the spin direction. Drop the top into the arena to test it
+  in a round; dunk it in the quench bucket to save and go home. A stats card over the far side
+  of the arena shows the build, previews a part's effect (green gains, red losses) and says what
+  just happened. `npm run report:tops` plays every build against the others and flags dominant
+  builds and dead parts.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
 - **Arena workshop:** pinch the blueprint on the arena rack. A menu board stands at the rack,
