@@ -242,12 +242,11 @@ const TRAY: [string, Piece[]][] = [
 /** Spacing of the pieces in the menu row (m) and how much larger than life they are shown. */
 const ITEM_GAP = 0.046;
 const ITEM_SCALE = 1.6;
-/** The menu floats this high above the left wrist (m), turned toward the eyes. */
-const MENU_ABOVE_WRIST = 0.13;
-/** ...and this far in toward the middle of the view (m). */
-const MENU_INWARD = 0.1;
-/** Without a tracked left hand the menu stands this far toward the arena from the eyes (m). */
-const MENU_DISTANCE = 0.4;
+/** The menu stands this far behind the arena's far rim and this high above the arena (m). */
+const MENU_BEHIND = 0.04;
+const MENU_HEIGHT = 0.16;
+/** It is farther from the eyes than a hand-held menu, so it is drawn larger. */
+const MENU_SCALE = 1.7;
 
 interface Slot {
   piece: Piece;
@@ -304,14 +303,14 @@ export class Builder {
   private readonly right = new Vector3();
   private readonly depth = new Vector3();
   private readonly basis = new Matrix4();
-  private menuPlaced = false;
   private logged = true;
 
   constructor(private readonly hooks: BuilderHooks) {
     this.root.name = 'arena-workshop';
-    // A hand-held menu, like Tiny Golf's: it rides above the left hand, facing the eyes. Tabs on
-    // top pick a category; that category's pieces sit big in one row below; pinch one with the
-    // other hand and carry it to the arena. Panel-local axes: x right, y up, +z toward the eyes.
+    // A menu board standing across the arena, facing the player. Tabs on top pick a category; that
+    // category's pieces sit big in one row below; pinch one and carry it over the arena.
+    // Panel-local axes: x right, y up, +z toward the eyes.
+    this.tray.scale.setScalar(MENU_SCALE);
     const back = new Mesh(new PlaneGeometry(0.24, 0.17), new MeshBasicMaterial({ color: 0x1e1814, transparent: true, opacity: 0.82, depthWrite: false }));
     back.position.z = -0.004;
     this.tray.add(back);
@@ -364,7 +363,6 @@ export class Builder {
     this.draft = cloneLayout(from);
     this.draft.name = 'My Arena';
     this.root.visible = true;
-    this.menuPlaced = false;
     this.held = null;
     this.say('Pinch a piece and drop it on the arena');
     this.hooks.preview(this.draft);
@@ -673,25 +671,13 @@ export class Builder {
   }
 
   /**
-   * Holds the menu above the left hand, turned toward the eyes. Without a tracked left hand it
-   * stands at eye level beside the arena instead. All arguments are arena-local.
+   * Stands the menu across the arena, behind its far rim and above it, facing the player, so the
+   * pieces are picked from the board opposite and carried over the arena. All arguments are
+   * arena-local (the arena center is the origin, +Z toward the player).
    */
-  placeMenu(wrist: Vector3 | null, head: Vector3, towardArena: Vector3) {
-    if (wrist) {
-      // Above the hand and a little in toward the middle of the view, between the hands.
-      const inward = this.right.set(-towardArena.z, 0, towardArena.x);
-      this.q.copy(wrist).addScaledVector(inward, MENU_INWARD);
-      this.q.y += MENU_ABOVE_WRIST;
-      // Smoothed so hand tracking jitter does not shake the menu.
-      if (this.menuPlaced) this.tray.position.lerp(this.q, 0.35);
-      else this.tray.position.copy(this.q);
-    } else {
-      const right = this.right.set(-towardArena.z, 0, towardArena.x);
-      this.q.copy(head).addScaledVector(towardArena, MENU_DISTANCE).addScaledVector(right, 0.2);
-      this.q.y -= 0.06;
-      this.tray.position.lerp(this.q, this.menuPlaced ? 0.1 : 1);
-    }
-    this.menuPlaced = true;
+  placeMenu(head: Vector3, arenaRadius: number) {
+    this.q.set(0, MENU_HEIGHT, -arenaRadius - MENU_BEHIND);
+    this.tray.position.copy(this.q);
     // Face the eyes upright: +Z toward the head, +Y up.
     const z = this.depth.copy(head).sub(this.tray.position).normalize();
     const x = this.right.crossVectors(this.up.set(0, 1, 0), z).normalize();

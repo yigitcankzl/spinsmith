@@ -45,10 +45,10 @@ What works:
   the opponent's is random.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
-- **Arena workshop:** pinch *Workshop* on the home screen. A menu rides above your left
-  hand, facing you (like Tiny Golf's builder): tabs on top (Place, Shape, Floor, Wall, Theme,
+- **Arena workshop:** pinch *Workshop* on the home screen. A menu board stands across the
+  arena, above its far rim and facing you: tabs on top (Place, Shape, Floor, Wall, Theme,
   Extras), and the chosen category's pieces shown large in one row below, sliding in when the
-  tab changes. Without a tracked left hand the menu stands at eye level beside the arena.
+  tab changes.
   The pieces: pockets, rails, pillars and bumpers to place; circle, oval and square plates;
   miniature floors (bowl, flat, hill, ridge, tiers); wall rings (low, standard, high, none);
   theme gems; and extras (vortex, turntable, rocking, embers). Pinch a piece, carry it over the arena and let go: pockets and rails snap to the

@@ -395,14 +395,9 @@ export class MatchSystem extends createSystem({
 
   /** Workshop: pieces, the tray and the rim, all handled by the builder. */
   private updateBuilder(dt: number) {
-    // The menu rides on the left hand; positions are arena-local.
-    const head = this.player.head;
-    head.getWorldPosition(this.p);
-    const local = this.root.worldToLocal(this.p);
-    this.fwd.set(-local.x, 0, -local.z).normalize();
-    const left = this.hands.left;
-    const wrist = left.tracked ? this.root.worldToLocal(this.handleWorld.copy(left.wrist)) : null;
-    this.builder.placeMenu(wrist, local, this.fwd);
+    // The menu board stands across the arena, facing the head; positions are arena-local.
+    this.player.head.getWorldPosition(this.p);
+    this.builder.placeMenu(this.root.worldToLocal(this.p), this.arena.layout.radius);
     this.builder.update(this.pointers, dt);
   }
 
