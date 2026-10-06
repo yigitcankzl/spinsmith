@@ -12,8 +12,6 @@
  * - Drop the top in the quench slot beside the anvil to save it and go home.
  */
 import {
-  BoxGeometry,
-  CanvasTexture,
   Color,
   CircleGeometry,
   ConeGeometry,
@@ -25,9 +23,7 @@ import {
   MeshBasicMaterial,
   MeshMatcapMaterial,
   Object3D,
-  PlaneGeometry,
   Quaternion,
-  SRGBColorSpace,
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
@@ -35,7 +31,8 @@ import { playDrawer, playLocked, playMachine, playPick, playPlace, playRemove } 
 import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
 import { tag } from './builder.js';
-import { engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
+import { ORANGE, TEXT_DIM } from './ui.js';
+import { DialPlate, popIn, RimTabs, rowSpots } from './rim.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
@@ -188,17 +185,19 @@ export class Forge {
   /** Seconds since the drawer opened: its parts pop up one after another. */
   private drawerT = 1;
   private tabs = new Group();
-  private tabCanvas = document.createElement('canvas');
-  private tabTex: CanvasTexture;
-  private tabKey = '';
-  private tabAt: Record<Drawer, Vector3> = { ring: new Vector3(), core: new Vector3(), tip: new Vector3(), style: new Vector3() };
+  private tabPlates = new RimTabs(
+    DRAWERS.map(([, label]) => label),
+    rowSpots(DRAWERS.length, TAB_GAP, TAB_Z, TAB_Y),
+    TAB_W,
+    TAB_H,
+  );
   private anvil = anvilModel();
   private quench = new Group();
   private display!: TopView;
   /** Tips the top toward the eyes so its face shows; it spins about its own axis inside. */
   private displayTilt = new Group();
   private displayHolder = new Group();
-  private stats = new StatsPlate();
+  private stats = new DialPlate();
   private cardKey = '';
   private message = '';
   private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
@@ -232,17 +231,14 @@ export class Forge {
   ) {
     this.root.name = 'top-forge';
     this.buildTray();
-    this.tabCanvas.width = 1024;
-    this.tabCanvas.height = Math.round((1024 * TAB_H) / (TAB_GAP * 4));
-    this.tabTex = new CanvasTexture(this.tabCanvas);
-    this.tabTex.colorSpace = SRGBColorSpace;
-    this.buildTabs();
+    this.tabs.add(this.tabPlates.mesh);
     this.buildQuench();
     this.anvil.scale.setScalar(ANVIL_SCALE);
     this.displayHolder.position.copy(WORK);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
     this.displayTilt.rotation.x = 0.5;
     this.displayHolder.add(this.displayTilt);
+    this.stats.mesh.name = 'forge-stats';
     this.stats.mesh.position.copy(STATS_AT);
     this.stats.mesh.rotation.x = -0.3;
     this.root.add(this.anvil, this.tray, this.tabs, this.quench, this.displayHolder, this.stats.mesh);
@@ -347,7 +343,11 @@ export class Forge {
       if (t?.kind === 'slot') hovered ??= t.slot;
       if (t?.kind === 'tab') hoveredTab ??= t.drawer;
     }
-    this.drawTabs(hoveredTab);
+    const blink = Math.floor(this.time * 4) % 2 === 0;
+    this.tabPlates.draw((i) => {
+      const d = DRAWERS[i][0];
+      return { on: d === this.drawer || (this.focus?.drawer === d && blink), hover: d === hoveredTab };
+    });
     this.drawerT += dt;
     for (const s of this.slots) {
       if (s.drawer !== this.drawer) continue;
@@ -360,8 +360,7 @@ export class Forge {
       if (s === this.focus) pad.copy(PAD_ON).lerp(this.white, 0.5 + 0.5 * Math.sin(this.time * 5));
       this.pads.setColorAt(s.pad, pad);
       // Out of the drawer one after another, then a slow turn; lifted while pointed at.
-      const order = this.slots.filter((x) => x.drawer === this.drawer).indexOf(s);
-      const pop = Math.min(1, Math.max(0, (this.drawerT - order * 0.05) / 0.2));
+      const pop = popIn(this.drawerT, this.slots.filter((x) => x.drawer === this.drawer).indexOf(s));
       const pulse = s.flash > 0 ? 1 + 0.25 * Math.sin((s.flash / 0.8) * Math.PI) : 1;
       s.model.position.set(s.home.x, s.home.y + (on ? 0.012 : 0) - 0.02 * (1 - pop), s.home.z);
       s.model.rotation.y += dt * (on ? 2 : 0.4);
@@ -634,7 +633,25 @@ export class Forge {
     const key = JSON.stringify([this.build, preview, message]);
     if (key === this.cardKey) return;
     this.cardKey = key;
-    this.stats.draw(this.build, preview, message);
+    const shown = preview ?? this.build;
+    const spec = specFromBuild(shown);
+    const now = statsOf(specFromBuild(this.build));
+    const next = preview ? statsOf(spec) : null;
+    const w = weightOf(shown);
+    const dials: [keyof TopStats, string][] = [
+      ['attack', 'ATTACK'],
+      ['defense', 'DEFENSE'],
+      ['stamina', 'STAMINA'],
+      ['dash', 'DASH'],
+      ['burst', 'BURST RES'],
+    ];
+    this.stats.draw(
+      buildName(shown),
+      `${roleOf(spec)} · ${shown.spin === 1 ? 'right' : 'left'} spin · ${w} / ${WEIGHT_LIMIT} g`,
+      dials.map(([k, label]) => ({ label, value: now[k], preview: next?.[k] })),
+      message,
+      w > WEIGHT_LIMIT ? '#ff5a4a' : TEXT_DIM,
+    );
   }
 
   /** Distance from a pointer to a fixed point (world), handed to a callback. */
@@ -657,12 +674,14 @@ export class Forge {
     };
     if (!this.heldTop) consider(this.displayHolder, { kind: 'top' }, GRAB_NEAR * 1.5);
     for (const slot of this.slots) if (slot.drawer === this.drawer) consider(slot.model, { kind: 'slot', slot });
-    for (const [d] of DRAWERS) this.consider(h, this.tabAt[d], touchOnly, (dist) => {
-      if (dist < bestD) {
-        bestD = dist;
-        best = { kind: 'tab', drawer: d };
-      }
-    });
+    DRAWERS.forEach(([d], i) =>
+      this.consider(h, this.tabPlates.spots[i].at, touchOnly, (dist) => {
+        if (dist < bestD) {
+          bestD = dist;
+          best = { kind: 'tab', drawer: d };
+        }
+      }),
+    );
     consider(this.quench, { kind: 'quench' });
     return best;
   }
@@ -725,45 +744,6 @@ export class Forge {
     this.tray.add(this.pads);
   }
 
-  /** The drawer tabs: four engraved plates on the near rim, all drawn on one canvas. */
-  private buildTabs() {
-    const w = TAB_GAP * DRAWERS.length;
-    const plate = new Mesh(new PlaneGeometry(w, TAB_H), new MeshBasicMaterial({ map: this.tabTex, transparent: true, depthWrite: false }));
-    plate.rotation.x = -1.1;
-    plate.position.set(0, TAB_Y, TAB_Z);
-    this.tabs.add(plate);
-    DRAWERS.forEach(([d], i) => this.tabAt[d].set((i - (DRAWERS.length - 1) / 2) * TAB_GAP, TAB_Y, TAB_Z));
-  }
-
-  private drawTabs(hovered: Drawer | null) {
-    const key = `${this.drawer}|${hovered}|${this.focus?.drawer}|${Math.floor(this.time * 4) % 2}`;
-    if (key === this.tabKey) return;
-    this.tabKey = key;
-    const g = this.tabCanvas.getContext('2d')!;
-    const { width: W, height: H } = this.tabCanvas;
-    g.clearRect(0, 0, W, H);
-    const cw = W / DRAWERS.length;
-    DRAWERS.forEach(([d, label], i) => {
-      const x = i * cw;
-      g.save();
-      g.translate(x + cw * (1 - TAB_W / TAB_GAP) / 2, 0);
-      const pw = cw * (TAB_W / TAB_GAP);
-      metalPlate(g, pw, H);
-      g.restore();
-      const open = d === this.drawer;
-      const calls = this.focus?.drawer === d && !open && Math.floor(this.time * 4) % 2 === 0;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.font = `700 ${Math.round(H * 0.5)}px ${FONT}`;
-      engrave(g, label, x + cw / 2, H / 2 + 2, open || calls ? ORANGE : d === hovered ? '#ffffff' : STEEL);
-      if (open) {
-        g.fillStyle = ORANGE;
-        g.fillRect(x + cw * 0.3, H - H * 0.14, cw * 0.4, H * 0.06);
-      }
-    });
-    this.tabTex.needsUpdate = true;
-  }
-
   /** The quench slot beside the anvil: drop your top in to save it and go home. */
   private buildQuench() {
     this.quench.position.copy(QUENCH_AT);
@@ -785,7 +765,7 @@ export class Forge {
     const at = (o: Object3D) => fmt(o.getWorldPosition(new Vector3()));
     return [
       `top@${at(this.displayHolder)}`,
-      ...DRAWERS.map(([d]) => `tab_${d}@${fmt(this.root.localToWorld(this.tabAt[d].clone()))}`),
+      ...DRAWERS.map(([d], i) => `tab_${d}@${fmt(this.root.localToWorld(this.tabPlates.spots[i].at.clone()))}`),
       ...this.slots.filter((s) => s.drawer === this.drawer).map((s) => `${s.item.name.replace(/ /g, '_')}${s.item.kind === 'color' ? this.slots.indexOf(s) : ''}@${fmt(this.root.localToWorld(s.home.clone()))}`),
       `quench@${at(this.quench)}`,
     ].join(' ');
@@ -828,96 +808,4 @@ export function itemModel(item: Item): Object3D {
     g.scale.setScalar(0.9);
   }
   return g;
-}
-
-/**
- * The stats plate on the far rim: the build engraved, weight against the limit, and one dial per
- * stat; a preview build shows as a second needle, green for a gain and red for a loss.
- */
-class StatsPlate {
-  readonly mesh: Mesh;
-  private canvas = document.createElement('canvas');
-  private tex: CanvasTexture;
-
-  constructor() {
-    this.canvas.width = 1200;
-    this.canvas.height = 500;
-    this.tex = new CanvasTexture(this.canvas);
-    this.tex.colorSpace = SRGBColorSpace;
-    this.tex.anisotropy = 4;
-    this.mesh = new Mesh(new PlaneGeometry(0.26, 0.108), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
-    this.mesh.name = 'forge-stats';
-  }
-
-  draw(build: TopBuild, preview: TopBuild | null, message: string) {
-    const g = this.canvas.getContext('2d')!;
-    const W = this.canvas.width;
-    metalPlate(g, W, 500);
-    const shown = preview ?? build;
-    const spec = specFromBuild(shown);
-    const now = statsOf(specFromBuild(build));
-    const next = preview ? statsOf(spec) : null;
-    g.textBaseline = 'middle';
-    g.textAlign = 'center';
-    g.font = `700 64px ${FONT}`;
-    engrave(g, buildName(shown).toUpperCase(), W / 2, 62, TEXT);
-    const w = weightOf(shown);
-    g.font = `600 36px ${FONT}`;
-    engrave(g, `${roleOf(spec)} · ${shown.spin === 1 ? 'right' : 'left'} spin · ${w} / ${WEIGHT_LIMIT} g`, W / 2, 116, w > WEIGHT_LIMIT ? '#ff5a4a' : TEXT_DIM);
-    const rows: [keyof TopStats, string][] = [
-      ['attack', 'ATTACK'],
-      ['defense', 'DEFENSE'],
-      ['stamina', 'STAMINA'],
-      ['dash', 'DASH'],
-      ['burst', 'BURST RES'],
-    ];
-    const R = 74;
-    rows.forEach(([key, label], i) => {
-      const cx = W * ((i + 0.5) / rows.length);
-      const cy = 268;
-      // The dial: a dark face, ticks along a 240 degree arc, and the needle.
-      g.fillStyle = '#15181d';
-      g.beginPath();
-      g.arc(cx, cy, R, 0, Math.PI * 2);
-      g.fill();
-      g.strokeStyle = '#8a94a3';
-      g.lineWidth = 4;
-      g.stroke();
-      const a0 = Math.PI * (5 / 6);
-      const span = Math.PI * (4 / 3);
-      for (let t = 0; t <= 10; t++) {
-        const a = a0 + (span * t) / 10;
-        g.strokeStyle = t % 5 === 0 ? '#c9d3e0' : '#5d6672';
-        g.lineWidth = t % 5 === 0 ? 4 : 2;
-        g.beginPath();
-        g.moveTo(cx + Math.cos(a) * R * 0.78, cy + Math.sin(a) * R * 0.78);
-        g.lineTo(cx + Math.cos(a) * R * 0.92, cy + Math.sin(a) * R * 0.92);
-        g.stroke();
-      }
-      const needle = (v: number, color: string, width: number) => {
-        const a = a0 + span * Math.min(1, Math.max(0, v / 100));
-        g.strokeStyle = color;
-        g.lineWidth = width;
-        g.lineCap = 'round';
-        g.beginPath();
-        g.moveTo(cx, cy);
-        g.lineTo(cx + Math.cos(a) * R * 0.8, cy + Math.sin(a) * R * 0.8);
-        g.stroke();
-      };
-      if (next && next[key] !== now[key]) needle(next[key], next[key] > now[key] ? '#6fd36f' : '#e0574a', 6);
-      needle(now[key], ORANGE, 8);
-      g.fillStyle = '#c9d3e0';
-      g.beginPath();
-      g.arc(cx, cy, 9, 0, Math.PI * 2);
-      g.fill();
-      g.font = `700 30px ${FONT}`;
-      engrave(g, label, cx, cy + R + 32, STEEL);
-    });
-    // What just happened, or what to do next.
-    let size = 36;
-    do g.font = `600 ${size--}px ${FONT}`;
-    while (g.measureText(message).width > W - 80 && size > 16);
-    engrave(g, message, W / 2, 450, STEEL);
-    this.tex.needsUpdate = true;
-  }
 }
