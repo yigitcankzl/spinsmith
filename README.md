@@ -15,16 +15,16 @@ What works:
   8 cm above the nearest detected table, or on a floating tray when there is no table or the
   table is far below the eyes (standing over a coffee table).
 - **The room is the smithy** (`src/game/wall.ts`, `src/game/hub.ts`): the arena sits on your
-  table, drawn twice its simulation size (about 60 cm across). The smithy wall hangs on the
-  real wall straight ahead (a detected wall plane, or a virtual wall 1.6 m ahead), larger the
-  farther it is, with a SPINSMITH sign, and it shows only what you are doing: at home the arena
-  shelf and the scoreboard; in the forge the top's parts and the stats card; in the workshop the
-  arena pieces and a short help; in a match a large scoreboard alone. Point at anything on the wall and pinch: it flies to your hand.
-  On the table, your top waits on a stand at the arena's left (carry it into the arena or tap it
-  to play) and an anvil at its right holds your top (pinch it to forge). Carry an arena miniature
-  from the wall onto the arena (or tap it) to switch; the blueprint opens the workshop, whose
-  board hangs on the wall's tool panel. In a match, a small *Menu* button beside the arena
-  returns home, and the match ends back home after 4 points.
+  table, drawn twice its simulation size (about 60 cm across). At home, your top waits on a stand
+  at the arena's left (carry it into the arena or tap it to play), an anvil at its right holds
+  your top (pinch it to forge), and a row of arena miniatures floats behind the arena: point at
+  one and pinch, it flies to your hand; drop it on the arena (or tap it) to switch. The blueprint
+  at the end opens the workshop. The smithy wall hangs on the real wall straight ahead (a
+  detected wall plane, or a virtual wall 1.6 m ahead) only when it has a use: in the forge and
+  the workshop it is a board with the parts or pieces on the left (they fly to your hand too);
+  in a match it is a fighting-game bar, each top's spin draining as a health bar, points as pips
+  and the round's result in the middle. A small *Menu* button beside the arena returns home, and
+  the match ends back home after 4 points.
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
   travelled and how fast it was still moving at release, so a rip that stops before letting

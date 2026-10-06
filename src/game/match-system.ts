@@ -102,9 +102,11 @@ export class MatchSystem extends createSystem({
   private demo = false;
   private hubLogPending = false;
   private demoFrom: 'build' | 'forge' = 'build';
+  /** The word in the middle of the wall's match bar. */
+  private barMessage = '';
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
-  private hub = new Hub(this.wall);
+  private hub = new Hub();
   private menuButton = new Button('menu', 0.07, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
@@ -320,6 +322,9 @@ export class MatchSystem extends createSystem({
     const live = this.phase === 'fight';
     this.tops.forEach((t, i) => this.hums[i].update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time));
     this.sinceClashSound += dt;
+    if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
+      this.wall.bar(this.mine.spin, this.theirs.spin, this.myPoints, this.theirPoints, MATCH_POINTS, ['YOU', 'RIVAL'], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage);
+    }
     this.myView.sync(this.mine, this.arena, this.time, dt);
     this.theirView.sync(this.theirs, this.arena, this.time, dt);
     this.sparks.update(dt);
@@ -386,7 +391,6 @@ export class MatchSystem extends createSystem({
     this.hub.show(this.arenas, this.arenaIndex, this.myBuild);
     this.label.set('');
     this.wall.setMode('home');
-    this.wall.score(['SpinSmith', this.arena.layout.name, 'Pick an arena on the shelf · put your top in the arena to play']);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
@@ -439,7 +443,7 @@ export class MatchSystem extends createSystem({
   private testBuild(build: TopBuild) {
     this.forge.root.visible = false;
     this.wall.setMode('match');
-    this.wall.score(['Test round', buildName(build)]);
+    this.barMessage = 'TEST';
     this.stage.visible = true;
     this.demo = true;
     this.demoFrom = 'forge';
@@ -658,7 +662,7 @@ export class MatchSystem extends createSystem({
     // The scoreboard on the wall shows the match; the card over the arena only the round's messages.
     this.label.set('');
     this.wall.setMode('match');
-    this.wall.score([`You ${this.myPoints} - ${this.theirPoints} Rival`, `${this.mine.spec.name} vs ${this.theirs.spec.name}`, `${this.arena.layout.name} · first to ${MATCH_POINTS}`]);
+    this.barMessage = 'READY';
   }
 
   private toLocal(world: Vector3) {
@@ -893,7 +897,7 @@ export class MatchSystem extends createSystem({
       }
     }
     this.label.set(text);
-    this.wall.score(text.split('\n'));
+    this.barMessage = text.split('\n')[0].replace(/!.*$/, '!');
     console.log(`[MATCH] ${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
     if (v !== 2) {
       this.round++;

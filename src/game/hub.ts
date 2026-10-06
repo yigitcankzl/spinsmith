@@ -2,8 +2,8 @@
  * The home screen as a smithy, with no buttons: things to pick up, on the table and on the wall.
  * - Your top waits on a stand at the arena's left: carry it into the arena (or tap it) to play.
  * - An anvil at the arena's right holds your top: pinch it to forge your top.
- * - The arena shelf on the wall holds a miniature of every arena: point at one and pinch, it flies
- *   to your hand; drop it on the arena (or tap it) to switch. The blueprint opens the workshop.
+ * - A row of arena miniatures floats behind the arena: point at one and pinch, it flies to your
+ *   hand; drop it on the arena (or tap it) to switch. The blueprint at the end opens the workshop.
  * Table things are arena-local (arena center at the origin, +Z toward the player).
  */
 import {
@@ -25,7 +25,6 @@ import type { HandState } from './hands.js';
 import type { ArenaLayout, Theme } from './layout.js';
 import type { TopBuild } from './parts.js';
 import { makeMatcap, TopView } from './visuals.js';
-import type { Wall } from './wall.js';
 
 export type HubAction = { kind: 'play' } | { kind: 'arena'; index: number } | { kind: 'forge' } | { kind: 'workshop' };
 
@@ -89,13 +88,16 @@ export class Hub {
   private readonly at = new Vector3();
   private readonly center = new Vector3();
 
-  constructor(private readonly wall: Wall) {
+  constructor() {
     this.root.name = 'smithy';
     this.buildShelf();
     this.buildAnvil();
     this.buildStand();
-    this.root.add(this.anvil, this.stand);
-    this.wall.arenas.add(this.shelf);
+    // The miniatures float in a row behind the arena's far rim (drawn at wall size: the arena's
+    // space is twice as large as the world).
+    this.shelf.position.set(0, 0.13, -0.26);
+    this.shelf.scale.setScalar(0.5);
+    this.root.add(this.anvil, this.stand, this.shelf);
     this.root.visible = false;
   }
 
@@ -234,7 +236,8 @@ export class Hub {
   private buildShelf() {
     const wood = new MeshMatcapMaterial({ matcap: WOOD });
     for (let r = 0; r < 2; r++) {
-      const plank = new Mesh(new BoxGeometry(WALL_MINI_GAP * WALL_ROW + 0.06, 0.012, 0.09), wood);
+      // A thin glowing ledge under each row.
+      const plank = new Mesh(new BoxGeometry(WALL_MINI_GAP * WALL_ROW + 0.06, 0.008, 0.09), wood);
       plank.position.set(0, -r * 0.2 - 0.045, 0.045);
       this.shelf.add(plank);
     }

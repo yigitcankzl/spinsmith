@@ -1,10 +1,10 @@
 /**
  * The smithy wall: hung on the real wall in front of the player (a detected wall plane), or on a
- * virtual one when the room has none. In world space, facing the player:
- * - a SPINSMITH sign across the top,
- * - the tool panel on the left, where the forge hangs its parts (point at one and pinch: it flies
- *   to your hand),
- * - the scoreboard on the right, with the arena shelf below it (arena miniatures and the blueprint).
+ * virtual one when the room has none, facing the player. It only shows when there is a use for it:
+ * - forge and workshop: a board with a SPINSMITH sign, the tool panel on the left where the parts
+ *   hang (point at one and pinch: it flies to your hand), and a card or help on the right;
+ * - match: just a fighting-game bar, each top's spin draining as a health bar, the points below;
+ * - home: nothing.
  */
 import { BoxGeometry, CanvasTexture, Group, Mesh, MeshBasicMaterial, MeshMatcapMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from '@iwsdk/core';
 import { makeMatcap } from './visuals.js';
@@ -31,11 +31,18 @@ export class Wall {
   readonly root = new Group();
   /** Left half: the forge's tool panel (local +x right, +y up, +z toward the player). */
   readonly tools = new Group();
-  /** Right half, below the scoreboard: the arena shelf. */
-  readonly arenas = new Group();
   /** Right half, top: where the forge's stats card hangs (over the scoreboard). */
   readonly cardSpot = new Group();
   private board: Mesh;
+  /** The board with its sign and halves (forge, workshop). */
+  private panel = new Group();
+  /** The match bar. */
+  private hud: Mesh;
+  private hudCanvas = document.createElement('canvas');
+  private hudTex: CanvasTexture;
+  private hudKey = '';
+  private mode: WallMode = 'home';
+  private placed = false;
   private canvas = document.createElement('canvas');
   private tex: CanvasTexture;
   private lines: string[] = [];
@@ -63,9 +70,6 @@ export class Wall {
     sign.position.set(0, HEIGHT / 2 - 0.1, 0.02);
     this.tools.position.set(-WIDTH / 4 - 0.02, -0.07, 0.02);
     this.cardSpot.position.set(WIDTH / 4 + 0.03, 0.12, 0.03);
-    // The arena shelf takes the left half at home, where the tool panel hangs otherwise.
-    this.arenas.position.set(-WIDTH / 4 - 0.02, 0.05, 0.02);
-    this.arenas.scale.setScalar(1.3);
     // The scoreboard: a slate in the right half.
     this.canvas.width = 1024;
     this.canvas.height = 420;
@@ -73,7 +77,14 @@ export class Wall {
     this.tex.colorSpace = SRGBColorSpace;
     this.board = new Mesh(new PlaneGeometry(0.72, 0.295), new MeshBasicMaterial({ map: this.tex, transparent: true }));
     this.board.position.set(WIDTH / 4 + 0.03, 0.12, 0.021);
-    this.root.add(back, ...frame, sign, this.board, this.tools, this.arenas, this.cardSpot);
+    this.panel.add(back, ...frame, sign, this.board, this.tools, this.cardSpot);
+    this.hudCanvas.width = 1400;
+    this.hudCanvas.height = 260;
+    this.hudTex = new CanvasTexture(this.hudCanvas);
+    this.hudTex.colorSpace = SRGBColorSpace;
+    this.hud = new Mesh(new PlaneGeometry(1.6, 0.297), new MeshBasicMaterial({ map: this.hudTex, transparent: true, depthWrite: false }));
+    this.hud.position.y = 0.15;
+    this.root.add(this.panel, this.hud);
     this.root.visible = false;
     this.score(['SpinSmith']);
   }
@@ -100,7 +111,8 @@ export class Wall {
     this.root.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0);
     // A farther wall gets a larger board, so it reads the same.
     this.root.scale.setScalar(Math.min(1.5, Math.max(1, (best ? bestT : VIRTUAL_DISTANCE) / 1.5)));
-    this.root.visible = true;
+    this.placed = true;
+    this.setMode(this.mode);
     console.log(`[WALL] on ${best ? 'detected wall' : 'virtual wall'} ${bestT.toFixed(2)} m ahead`);
   }
 
@@ -130,25 +142,69 @@ export class Wall {
     this.tex.needsUpdate = true;
   }
 
-  /**
-   * Shows only what the current activity needs:
-   * - home: the arena shelf on the left (pick an arena), the scoreboard on the right;
-   * - forge: the tool panel with the top's parts on the left, the stats card on the right;
-   * - workshop: the tool panel with the workshop's board on the left, the scoreboard (help) right;
-   * - match: the scoreboard alone, large, in the middle.
-   */
+  /** Shows only what the current activity needs (see the file comment). */
   setMode(mode: WallMode) {
-    this.tools.visible = mode === 'forge' || mode === 'workshop';
-    this.arenas.visible = mode === 'home';
+    this.mode = mode;
+    this.root.visible = this.placed && mode !== 'home';
+    this.panel.visible = mode === 'forge' || mode === 'workshop';
+    this.hud.visible = mode === 'match';
     this.cardSpot.visible = mode === 'forge';
-    this.board.visible = mode !== 'forge';
-    if (mode === 'match') {
-      this.board.position.set(0, -0.02, 0.021);
-      this.board.scale.setScalar(1.9);
-    } else {
-      this.board.position.set(WIDTH / 4 + 0.03, 0.12, 0.021);
-      this.board.scale.setScalar(1);
-    }
+    this.board.visible = mode === 'workshop';
+  }
+
+  /**
+   * The match bar, fighting-game style: your top's spin as a health bar draining toward the middle
+   * on the left, the rival's on the right, points toward the match as pips, a message in between.
+   * Redraws only when something visible changed.
+   */
+  bar(mine: number, theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string) {
+    const a = Math.round(Math.max(0, Math.min(1, mine)) * 100);
+    const b = Math.round(Math.max(0, Math.min(1, theirs)) * 100);
+    const key = [a, b, myPoints, theirPoints, names, message].join('|');
+    if (key === this.hudKey) return;
+    this.hudKey = key;
+    const g = this.hudCanvas.getContext('2d')!;
+    const W = 1400;
+    g.clearRect(0, 0, W, 260);
+    g.fillStyle = 'rgba(20, 16, 14, 0.85)';
+    g.beginPath();
+    g.roundRect(4, 4, W - 8, 252, 30);
+    g.fill();
+    const barW = 560;
+    const barY = 90;
+    const side = (x0: number, dir: 1 | -1, value: number, color: string, name: string, points: number) => {
+      // Frame, then the fill anchored at the outer end, draining toward the middle.
+      g.fillStyle = '#3a2e27';
+      g.fillRect(dir === 1 ? x0 : x0 - barW, barY, barW, 56);
+      g.fillStyle = value > 25 ? color : '#e0574a';
+      const w = (barW * value) / 100;
+      g.fillRect(dir === 1 ? x0 + barW - w : x0 - barW, barY, w, 56);
+      g.strokeStyle = '#f3e6d3';
+      g.lineWidth = 4;
+      g.strokeRect(dir === 1 ? x0 : x0 - barW, barY, barW, 56);
+      g.fillStyle = '#f3e6d3';
+      g.font = 'bold 40px system-ui, sans-serif';
+      g.textAlign = dir === 1 ? 'left' : 'right';
+      g.textBaseline = 'middle';
+      g.fillText(name, dir === 1 ? x0 : x0, 50);
+      for (let i = 0; i < toWin; i++) {
+        g.beginPath();
+        const px = dir === 1 ? x0 + 26 + i * 54 : x0 - 26 - i * 54;
+        g.arc(px, 196, 18, 0, Math.PI * 2);
+        g.fillStyle = i < points ? '#ffd28a' : 'rgba(255,255,255,0.18)';
+        g.fill();
+      }
+    };
+    side(40, 1, a, '#ff9a3c', names[0], myPoints);
+    side(W - 40, -1, b, '#4fc3d6', names[1], theirPoints);
+    g.fillStyle = '#ffd28a';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    let size = 64;
+    do g.font = `bold ${size--}px system-ui, sans-serif`;
+    while (g.measureText(message).width > 200 && size > 20);
+    g.fillText(message, W / 2, 120);
+    this.hudTex.needsUpdate = true;
   }
 }
 
