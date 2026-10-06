@@ -36,7 +36,7 @@ export class SmithBoard {
   private tex: CanvasTexture;
   private key = '';
 
-  constructor(width = 0.27) {
+  constructor(width = 0.31) {
     this.canvas.width = W;
     this.canvas.height = H;
     this.tex = new CanvasTexture(this.canvas);
@@ -76,7 +76,7 @@ export class SmithBoard {
     g.font = `700 32px ${FONT}`;
     engrave(g, 'RIVALS', W / 2, 272, STEEL);
     const n = s.rivals.length;
-    const R = 52;
+    const R = 62;
     s.rivals.forEach((r, i) => {
       const cx = (W * (i + 0.5)) / n;
       const cy = 380;
@@ -96,13 +96,11 @@ export class SmithBoard {
         g.arc(cx, cy, R - 12, a - 0.2, a + 0.2);
         g.stroke();
       }
-      g.font = `700 ${r.met ? 30 : 26}px ${FONT}`;
+      g.font = `700 ${r.met ? 34 : 32}px ${FONT}`;
       engrave(g, r.met ? r.name.split(' ')[0].toUpperCase() : `LV ${r.level}`, cx, cy + 12, r.met ? TEXT : TEXT_DIM);
-      g.font = `600 22px ${FONT}`;
+      g.font = `600 30px ${FONT}`;
       if (r.met) engrave(g, r.name.includes(' ') ? r.name.split(' ').slice(1).join(' ').toUpperCase() : '', cx, cy + R + 22, STEEL);
     });
-    g.font = `600 26px ${FONT}`;
-    engrave(g, 'notches: beaten · knocked out · by your ramp or well', W / 2, 490, TEXT_DIM);
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(60, 526, W - 120, 3);
     // The ledger: one stamp per order done.

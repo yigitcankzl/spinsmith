@@ -197,8 +197,8 @@ export class DialPlate {
       g.beginPath();
       g.arc(cx, cy, 9, 0, Math.PI * 2);
       g.fill();
-      g.font = `700 30px ${FONT}`;
-      engrave(g, d.label, cx, cy + R + 32, STEEL);
+      g.font = `700 40px ${FONT}`;
+      engrave(g, d.label, cx, cy + R + 36, STEEL);
     });
     // What just happened, or what to do next.
     let size = 36;

@@ -27,36 +27,38 @@ export class MatchBar {
    * on the left, the rival's on the right, points toward the match as pips, a message in between.
    * Redraws only when something visible changed.
    */
-  bar(mine: number, theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string, xp: { level: number; rank: string; fraction: number; gained: number }) {
-    const a = Math.round(Math.max(0, Math.min(1, mine)) * 100);
-    const b = Math.round(Math.max(0, Math.min(1, theirs)) * 100);
-    const key = [a, b, myPoints, theirPoints, names, message, xp.level, xp.fraction.toFixed(3), xp.gained].join('|');
+  bar(mine: number, theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string, xp: { level: number; rank: string; fraction: number; gained: number; show: boolean }) {
+    // In 2% steps: the spin drains every frame, the texture need not.
+    const a = Math.round(Math.max(0, Math.min(1, mine)) * 50) * 2;
+    const b = Math.round(Math.max(0, Math.min(1, theirs)) * 50) * 2;
+    const key = [a, b, myPoints, theirPoints, names, message, xp.show, xp.level, xp.fraction.toFixed(3), xp.gained].join('|');
     if (key === this.key) return;
     this.key = key;
     const g = this.canvas.getContext('2d')!;
     const W = 1400;
     metalPlate(g, W, 330);
     const barW = 560;
-    const barY = 90;
+    const barY = 92;
     const side = (x0: number, dir: 1 | -1, value: number, color: string, name: string, points: number) => {
       // A dark slot cut into the plate, then the fill anchored at the outer end, draining toward the middle.
       g.fillStyle = '#121418';
-      g.fillRect(dir === 1 ? x0 : x0 - barW, barY, barW, 56);
+      g.fillRect(dir === 1 ? x0 : x0 - barW, barY, barW, 60);
       g.fillStyle = value > 25 ? color : '#e0574a';
       const w = (barW * value) / 100;
-      g.fillRect(dir === 1 ? x0 + barW - w : x0 - barW, barY, w, 56);
+      g.fillRect(dir === 1 ? x0 + barW - w : x0 - barW, barY, w, 60);
       g.strokeStyle = 'rgba(200, 220, 245, 0.6)';
       g.lineWidth = 3;
-      g.strokeRect(dir === 1 ? x0 : x0 - barW, barY, barW, 56);
+      g.strokeRect(dir === 1 ? x0 : x0 - barW, barY, barW, 60);
       g.fillStyle = TEXT;
-      g.font = `700 40px ${FONT}`;
+      g.font = `700 56px ${FONT}`;
       g.textAlign = dir === 1 ? 'left' : 'right';
       g.textBaseline = 'middle';
-      g.fillText(name, dir === 1 ? x0 : x0, 50);
+      g.fillText(name, x0, 48);
+      // Heat toward the match: one pip per point.
       for (let i = 0; i < toWin; i++) {
         g.beginPath();
-        const px = dir === 1 ? x0 + 26 + i * 54 : x0 - 26 - i * 54;
-        g.arc(px, 196, 18, 0, Math.PI * 2);
+        const px = dir === 1 ? x0 + 30 + i * 74 : x0 - 30 - i * 74;
+        g.arc(px, 205, 26, 0, Math.PI * 2);
         g.fillStyle = i < points ? ORANGE : 'rgba(255,255,255,0.14)';
         g.fill();
       }
@@ -68,24 +70,26 @@ export class MatchBar {
     g.textBaseline = 'middle';
     let size = 64;
     do g.font = `bold ${size--}px ${FONT}`;
-    while (g.measureText(message).width > 200 && size > 20);
-    g.fillText(message, W / 2, 120);
-    // Your smith level along the bottom: level and rank, the XP bar, the XP just earned.
-    g.font = `700 32px ${FONT}`;
+    while (g.measureText(message).width > 220 && size > 44);
+    g.fillText(message, W / 2, 122);
+    // After a round only: your smith level, the XP bar and the XP just earned (not during a fight,
+    // when the eyes are on the tops).
+    if (!xp.show) {
+      this.tex.needsUpdate = true;
+      return;
+    }
+    g.font = `700 48px ${FONT}`;
     g.fillStyle = TEXT;
     g.textAlign = 'left';
     g.fillText(`Lv ${xp.level}`, 40, 280);
-    g.fillStyle = ORANGE;
-    g.font = `700 26px ${FONT}`;
-    g.fillText(xp.rank.toUpperCase(), 130, 281);
     g.fillStyle = 'rgba(255,255,255,0.1)';
-    g.fillRect(380, 270, 760, 20);
+    g.fillRect(220, 268, 820, 26);
     g.fillStyle = STEEL;
-    g.fillRect(380, 270, 760 * xp.fraction, 20);
+    g.fillRect(220, 268, 820 * xp.fraction, 26);
     if (xp.gained > 0) {
       g.fillStyle = ORANGE;
       g.textAlign = 'right';
-      g.font = `700 32px ${FONT}`;
+      g.font = `700 48px ${FONT}`;
       g.fillText(`+${xp.gained} XP`, W - 40, 280);
     }
     this.tex.needsUpdate = true;

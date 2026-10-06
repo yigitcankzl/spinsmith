@@ -485,6 +485,7 @@ export class MatchSystem extends createSystem({
         rank: p.rank,
         fraction: p.fraction,
         gained: this.phase === 'result' ? this.xpGained : 0,
+        show: this.phase === 'result',
       });
     }
     this.myView.sync(this.mine, this.arena, this.time, dt);
