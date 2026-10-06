@@ -9,7 +9,7 @@ import { cloneLayout, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { LEVEL_UNLOCKS, Progress, xpToNext } from '../src/game/progress.ts';
 import { allBuilds, PRESETS, specFromBuild, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -40,6 +40,11 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
   }
   return { t, clashes, result: verdict(a, b, t) };
 }
+
+// Rule tests start the clock at zero; the opening grace (no pockets or ring-outs) would hide
+// the rules, so it is off for them and back on for the type loop.
+const GRACE = TUNING.grace;
+TUNING.grace = 0;
 
 // 1. A lone top launched toward the rim is pulled back by the bowl and eventually topples in place.
 {
@@ -183,6 +188,7 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
   assert.ok(bursts > 0, 'full-power head-on fights must sometimes burst the stamina top');
 }
 
+TUNING.grace = GRACE;
 // 7. The type loop holds: attack beats stamina, defense beats attack, stamina beats defense.
 {
   let seed = 3;
@@ -219,6 +225,7 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
   assert.ok(as > 0.55 && da > 0.55 && sd > 0.55, 'each type must beat the one it counters');
 }
 
+TUNING.grace = 0;
 // 8. Arena knobs.
 {
   // Every built-in arena is a valid layout.

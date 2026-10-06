@@ -352,6 +352,10 @@ export class TopView {
   private burst = false;
   private core: MeshBasicMaterial;
   private blur: Mesh;
+  private blurColor: Color;
+  private flashT = 0;
+  private readonly danger = new Color(0xff2a14);
+  private readonly white = new Color(0xffffff);
   /** Which part each mesh belongs to, and its resting height, for the exploded view. */
   private kinds: ('ring' | 'core' | 'tip')[] = [];
   private bases: number[] = [];
@@ -379,6 +383,7 @@ export class TopView {
       new RingGeometry(ring.radius * 0.5, ring.radius * 1.12, 48).rotateX(-Math.PI / 2),
       new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.4), transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
     );
+    this.blurColor = (this.blur.material as MeshBasicMaterial).color.clone();
     this.blur.position.y = topHeight(ring, base) - 0.002;
     this.root.add(this.blur);
     this.spinner.add(...this.parts);
@@ -394,6 +399,11 @@ export class TopView {
       this.flying.push({ mesh: m, vel: new Vector3(), spin: new Vector3() });
       this.debris.add(m);
     }
+  }
+
+  /** A hard hit: the halo flashes white for about 80 ms. */
+  flash() {
+    this.flashT = 0.08;
   }
 
   /**
@@ -469,7 +479,13 @@ export class TopView {
     }
     this.core.color.copy(this.cool).lerp(this.hot, top.wobble);
     const blur = this.blur.material as MeshBasicMaterial;
-    blur.opacity = top.state === 'spinning' ? 0.28 * Math.min(1, Math.max(0, top.spin)) : 0;
+    // A hit flashes the halo white for a moment; accumulated damage heats it red and starts to
+    // lift the ring off the core, so a coming burst shows before it happens.
+    this.flashT = Math.max(0, this.flashT - dt);
+    const risk = Math.max(0, (top.damage - 0.45) / 0.55);
+    blur.opacity = top.state === 'spinning' ? Math.max(0.28 * Math.min(1, Math.max(0, top.spin)), this.flashT * 9, 0.35 * risk) : 0;
+    blur.color.copy(this.blurColor).lerp(this.danger, Math.min(1, risk)).lerp(this.white, Math.min(1, this.flashT * 12));
+    this.explode(0.35 * risk * (0.85 + 0.15 * Math.sin(time * 30)), null, time);
   }
 
   /** Burst: the parts fly apart, tumble, bounce on the floor and fade out. */
@@ -1055,5 +1071,77 @@ export class Label {
       g.fillText(line, 256, 80 + (i - (lines.length - 1) / 2) * 58);
     });
     this.tex.needsUpdate = true;
+  }
+}
+
+/**
+ * Impact effects in the arena: an expanding ring of light where a hard hit lands, and a fading
+ * streak behind a top that dashes along a rail. Small pools, additive, no depth writes.
+ */
+export class Impacts {
+  readonly root = new Group();
+  private rings: { mesh: Mesh; t: number; size: number }[] = [];
+  private streaks: { mesh: Mesh; t: number }[] = [];
+  private nextRing = 0;
+  private nextStreak = 0;
+
+  constructor() {
+    for (let i = 0; i < 4; i++) {
+      const mesh = new Mesh(
+        new RingGeometry(0.8, 1, 32).rotateX(-Math.PI / 2),
+        new MeshBasicMaterial({ color: 0xffd2a0, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
+      );
+      mesh.visible = false;
+      this.rings.push({ mesh, t: 1, size: 0 });
+      this.root.add(mesh);
+    }
+    for (let i = 0; i < 3; i++) {
+      const mesh = new Mesh(
+        new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(-0.5, 0, 0),
+        new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
+      );
+      mesh.visible = false;
+      this.streaks.push({ mesh, t: 1 });
+      this.root.add(mesh);
+    }
+  }
+
+  /** A ring of light expanding from a hard hit (strength 0..1). */
+  hit(x: number, y: number, z: number, strength: number) {
+    const r = this.rings[this.nextRing];
+    this.nextRing = (this.nextRing + 1) % this.rings.length;
+    r.t = 0;
+    r.size = 0.02 + 0.04 * strength;
+    r.mesh.position.set(x, y + 0.002, z);
+    r.mesh.visible = true;
+  }
+
+  /** A streak behind a top dashing in direction (dx, dz). */
+  dash(x: number, y: number, z: number, dx: number, dz: number) {
+    const s = this.streaks[this.nextStreak];
+    this.nextStreak = (this.nextStreak + 1) % this.streaks.length;
+    s.t = 0;
+    s.mesh.position.set(x, y + 0.003, z);
+    s.mesh.rotation.y = -Math.atan2(dz, dx);
+    s.mesh.visible = true;
+  }
+
+  update(dt: number) {
+    for (const r of this.rings) {
+      if (!r.mesh.visible) continue;
+      r.t += dt / 0.18;
+      const k = Math.min(1, r.t);
+      r.mesh.scale.setScalar(r.size * (0.4 + 1.6 * k));
+      (r.mesh.material as MeshBasicMaterial).opacity = 0.9 * (1 - k);
+      if (k >= 1) r.mesh.visible = false;
+    }
+    for (const s of this.streaks) {
+      if (!s.mesh.visible) continue;
+      s.t += dt / 0.35;
+      const k = Math.min(1, s.t);
+      s.mesh.scale.set(0.09 * (0.5 + k), 1, 0.014 * (1 - 0.6 * k));
+      (s.mesh.material as MeshBasicMaterial).opacity = 0.8 * (1 - k);
+      if (k >= 1) s.mesh.visible = false;
+    }
   }
 }

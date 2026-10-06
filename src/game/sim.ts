@@ -60,22 +60,24 @@ export const TUNING = {
   /** Bounciness of the bodies (0..1). */
   restitution: 0.77,
   /** Spinning rims kick each other apart on contact (m/s at full spin). */
-  recoil: 0.225,
+  recoil: 0.265,
   /** Spin lost per unit of impulse. */
   spinHit: 0.03,
   /** Burst damage per unit of impulse (before the top's burst resistance). */
-  burst: 0.244,
+  burst: 0.24,
   /** How strongly a spinning tip turns radial motion into an orbit around the center (1/s). */
   orbit: 1.44,
   /** Scales every top's spin drain: sets how long rounds last. */
-  drain: 0.57,
+  drain: 0.59,
   /**
    * How much of the difference between tops' drains is kept (1 = all). Long rounds magnify
    * stamina's edge, so it is narrowed around a typical drain.
    */
-  drainSpread: 0.57,
+  drainSpread: 0.565,
   /** Outward speed (m/s) a top needs to drop into a pocket. */
   pocket: 0.27,
+  /** Seconds after the launch during which pockets and walls hold every top (no instant finishes). */
+  grace: 2.5,
 };
 /** Height rule: a height gap this large (m) gives the lower top its full lift on the taller one. */
 const HEIGHT_GAP = 0.002;
@@ -519,10 +521,21 @@ function wall(arena: Arena, t: Top) {
   const r = Math.hypot(t.x, t.z);
   // No wall: crossing the edge is a ring-out (sumo).
   if (L.wall === 'none') {
-    // Out once its center has crossed the edge (riding the berm is still in).
+    // Out once its center has crossed the edge (riding the berm is still in); during the opening
+    // grace the edge bounces it back instead.
     if (r > rim) {
-      t.state = 'out';
-      t.finish = 'over';
+      if (arena.elapsed >= TUNING.grace) {
+        t.state = 'out';
+        t.finish = 'over';
+      } else {
+        t.x = (t.x / r) * rim;
+        t.z = (t.z / r) * rim;
+        const out = (t.vx * t.x + t.vz * t.z) / rim;
+        if (out > 0) {
+          t.vx -= (1.5 * out * t.x) / rim;
+          t.vz -= (1.5 * out * t.z) / rim;
+        }
+      }
     }
     return;
   }
@@ -534,13 +547,16 @@ function wall(arena: Arena, t: Top) {
   const outward = t.vx * nx + t.vz * nz;
   const pocket = pocketAt(L, angle);
   const ease = t.lifted > 0 ? LIFT_ESCAPE : 1;
-  if (pocket && outward > TUNING.pocket * ease) {
+  // Opening grace: right after the launch the rim holds everything, so no round is decided by
+  // the first collision before anyone can read it.
+  const open = arena.elapsed >= TUNING.grace;
+  if (open && pocket && outward > TUNING.pocket * ease) {
     t.state = 'out';
     t.finish = 'pocket';
     t.pocketPoints = pocket.points;
     return;
   }
-  if (outward > WALL_ESCAPE[L.wall] * ease) {
+  if (open && outward > WALL_ESCAPE[L.wall] * ease) {
     t.state = 'out';
     t.finish = 'over';
     return;

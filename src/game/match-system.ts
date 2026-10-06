@@ -14,7 +14,7 @@ import type { WallPlane } from './wall.js';
 import { allBuilds, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, Cord, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
+import { ArenaView, Cord, Impacts, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
 const PEDESTAL = 0.08;
@@ -50,6 +50,11 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
+/** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
+const HARD_HIT = 0.6;
+/** Hard hits closer together than this (s) do not stop the simulation again. */
+const HIT_STOP_GAP = 0.3;
+const HIT_STOP = 0.045;
 /** A pointing ray this close to a button's center (m) presses it. */
 const BUTTON_REACH = 0.035;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
@@ -114,6 +119,10 @@ export class MatchSystem extends createSystem({
   private lastPerfect = false;
   private levelUpText = '';
   private perfTimer = 0;
+  /** Seconds left of the simulation-only pause after a hard hit. */
+  private hitStop = 0;
+  private lastHardHit = -1;
+  private impacts = new Impacts();
   /** Unlocks waiting to be shown over the arena, and the one showing. */
   private reveals: string[] = [];
   private reveal: { obj: Object3D; t: number } | null = null;
@@ -214,6 +223,7 @@ export class MatchSystem extends createSystem({
       this.reticle,
       this.arenaView.root,
       this.sparks.points,
+      this.impacts.root,
     );
     this.myBuild = this.forge.allowed(this.myBuild);
     this.setBuilds(this.myBuild, this.theirBuild);
@@ -356,6 +366,7 @@ export class MatchSystem extends createSystem({
     this.myView.sync(this.mine, this.arena, this.time, dt);
     this.theirView.sync(this.theirs, this.arena, this.time, dt);
     this.sparks.update(dt);
+    this.impacts.update(dt);
     this.updateRewards(dt);
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
@@ -813,6 +824,7 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(0, -this.SPAWN, Math.sin(aiDir) * aiSpeed * th, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, th);
     this.phase = 'fight';
     this.elapsed = 0;
+    this.lastHardHit = -1;
     this.accumulator = 0;
     this.clashes = 0;
     this.label.set(perfect ? 'Perfect rip!\nExtra spin' : '');
@@ -860,6 +872,12 @@ export class MatchSystem extends createSystem({
   }
 
   private updateFight(dt: number) {
+    // Hit stop: the simulation alone pauses for a moment after a hard hit; head tracking and
+    // rendering never do.
+    if (this.hitStop > 0) {
+      this.hitStop -= dt;
+      return;
+    }
     this.accumulator += dt;
     let steps = 0;
     while (this.accumulator >= STEP && steps < 8) {
@@ -869,7 +887,18 @@ export class MatchSystem extends createSystem({
       const clash = step(this.arena, this.mine, this.theirs);
       if (clash) {
         this.clashes++;
-        this.sparks.burst(clash.x, this.arena.height(clash.x, clash.z), clash.z, clash.strength);
+        const y = this.arena.height(clash.x, clash.z);
+        this.sparks.burst(clash.x, y, clash.z, clash.strength);
+        if (clash.strength > HARD_HIT && this.elapsed - this.lastHardHit > HIT_STOP_GAP) {
+          this.lastHardHit = this.elapsed;
+          // A hard hit: more sparks, a ring of light, both tops flash, and a brief hit stop.
+          this.sparks.burst(clash.x, y, clash.z, 1);
+          this.impacts.hit(clash.x, y, clash.z, clash.strength);
+          this.myView.flash();
+          this.theirView.flash();
+          this.hitStop = HIT_STOP;
+          this.accumulator = 0;
+        }
         if (this.sinceClashSound > 0.06) {
           playClash(clash.strength);
           this.sinceClashSound = 0;
@@ -883,6 +912,7 @@ export class MatchSystem extends createSystem({
         }
         if (t.sinceDash !== 0) continue;
         this.arenaView.flashRail(t.x, t.z);
+        this.impacts.dash(t.x, this.arena.height(t.x, t.z), t.z, t.vx, t.vz);
         playDash();
         this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.8);
       }
