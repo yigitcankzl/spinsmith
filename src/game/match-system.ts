@@ -1,4 +1,4 @@
-import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -199,6 +199,13 @@ export class MatchSystem extends createSystem({
     this.menuButton.set('Menu');
     this.menuButton.mesh.visible = false;
     this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];
+    if (import.meta.env.DEV) {
+      // A crosshair in the middle of the view shows where the gaze pointer aims.
+      const crosshair = new Mesh(new RingGeometry(0.003, 0.0055, 24), new MeshBasicMaterial({ color: 0xff6a1a, depthTest: false, transparent: true }));
+      crosshair.position.z = -0.4;
+      crosshair.renderOrder = 999;
+      this.player.head.add(crosshair);
+    }
     this.setArena(this.arenas[this.arenaIndex]);
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
