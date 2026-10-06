@@ -1,12 +1,12 @@
-import { AdditiveBlending, BoxGeometry, CircleGeometry, createSystem, CylinderGeometry, MeshMatcapMaterial, Group, Matrix4, Mesh, MeshBasicMaterial, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, playPlace, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
+import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { CordTone, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
-import { Builder, loadArenas } from './builder.js';
+import { Builder, Button, loadArenas } from './builder.js';
 import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TYPES, verdict } from './sim.js';
-import { ANVIL_SHAPE, ArenaView, Cord, Label, makeMatcap, NEEDLE_SHAPE, OPPONENT_COLOR, PLAYER_COLOR, Sparks, STRIKER_SHAPE, TopView } from './visuals.js';
+import { ANVIL_SHAPE, ArenaView, Cord, Label, NEEDLE_SHAPE, OPPONENT_COLOR, PLAYER_COLOR, Sparks, STRIKER_SHAPE, TopView } from './visuals.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
 const PEDESTAL = 0.08;
@@ -40,8 +40,8 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
-/** Rim dial: turning the rim this far (radians) clicks to the next arena. */
-const DIAL_STEP = 0.9;
+/** A pointing ray this close to a button's center (m) presses it. */
+const BUTTON_REACH = 0.035;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
 const MATCH_POINTS = 4;
 /** Launch power at or above this is a perfect rip: extra starting spin. */
@@ -53,7 +53,7 @@ const RAY_BUMP_RATE = 0.05;
 const SHAPES = [STRIKER_SHAPE, ANVIL_SHAPE, NEEDLE_SHAPE];
 const TYPE_ROLE = ['attack', 'defense', 'stamina'];
 
-type Phase = 'placing' | 'ready' | 'pulling' | 'fight' | 'result' | 'build';
+type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build';
 
 type RawPlane = { orientation?: string; semanticLabel?: string };
 
@@ -87,15 +87,9 @@ export class MatchSystem extends createSystem({
   });
   /** A demo round from the workshop's Try it: two AI tops, no score, back to the workshop after. */
   private demo = false;
-  /**
-   * The arena is its own menu: turn its rim like a dial to change arena, pinch the smith's hammer
-   * beside it to open the workshop, and rip your top to play.
-   */
-  private hammer = buildHammer();
-  private hammerHover = 0;
-  /** Rim dial in progress: the turning hand, its last angle on the rim, and the turn not yet spent. */
-  private dial: { hand: HandState; last: number; turn: number } | null = null;
-  private dialAngle = 0;
+  /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
+  private hubButtons = [new Button('play', 0.11, 0.04), new Button('workshop', 0.11, 0.04), new Button('arena', 0.15, 0.04)];
+  private menuButton = new Button('menu', 0.07, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
   private gazePointer: HandState = {
@@ -191,10 +185,19 @@ export class MatchSystem extends createSystem({
       ...[...this.myViews, ...this.theirViews].flatMap((v) => [v.root, v.shadowMesh, v.debris]),
       this.sparks.points,
     );
-    this.root.add(this.stage, this.label.mesh, this.builder.root, this.hammer);
-    // The hammer leans against the pedestal on the player's right.
-    this.hammer.position.set(0.21, -0.02, 0.08);
-    this.hammer.rotation.set(0, -0.5, 0.25);
+    this.root.add(this.stage, this.label.mesh, this.builder.root, this.menuButton.mesh, ...this.hubButtons.map((b) => b.mesh));
+    // Home buttons: a row above the near rim, tipped back toward the player.
+    this.hubButtons.forEach((b, i) => {
+      b.mesh.position.set((i - 1) * 0.135, 0.09, 0.2);
+      b.mesh.rotation.x = -0.35;
+      b.mesh.visible = false;
+    });
+    this.hubButtons[0].set('Play');
+    this.hubButtons[1].set('Workshop');
+    this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
+    this.menuButton.mesh.rotation.y = 0.4;
+    this.menuButton.set('Menu');
+    this.menuButton.mesh.visible = false;
     this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];
     this.setArena(this.arenas[this.arenaIndex]);
     this.world.createTransformEntity(this.root);
@@ -207,7 +210,11 @@ export class MatchSystem extends createSystem({
         this.keys.add(e.code);
         if (e.code === 'KeyR') this.toReady();
         if (e.code === 'KeyP') this.phase = 'placing';
-        if (e.code === 'KeyA' && this.phase === 'ready') this.switchArena(1);
+        if (e.code === 'KeyA' && (this.phase === 'hub' || this.phase === 'ready')) {
+          this.nextArena();
+          if (this.phase === 'hub') this.toHub();
+          else this.toReady();
+        }
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
         if (e.code === 'KeyK' && this.phase === 'fight') {
           // Burst the opponent now, to see the burst finish.
@@ -251,6 +258,9 @@ export class MatchSystem extends createSystem({
         this.settle += dt;
         if (this.settle >= SETTLE) this.place();
         return;
+      case 'hub':
+        this.updateHub();
+        break;
       case 'build':
         this.updateBuilder(dt);
         break;
@@ -260,12 +270,16 @@ export class MatchSystem extends createSystem({
           this.resultTimer -= dt;
           if (this.resultTimer <= 0) {
             if (this.demo) this.endDemo();
+            else if (this.matchOver) this.toHub();
             else this.toReady();
             break;
           }
           if (this.demo) break;
         }
-        if (this.updateArenaControls(dt)) break;
+        if (this.pickButton([this.menuButton]) === 'menu') {
+          this.toHub();
+          break;
+        }
         this.updateReadyPinch();
         break;
       case 'pulling':
@@ -287,8 +301,7 @@ export class MatchSystem extends createSystem({
     this.syncViews(this.theirViews, this.theirs, dt);
     this.sparks.update(dt);
     this.arenaView.update(dt, this.arena);
-    if (!this.dial) this.dialAngle *= Math.exp(-dt * 10); // springs back after a turn
-    this.stage.rotation.set(this.arena.tiltX, this.dialAngle, this.arena.tiltZ);
+    this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
   }
 
   /** Player's top this round (alternates so both shapes get played). */
@@ -304,6 +317,11 @@ export class MatchSystem extends createSystem({
     console.log(`[MATCH] arena ${layout.name}`);
   }
 
+  private nextArena() {
+    this.arenaIndex = (this.arenaIndex + 1) % this.arenas.length;
+    this.setArena(this.arenas[this.arenaIndex]);
+  }
+
   /** Shows a layout in the arena without changing the rotation (builder preview). */
   private showLayout(layout: ArenaLayout) {
     this.arena.reset(layout);
@@ -311,74 +329,65 @@ export class MatchSystem extends createSystem({
   }
 
   /**
-   * The arena as a menu, between rounds: the hammer opens the workshop, turning the rim switches
-   * arena. Returns true while a pinch is used here, so it does not also start a launch.
+   * Hover and press for a set of buttons, near (pinch) or far (pointing ray, or the gaze in dev).
+   * Returns the id of a button pinched this frame, else null. Only one press per frame.
    */
-  private updateArenaControls(dt: number): boolean {
-    // Hammer: lifts and grows when pointed at, opens the workshop when pinched. Aim at its middle.
-    this.hammer.localToWorld(this.p.set(0, 0.05, 0));
-    let onHammer = false;
+  private pickButton(buttons: Button[]): string | null {
+    let hovered: Button | null = null;
+    let pressed: string | null = null;
     for (const h of this.pointers) {
       if (!h.tracked) continue;
-      const near = h.pinch.distanceTo(this.p) < 0.06;
-      const t = this.local.copy(this.p).sub(h.rayOrigin).dot(h.rayDir);
-      const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < 0.05;
-      if (!near && !far) continue;
-      onHammer = true;
-      if (h.justPinched && !this.dial) {
-        this.openWorkshop();
-        return true;
+      for (const b of buttons) {
+        if (!b.mesh.visible) continue;
+        b.mesh.getWorldPosition(this.p);
+        const near = h.pinch.distanceTo(this.p) < 0.05;
+        const t = this.local.copy(this.p).sub(h.rayOrigin).dot(h.rayDir);
+        const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < Math.max(BUTTON_REACH, b.height * 0.8);
+        if (!near && !far) continue;
+        hovered ??= b;
+        if (h.justPinched && !pressed) pressed = b.id;
       }
     }
-    this.hammerHover += ((onHammer ? 1 : 0) - this.hammerHover) * Math.min(1, dt * 12);
-    this.hammer.scale.setScalar(1 + 0.25 * this.hammerHover);
-    this.hammer.position.y = -0.02 + 0.015 * this.hammerHover;
-
-    // Rim dial: pinch the rim and turn it; every step clicks to the next (or previous) arena.
-    if (this.dial) {
-      const h = this.dial.hand;
-      const at = this.arenaPoint(h);
-      if (at) {
-        const a = Math.atan2(at.z, at.x);
-        const d = Math.atan2(Math.sin(a - this.dial.last), Math.cos(a - this.dial.last));
-        this.dial.last = a;
-        this.dial.turn += d;
-        if (Math.abs(this.dial.turn) > DIAL_STEP) {
-          const dir = Math.sign(this.dial.turn);
-          this.dial.turn -= dir * DIAL_STEP;
-          this.switchArena(dir);
-        }
-      }
-      // The stage turns with the hand (a turn toward +angle is a negative rotation about y).
-      this.dialAngle = -this.dial.turn;
-      if (!h.pinching || !h.tracked) this.dial = null;
-      return true;
-    }
-    for (const h of this.pointers) {
-      if (!h.tracked || !h.justPinched) continue;
-      const at = this.arenaPoint(h);
-      if (!at) continue;
-      const n = normRadius(this.arena.layout, at.x, at.z);
-      if (n < 0.85 || n > 1.3) continue;
-      this.dial = { hand: h, last: Math.atan2(at.z, at.x), turn: 0 };
-      return true;
-    }
-    return false;
+    for (const b of buttons) b.highlight(b === hovered);
+    return pressed;
   }
 
-  /** Next (dir 1) or previous (dir -1) arena; a new match starts in it. */
-  private switchArena(dir: number) {
-    this.arenaIndex = (this.arenaIndex + dir + this.arenas.length) % this.arenas.length;
-    this.setArena(this.arenas[this.arenaIndex]);
-    this.myPoints = 0;
-    this.theirPoints = 0;
-    playPlace();
-    this.toReady();
+  /** Home: the arena waits with both tops; Play, Workshop, or switch arena. Pinching never launches here. */
+  private toHub() {
+    this.phase = 'hub';
+    this.matchOver = false;
+    this.arena.reset(this.arenas[this.arenaIndex]);
+    this.arenaView.build(this.arena.layout);
+    this.mine.launch(0, this.SPAWN, 0, 0, 1, 1);
+    this.theirs.launch(0, -this.SPAWN, 0, 0, 1, -1);
+    this.cord.set(null);
+    this.menuButton.mesh.visible = false;
+    for (const b of this.hubButtons) b.mesh.visible = true;
+    this.hubButtons[2].set(`Arena: ${this.arena.layout.name} ▸`);
+    this.label.set(`SpinSmith\n${this.arena.layout.name}`);
+  }
+
+  private updateHub() {
+    switch (this.pickButton(this.hubButtons)) {
+      case 'play':
+        this.myPoints = 0;
+        this.theirPoints = 0;
+        this.typesPicked = false;
+        this.toReady();
+        break;
+      case 'workshop':
+        this.openWorkshop();
+        break;
+      case 'arena':
+        this.nextArena();
+        this.toHub();
+        break;
+    }
   }
 
   private openWorkshop() {
     this.phase = 'build';
-    this.hammer.visible = false;
+    for (const b of this.hubButtons) b.mesh.visible = false;
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.builder.open(this.arena.layout);
@@ -399,6 +408,7 @@ export class MatchSystem extends createSystem({
 
   /** Try it: two AI tops fight in the draft arena; the workshop comes back after the round. */
   private tryArena(layout: ArenaLayout) {
+    this.menuButton.mesh.visible = false;
     this.arena.reset(layout);
     this.demo = true;
     this.mine.spec = TYPES[Math.floor(Math.random() * TYPES.length)];
@@ -464,10 +474,7 @@ export class MatchSystem extends createSystem({
   private leaveBuilder() {
     this.builder.close();
     this.setArena(this.arenas[this.arenaIndex]);
-    this.myPoints = 0;
-    this.theirPoints = 0;
-    this.phase = 'ready';
-    this.toReady();
+    this.toHub();
   }
 
   /** Shows the view for the top's current type and hides the others. */
@@ -504,8 +511,7 @@ export class MatchSystem extends createSystem({
     this.root.rotation.set(0, Math.atan2(this.head.x - center.x, this.head.z - center.z), 0);
     this.root.visible = true;
     console.log(`[MATCH] arena on ${table !== null ? 'table' : 'tray'} at ${center.toArray().map((v) => v.toFixed(2)).join(',')}`);
-    this.phase = 'ready';
-    this.toReady();
+    this.toHub();
   }
 
   /** Height of the nearest table/desk plane within reach, or null. */
@@ -531,14 +537,10 @@ export class MatchSystem extends createSystem({
 
   private toReady() {
     if (this.phase === 'placing') return;
-    if (this.matchOver) {
-      // The deciding round is over: a fresh match in the same arena.
-      this.myPoints = 0;
-      this.theirPoints = 0;
-    }
     this.matchOver = false;
     this.phase = 'ready';
-    this.hammer.visible = true;
+    for (const b of this.hubButtons) b.mesh.visible = false;
+    this.menuButton.mesh.visible = true;
     this.arena.reset();
     // Both tops wait upright at their spawn points.
     if (!this.typesPicked) this.pickTypes();
@@ -548,7 +550,7 @@ export class MatchSystem extends createSystem({
     this.puller = null;
     this.cord.set(null);
     this.label.set(
-      `${this.describe(this.mine.spec)} vs ${this.describe(this.theirs.spec)}\n${this.arena.layout.name} · You ${this.myPoints} - ${this.theirPoints} · first to ${MATCH_POINTS}\nRip your top · turn the rim · hammer = workshop`,
+      `${this.describe(this.mine.spec)} vs ${this.describe(this.theirs.spec)}\n${this.arena.layout.name} · You ${this.myPoints} - ${this.theirPoints} · first to ${MATCH_POINTS}`,
     );
   }
 
@@ -842,18 +844,4 @@ export class MatchSystem extends createSystem({
     }
     return false;
   }
-}
-
-/** The smith's hammer that opens the workshop: a wooden handle and a steel head with a hot edge. */
-function buildHammer(): Group {
-  const g = new Group();
-  g.name = 'workshop-hammer';
-  const handle = new Mesh(new CylinderGeometry(0.0035, 0.0045, 0.075, 12), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x8a5a36) }));
-  handle.position.y = 0.0375;
-  const head = new Mesh(new BoxGeometry(0.04, 0.016, 0.016), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xb8bec8) }));
-  head.position.y = 0.08;
-  const edge = new Mesh(new BoxGeometry(0.003, 0.017, 0.017), new MeshBasicMaterial({ color: 0xff6a1a }));
-  edge.position.set(0.021, 0.08, 0);
-  g.add(handle, head, edge);
-  return g;
 }

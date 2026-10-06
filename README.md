@@ -14,10 +14,10 @@ What works:
 - The arena is placed about 40 cm in front of the seated player, on a pedestal
   8 cm above the nearest detected table, or on a floating tray when there is no table or the
   table is far below the eyes (standing over a coffee table).
-- **The arena is the menu:** between rounds, rip your top to play; pinch the arena's rim and
-  turn it like a dial to click through the arenas (the arena turns with your hand and springs
-  back); pinch the smith's hammer leaning on the pedestal to open the workshop. A match ends
-  at 4 points and the next one starts in the same arena.
+- **Home screen:** once the arena is placed it waits with both tops and three big buttons in
+  front of it: *Play* starts a match, *Workshop* opens the arena workshop, *Arena: … ▸*
+  switches to the next arena. Pinching here never launches. In a match, a small *Menu* button
+  beside the arena returns home, and the match ends back home after 4 points.
 - **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
   your hand. Rip it back and let go: power comes only from the motion, how far the hand
   travelled and how fast it was still moving at release, so a rip that stops before letting
@@ -35,8 +35,8 @@ What works:
   embers that closes in after 12 s, and a theme (forge, stone, clockwork, ice; ice is
   slippery).
 - **Six built-in arenas** (`src/game/arenas.ts`) that together use every knob: Forge Bowl,
-  Ember Ring, Zero-G Dish, Clockwork Spire, Frost Oval and Sumo Square. Turn the rim to pick the
-  arena. `npm run report:arenas` simulates every
+  Ember Ring, Zero-G Dish, Clockwork Spire, Frost Oval and Sumo Square. Pick the arena on the home
+  screen. `npm run report:arenas` simulates every
   type matchup on every arena and reports round length, knockouts and type balance.
 - **Three top types** in a rock-paper-scissors loop: Striker (attack) hunts the opponent,
   Anvil (defense) is heavy and holds the middle, Needle (stamina) spins longest. Attack
@@ -45,7 +45,7 @@ What works:
   the opponent's is random.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
-- **Arena workshop:** pinch the hammer beside the arena. A menu rides above your left
+- **Arena workshop:** pinch *Workshop* on the home screen. A menu rides above your left
   hand, facing you (like Tiny Golf's builder): tabs on top (Place, Shape, Floor, Wall, Theme,
   Extras), and the chosen category's pieces shown large in one row below, sliding in when the
   tab changes. Without a tracked left hand the menu stands at eye level beside the arena.
