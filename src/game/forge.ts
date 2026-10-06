@@ -19,6 +19,7 @@ import {
   ConeGeometry,
   CylinderGeometry,
   Group,
+  InstancedMesh,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
@@ -117,18 +118,25 @@ interface Slot {
   item: Item;
   model: Object3D;
   home: Vector3;
-  /** The card behind the part: its frame lights up when the part is on your top. */
-  frame: MeshBasicMaterial;
-  equipped: Mesh;
+  /** Its card: the instance in the shared frame and face meshes, its width and row center. */
+  card: number;
+  w: number;
+  y: number;
   /** Seconds left of the flash after the part was fitted. */
   flash: number;
   /** Its scale on the wall. */
   size: number;
-  /** Unlock key ('ring:hook'), or null for things never locked; its LOCKED tag. */
+  /** Unlock key ('ring:hook'), or null for things never locked, and how it is earned. */
   key: string | null;
-  lock: Mesh | null;
-  face: MeshBasicMaterial;
+  hint: string | null;
 }
+
+/** The tool panel's text layer: one canvas over the whole panel (panel-local meters). */
+const TEXT_X0 = -0.56;
+const TEXT_Y0 = -0.47;
+const TEXT_W = 1.18;
+const TEXT_H = 0.94;
+const TEXT_PX = 1600;
 
 /** The unlock key of a shelf item, or null when it is never locked. */
 export function itemKey(item: Item): string | null {
@@ -141,6 +149,9 @@ export function itemKey(item: Item): string | null {
 const FRAME_IDLE = new Color(0x2a3446);
 const FRAME_HOVER = new Color(0xdfe8f5);
 const FRAME_ON = new Color(ORANGE);
+/** Card faces: normal, and darker while locked. */
+const FACE = new Color(0x111824);
+const FACE_LOCKED = new Color(0x07090e);
 
 export interface ForgeHooks {
   /** Save the build and go back. */
@@ -174,6 +185,13 @@ export class Forge {
   /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
   private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion; lost: number } | null = null;
   private explode = 0;
+  /** The tool panel's cards (instanced) and their text canvas. */
+  private frames!: InstancedMesh;
+  private faces!: InstancedMesh;
+  private textCanvas = document.createElement('canvas');
+  private textTex!: CanvasTexture;
+  private textKey = '';
+  private readonly frameColor = new Color();
   /** The part the first session asks the player to fit, if any. */
   private focus: Slot | null = null;
   /** The halo flares when a part is fitted. */
@@ -316,23 +334,25 @@ export class Forge {
       const t = this.under(h, false);
       if (t?.kind === 'slot') hovered ??= t.slot;
     }
+    this.drawShelfText();
     for (const s of this.slots) {
       const locked = this.locked(s);
-      if (s.lock) s.lock.visible = locked;
-      s.face.color.setHex(locked ? 0x07090e : 0x111824);
+      this.faces.setColorAt(s.card, locked ? FACE_LOCKED : FACE);
       const on = s === hovered && !locked;
       const fitted = this.isOn(s.item);
       s.flash = Math.max(0, s.flash - dt);
-      s.equipped.visible = fitted;
-      s.frame.color.copy(fitted ? FRAME_ON : on ? FRAME_HOVER : FRAME_IDLE);
+      const frame = this.frameColor.copy(fitted ? FRAME_ON : on ? FRAME_HOVER : FRAME_IDLE);
       // A part just fitted flashes white and pulses.
-      if (s.flash > 0) s.frame.color.lerp(this.white, s.flash / 0.8);
+      if (s.flash > 0) frame.lerp(this.white, s.flash / 0.8);
       // The first session's new part breathes until it is fitted.
-      if (s === this.focus) s.frame.color.copy(FRAME_ON).lerp(this.white, 0.5 + 0.5 * Math.sin(this.time * 5));
+      if (s === this.focus) frame.copy(FRAME_ON).lerp(this.white, 0.5 + 0.5 * Math.sin(this.time * 5));
+      this.frames.setColorAt(s.card, frame);
       const pulse = s.flash > 0 ? 1 + 0.25 * Math.sin((s.flash / 0.8) * Math.PI) : 1;
       s.model.position.set(s.home.x, s.home.y, s.home.z + (on ? 0.03 + 0.005 * Math.sin(this.time * 8) : 0));
       s.model.scale.setScalar(s.size * (on ? 1.15 : 1) * pulse * (locked ? 0.55 : 1));
     }
+    this.frames.instanceColor!.needsUpdate = true;
+    this.faces.instanceColor!.needsUpdate = true;
     if (!this.heldPart) this.showCard(hovered ? this.withItem(hovered.item) : null);
   }
 
@@ -610,30 +630,21 @@ export class Forge {
   }
 
   /** The tool panel on the wall: a row of parts on pegs per kind, its name above the row. */
+  /**
+   * The tool panel on the wall: a row of parts per kind on cards. To keep draw calls low the cards
+   * are two instanced meshes (frames and faces, colored per card) and all their text is one
+   * canvas, redrawn only when what is equipped or locked changes.
+   */
   private buildShelf() {
-    ROWS.forEach(([label, items, gap], r) => {
+    const cards: { x: number; y: number; w: number }[] = [];
+    ROWS.forEach(([, items, gap], r) => {
       const y = 0.33 - r * ROW_GAP;
-      const name = tag(label, 0.12, 44);
-      name.position.set(-0.47, y, 0.005);
-      this.shelf.add(name);
       const step = Math.max(0.15, gap * WALL_SCALE * 1.25);
       items.forEach((item, c) => {
         // Tips and cores stand up from their base, so they sit lower on the card.
         const low = item.kind === 'tip' || item.kind === 'core';
         const home = new Vector3((c - (items.length - 1) / 2) * step + 0.08, y + (low ? -0.028 : 0.008), 0.04);
-        // A card behind each part: a lit frame, a lighter face, the part's name below.
         const w = Math.min(step - 0.012, 0.16);
-        const frame = new MeshBasicMaterial({ color: FRAME_IDLE.clone() });
-        const border = new Mesh(new PlaneGeometry(w, ROW_GAP - 0.012), frame);
-        border.position.set(home.x, y, 0.004);
-        const faceMat = new MeshBasicMaterial({ color: 0x111824 });
-        const face = new Mesh(new PlaneGeometry(w - 0.008, ROW_GAP - 0.02), faceMat);
-        face.position.set(home.x, y, 0.005);
-        const label = tag(item.name, w * 0.95, 40);
-        label.position.set(home.x, y - ROW_GAP / 2 + 0.022, 0.007);
-        const equipped = tag('EQUIPPED', w * 0.8, 40);
-        equipped.position.set(home.x, y + ROW_GAP / 2 - 0.02, 0.007);
-        equipped.visible = false;
         // Rings and presets show their top face; tips and cores their profile; pots their paint.
         const model = new Group();
         const inner = itemModel(item);
@@ -643,18 +654,59 @@ export class Forge {
         // Rings and preset tops are wide: a little smaller, so they stay on their card.
         const size = WALL_SCALE * (item.kind === 'ring' ? 0.98 : item.kind === 'preset' ? 0.78 : item.kind === 'core' ? 0.8 : 1.3);
         model.scale.setScalar(size);
-        // Locked parts show how they are earned.
+        this.shelf.add(model);
         const key = itemKey(item);
-        const hint = key ? unlockHint(key) : null;
-        let lock: Mesh | null = null;
-        if (hint) {
-          lock = tag(`LOCKED · ${hint}`, w * 0.95, 34);
-          lock.position.set(home.x, y - 0.012, 0.1);
-        }
-        this.shelf.add(border, face, label, equipped, model, ...(lock ? [lock] : []));
-        this.slots.push({ item, model, home, frame, equipped, flash: 0, size, key, lock, face: faceMat });
+        this.slots.push({ item, model, home, card: cards.length, w, y, flash: 0, size, key, hint: key ? unlockHint(key) : null });
+        cards.push({ x: home.x, y, w });
       });
     });
+    const plane = new PlaneGeometry(1, 1);
+    this.frames = new InstancedMesh(plane, new MeshBasicMaterial(), cards.length);
+    this.faces = new InstancedMesh(plane, new MeshBasicMaterial(), cards.length);
+    const m = new Matrix4();
+    cards.forEach((c, i) => {
+      this.frames.setMatrixAt(i, m.makeScale(c.w, ROW_GAP - 0.012, 1).setPosition(c.x, c.y, 0.004));
+      this.faces.setMatrixAt(i, m.makeScale(c.w - 0.008, ROW_GAP - 0.02, 1).setPosition(c.x, c.y, 0.005));
+      this.frames.setColorAt(i, FRAME_IDLE);
+      this.faces.setColorAt(i, FACE);
+    });
+    this.textCanvas.width = TEXT_PX;
+    this.textCanvas.height = Math.round((TEXT_PX * TEXT_H) / TEXT_W);
+    this.textTex = new CanvasTexture(this.textCanvas);
+    this.textTex.colorSpace = SRGBColorSpace;
+    this.textTex.anisotropy = 4;
+    const text = new Mesh(new PlaneGeometry(TEXT_W, TEXT_H), new MeshBasicMaterial({ map: this.textTex, transparent: true, depthWrite: false }));
+    text.position.set(TEXT_X0 + TEXT_W / 2, TEXT_Y0 + TEXT_H / 2, 0.007);
+    this.shelf.add(this.frames, this.faces, text);
+  }
+
+  /** Redraws the panel's text: row names, part names, and EQUIPPED or LOCKED on the cards. */
+  private drawShelfText() {
+    const key = this.slots.map((s) => (this.locked(s) ? 'L' : this.isOn(s.item) ? 'E' : '-')).join('');
+    if (key === this.textKey) return;
+    this.textKey = key;
+    const g = this.textCanvas.getContext('2d')!;
+    const k = TEXT_PX / TEXT_W;
+    const px = (x: number) => (x - TEXT_X0) * k;
+    const py = (y: number) => (TEXT_Y0 + TEXT_H - y) * k;
+    g.clearRect(0, 0, this.textCanvas.width, this.textCanvas.height);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const write = (text: string, x: number, y: number, size: number, maxW: number, color: string) => {
+      let s = size * k;
+      do g.font = `700 ${Math.round(s--)}px ${FONT}`;
+      while (g.measureText(text).width > maxW * k && s > 8);
+      g.fillStyle = color;
+      g.fillText(text, px(x), py(y));
+    };
+    ROWS.forEach(([label], r) => write(label, -0.49, 0.33 - r * ROW_GAP, 0.022, 0.09, TEXT_DIM));
+    for (const s of this.slots) {
+      write(s.item.name, s.home.x, s.y - ROW_GAP / 2 + 0.022, 0.02, s.w * 0.92, TEXT);
+      const top = s.y + ROW_GAP / 2 - 0.02;
+      if (this.locked(s)) write(`LOCKED · ${s.hint}`, s.home.x, top, 0.015, s.w * 0.92, TEXT_DIM);
+      else if (this.isOn(s.item)) write('EQUIPPED', s.home.x, top, 0.016, s.w * 0.8, ORANGE);
+    }
+    this.textTex.needsUpdate = true;
   }
 
   /** The quench bucket: dunk your top in it to save and go home. */

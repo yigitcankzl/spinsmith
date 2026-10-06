@@ -15,11 +15,13 @@ import {
   Float32BufferAttribute,
   Group,
   InstancedMesh,
+  Material,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshMatcapMaterial,
   MeshStandardMaterial,
+  Object3D,
   Path,
   PlaneGeometry,
   Points,
@@ -200,6 +202,39 @@ function merge(parts: BufferGeometry[]): BufferGeometry {
   const out = new BufferGeometry();
   out.setAttribute('position', new BufferAttribute(pos, 3));
   out.setAttribute('normal', new BufferAttribute(nor, 3));
+  return out;
+}
+
+/**
+ * Bakes a static model into one mesh per material look (same kind, color, matcap, blending), so a
+ * model of many parts costs a few draw calls. Textured meshes (labels, shadows) stay separate.
+ * The source is left untouched; the result shares its materials.
+ */
+export function mergeByMaterial(root: Object3D): Group {
+  root.updateMatrixWorld(true);
+  const inv = new Matrix4().copy(root.matrixWorld).invert();
+  const local = new Matrix4();
+  const groups = new Map<string, { material: Material; geos: BufferGeometry[] }>();
+  const out = new Group();
+  root.traverse((o) => {
+    const m = o as Mesh;
+    if (!m.isMesh || !m.visible) return;
+    local.multiplyMatrices(inv, m.matrixWorld);
+    const mat = m.material as Material & { color?: Color; map?: unknown; matcap?: { uuid: string } | null; blending?: number };
+    if (Array.isArray(m.material) || mat.map) {
+      const keep = new Mesh(m.geometry, m.material);
+      keep.applyMatrix4(local);
+      out.add(keep);
+      return;
+    }
+    const key = [mat.type, mat.color?.getHex(), mat.matcap?.uuid, mat.transparent, mat.opacity, mat.side, mat.blending].join('|');
+    const geo = m.geometry.clone().applyMatrix4(local);
+    if (!geo.getAttribute('normal')) geo.computeVertexNormals();
+    const group = groups.get(key) ?? { material: mat, geos: [] };
+    group.geos.push(geo);
+    groups.set(key, group);
+  });
+  for (const { material, geos } of groups.values()) out.add(new Mesh(merge(geos), material));
   return out;
 }
 
@@ -734,6 +769,9 @@ function floorTexture(): CanvasTexture {
   return t;
 }
 
+/** The forge shell baked to a few meshes, made on first use. */
+let SHELL: Group | null = null;
+
 /** Wall heights (m) by wall type. */
 const WALL_HEIGHT: Record<Wall, number> = { low: 0.007, standard: 0.012, high: 0.028, none: 0 };
 const POCKET_REACH = 0.03;
@@ -980,7 +1018,8 @@ export class ArenaView {
     const sz = layout.shape === 'oval' ? 0.78 : sx;
     const scale = layout.radius / 0.15;
     if (layout.theme === 'forge') {
-      const shell = forgeArenaShell.clone(true);
+      SHELL ??= mergeByMaterial(forgeArenaShell);
+      const shell = SHELL.clone(true);
       shell.scale.set(scale * sx, this.pedestalHeight / FORGE_SHELL_HEIGHT, scale * sz);
       this.features.add(shell);
     } else {

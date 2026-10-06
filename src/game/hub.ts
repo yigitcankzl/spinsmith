@@ -35,7 +35,7 @@ import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import type { ArenaLayout, Theme } from './layout.js';
 import type { TopBuild } from './parts.js';
-import { makeMatcap, SOFT_SHADOW, TopView } from './visuals.js';
+import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
 
 export type HubAction = { kind: 'play' } | { kind: 'arena'; index: number } | { kind: 'forge' } | { kind: 'workshop' } | { kind: 'locked'; text: string };
 
@@ -417,7 +417,7 @@ export function miniArena(layout: ArenaLayout, current: boolean): Group {
     g.add(pocket);
   }
   if (layout.shape === 'oval') g.scale.set(1, 1, 0.78);
-  return outer;
+  return mergeByMaterial(outer);
 }
 
 /** Height of the anvil's face (m): a top set on the anvil stands here. */
@@ -463,7 +463,7 @@ export function anvilModel(): Group {
   hammer.rotation.z = 0.3;
   const g = new Group();
   g.add(plinth, cap, band, seam, body, face, hardy, glow, hammer, softShadow(0.16));
-  return g;
+  return mergeByMaterial(g);
 }
 
 /**
@@ -535,7 +535,7 @@ export function standModel(): Group {
     prong.rotation.set(0, -a, 0.35);
     g.add(prong);
   }
-  return g;
+  return mergeByMaterial(g);
 }
 
 /** A soft round shadow on the table under a prop (size in m, arena-local). */
