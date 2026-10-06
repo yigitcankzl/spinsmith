@@ -403,3 +403,30 @@ See WP14. Capture after the feature freeze.
 - **Accessibility-award features** (a one-hand mode or high-contrast mode as a project). Not winnable this cycle.
 - **Public hosting before the final build**, and any deploy after Nov 16.
 - **Re-recording the video** after the code freeze for small UI changes.
+
+---
+
+## 6. Status (Oct 7, 2026)
+
+Decisions taken: hosting later (D1 open); names and scoring as proposed in D2 and D3 (heat,
+first to 3); the developer handles the Quest (D4).
+
+| WP | State | Notes |
+|---|---|---|
+| 1 Names and heat | Done | check:sim §13 |
+| 2 Placement | Done | `placement.ts`, §14; wait for a table up to 5 s, late-table snap, re-place on a new session and on `reset`, brass drag handle |
+| 3 Fresh / demo / reset | Done | `?fresh`, `?demo`, hold-and-confirm on the level plate; §15 |
+| 4 Tops land on the table | Done | thrown tops arc onto the table and fall over; pit tops sink; shattered parts bounce on the table |
+| 5 Readable text | Done | bar names 56 px, XP only after a round, bigger dials and board |
+| 6 Touch targets | Done, except the table-edge fit | `reach.ts`, §16 (0.32-0.62 m, at most 63° below the eyes); `tuning.ts` dev knobs. The table edge needs the plane polygon on a device |
+| 7 Performance | Done (lighter version) | floor syncs only while it changes; bar redraws in 2% steps instead of separate quads; pull card in 5% steps |
+| 8 Accidental shapes | Done | the slow-press rejection can only be verified on a device (T6): emulator hand moves are teleports |
+| 9 Hero verb | Done | first match steadier, slow motion on a shape knockout, rivals from Lv 6 ramp (no shaping 36% / push-out 47% against a full push-out rival in `report:shaping`) |
+| 10 Landing page | Done | HTML landing with Enter; the UIKit panel is gone. Bundle size did not drop (UIKit ships with the core) |
+| 11 Audio | Done | panned clashes, a synthesized forge loop (no files, no licence needed) |
+| 12 Tomorrow teaser | Done | on the board once today's order is done |
+| 13 Docs | Done | README rewritten at the top; LICENSE left to the developer |
+| 14 Submission | Testing notes and storyboard done | cover, logo art and video need the Quest |
+| 15 Hosting | Waiting for D1 | |
+
+Draw calls: hub about 210 with a champion, forge 160, workshop 90, fight 108-112.
