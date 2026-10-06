@@ -110,7 +110,7 @@ export const RINGS: Ring[] = [
     burstResist: 0.92,
     contact: 'absorb',
     chip: 1,
-    drain: 0.92,
+    drain: 0.9,
     weight: 27,
     blades: 0,
     blurb: 'Mass on the rim: spins long',
@@ -153,12 +153,12 @@ export const CORES: Core[] = [
 ];
 
 export const TIPS: Tip[] = [
-  { id: 'flat', name: 'Flat', spinDrain: 0.0544, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
+  { id: 'flat', name: 'Flat', spinDrain: 0.0535, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
   { id: 'rush', name: 'Rush', spinDrain: 0.0533, roam: 0.45, cruise: 0.58, drive: 2.6, maxSpeed: 1.9, seek: 4, center: 0, gear: 1.25, weight: 4, blurb: 'Aggressive, steers better' },
   { id: 'taper', name: 'Taper', spinDrain: 0.0523, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
   { id: 'ball', name: 'Ball', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.84, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
-  { id: 'needle', name: 'Needle', spinDrain: 0.047, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
-  { id: 'orb', name: 'Orb', spinDrain: 0.051, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
+  { id: 'needle', name: 'Needle', spinDrain: 0.0485, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
+  { id: 'orb', name: 'Orb', spinDrain: 0.0525, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
 ];
 
 /** A build must stay at or under this many grams: heavy rings need light cores and tips. */

@@ -101,7 +101,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // Sumo: no walls at all, just a berm at the edge; a sunken middle below a terrace, and pinball bumpers.
     name: 'Sumo Square',
-    rule: 'No walls: heavy tops hold, light tops fly off',
+    rule: 'No walls: heavy tops hold, light spinners get pushed off',
     theme: 'stone',
     radius: 0.16,
     shape: 'square',
