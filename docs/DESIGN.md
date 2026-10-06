@@ -2,7 +2,8 @@
 
 Meta VR Start Developer Competition 2026 · **Gaming – New Experience** · deadline Nov 18, 2026, 12:00 PT (target Nov 17)
 
-> The original design. Arena shaping has since become two verbs, the **ramp** (replacing the
+> **Historical:** the original design, superseded by [GAMEPLAY-DIRECTION.md](GAMEPLAY-DIRECTION.md)
+> and the later docs; kept for the record. Arena shaping has since become two verbs, the **ramp** (replacing the
 > bump and the wave) and the **well** (replacing the dent), with charges earned by clashing:
 > see [ARENA-SHAPING.md](ARENA-SHAPING.md).
 > Names and scoring have changed too: the parts, finishes and points are now SpinSmith's own

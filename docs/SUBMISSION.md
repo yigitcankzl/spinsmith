@@ -55,7 +55,7 @@ strategy is measured over thousands of rounds.
   ramp before you let go, and release commits it. Far shapes use the hand ray with the same lock,
   so tracking jitter never moves them.
 - **Press to well:** a fingertip pressed into the arena floor.
-- **Seated:** everything touched sits within a seated arm's reach (about 0.45 m); only the
+- **Seated:** everything touched sits within a seated arm's reach (about 0.35-0.55 m); only the
   score and the stats, which are read, sit on the far rim.
 - **Forgiving by design:** tracking loss shorter than a tenth of a second is ignored, and a lost
   hand cancels a half-made shape instead of committing it.

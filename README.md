@@ -5,15 +5,31 @@ Immersive Web SDK (IWSDK). Rip your top into an arena on your real table, then
 steer the fight by pulling ramps up out of the arena floor and pressing wells into it.
 
 Entry for the Meta VR Start Developer Competition 2026 (Gaming – New Experience).
-Design document: [docs/DESIGN.md](docs/DESIGN.md).
+Current direction: [docs/GAMEPLAY-DIRECTION.md](docs/GAMEPLAY-DIRECTION.md); the remaining work:
+[docs/ACTION-PLAN.md](docs/ACTION-PLAN.md).
 
-## Status: first playable prototype
+## How to play
 
-What works:
+Sit at a table, enable hand tracking, and allow spatial data so the arena can stand on your
+table. Everything is done with a pinch: carry your top from its dock into the arena, pinch near
+it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (or
+press a fingertip in for a well). Pinch the small anvil to forge your top, the blueprint to build
+an arena. First to 3 heat wins a match.
 
-- The arena is placed about 40 cm in front of the seated player, on a pedestal
-  8 cm above the nearest detected table, or on a floating tray when there is no table or the
-  table is far below the eyes (standing over a coffee table).
+- **Shared headset:** add `?fresh` to the address to start as a new player, or `?demo` for a
+  prepared level-8 smith. In the headset, hold your level plate for 2 s, then pinch it again, to
+  start over.
+- **Move the arena:** at home, pinch the brass handle on the pedestal's near face and carry it.
+  Leaving and re-entering, or recentering the headset, places it in front of you again.
+- **Known limits:** nothing has been measured on a headset yet; the arena stands on the nearest
+  table plane but does not yet know the table's edge.
+
+## What is in the game
+
+- The arena is placed about 60 cm in front of the seated player (its near rim about 30 cm), on a
+  pedestal 8 cm above the nearest detected table, or on a floating tray when there is no table or
+  the table is far below the eyes (standing over a coffee table). It waits up to 5 s for a table,
+  and moves onto one that appears later.
 - **One machine on the table** (`src/game/hub.ts`, `src/game/rim.ts`): the arena sits on your
   table, drawn twice its simulation size (about 60 cm across), and everything else is built into
   it. At home, your top waits in its dock on the near rim's left (carry it into the arena or tap
@@ -139,11 +155,7 @@ What works:
   raise a ramp there; its place locks when the pinch starts. A small blue dot marks where the ray meets the arena floor. In the
   emulator's play mode a left click is a pinch, so the game is playable by looking
   around with the mouse and click-holding.
-- Result card with the finish and score, then pinch again for the next round. Your top alternates
-  between the wide (orange) and the narrow (teal) shape each round.
-
-Not in the prototype yet: top shaping, parts, energy, table-tap waves, pause,
-saving progress (only built arenas are saved) (see the phase plan in the design document).
+- Result card with the finish and score, then pinch again for the next round.
 
 ## Run
 
@@ -162,7 +174,7 @@ On a headset on the same network, open the network URL printed by
 
 ### Dev keys (only in `npm run dev`)
 
-Pinching in the emulator is awkward, so the prototype can also be played with the
+Pinching in the emulator is awkward, so the game can also be played with the
 keyboard and the head's gaze. Enter play mode in the emulator toolbar to look around
 with the mouse; a small blue reticle marks where you look on the arena floor.
 
