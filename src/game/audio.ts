@@ -246,3 +246,14 @@ export function playUnlock() {
 export function playLocked() {
   tone(140, 0.15, 0.15, 'square', 0, 90);
 }
+
+/** A ramp or well set into the floor: a low, solid thock. */
+export function playThock() {
+  tone(120, 0.22, 0.18, 'sine', 0, 70);
+  hiss(0.08, 0.06, 900, 400, 1.5);
+}
+
+/** A top runs into a player's shape: a short gritty crunch. */
+export function playCrunch() {
+  hiss(0.12, 0.09, 2200, 900, 2);
+}

@@ -151,8 +151,8 @@ own rays rarely line up with what you are looking at.
 | Key | Action |
 |---|---|
 | `Space` | Hold to charge, release to launch toward where you are looking |
-| `B` | Hold to raise a bump where you are looking (during a fight) |
-| `N` | Hold to press a dent where you are looking (during a fight) |
+| `B` | Hold to grow a ramp where you are looking, aimed outward; release to set it (during a fight) |
+| `N` | Make a well where you are looking (during a fight) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Burst the opponent now (during a fight) |
 | `` ` `` | Start over as a new player: clears progress and the saved top, reloads |

@@ -1,11 +1,12 @@
 import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
+import { CordTone, playCrunch, playLocked, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, verdict } from './sim.js';
+import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
 import { GUIDE_ORDER, Progress } from './progress.js';
 import { ANVIL_AT, anvilModel, Hub, miniArena, standModel } from './hub.js';
@@ -14,7 +15,9 @@ import type { WallPlane } from './wall.js';
 import { allBuilds, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, Cord, Impacts, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, OPPONENT_COLOR, ShapeMarks, Sparks, TopView } from './visuals.js';
+import type { ShapeMarkSpec } from './visuals.js';
+import { SHAPE_SIZE, ShapingCharges } from './shaping.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
 const PEDESTAL = 0.08;
@@ -44,12 +47,12 @@ const LAUNCH_REACH = 1.0;
 const MAX_PULL = 0.32;
 /** Launch direction is clamped to this many radians off straight-at-center. */
 const MAX_AIM = 0.6;
-/** Pinches this close to the floor (vertically) grab it to raise a bump. */
+/** Pinches this close to the floor (vertically) grab it to start a ramp. */
 const SHAPE_GRAB = 0.05;
-const BUMP_MIN = 0.008;
-const BUMP_MAX = 0.04;
-const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
+/** A finish this soon (s) after the player's shape is credited to it. */
+const CAUSE_WINDOW = 1.5;
+const FINISH_WORD: Record<string, string> = { pocket: 'POCKET', over: 'OVER', burst: 'BURST', spin: 'SPIN' };
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
 /** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
@@ -68,7 +71,7 @@ const MATCH_POINTS = 4;
 /** Launch power at or above this is a perfect rip: extra starting spin. */
 const PERFECT = 0.92;
 const PERFECT_SPIN = 1.1;
-/** Far bumps grow at this rate (m/s) while the pinch is held. */
+/** Far ramps (and the dev key's) grow at this rate (m/s) while the pinch is held. */
 const RAY_BUMP_RATE = 0.05;
 
 
@@ -198,7 +201,24 @@ export class MatchSystem extends createSystem({
   private peakSpeed = 0;
   private lastPull = 0;
   /** Per-hand bump being held: arena-local anchor and the pinch height when grabbed. */
-  private shaping: Record<Side, { x: number; z: number; y0: number; t: number; far: boolean } | null> = { left: null, right: null };
+  /**
+   * A ramp being made by each hand: locked start point, pinch height and position at the start,
+   * time held, near or far (ray), and its current height and push direction (the ghost).
+   */
+  private shaping: Record<Side, { x: number; z: number; y0: number; sx: number; sz: number; t: number; far: boolean; amp: number; dx: number; dz: number } | null> = { left: null, right: null };
+  /** A fingertip pressed into the floor already made its well (until it lifts out). */
+  private pressing: Record<Side, boolean> = { left: false, right: false };
+  /** The shaping economy, the marks for shapes and ghosts, the charge embers at the near rim. */
+  private charges = new ShapingCharges();
+  private marks = new ShapeMarks(0xff8a2a);
+  private pips = new ChargePips();
+  /** The player's last shape (fight time and kind), to name it when it decides a round. */
+  private lastShape: { t: number; kind: ShapeKind } | null = null;
+  /** Which tops already ran into which shape (one crunch each). */
+  private crunched = new WeakMap<FloorShape, Set<Top>>();
+  /** Dev: the time B was pressed (a ramp at the gaze grows while it is held). */
+  private devRampSince = -1;
+  private devWellHeld = false;
   private clashes = 0;
   private head = new Vector3();
   private fwd = new Vector3();
@@ -245,6 +265,8 @@ export class MatchSystem extends createSystem({
       this.impacts.root,
       this.ripArrows,
       this.bumpMark,
+      this.marks.root,
+      this.pips.root,
     );
     this.myBuild = this.forge.allowed(this.myBuild);
     this.setBuilds(this.myBuild, this.theirBuild);
@@ -434,6 +456,7 @@ export class MatchSystem extends createSystem({
     this.updateGuide();
     for (const c of this.showcase.children) c.rotation.y += dt * 0.4;
     this.updateRewards(dt);
+    this.updateShapes();
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
   }
@@ -911,6 +934,8 @@ export class MatchSystem extends createSystem({
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
     this.lastPerfect = perfect;
+    this.charges.reset();
+    this.lastShape = null;
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
     const mh = this.mine.hand;
@@ -939,44 +964,110 @@ export class MatchSystem extends createSystem({
   }
 
   /** Pinch near the floor and lift to raise a bump; press a fingertip into the floor to dent it. */
+  /**
+   * Ramps and wells by hand. A ramp: pinch the floor (or point the ray at it and pinch); the start
+   * point is locked, lifting raises it (far: it grows while held), pulling sideways aims it. Its
+   * ghost shows until release, which sets it if a charge is left. A well: press a fingertip into
+   * the floor. Nothing during the opening grace; a lost hand cancels.
+   */
   private updateShaping() {
+    const open = this.elapsed >= TUNING.grace;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
       if (!h.tracked) {
         this.shaping[side] = null;
+        this.pressing[side] = false;
         continue;
       }
+      const l = this.toLocal(h.pinch);
       if (h.pinching) {
-        const l = this.toLocal(h.pinch);
-        let held = this.shaping[side];
-        if (!held && h.justPinched) {
+        let d = this.shaping[side];
+        if (!d && h.justPinched && open) {
           if (this.arena.inside(l.x, l.z) && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
-            held = this.shaping[side] = { x: l.x, z: l.z, y0: l.y, t: 0, far: false };
-            this.progress.advance('match');
+            d = this.shaping[side] = { x: l.x, z: l.z, y0: l.y, sx: l.x, sz: l.z, t: 0, far: false, amp: SHAPE_SIZE.rampMin, dx: 0, dz: 0 };
           } else if (this.rayFloor(h)) {
-            // Far bump: point at the floor and pinch; it rises while the pinch is held.
-            held = this.shaping[side] = { x: this.rayHit.x, z: this.rayHit.z, y0: l.y, t: 0, far: true };
-            this.progress.advance('match');
+            d = this.shaping[side] = { x: this.rayHit.x, z: this.rayHit.z, y0: l.y, sx: l.x, sz: l.z, t: 0, far: true, amp: SHAPE_SIZE.rampMin, dx: 0, dz: 0 };
           }
         }
-        if (held) {
-          held.t += this.frameDt;
-          const lift = held.far ? held.t * RAY_BUMP_RATE : l.y - held.y0;
-          const amplitude = Math.min(BUMP_MAX, Math.max(BUMP_MIN, 0.012 + lift));
-          this.arena.stamp(held.x, held.z, amplitude);
+        if (d) {
+          d.t += this.frameDt;
+          const lift = d.far ? d.t * RAY_BUMP_RATE : (l.y - d.y0) * 1.2;
+          d.amp = Math.min(SHAPE_SIZE.ramp, Math.max(SHAPE_SIZE.rampMin, SHAPE_SIZE.rampMin + lift));
+          // Aim: the sideways pull since the pinch began (the far hand's own motion counts double);
+          // too small a pull aims straight out from the middle.
+          const k = d.far ? 2 : 1;
+          let px = (l.x - d.sx) * k;
+          let pz = (l.z - d.sz) * k;
+          if (Math.hypot(px, pz) < 0.012) {
+            px = d.x;
+            pz = d.z;
+          }
+          const n = Math.hypot(px, pz) || 1;
+          d.dx = px / n;
+          d.dz = pz / n;
         }
         continue;
       }
-      this.shaping[side] = null;
-      this.pressDent(h);
+      const d = this.shaping[side];
+      if (d) {
+        // Released: the ramp is set, if a charge is left.
+        this.shaping[side] = null;
+        this.makeShape('ramp', d.x, d.z, d.amp, side, d.dx, d.dz);
+      }
+      // A fingertip pressed into the floor makes a well, once per press.
+      const tip = this.toLocal(h.index);
+      const depth = this.arena.inside(tip.x, tip.z) ? this.arena.height(tip.x, tip.z) - tip.y : -1;
+      if (depth > 0.004 && !this.pressing[side] && open) {
+        this.pressing[side] = true;
+        this.makeShape('well', tip.x, tip.z, SHAPE_SIZE.well, side);
+      } else if (depth < 0) this.pressing[side] = false;
     }
   }
 
-  private pressDent(h: HandState) {
-    const l = this.toLocal(h.index);
-    if (!this.arena.inside(l.x, l.z)) return;
-    const depth = this.arena.height(l.x, l.z) - l.y;
-    if (depth > 0.004) this.arena.stamp(l.x, l.z, -Math.min(DENT_MAX, depth));
+  /** Spends a charge and sets a shape (one live shape per hand); without a charge, a dull clunk. */
+  private makeShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0) {
+    const f = this.charges.spend(this.elapsed, TUNING.grace);
+    if (import.meta.env.DEV) console.log(`[SHAPE] ${kind} at ${x.toFixed(3)},${z.toFixed(3)} amp ${amp.toFixed(3)} factor ${f} charges ${this.charges.charges} t ${this.elapsed.toFixed(1)}`);
+    if (!f) {
+      playLocked();
+      return;
+    }
+    this.arena.addShape(kind, x, z, amp * f, owner, dx, dz);
+    this.lastShape = { t: this.elapsed, kind };
+    this.progress.advance('match');
+    playThock();
+  }
+
+  /** Marks for live shapes and ghosts, the charge embers, and a crunch when a top runs into a shape. */
+  private updateShapes() {
+    const specs: ShapeMarkSpec[] = this.arena.shapes.map((s) => ({ kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false }));
+    for (const side of ['left', 'right'] as const) {
+      const d = this.shaping[side];
+      if (d) specs.push({ kind: 'ramp', x: d.x, z: d.z, dx: d.dx, dz: d.dz, strength: d.amp / SHAPE_SIZE.ramp, ghost: true });
+    }
+    if (this.devRampSince >= 0 && this.gazeHit.ok) {
+      const r = Math.hypot(this.gazeHit.x, this.gazeHit.z) || 1;
+      specs.push({ kind: 'ramp', x: this.gazeHit.x, z: this.gazeHit.z, dx: this.gazeHit.x / r, dz: this.gazeHit.z / r, strength: this.devRampAmp() / SHAPE_SIZE.ramp, ghost: true });
+    }
+    this.marks.show(this.phase === 'fight' ? specs : [], (x, z) => this.arena.height(x, z), this.time);
+    this.pips.root.visible = this.phase === 'fight' || this.phase === 'ready' || this.phase === 'pulling';
+    this.pips.set(this.charges.charges, this.charges.refilling);
+    for (const s of this.arena.shapes) {
+      if (Arena.strength(s) < 0.3) continue;
+      for (const t of this.tops) {
+        if (!t.alive || Math.hypot(t.x - s.x, t.z - s.z) > (s.kind === 'ramp' ? 0.036 : 0.026)) continue;
+        let hit = this.crunched.get(s);
+        if (!hit) this.crunched.set(s, (hit = new Set()));
+        if (hit.has(t)) continue;
+        hit.add(t);
+        playCrunch();
+      }
+    }
+  }
+
+  /** Dev: the height of the ramp B is growing at the gaze. */
+  private devRampAmp() {
+    return Math.min(SHAPE_SIZE.ramp, SHAPE_SIZE.rampMin + (this.time - this.devRampSince) * RAY_BUMP_RATE);
   }
 
   private updateFight(dt: number) {
@@ -993,8 +1084,10 @@ export class MatchSystem extends createSystem({
       steps++;
       this.elapsed += STEP;
       const clash = step(this.arena, this.mine, this.theirs);
+      this.charges.update(STEP);
       if (clash) {
         this.clashes++;
+        this.charges.clash(clash.strength, this.elapsed);
         const y = this.arena.height(clash.x, clash.z);
         this.sparks.burst(clash.x, y, clash.z, clash.strength);
         if (clash.strength > HARD_HIT && this.elapsed - this.lastHardHit > HIT_STOP_GAP) {
@@ -1073,6 +1166,10 @@ export class MatchSystem extends createSystem({
       } else {
         text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points}\n${score}`;
       }
+      // A finish within 1.5 s of the player's shape names it as the cause.
+      const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? this.lastShape.kind.toUpperCase() : null;
+      if (recent && v === 1) text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
+      else if (recent && v === -1 && loser.finish !== 'spin') text = `YOUR ${recent} BACKFIRED\n${text}`;
     }
     this.label.set(text);
     this.barMessage = text.split('\n')[0].replace(/!.*$/, '!');
@@ -1115,7 +1212,7 @@ export class MatchSystem extends createSystem({
       const z = this.theirs.z - (this.theirs.z / r) * 0.035;
       this.bumpMark.position.set(x, this.arena.height(x, z) + 0.002, z);
       this.bumpMark.scale.setScalar(1 + 0.3 * Math.sin(this.time * 6));
-      this.label.set('Pinch the floor at the ring and lift\nthe slope pushes the rival');
+      this.label.set('Pinch the floor at the ring, lift and pull outward\nlet go: the ramp pushes the rival');
       this.bumpHintShown = true;
     } else if (this.bumpHintShown && g !== 'bump') {
       // The first move is made: the hint goes.
@@ -1198,11 +1295,15 @@ export class MatchSystem extends createSystem({
     }
     if (this.phase !== 'fight' || !this.gazeHit.ok) return;
     const { x, z } = this.gazeHit;
-    if (this.keys.has('KeyB')) {
-      this.arena.stamp(x, z, 0.03);
-      this.progress.advance('match');
+    // B: hold to grow a ramp at the gaze aimed outward, release to set it. N: a well at the gaze.
+    if (this.keys.has('KeyB') && this.devRampSince < 0 && this.elapsed >= TUNING.grace) this.devRampSince = this.time;
+    if (!this.keys.has('KeyB') && this.devRampSince >= 0) {
+      const r = Math.hypot(x, z) || 1;
+      this.makeShape('ramp', x, z, this.devRampAmp(), 'dev', x / r, z / r);
+      this.devRampSince = -1;
     }
-    if (this.keys.has('KeyN')) this.arena.stamp(x, z, -0.025);
+    if (this.keys.has('KeyN') && !this.devWellHeld) this.makeShape('well', x, z, SHAPE_SIZE.well, 'dev-well');
+    this.devWellHeld = this.keys.has('KeyN');
   }
 
   /** Intersects the head's view ray with the arena floor (arena-local). */

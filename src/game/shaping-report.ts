@@ -4,10 +4,8 @@
  */
 import { ARENAS } from './arenas.ts';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
-import { ShapingCharges } from './shaping.ts';
+import { SHAPE_SIZE, ShapingCharges } from './shaping.ts';
 
-/** Ramp height and well depth (m) a simulated player makes (the game's full-lift values). */
-export const SHAPE_SIZE = { ramp: 0.06, well: 0.02 };
 
 type Policy = (arena: Arena, me: Top, rival: Top, t: number, charges: ShapingCharges, rnd: () => number) => void;
 

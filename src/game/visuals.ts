@@ -1370,3 +1370,96 @@ export class Impacts {
     }
   }
 }
+
+/** What a shape mark draws: a live shape or a ghost of one being made. */
+export interface ShapeMarkSpec {
+  kind: 'ramp' | 'well';
+  x: number;
+  z: number;
+  dx: number;
+  dz: number;
+  /** 0..1: how strong it still is (rings shrink as it relaxes). */
+  strength: number;
+  ghost: boolean;
+}
+
+/**
+ * Contour marks for player shapes: two or three rings that shrink as the shape relaxes (the
+ * timer is the shape itself), and a chevron showing which way a ramp pushes. Ghosts are fainter.
+ * Drawn over the floor so they never hide inside a mound.
+ */
+export class ShapeMarks {
+  readonly root = new Group();
+  private marks: { group: Group; rings: Mesh[]; chevron: Mesh; mats: MeshBasicMaterial[] }[] = [];
+
+  constructor(color: number, count = 4) {
+    const ring = new RingGeometry(0.94, 1, 48).rotateX(-Math.PI / 2);
+    const chevron = new ConeGeometry(0.008, 0.016, 3).rotateX(Math.PI / 2);
+    for (let i = 0; i < count; i++) {
+      const group = new Group();
+      const mats = [0, 1, 2, 3].map(() => new MeshBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false }));
+      const rings = [0, 1, 2].map((k) => {
+        const m = new Mesh(ring, mats[k]);
+        m.renderOrder = 20;
+        return m;
+      });
+      const ch = new Mesh(chevron, mats[3]);
+      ch.renderOrder = 21;
+      group.add(...rings, ch);
+      group.visible = false;
+      this.marks.push({ group, rings, chevron: ch, mats });
+      this.root.add(group);
+    }
+  }
+
+  /** Shows marks for these shapes (in order) at their floor heights; the rest hide. */
+  show(specs: ShapeMarkSpec[], height: (x: number, z: number) => number, time: number) {
+    this.marks.forEach((m, i) => {
+      const s = specs[i];
+      m.group.visible = !!s;
+      if (!s) return;
+      const sigma = s.kind === 'ramp' ? 0.03 : 0.022;
+      const shrink = 0.4 + 0.6 * s.strength;
+      m.group.position.set(s.x, height(s.x, s.z) + 0.003, s.z);
+      const radii = s.kind === 'ramp' ? [0.6, 1.1, 1.6] : [0.5, 1, 1.5];
+      m.rings.forEach((r, k) => {
+        r.scale.setScalar(sigma * radii[k] * shrink);
+        m.mats[k].opacity = (s.ghost ? 0.35 + 0.15 * Math.sin(time * 8) : 0.85) * (1 - k * 0.25) * Math.max(0.2, s.strength);
+      });
+      m.chevron.visible = s.kind === 'ramp';
+      if (s.kind === 'ramp') {
+        m.chevron.position.set(s.dx * sigma * 1.1, 0, s.dz * sigma * 1.1);
+        m.chevron.rotation.y = Math.atan2(s.dx, s.dz);
+        m.mats[3].opacity = s.ghost ? 0.6 : 0.9 * s.strength;
+      }
+    });
+  }
+}
+
+/**
+ * The shaping charges at the near rim: one ember per charge, lit when ready, dim when spent, the
+ * next one glowing up as it refills.
+ */
+export class ChargePips {
+  readonly root = new Group();
+  private mats: MeshBasicMaterial[] = [];
+  private readonly lit = new Color(0xff8a2a);
+  private readonly dim = new Color(0x2a2f38);
+
+  constructor(count = 2) {
+    const geo = new CircleGeometry(0.006, 20).rotateX(-Math.PI / 2);
+    for (let i = 0; i < count; i++) {
+      const mat = new MeshBasicMaterial({ color: this.dim.clone() });
+      const m = new Mesh(geo, mat);
+      m.position.x = (i - (count - 1) / 2) * 0.018;
+      this.mats.push(mat);
+      this.root.add(m);
+    }
+  }
+
+  set(charges: number, refilling: number) {
+    this.mats.forEach((m, i) => {
+      m.color.copy(this.dim).lerp(this.lit, i < charges ? 1 : i === charges ? 0.35 * refilling : 0);
+    });
+  }
+}
