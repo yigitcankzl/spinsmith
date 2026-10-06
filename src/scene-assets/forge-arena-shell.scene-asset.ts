@@ -32,13 +32,14 @@ root.name = 'ForgeArenaShell';
 // One continuous, weighty silhouette: broad shoulder, inset waist and flared foot.
 const body = new Mesh(
   new LatheGeometry(
+    // Listed bottom to top so the lathe faces point outward (top to bottom renders inside-out).
     [
-      new Vector2(ARENA_RADIUS + 0.008, -0.002),
-      new Vector2(ARENA_RADIUS + 0.019, -0.012),
-      new Vector2(ARENA_RADIUS + 0.022, -0.026),
-      new Vector2(ARENA_RADIUS + 0.017, -0.057),
-      new Vector2(ARENA_RADIUS + 0.011, -0.071),
       new Vector2(ARENA_RADIUS + 0.02, -FORGE_SHELL_HEIGHT),
+      new Vector2(ARENA_RADIUS + 0.011, -0.071),
+      new Vector2(ARENA_RADIUS + 0.017, -0.057),
+      new Vector2(ARENA_RADIUS + 0.022, -0.026),
+      new Vector2(ARENA_RADIUS + 0.019, -0.012),
+      new Vector2(ARENA_RADIUS + 0.008, -0.002),
     ],
     64,
   ),

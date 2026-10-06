@@ -6,6 +6,7 @@ import {
   CircleGeometry,
   Color,
   ConeGeometry,
+  CylinderGeometry,
   DataTexture,
   DoubleSide,
   Group,
