@@ -21,7 +21,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { arenaWarning, reportArena } from './arena-report.js';
-import { chamfer, GLASS_LIGHT, STEEL as UI_STEEL, glassMesh, ORANGE, TEXT } from './ui.js';
+import { chamfer, FONT, GLASS_LIGHT, glassMesh, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
@@ -108,7 +108,7 @@ export class Button {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     let size = Math.round(h * 0.5);
-    do g.font = `bold ${size--}px system-ui, sans-serif`;
+    do g.font = `bold ${size--}px ${FONT}`;
     while (g.measureText(text).width > w - 16 && size > 10);
     g.fillText(text, w / 2, h / 2 + 1);
     this.tex.needsUpdate = true;
@@ -133,7 +133,7 @@ export function tag(text: string, width: number, size = 40) {
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   let s = size;
-  do g.font = `bold ${s--}px system-ui, sans-serif`;
+  do g.font = `bold ${s--}px ${FONT}`;
   while (g.measureText(text).width > 248 && s > 10);
   g.shadowColor = 'rgba(0,0,0,0.9)';
   g.shadowBlur = 6;

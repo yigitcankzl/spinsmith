@@ -8,7 +8,7 @@ import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, verdict } from './sim.js';
 import { Forge, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
 import { GUIDE_ORDER, Progress } from './progress.js';
-import { anvilModel, Hub, miniArena, standModel } from './hub.js';
+import { ANVIL_AT, anvilModel, Hub, miniArena, standModel } from './hub.js';
 import { Wall } from './wall.js';
 import type { WallPlane } from './wall.js';
 import { allBuilds, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
@@ -50,6 +50,8 @@ const BUMP_MIN = 0.008;
 const BUMP_MAX = 0.04;
 const DENT_MAX = 0.03;
 const RESULT_TIME = 4;
+/** Where round messages hang: small, over the arena's far rim (arena-local). */
+const LABEL_AT = new Vector3(0, 0.1, -0.2);
 /** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
@@ -222,7 +224,7 @@ export class MatchSystem extends createSystem({
     this.reticle.visible = false;
     this.root.visible = false;
     // Messages hang small over the arena's far rim, never between the eyes and the tops.
-    this.label.mesh.position.set(0, 0.1, -0.2);
+    this.label.mesh.position.copy(LABEL_AT);
     this.label.mesh.scale.setScalar(0.8);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
@@ -470,10 +472,13 @@ export class MatchSystem extends createSystem({
     this.label.set('');
     this.wall.setMode('home');
     // The first session says where to reach next.
+    // The note hangs over the station it points at: the stand, or the anvil for the new part.
     const guide = this.progress.guide;
     if (guide === 'launch') this.label.set('Your top is on the stand\nPut it in the arena to play');
     else if (guide === 'forge') this.label.set('New part: Rush tip!\nPinch the anvil to fit it');
     else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
+    if (guide === 'forge') this.label.mesh.position.set(ANVIL_AT.x, 0.27, ANVIL_AT.z - 0.02);
+    else this.label.mesh.position.set(-0.23, 0.27, 0.04);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
@@ -746,6 +751,7 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirs.hand);
     this.puller = null;
     this.cord.set(null);
+    this.label.mesh.position.copy(LABEL_AT);
     // The scoreboard on the wall shows the match; the card over the arena only the round's messages,
     // and at a match's start, who the rival is and how it plays.
     if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name} · ${this.rival.style}\n${this.arena.layout.rule ?? this.arena.layout.name}`);

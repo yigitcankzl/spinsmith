@@ -8,7 +8,7 @@
  * - home: nothing.
  */
 import { CanvasTexture, Group, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from '@iwsdk/core';
-import { CYAN, glass, GLASS_LIGHT, STEEL, glassMesh, ORANGE, TEXT, TEXT_DIM, titleMesh } from './ui.js';
+import { CYAN, FONT, glass, GLASS_LIGHT, glassMesh, ORANGE, STEEL, TEXT, TEXT_DIM, titleMesh } from './ui.js';
 
 /** Wall board size (m). */
 const WIDTH = 1.7;
@@ -113,7 +113,7 @@ export class Wall {
     lines.forEach((line, i) => {
       g.fillStyle = i === 0 ? TEXT : TEXT_DIM;
       let size = i === 0 ? 110 : 52;
-      do g.font = `bold ${size--}px system-ui, sans-serif`;
+      do g.font = `bold ${size--}px ${FONT}`;
       while (g.measureText(line).width > 960 && size > 16);
       const y = lines.length === 1 ? 210 : i === 0 ? 120 : 220 + (i - 1) * 70;
       g.fillText(line, 512, y);
@@ -165,7 +165,7 @@ export class Wall {
       g.lineWidth = 3;
       g.strokeRect(dir === 1 ? x0 : x0 - barW, barY, barW, 56);
       g.fillStyle = TEXT;
-      g.font = '800 40px system-ui, sans-serif';
+      g.font = `700 40px ${FONT}`;
       g.textAlign = dir === 1 ? 'left' : 'right';
       g.textBaseline = 'middle';
       g.fillText(name, dir === 1 ? x0 : x0, 50);
@@ -183,16 +183,16 @@ export class Wall {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     let size = 64;
-    do g.font = `bold ${size--}px system-ui, sans-serif`;
+    do g.font = `bold ${size--}px ${FONT}`;
     while (g.measureText(message).width > 200 && size > 20);
     g.fillText(message, W / 2, 120);
     // Your smith level along the bottom: level and rank, the XP bar, the XP just earned.
-    g.font = '800 32px system-ui, sans-serif';
+    g.font = `700 32px ${FONT}`;
     g.fillStyle = TEXT;
     g.textAlign = 'left';
     g.fillText(`Lv ${xp.level}`, 40, 280);
     g.fillStyle = ORANGE;
-    g.font = '700 26px system-ui, sans-serif';
+    g.font = `700 26px ${FONT}`;
     g.fillText(xp.rank.toUpperCase(), 130, 281);
     g.fillStyle = 'rgba(255,255,255,0.1)';
     g.fillRect(380, 270, 760, 20);
@@ -201,7 +201,7 @@ export class Wall {
     if (xp.gained > 0) {
       g.fillStyle = ORANGE;
       g.textAlign = 'right';
-      g.font = '800 32px system-ui, sans-serif';
+      g.font = `700 32px ${FONT}`;
       g.fillText(`+${xp.gained} XP`, W - 40, 280);
     }
     this.hudTex.needsUpdate = true;

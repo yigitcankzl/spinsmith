@@ -4,6 +4,22 @@
  */
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
 
+/** The one display font of every panel, card and label (Rajdhani, SIL OFL, in public/fonts). */
+export const FONT = 'Rajdhani, system-ui, sans-serif';
+
+/**
+ * Loads the display font before anything is drawn: canvas text drawn earlier would silently fall
+ * back to the system font. Resolves even if the font fails to load.
+ */
+export async function loadFonts() {
+  const base = import.meta.env.BASE_URL;
+  const faces = [
+    new FontFace('Rajdhani', `url(${base}fonts/Rajdhani-SemiBold.ttf)`, { weight: '600' }),
+    new FontFace('Rajdhani', `url(${base}fonts/Rajdhani-Bold.ttf)`, { weight: '700' }),
+  ];
+  await Promise.all(faces.map((f) => f.load().then((loaded) => document.fonts.add(loaded)).catch(() => undefined)));
+}
+
 export const GLASS = 'rgba(9, 13, 21, 0.86)';
 export const GLASS_LIGHT = 'rgba(22, 30, 44, 0.9)';
 export const ORANGE = '#ff8a2a';
@@ -104,7 +120,7 @@ export function titleMesh(text: string, width: number, height: number): Mesh {
   const g = c.getContext('2d')!;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.font = `800 ${Math.round(c.height * 0.58)}px system-ui, sans-serif`;
+  g.font = `700 ${Math.round(c.height * 0.58)}px ${FONT}`;
   (g as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${Math.round(c.height * 0.18)}px`;
   g.fillStyle = TEXT;
   g.shadowColor = 'rgba(120, 190, 255, 0.6)';

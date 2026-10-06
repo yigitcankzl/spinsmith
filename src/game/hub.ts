@@ -30,7 +30,7 @@ import {
 } from '@iwsdk/core';
 import { playLocked, playPick, playRemove } from './audio.js';
 import type { Progress } from './progress.js';
-import { glass, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
+import { FONT, glass, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import type { ArenaLayout, Theme } from './layout.js';
@@ -341,10 +341,10 @@ export class Hub {
     glass(g, 512, 200, ORANGE);
     g.fillStyle = TEXT;
     g.textBaseline = 'middle';
-    g.font = '800 54px system-ui, sans-serif';
+    g.font = `700 54px ${FONT}`;
     g.fillText(`Lv ${progress.level}`, 28, 52);
     g.fillStyle = ORANGE;
-    g.font = '700 34px system-ui, sans-serif';
+    g.font = `700 34px ${FONT}`;
     g.fillText(progress.rank.toUpperCase(), 190, 54);
     g.fillStyle = 'rgba(255,255,255,0.1)';
     g.fillRect(28, 100, 456, 20);
@@ -352,7 +352,7 @@ export class Hub {
     g.fillRect(28, 100, 456 * progress.fraction, 20);
     // Where progress leads next.
     g.fillStyle = TEXT;
-    g.font = '600 28px system-ui, sans-serif';
+    g.font = `600 28px ${FONT}`;
     g.fillText(next ? `Next: ${unlockLabel(next.key)} at Lv ${next.level}` : 'Every part is yours', 28, 160);
     this.rankTex.needsUpdate = true;
   }

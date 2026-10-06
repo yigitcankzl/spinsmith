@@ -39,7 +39,7 @@ import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena
 import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
 import { Arena, Top } from './sim.js';
-import { glass, ORANGE, TEXT } from './ui.js';
+import { FONT, glass, ORANGE, TEXT } from './ui.js';
 import { coreOf, ringOf } from './parts.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
@@ -1252,7 +1252,7 @@ export class Label {
       // Shrink each line until it fits the card.
       let size = i === 0 ? 56 : 34;
       const weight = i === 0 ? 'bold ' : '';
-      do g.font = `${weight}${size--}px system-ui, sans-serif`;
+      do g.font = `${weight}${size--}px ${FONT}`;
       while (g.measureText(line).width > 470 && size > 12);
       g.fillText(line, 256, 80 + (i - (lines.length - 1) / 2) * 58);
     });

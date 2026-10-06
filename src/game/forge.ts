@@ -34,7 +34,7 @@ import { playLocked, playPick, playPlace, playRemove } from './audio.js';
 import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
 import { tag } from './builder.js';
-import { glass, GLASS_LIGHT, STEEL, ORANGE, TEXT, TEXT_DIM } from './ui.js';
+import { FONT, glass, GLASS_LIGHT, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import type { TopBuild, TopStats } from './parts.js';
@@ -726,9 +726,9 @@ class StatsCard {
     const next = preview ? statsOf(specFromBuild(preview)) : null;
     g.fillStyle = TEXT;
     g.textBaseline = 'middle';
-    g.font = '800 38px system-ui, sans-serif';
+    g.font = `700 38px ${FONT}`;
     g.fillText(buildName(preview ?? build), 26, 44);
-    g.font = '28px system-ui, sans-serif';
+    g.font = `28px ${FONT}`;
     const w = weightOf(preview ?? build);
     g.fillStyle = w > WEIGHT_LIMIT ? '#ff5a4a' : TEXT_DIM;
     g.fillText(`${roleOf(specFromBuild(preview ?? build))} · ${build.spin === 1 ? 'right' : 'left'} spin · ${w} / ${WEIGHT_LIMIT} g`, 26, 88);
@@ -742,7 +742,7 @@ class StatsCard {
     rows.forEach(([key, label], i) => {
       const y = 140 + i * 54;
       g.fillStyle = TEXT;
-      g.font = '700 28px system-ui, sans-serif';
+      g.font = `700 28px ${FONT}`;
       g.fillText(label, 26, y);
       const x0 = 190;
       const width = 290;
@@ -766,7 +766,7 @@ class StatsCard {
     // What just happened, or what to do next.
     g.fillStyle = STEEL;
     let size = 26;
-    do g.font = `${size--}px system-ui, sans-serif`;
+    do g.font = `${size--}px ${FONT}`;
     while (g.measureText(message).width > 470 && size > 14);
     g.fillText(message, 26, 425);
     this.tex.needsUpdate = true;
