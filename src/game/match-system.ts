@@ -8,7 +8,7 @@ import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, verdict } from './sim.js';
 import { Forge, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
 import { GUIDE_ORDER, Progress } from './progress.js';
-import { Hub, miniArena } from './hub.js';
+import { anvilModel, Hub, miniArena, standModel } from './hub.js';
 import { Wall } from './wall.js';
 import type { WallPlane } from './wall.js';
 import { allBuilds, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
@@ -271,6 +271,12 @@ export class MatchSystem extends createSystem({
               v.root.scale.setScalar(1.6);
               this.showcase.add(v.root);
             });
+            // The props too, on the table level beside them.
+            const anvil = anvilModel();
+            anvil.position.set(0.3, -0.04, 0.02);
+            const stand = standModel();
+            stand.position.set(-0.3, -0.04, 0.02);
+            this.showcase.add(anvil, stand);
             this.stage.add(this.showcase);
             this.showcase.visible = false;
           }
@@ -398,7 +404,7 @@ export class MatchSystem extends createSystem({
     this.sparks.update(dt);
     this.impacts.update(dt);
     this.updateGuide();
-    for (const c of this.showcase.children) c.rotation.y += dt * 0.6;
+    for (const c of this.showcase.children) c.rotation.y += dt * 0.4;
     this.updateRewards(dt);
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);

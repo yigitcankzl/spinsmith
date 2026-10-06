@@ -8,6 +8,11 @@
  */
 import {
   BoxGeometry,
+  BufferGeometry,
+  ExtrudeGeometry,
+  LatheGeometry,
+  Shape,
+  Vector2,
   CanvasTexture,
   CircleGeometry,
   ConeGeometry,
@@ -55,10 +60,10 @@ const TAP_MOVE = 0.03;
 
 const THEME_COLOR: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff };
 const FLOOR_COLOR: Record<Theme, number> = { forge: 0xe8dcc4, stone: 0xb9b3a8, clockwork: 0xd9c9a3, ice: 0xdff1fa };
-const IRON = makeMatcap('metal', 0x6a707b);
+const IRON = makeMatcap('metal', 0x9aa1ad);
 /** The forged-tech set: graphite bodies, light steel, brass trim, orange heat. */
 const GRAPHITE = makeMatcap('metal', 0x4a4e57);
-const STEEL = makeMatcap('metal', 0x8a909b);
+const STEEL = makeMatcap('chrome', 0xd6dce6);
 /** The table is this far below the arena floor (arena-local): props stand on the table itself. */
 const TABLE_Y = -0.04;
 const BRASS = makeMatcap('metal', 0xe2b866);
@@ -362,14 +367,7 @@ export class Hub {
     rank.position.set(0, 0.21, 0);
     rank.rotation.x = -0.3;
     this.stand.add(rank);
-    // An octagonal graphite post with a glowing seam and a brass cup on top.
-    const stem = new Mesh(new CylinderGeometry(0.011, 0.02, 0.09, 8), new MeshMatcapMaterial({ matcap: GRAPHITE }));
-    stem.position.y = 0.045;
-    const seam = new Mesh(new TorusGeometry(0.0125, 0.0016, 6, 24).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: ORANGE }));
-    seam.position.y = 0.088;
-    const cup = new Mesh(new TorusGeometry(0.016, 0.003, 8, 32).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
-    cup.position.y = 0.092;
-    this.stand.add(stem, seam, cup, softShadow(0.06));
+    this.stand.add(standModel());
     this.label('PLAY', this.stand, 0.15);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
@@ -413,40 +411,117 @@ export function miniArena(layout: ArenaLayout, current: boolean): Group {
 export const ANVIL_FACE = 0.1435;
 
 /**
- * The anvil, standing on the table: a steel anvil with a horn on an octagonal graphite plinth with
- * a brass band and a glowing seam, heat on its face and a hammer leaning on it.
+ * The anvil, standing on the table: a forged steel anvil drawn from its side profile (a horn that
+ * tapers to a point, a polished face with a hardy hole, a stepped heel, a narrow waist and splayed
+ * feet) on an octagonal graphite plinth with a brass band and a glowing seam, a hammer against it.
  */
 export function anvilModel(): Group {
   const iron = new MeshMatcapMaterial({ matcap: IRON });
+  const steel = new MeshMatcapMaterial({ matcap: STEEL });
   const graphite = new MeshMatcapMaterial({ matcap: GRAPHITE });
-  const plinth = new Mesh(new CylinderGeometry(0.048, 0.056, 0.075, 8), graphite);
-  plinth.position.y = 0.0375;
+  const plinth = new Mesh(new CylinderGeometry(0.048, 0.056, 0.07, 8), graphite);
+  plinth.position.y = 0.035;
+  const cap = new Mesh(new CylinderGeometry(0.052, 0.05, 0.006, 8), graphite);
+  cap.position.y = 0.072;
   const band = new Mesh(new TorusGeometry(0.049, 0.003, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshMatcapMaterial({ matcap: BRASS }));
-  band.position.y = 0.071;
+  band.position.y = 0.064;
   const seam = new Mesh(new TorusGeometry(0.053, 0.0015, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshBasicMaterial({ color: ORANGE }));
   seam.position.y = 0.012;
-  const foot = new Mesh(new BoxGeometry(0.09, 0.016, 0.06), iron);
-  foot.position.y = 0.083;
-  const waist = new Mesh(new BoxGeometry(0.05, 0.03, 0.035), iron);
-  waist.position.y = 0.106;
-  const face = new Mesh(new BoxGeometry(0.11, 0.022, 0.05), new MeshMatcapMaterial({ matcap: STEEL }));
-  face.position.y = 0.132;
-  const horn = new Mesh(new ConeGeometry(0.02, 0.06, 16).rotateZ(Math.PI / 2), iron);
-  horn.position.set(-0.084, 0.132, 0);
+  const body = new Mesh(anvilBody(), iron);
+  // The face: a polished steel plate with the square hardy hole near the heel.
+  const face = new Mesh(new BoxGeometry(0.1, 0.004, 0.046), steel);
+  face.position.set(0.004, ANVIL_FACE - 0.002, 0);
+  const hardy = new Mesh(new BoxGeometry(0.008, 0.0045, 0.008), new MeshBasicMaterial({ color: 0x15161a }));
+  hardy.position.set(0.04, ANVIL_FACE - 0.0015, 0);
   const glow = new Mesh(new CircleGeometry(0.03, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0.5 }));
-  glow.position.y = ANVIL_FACE;
+  glow.position.y = ANVIL_FACE + 0.0003;
+  // The hammer: a tapered graphite handle with a brass ferrule, an octagonal steel head and a peen.
   const hammer = new Group();
-  const handle = new Mesh(new CylinderGeometry(0.004, 0.005, 0.09, 8), graphite);
-  handle.position.y = 0.045;
-  const ferrule = new Mesh(new CylinderGeometry(0.0055, 0.0055, 0.008, 8), new MeshMatcapMaterial({ matcap: BRASS }));
-  ferrule.position.y = 0.082;
-  const head = new Mesh(new BoxGeometry(0.034, 0.016, 0.016), new MeshMatcapMaterial({ matcap: STEEL }));
-  head.position.y = 0.09;
-  hammer.add(handle, ferrule, head);
+  const handle = new Mesh(new CylinderGeometry(0.0035, 0.0052, 0.095, 8), graphite);
+  handle.position.y = 0.0475;
+  const ferrule = new Mesh(new CylinderGeometry(0.0058, 0.0058, 0.008, 8), new MeshMatcapMaterial({ matcap: BRASS }));
+  ferrule.position.y = 0.088;
+  const head = new Mesh(new CylinderGeometry(0.0085, 0.0085, 0.026, 8).rotateZ(Math.PI / 2), steel);
+  head.position.set(0.004, 0.096, 0);
+  const peen = new Mesh(new ConeGeometry(0.0085, 0.014, 8).rotateZ(Math.PI / 2), steel);
+  peen.position.set(-0.016, 0.096, 0);
+  hammer.add(handle, ferrule, head, peen);
   hammer.position.set(0.075, 0, 0.045);
   hammer.rotation.z = 0.3;
   const g = new Group();
-  g.add(plinth, band, seam, foot, waist, face, horn, glow, hammer, softShadow(0.16));
+  g.add(plinth, cap, band, seam, body, face, hardy, glow, hammer, softShadow(0.16));
+  return g;
+}
+
+/**
+ * The anvil's body from its side profile, extruded through its width; the horn narrows to a
+ * point toward its tip. Sits on the plinth (y 0.075) with its face at ANVIL_FACE.
+ */
+function anvilBody(): BufferGeometry {
+  const top = ANVIL_FACE - 0.003;
+  const sh = new Shape();
+  sh.moveTo(-0.088, top - 0.012); // horn tip
+  sh.quadraticCurveTo(-0.07, top - 0.001, -0.046, top);
+  sh.lineTo(0.05, top); // face
+  sh.lineTo(0.056, top - 0.004);
+  sh.lineTo(0.056, top - 0.014); // heel
+  sh.quadraticCurveTo(0.032, top - 0.016, 0.024, top - 0.03); // under the heel into the waist
+  sh.lineTo(0.022, 0.092);
+  sh.quadraticCurveTo(0.026, 0.08, 0.046, 0.078); // flaring foot
+  sh.lineTo(0.046, 0.075);
+  sh.lineTo(-0.046, 0.075);
+  sh.lineTo(-0.046, 0.078);
+  sh.quadraticCurveTo(-0.026, 0.08, -0.022, 0.092);
+  sh.lineTo(-0.024, top - 0.03);
+  sh.quadraticCurveTo(-0.04, top - 0.022, -0.088, top - 0.012); // under the horn
+  const depth = 0.044;
+  const geo = new ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: 0.002, bevelSize: 0.0015, bevelSegments: 2, curveSegments: 10 }).translate(0, 0, -depth / 2);
+  // The horn narrows in width toward its tip; the waist is a little narrower than face and feet.
+  const pos = geo.getAttribute('position');
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    let k = 1;
+    if (x < -0.04) k = 1 - 0.75 * Math.min(1, (-0.04 - x) / 0.048);
+    else if (y > 0.088 && y < top - 0.02) k = 0.8;
+    pos.setZ(i, pos.getZ(i) * k);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** The stand your top waits on: a turned graphite pedestal with a glowing seam and three brass prongs. */
+export function standModel(): Group {
+  // A flared foot, a slim stem with a collar, a glowing seam and a shallow cup whose three brass
+  // prongs cradle the top.
+  const profile = [
+    [0.026, 0],
+    [0.026, 0.004],
+    [0.02, 0.008],
+    [0.009, 0.02],
+    [0.0065, 0.05],
+    [0.0065, 0.074],
+    [0.011, 0.077],
+    [0.011, 0.081],
+    [0.007, 0.084],
+    [0.008, 0.088],
+    [0.018, 0.094],
+    [0.019, 0.097],
+    [0, 0.097],
+  ].map(([r, y]) => new Vector2(r, y));
+  const pedestal = new Mesh(new LatheGeometry(profile, 32), new MeshMatcapMaterial({ matcap: GRAPHITE }));
+  const seam = new Mesh(new TorusGeometry(0.0115, 0.0012, 6, 24).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: ORANGE }));
+  seam.position.y = 0.079;
+  const brass = new MeshMatcapMaterial({ matcap: BRASS });
+  const g = new Group();
+  g.add(pedestal, seam, softShadow(0.07));
+  for (let i = 0; i < 3; i++) {
+    const prong = new Mesh(new BoxGeometry(0.003, 0.012, 0.004), brass);
+    const a = (i / 3) * Math.PI * 2;
+    prong.position.set(Math.cos(a) * 0.019, 0.1, Math.sin(a) * 0.019);
+    prong.rotation.set(0, -a, 0.35);
+    g.add(prong);
+  }
   return g;
 }
 
