@@ -87,6 +87,8 @@ export class MatchSystem extends createSystem({
 }) {
   private phase: Phase = 'placing';
   private settle = 0;
+  /** The floor mesh needs one more sync (the arena was reset or a shape just ended). */
+  private arenaDirty = true;
   /** The XR session the arena was placed in; a new one (or a recenter) places it again. */
   private xrSession: XRSession | null = null;
   private needPlace = false;
@@ -475,7 +477,11 @@ export class MatchSystem extends createSystem({
       }
     }
     this.updateReticle();
-    this.arenaView.sync(this.arena);
+    // The floor mesh follows the simulation only while it changes: live shapes or embers, plus one
+    // frame after they end, and after any reset of the arena.
+    const moving = this.arena.shapes.length > 0 || this.arena.safe < 1;
+    if (moving || this.arenaDirty) this.arenaView.sync(this.arena);
+    this.arenaDirty = moving;
     const live = this.phase === 'fight';
     this.tops.forEach((t, i) => this.hums[i].update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time));
     this.sinceClashSound += dt;
@@ -510,6 +516,7 @@ export class MatchSystem extends createSystem({
   /** Switches to another arena layout (rebuilds the visuals). */
   setArena(layout: ArenaLayout) {
     this.arena.reset(layout);
+    this.arenaDirty = true;
     this.arenaView.build(layout);
     console.log(`[MATCH] arena ${layout.name}`);
   }
@@ -517,6 +524,7 @@ export class MatchSystem extends createSystem({
   /** Shows a layout in the arena without changing the rotation (builder preview). */
   private showLayout(layout: ArenaLayout) {
     this.arena.reset(layout);
+    this.arenaDirty = true;
     this.arenaView.build(layout);
   }
 
@@ -549,6 +557,7 @@ export class MatchSystem extends createSystem({
     this.phase = 'hub';
     this.matchOver = false;
     this.arena.reset(this.arenas[this.arenaIndex]);
+    this.arenaDirty = true;
     this.arenaView.build(this.arena.layout);
     this.setBuilds(this.myBuild, this.theirBuild);
     this.mine.launch(0, this.SPAWN, 0, 0, 1, this.myBuild.spin);
@@ -734,6 +743,7 @@ export class MatchSystem extends createSystem({
   private tryArena(layout: ArenaLayout) {
     this.menuButton.mesh.visible = false;
     this.arena.reset(layout);
+    this.arenaDirty = true;
     this.demo = true;
     this.setBuilds(this.randomBuild(), this.randomBuild());
     this.launch(0.6 + Math.random() * 0.35, (Math.random() - 0.5) * 0.6);
@@ -747,6 +757,7 @@ export class MatchSystem extends createSystem({
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.arena.reset();
+    this.arenaDirty = true;
     this.builder.fold('out');
   }
 
@@ -939,6 +950,7 @@ export class MatchSystem extends createSystem({
     this.phase = 'ready';
     this.menuButton.mesh.visible = true;
     this.arena.reset();
+    this.arenaDirty = true;
     // Both tops wait upright at their spawn points.
     if (!this.typesPicked) this.pickBuilds();
     this.typesPicked = true;
@@ -1009,7 +1021,9 @@ export class MatchSystem extends createSystem({
       this.pullEnd.copy(h.pinch);
       const power = this.pullPower();
       this.showCharge(power, dt);
-      this.label.set(power >= PERFECT ? `WHITE HOT ${Math.round(power * 100)}%` : power > 0 ? `${Math.round(power * 100)}%` : 'Pull back and let go');
+      // In 5% steps, so the card is not redrawn every frame of the pull.
+      const pct = Math.round(power * 20) * 5;
+      this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%` : power > 0 ? `${pct}%` : 'Pull back and let go');
       this.lostFor = 0;
       if (dist < MAX_PULL) return;
     } else if (!h.tracked) {
