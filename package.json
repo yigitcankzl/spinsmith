@@ -14,7 +14,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:sim": "node scripts/sim-check.ts",
-    "report:arenas": "node scripts/arena-report.ts"
+    "report:arenas": "node scripts/arena-report.ts",
+    "report:tops": "node scripts/top-report.ts"
   },
   "dependencies": {
     "@iwsdk/core": "1.0.1",

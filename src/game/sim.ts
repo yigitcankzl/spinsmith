@@ -13,6 +13,7 @@ import {
   rimRadius,
 } from './layout.ts';
 import { ARENAS } from './arenas.ts';
+import { PRESETS, specFromBuild } from './parts.ts';
 
 /** Floor dips toward a pocket over this outer band of the radius. */
 const POCKET_BAND = 0.25;
@@ -72,6 +73,23 @@ export const TUNING = {
   /** How strongly a spinning tip turns radial motion into an orbit around the center (1/s). */
   orbit: 1.44,
 };
+/** Height rule: a height gap this large (m) gives the lower top its full lift on the taller one. */
+const HEIGHT_GAP = 0.002;
+/** Extra knockback and tilt the taller top takes at a full height gap. */
+const HEIGHT_LIFT = 0.25;
+/** Below this height (m) a top's ring scrapes on slopes steeper than SCRAPE_SLOPE. */
+const LOW_HEIGHT = 0.0055;
+const SCRAPE_SLOPE = 0.12;
+const SCRAPE_DRAIN = 0.25;
+/** Upper contact: how long a lifted top flies light, and how much easier walls and pockets get. */
+const LIFT_TIME = 0.4;
+const LIFT_ESCAPE = 0.7;
+/** Opposite spins exchange spin on contact (the faster feeds the slower); grind does it harder. */
+const SPIN_SHARE = 0.03;
+const GRIND_SHARE = 0.12;
+/** Same-direction rims grind against each other: extra recoil and spin lost. */
+const SAME_SPIN_RECOIL = 1.25;
+const SAME_SPIN_COST = 0.012;
 /** Fixed simulation step. */
 export const STEP = 1 / 120;
 /** Below this spin a top topples. */
@@ -263,58 +281,29 @@ export interface TopSpec {
   center: number;
   /** Divides burst damage taken. */
   burstResist: number;
+  /** Height of the contact ring above the floor (m): a lower top hits under a taller one. */
+  height: number;
+  /**
+   * Contact style: smash and absorb are carried by punch/knockback; upper lifts the opponent (it
+   * clears walls and pockets more easily for a moment); grind steals spin from an opposite spinner.
+   */
+  contact: Contact;
+  /** Rail dash strength from the tip's gear (0 = cannot catch the rail). */
+  gear: number;
+  /** Multiplies the burst damage this top deals (many small teeth chip away). */
+  chip: number;
 }
+
+export type Contact = 'smash' | 'upper' | 'absorb' | 'grind';
 
 /**
  * Three types in a rock-paper-scissors loop, after real top battling:
  * attack beats stamina (hunts it down and smashes it out), defense beats attack (holds the
  * middle and lets the attacker burn itself out), stamina beats defense (simply outspins it).
  */
-export const ATTACK: TopSpec = {
-  name: 'Striker',
-  radius: 0.024,
-  punch: 0.87,
-  knockback: 0.84,
-  spinDrain: 0.064,
-  roam: 0.6,
-  cruise: 0.66,
-  drive: 3,
-  maxSpeed: 2,
-  seek: 3.43,
-  center: 0,
-  burstResist: 1,
-};
-
-export const DEFENSE: TopSpec = {
-  name: 'Anvil',
-  radius: 0.03,
-  punch: 0.84,
-  knockback: 0.57,
-  spinDrain: 0.06,
-  roam: 0.1,
-  cruise: 0.29,
-  drive: 1.5,
-  maxSpeed: 1.6,
-  seek: 0,
-  center: 7.38,
-  burstResist: 1.28,
-};
-
-export const STAMINA: TopSpec = {
-  name: 'Needle',
-  radius: 0.027,
-  punch: 0.7,
-  knockback: 0.99,
-  spinDrain: 0.023,
-  roam: 0.2,
-  cruise: 0.44,
-  drive: 1.5,
-  maxSpeed: 1.8,
-  seek: 0,
-  center: 0,
-  burstResist: 0.92,
-};
-
+export const ATTACK: TopSpec = { ...specFromBuild(PRESETS[0].build), name: 'Striker' };
+export const DEFENSE: TopSpec = { ...specFromBuild(PRESETS[1].build), name: 'Anvil' };
+export const STAMINA: TopSpec = { ...specFromBuild(PRESETS[2].build), name: 'Needle' };
 export const TYPES = [ATTACK, DEFENSE, STAMINA];
 
 export type Outcome = 'spinning' | 'out' | 'toppled';
@@ -344,6 +333,8 @@ export class Top {
   sinceBump = 99;
   /** Accumulated hit damage; at 1 the top bursts apart. */
   damage = 0;
+  /** Seconds left of being lifted by an upper hit (walls and pockets take less to clear). */
+  lifted = 0;
   /** Points of the pocket it fell into (pockets can be worth 2 or 3). */
   pocketPoints = 2;
   /** Sign of the curving direction (tops spin opposite ways). */
@@ -356,7 +347,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, sinceDash: 99, sinceBump: 99, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -462,6 +453,12 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.z += t.vz * dt;
   // Spin drains on its own, faster while scraping across the floor, much faster in the embers.
   t.spin -= (s.spinDrain + v * 0.02) * dt;
+  // A low ring scrapes the floor on steep slopes (the bumps the player raises, steep bowls).
+  if (s.height < LOW_HEIGHT) {
+    const steep = Math.hypot(slopeTmp.x, slopeTmp.z) - SCRAPE_SLOPE;
+    if (steep > 0) t.spin -= steep * SCRAPE_DRAIN * dt;
+  }
+  t.lifted = Math.max(0, t.lifted - dt);
   if (n > arena.safe) t.spin -= EMBER_DRAIN * dt;
   // Visual spin, capped so the body stripes never alias into spinning backwards on screen.
   t.angle += (6 + 22 * Math.max(0, t.spin)) * dt * t.hand;
@@ -530,13 +527,14 @@ function wall(arena: Arena, t: Top) {
   const nz = normalTmp.z;
   const outward = t.vx * nx + t.vz * nz;
   const pocket = pocketAt(L, angle);
-  if (pocket && outward > POCKET_SPEED) {
+  const ease = t.lifted > 0 ? LIFT_ESCAPE : 1;
+  if (pocket && outward > POCKET_SPEED * ease) {
     t.state = 'out';
     t.finish = 'pocket';
     t.pocketPoints = pocket.points;
     return;
   }
-  if (outward > WALL_ESCAPE[L.wall]) {
+  if (outward > WALL_ESCAPE[L.wall] * ease) {
     t.state = 'out';
     t.finish = 'over';
     return;
@@ -544,11 +542,11 @@ function wall(arena: Arena, t: Top) {
   // Keep it inside.
   t.x = (t.x / r) * limit;
   t.z = (t.z / r) * limit;
-  if (railAt(L, angle) && t.sinceDash > DASH_COOLDOWN && t.spin > 0.2) {
+  if (railAt(L, angle) && t.spec.gear > 0 && t.sinceDash > DASH_COOLDOWN && t.spin > 0.2) {
     // Rail dash: the tip catches the rail and the top shoots along it and into the middle.
     const tx = -nz * t.hand;
     const tz = nx * t.hand;
-    const k = DASH_SPEED * Math.min(1, t.spin + 0.2);
+    const k = DASH_SPEED * t.spec.gear * Math.min(1, t.spin + 0.2);
     t.vx = (tx * 0.55 - nx * 0.85) * k;
     t.vz = (tz * 0.55 - nz * 0.85) * k;
     t.sinceDash = 0;
@@ -589,26 +587,45 @@ function collide(a: Top, b: Top): Clash | null {
   // Only a fresh hit (approaching) bounces; resting contact is just pushed apart above.
   if (closing <= 0) return null;
   // Equal-mass bounce plus a kick from the spinning rims, scaled by each side's punch/knockback.
-  const impulse = ((1 + TUNING.restitution) / 2) * closing + TUNING.recoil * (a.spin + b.spin) * 0.5;
-  const ja = impulse * b.spec.punch * a.spec.knockback;
-  const jb = impulse * a.spec.punch * b.spec.knockback;
+  const same = a.hand === b.hand;
+  const impulse = ((1 + TUNING.restitution) / 2) * closing + TUNING.recoil * (a.spin + b.spin) * 0.5 * (same ? SAME_SPIN_RECOIL : 1);
+  // The lower top hits under the taller one: the taller takes extra knockback and tilt.
+  const gap = Math.max(-1, Math.min(1, (a.spec.height - b.spec.height) / HEIGHT_GAP));
+  const liftA = gap > 0 ? gap * HEIGHT_LIFT : 0;
+  const liftB = gap < 0 ? -gap * HEIGHT_LIFT : 0;
+  const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA);
+  const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB);
   a.vx -= nx * ja;
   a.vz -= nz * ja;
   b.vx += nx * jb;
   b.vz += nz * jb;
   // The hit knocks each top's axis away from the other.
-  a.kick = Math.min(1, a.kick + ja * 2);
+  a.kick = Math.min(1, a.kick + ja * 2 + liftA);
   a.kickX = -nx;
   a.kickZ = -nz;
-  b.kick = Math.min(1, b.kick + jb * 2);
+  b.kick = Math.min(1, b.kick + jb * 2 + liftB);
+  // Upper contact lifts the other top: for a moment walls and pockets take less to clear.
+  if (a.spec.contact === 'upper') b.lifted = LIFT_TIME;
+  if (b.spec.contact === 'upper') a.lifted = LIFT_TIME;
   b.kickX = nx;
   b.kickZ = nz;
   // Hits cost spin, the weaker puncher loses more.
   a.spin -= TUNING.spinHit * impulse * b.spec.punch;
   b.spin -= TUNING.spinHit * impulse * a.spec.punch;
+  if (same) {
+    // Same direction: the rims rub against each other's motion and both lose spin.
+    a.spin -= SAME_SPIN_COST;
+    b.spin -= SAME_SPIN_COST;
+  } else {
+    // Opposite directions mesh like gears: spin flows from the faster top to the slower one.
+    const share = a.spec.contact === 'grind' || b.spec.contact === 'grind' ? GRIND_SHARE : SPIN_SHARE;
+    const flow = (a.spin - b.spin) * share;
+    a.spin -= flow;
+    b.spin += flow;
+  }
   // Hard hits crack the top; enough damage bursts it apart.
-  a.damage += (TUNING.burst * impulse * impulse * b.spec.punch) / a.spec.burstResist;
-  b.damage += (TUNING.burst * impulse * impulse * a.spec.punch) / b.spec.burstResist;
+  a.damage += (TUNING.burst * impulse * impulse * b.spec.punch * b.spec.chip) / a.spec.burstResist;
+  b.damage += (TUNING.burst * impulse * impulse * a.spec.punch * a.spec.chip) / b.spec.burstResist;
   if (a.damage >= 1) burstApart(a);
   if (b.damage >= 1) burstApart(b);
   return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 1.6) };

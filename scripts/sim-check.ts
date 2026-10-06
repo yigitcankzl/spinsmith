@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { ARENAS } from '../src/game/arenas.ts';
 import { cloneLayout, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
+import { allBuilds, PRESETS, specFromBuild, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
@@ -302,6 +303,58 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
     const r = fight(arena, a, b);
     assert.notEqual(r.result, 0, `${layout.name} must produce a result`);
   }
+}
+
+// 9. Top parts.
+{
+  // The classic tops are builds, and every preset fits the weight limit.
+  for (const p of PRESETS) assert.ok(weightOf(p.build) <= WEIGHT_LIMIT, `${p.name} is over the weight limit`);
+  assert.deepEqual({ ...specFromBuild(PRESETS[0].build), name: 'Striker' }, ATTACK);
+  assert.ok(allBuilds().length > 100, 'the parts should allow over a hundred builds');
+  const plain = arenaWith({ pockets: [], rails: [] });
+  const r = plain.radius;
+  // Upper: a lifted top clears a standard wall at a speed that would otherwise bounce back.
+  const over = (lifted: boolean) => {
+    plain.reset();
+    const t = new Top(ATTACK);
+    const idle = new Top(DEFENSE);
+    idle.state = 'toppled';
+    t.launch(r - ATTACK.radius - 0.002, 0, 0.95, 0, 1, 1);
+    if (lifted) t.lifted = 0.4;
+    step(plain, t, idle);
+    return t.state === 'out';
+  };
+  assert.ok(!over(false) && over(true), 'an upper hit should let a top clear the wall more easily');
+  // Height: in a head-on clash the taller top is knocked back harder.
+  const clash = (ha: number, hb: number) => {
+    plain.reset();
+    const a = new Top({ ...ATTACK, height: ha });
+    const b = new Top({ ...ATTACK, height: hb });
+    a.launch(-0.03, 0, 0.3, 0, 1, 1);
+    b.launch(0.03, 0, -0.3, 0, 1, -1);
+    for (let i = 0; i < 60 && Math.hypot(b.vx, b.vz) > 0 && b.vx < 0; i++) step(plain, a, b);
+    return b.vx;
+  };
+  assert.ok(clash(0.005, 0.008) > clash(0.006, 0.006), 'a lower top should knock a taller one back harder');
+  // Spin direction: opposite spins pass spin from the faster top to the slower one; same spins both lose.
+  const spinAfter = (hb: number) => {
+    plain.reset();
+    const a = new Top(DEFENSE);
+    const b = new Top(DEFENSE);
+    a.launch(-0.032, 0, 0.2, 0, 1, 1);
+    b.launch(0.032, 0, -0.2, 0, 0.5, hb);
+    for (let i = 0; i < 5; i++) step(plain, a, b);
+    return b.spin;
+  };
+  assert.ok(spinAfter(-1) > spinAfter(1), 'the slower top should gain spin from an opposite spinner');
+  // Gear: a tip without gear never dashes on a rail.
+  const rails = arenaWith({ pockets: [] });
+  const t = new Top({ ...ATTACK, gear: 0 });
+  t.launch(rails.radius - ATTACK.radius - 0.001, 0, 0.3, 0, 1, 1);
+  const idle = new Top(DEFENSE);
+  idle.state = 'toppled';
+  solo(rails, t, 0.05);
+  assert.equal(t.sinceDash > 50, true, 'a gearless tip must not dash');
 }
 
 console.log('sim-check: all passed');
