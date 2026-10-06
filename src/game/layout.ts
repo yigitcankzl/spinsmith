@@ -35,6 +35,8 @@ export interface Pillar {
 
 export interface ArenaLayout {
   name: string;
+  /** The arena's main rule in a few words, shown before a match (built-in arenas). */
+  rule?: string;
   theme: Theme;
   /** Arena radius in meters (the long side for an oval). 0.12 to 0.18 fits a seated reach. */
   radius: number;

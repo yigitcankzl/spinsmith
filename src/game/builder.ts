@@ -365,6 +365,8 @@ export class Builder {
   open(from: ArenaLayout) {
     this.draft = cloneLayout(from);
     this.draft.name = 'My Arena';
+    // A built-in arena's rule does not describe the player's own.
+    delete this.draft.rule;
     this.root.visible = true;
     this.tray.visible = true;
     this.held = null;

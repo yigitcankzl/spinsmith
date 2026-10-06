@@ -11,6 +11,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // The balanced learning arena.
     name: 'Forge Bowl',
+    rule: 'Balanced bowl: four pockets, four dash rails',
     theme: 'forge',
     radius: 0.15,
     shape: 'circle',
@@ -28,6 +29,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // Small and fast: a tornado ridge to race on, low walls and wide exits, embers closing in.
     name: 'Ember Ring',
+    rule: 'Small and fast: embers close in after 12 s',
     theme: 'forge',
     radius: 0.12,
     shape: 'circle',
@@ -45,6 +47,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // A dish that rocks under the tops: the heavy side dips and flings the light side.
     name: 'Zero-G Dish',
+    rule: 'The dish tips under weight: long spinners thrive',
     theme: 'stone',
     radius: 0.16,
     shape: 'circle',
@@ -62,6 +65,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // Big and tall: a central hill on a turntable, four pillars, and a high wall to climb.
     name: 'Clockwork Spire',
+    rule: 'High walls, a turning hill: no ring-outs',
     theme: 'clockwork',
     radius: 0.17,
     shape: 'circle',
@@ -79,6 +83,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // A slippery ice oval with long side rails and a vortex in the middle.
     name: 'Frost Oval',
+    rule: 'Ice: tips barely grip, a vortex in the middle',
     theme: 'ice',
     radius: 0.17,
     shape: 'oval',
@@ -96,6 +101,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // Sumo: no walls at all, just a berm at the edge; a sunken middle below a terrace, and pinball bumpers.
     name: 'Sumo Square',
+    rule: 'No walls: push the rival off the edge',
     theme: 'stone',
     radius: 0.16,
     shape: 'square',

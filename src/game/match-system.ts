@@ -724,7 +724,7 @@ export class MatchSystem extends createSystem({
     this.cord.set(null);
     // The scoreboard on the wall shows the match; the card over the arena only the round's messages,
     // and at a match's start, who the rival is and how it plays.
-    if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name}\n${this.rival.style}`);
+    if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name} · ${this.rival.style}\n${this.arena.layout.rule ?? this.arena.layout.name}`);
     else this.label.set('');
     this.wall.setMode('match');
     this.barMessage = 'READY';
