@@ -18,6 +18,8 @@ const VIRTUAL_DISTANCE = 1.6;
 const MIN_DISTANCE = 0.7;
 const MAX_DISTANCE = 4;
 
+export type WallMode = 'home' | 'forge' | 'workshop' | 'match';
+
 export interface WallPlane {
   /** Center and unit normal, world space. */
   center: Vector3;
@@ -61,14 +63,16 @@ export class Wall {
     sign.position.set(0, HEIGHT / 2 - 0.1, 0.02);
     this.tools.position.set(-WIDTH / 4 - 0.02, -0.07, 0.02);
     this.cardSpot.position.set(WIDTH / 4 + 0.03, 0.12, 0.03);
-    this.arenas.position.set(WIDTH / 4 + 0.03, -0.3, 0.02);
+    // The arena shelf takes the left half at home, where the tool panel hangs otherwise.
+    this.arenas.position.set(-WIDTH / 4 - 0.02, 0.05, 0.02);
+    this.arenas.scale.setScalar(1.3);
     // The scoreboard: a slate in the right half.
     this.canvas.width = 1024;
     this.canvas.height = 420;
     this.tex = new CanvasTexture(this.canvas);
     this.tex.colorSpace = SRGBColorSpace;
     this.board = new Mesh(new PlaneGeometry(0.72, 0.295), new MeshBasicMaterial({ map: this.tex, transparent: true }));
-    this.board.position.set(WIDTH / 4 + 0.03, 0.17, 0.021);
+    this.board.position.set(WIDTH / 4 + 0.03, 0.12, 0.021);
     this.root.add(back, ...frame, sign, this.board, this.tools, this.arenas, this.cardSpot);
     this.root.visible = false;
     this.score(['SpinSmith']);
@@ -126,9 +130,25 @@ export class Wall {
     this.tex.needsUpdate = true;
   }
 
-  /** The scoreboard hides while the forge's stats card hangs in its place. */
-  showScore(on: boolean) {
-    this.board.visible = on;
+  /**
+   * Shows only what the current activity needs:
+   * - home: the arena shelf on the left (pick an arena), the scoreboard on the right;
+   * - forge: the tool panel with the top's parts on the left, the stats card on the right;
+   * - workshop: the tool panel with the workshop's board on the left, the scoreboard (help) right;
+   * - match: the scoreboard alone, large, in the middle.
+   */
+  setMode(mode: WallMode) {
+    this.tools.visible = mode === 'forge' || mode === 'workshop';
+    this.arenas.visible = mode === 'home';
+    this.cardSpot.visible = mode === 'forge';
+    this.board.visible = mode !== 'forge';
+    if (mode === 'match') {
+      this.board.position.set(0, -0.02, 0.021);
+      this.board.scale.setScalar(1.9);
+    } else {
+      this.board.position.set(WIDTH / 4 + 0.03, 0.12, 0.021);
+      this.board.scale.setScalar(1);
+    }
   }
 }
 

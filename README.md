@@ -17,8 +17,9 @@ What works:
 - **The room is the smithy** (`src/game/wall.ts`, `src/game/hub.ts`): the arena sits on your
   table, drawn twice its simulation size (about 60 cm across). The smithy wall hangs on the
   real wall straight ahead (a detected wall plane, or a virtual wall 1.6 m ahead), larger the
-  farther it is: a SPINSMITH sign, the forge's tool panel on the left, a scoreboard on the right
-  and the arena shelf below it. Point at anything on the wall and pinch: it flies to your hand.
+  farther it is, with a SPINSMITH sign, and it shows only what you are doing: at home the arena
+  shelf and the scoreboard; in the forge the top's parts and the stats card; in the workshop the
+  arena pieces and a short help; in a match a large scoreboard alone. Point at anything on the wall and pinch: it flies to your hand.
   On the table, your top waits on a stand at the arena's left (carry it into the arena or tap it
   to play) and an anvil at its right holds your top (pinch it to forge). Carry an arena miniature
   from the wall onto the arena (or tap it) to switch; the blueprint opens the workshop, whose

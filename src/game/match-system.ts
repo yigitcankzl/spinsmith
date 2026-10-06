@@ -10,7 +10,7 @@ import { Forge, loadBuild } from './forge.js';
 import { Hub } from './hub.js';
 import { Wall } from './wall.js';
 import type { WallPlane } from './wall.js';
-import { allBuilds, PRESETS, roleOf, specFromBuild } from './parts.js';
+import { allBuilds, buildName, PRESETS, roleOf, specFromBuild } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, Cord, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
 
@@ -395,7 +395,8 @@ export class MatchSystem extends createSystem({
     this.mine.state = 'out';
     this.hub.show(this.arenas, this.arenaIndex, this.myBuild);
     this.label.set('');
-    this.wall.score(['SpinSmith', this.arena.layout.name, 'Put your top in the arena to play']);
+    this.wall.setMode('home');
+    this.wall.score(['SpinSmith', this.arena.layout.name, 'Pick an arena on the shelf · put your top in the arena to play']);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
@@ -432,6 +433,7 @@ export class MatchSystem extends createSystem({
     for (const top of this.tops) top.state = 'out';
     // The forge is its own place: the arena hides while you build.
     this.stage.visible = false;
+    this.wall.setMode('forge');
     this.forge.open();
   }
 
@@ -446,6 +448,8 @@ export class MatchSystem extends createSystem({
   /** Forge Test: your build against a random one, launched by the AI; back to the forge after. */
   private testBuild(build: TopBuild) {
     this.forge.root.visible = false;
+    this.wall.setMode('match');
+    this.wall.score(['Test round', buildName(build)]);
     this.stage.visible = true;
     this.demo = true;
     this.demoFrom = 'forge';
@@ -490,6 +494,8 @@ export class MatchSystem extends createSystem({
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.forge.showShelf(false);
+    this.wall.setMode('workshop');
+    this.wall.score(['Arena workshop', 'Pinch a piece on the wall and drop it on the arena', 'Try it, Save & play or Back on the board']);
     this.builder.open(this.arena.layout);
   }
 
@@ -519,6 +525,7 @@ export class MatchSystem extends createSystem({
     for (const top of this.tops) top.state = 'out';
     this.arena.reset();
     if (this.demoFrom === 'forge') {
+      this.wall.setMode('forge');
       this.forge.root.visible = true;
       this.stage.visible = false;
     }
@@ -660,6 +667,7 @@ export class MatchSystem extends createSystem({
     this.cord.set(null);
     // The scoreboard on the wall shows the match; the card over the arena only the round's messages.
     this.label.set('');
+    this.wall.setMode('match');
     this.wall.score([`You ${this.myPoints} - ${this.theirPoints} Rival`, `${this.mine.spec.name} vs ${this.theirs.spec.name}`, `${this.arena.layout.name} · first to ${MATCH_POINTS}`]);
   }
 

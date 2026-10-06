@@ -205,7 +205,6 @@ export class Forge {
     this.rebuildDisplay();
     this.root.visible = true;
     this.card.mesh.visible = true;
-    this.wall.showScore(false);
     this.dropAll();
     this.say('Pick up your top, or bring it a part from the shelf');
     this.logPending = true;
@@ -214,7 +213,6 @@ export class Forge {
   close() {
     this.root.visible = false;
     this.card.mesh.visible = false;
-    this.wall.showScore(true);
     this.dropAll();
   }
 
