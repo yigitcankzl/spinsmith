@@ -67,17 +67,23 @@ reshape the arena to win.*
 
 | Time | Shot | On screen |
 |---|---|---|
-| 0:00-0:08 | Over the shoulder: a real table, the arena appears on it | Title: SpinSmith |
-| 0:08-0:18 | The arena transforms into the forge; hands pinch a tip from the drawer and press it onto the top | "Forge it by hand" |
+| 0:00-0:08 | Cold open on a real wooden table: a ramp throws the rival over the wall, it lands on the table beside the arena, skids and falls over (slow motion) | YOUR RAMP → THROWN |
+| 0:08-0:12 | Over the shoulder: the whole arena on the table | Title: SpinSmith |
+| 0:12-0:18 | The arena transforms into the forge; hands pinch a tip from the drawer and press it onto the top | "Forge it by hand" |
 | 0:18-0:28 | Pinch and pull back; the top rips into the arena | "Rip it into your real table" |
 | 0:28-0:40 | Pinch the floor, lift and pull: a ramp throws the rival into a slag pit | "Reshape the arena to win" · YOUR RAMP → SLAG |
 | 0:40-0:45 | XP fills, LEVEL 2, a new part spins over the arena | Rematch |
 | 0:45-0:55 | Home: the Smith's board with today's order; pinch it, ramp the rival out, ORDER DONE and a stamp strikes the ledger | A new order every day |
 | 0:55-1:15 | The well: holding a stamina top in the middle against an attacker | Two verbs: ramp and well |
-| 1:15-1:45 | Three arenas in quick cuts: embers closing in, the tipping dish, the sumo square | Six arenas |
+| 1:15-1:25 | Hookjaw ramps you: the cyan ramp, THEIR RAMP → SLAG | Rivals use the arena too |
+| 1:25-1:45 | Three arenas in quick cuts: embers closing in, the tipping dish, the sumo square | Six arenas |
 | 1:45-2:15 | Forge close-ups: rings, cores, tips; stats changing as parts click in | 136 builds |
 | 2:15-2:40 | A full round from the pull to a shatter | |
 | 2:40-2:50 | End card: logo, "Play in the Quest browser", the link | |
+
+Capture: on a Quest in passthrough, daylight, a real wooden table, in-headset audio; two takes
+per shot; use `?demo` for the progression shots and dev key `H` (dev build) or a level-6 save for
+Hookjaw.
 
 ## Still to do
 
