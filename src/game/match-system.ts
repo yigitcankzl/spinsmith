@@ -96,12 +96,10 @@ export class MatchSystem extends createSystem({
   /** The forge: build your own top from parts. */
   private forge = new Forge({
     done: (build) => this.leaveForge(build),
-    test: (build) => this.testBuild(build),
   }, this.wall);
-  /** A demo round (workshop Try it, forge Test): AI launches, no score, then back where it came from. */
+  /** A demo round from the workshop's Try it: AI launches, no score, then back to the workshop. */
   private demo = false;
   private hubLogPending = false;
-  private demoFrom: 'build' | 'forge' = 'build';
   /** The word in the middle of the wall's match bar. */
   private barMessage = '';
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
@@ -439,18 +437,6 @@ export class MatchSystem extends createSystem({
     this.toHub();
   }
 
-  /** Forge Test: your build against a random one, launched by the AI; back to the forge after. */
-  private testBuild(build: TopBuild) {
-    this.forge.root.visible = false;
-    this.wall.setMode('match');
-    this.barMessage = 'TEST';
-    this.stage.visible = true;
-    this.demo = true;
-    this.demoFrom = 'forge';
-    this.setBuilds(build, this.randomBuild());
-    this.launch(0.6 + Math.random() * 0.35, (Math.random() - 0.5) * 0.6);
-  }
-
   /** Builds both sides' fight stats and views (views only rebuild when a build changed). */
   private setBuilds(mine: TopBuild, theirs: TopBuild) {
     this.mine.spec = specFromBuild(mine);
@@ -506,7 +492,6 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.visible = false;
     this.arena.reset(layout);
     this.demo = true;
-    this.demoFrom = 'build';
     this.setBuilds(this.randomBuild(), this.randomBuild());
     this.launch(0.6 + Math.random() * 0.35, (Math.random() - 0.5) * 0.6);
   }
@@ -514,15 +499,10 @@ export class MatchSystem extends createSystem({
   /** Back to the workshop or the forge after a demo round. */
   private endDemo() {
     this.demo = false;
-    this.phase = this.demoFrom;
+    this.phase = 'build';
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     this.arena.reset();
-    if (this.demoFrom === 'forge') {
-      this.wall.setMode('forge');
-      this.forge.root.visible = true;
-      this.stage.visible = false;
-    }
   }
 
   /**

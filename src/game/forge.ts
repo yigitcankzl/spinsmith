@@ -9,8 +9,7 @@
  *   top comes apart to show where it goes and that slot pulses; let go to fit it with a clack. The
  *   old part goes back to the shelf. Builds over the weight limit are refused.
  * - Tap a paint pot (or dip the top into it) to paint the top; spin tokens set its spin direction.
- * - Lower the top into the TEST ring on the table to test it in a round; dunk it in the quench
- *   bucket to save and go home.
+ * - Dunk the top in the quench bucket to save it and go home.
  */
 import {
   BoxGeometry,
@@ -95,9 +94,6 @@ const DISPLAY_SCALE = 1.8;
 const FLOAT_AHEAD = 0.35;
 const FLOAT_RIGHT = 0.22;
 const FLOAT_BELOW = 0.2;
-/** The TEST ring on the table: a top released inside it, this low, starts a test round (arena-local). */
-const TEST_R = 0.15;
-const TEST_HEIGHT = 0.14;
 /** A carried part makes the top come apart within this distance, and fits within SNAP (world m). */
 const EXPLODE_R = 0.3;
 const SNAP = 0.15;
@@ -120,8 +116,6 @@ interface Slot {
 export interface ForgeHooks {
   /** Save the build and go back. */
   done(build: TopBuild): void;
-  /** Watch your build fight a round. */
-  test(build: TopBuild): void;
 }
 
 type Target = { kind: 'slot'; slot: Slot } | { kind: 'top' } | { kind: 'bucket' };
@@ -176,16 +170,8 @@ export class Forge {
     this.buildShelf();
     this.wall.tools.add(this.shelf);
     this.buildBucket();
-    // A ring of light under the floating top, and the TEST ring where the arena stands.
+    // A ring of light under the floating top.
     this.halo = new Mesh(new TorusGeometry(0.035, 0.0018, 8, 48).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.8 }));
-    const test = new Group();
-    const ring = new Mesh(new TorusGeometry(TEST_R, 0.004, 8, 64).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0x6fd3ff, transparent: true, opacity: 0.85 }));
-    ring.position.y = 0.004;
-    const disc = new Mesh(new CircleGeometry(TEST_R, 48).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x6fd3ff, transparent: true, opacity: 0.12, depthWrite: false }));
-    disc.position.y = 0.002;
-    const testTag = tag('TEST: drop your top here', 0.16, 40);
-    testTag.position.set(0, 0.03, -TEST_R + 0.02);
-    test.add(ring, disc, testTag);
     this.displayHolder.position.copy(this.floatSpot);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
     this.displayTilt.rotation.x = 0.6;
@@ -194,7 +180,7 @@ export class Forge {
     this.card.mesh.scale.setScalar(3.6);
     this.card.mesh.visible = false;
     this.wall.cardSpot.add(this.card.mesh);
-    this.root.add(this.bucket, test, this.halo, this.displayHolder);
+    this.root.add(this.bucket, this.halo, this.displayHolder);
     this.rebuildDisplay();
     this.root.visible = false;
   }
@@ -293,7 +279,7 @@ export class Forge {
       if (this.heldTop) return;
       this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone() };
       playPick();
-      this.say('Move it anywhere and let go: it stays. TEST ring to test, bucket to save');
+      this.say('Move it anywhere and let go: it stays. Dunk it in the bucket to save');
       return;
     }
     if (this.heldPart) return;
@@ -332,12 +318,6 @@ export class Forge {
     this.heldTop = null;
     this.bucket.getWorldPosition(this.p);
     if (at.distanceTo(this.p) < DIP * 1.5) return this.save();
-    const local = this.root.worldToLocal(this.q.copy(at));
-    if (Math.hypot(local.x, local.z) < TEST_R + 0.03 && local.y < TEST_HEIGHT) {
-      playPlace();
-      this.hooks.test(this.build);
-      return;
-    }
     // Left anywhere else, it floats right there.
     this.floatSpot.copy(this.displayHolder.position);
     playPlace();
