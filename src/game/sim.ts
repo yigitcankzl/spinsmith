@@ -38,11 +38,11 @@ const TILT_WEIGHT = 2.5;
 const TILT_SPRING = 18;
 const TILT_DAMP = 3;
 /** Shrinking ring: starts after this many seconds and closes to this fraction of the radius. */
-const SHRINK_START = 12;
+const SHRINK_START = 16;
 const SHRINK_TIME = 15;
 const SHRINK_MIN = 0.45;
 /** Spin drained per second while standing in the embers outside the safe zone. */
-const EMBER_DRAIN = 0.35;
+const EMBER_DRAIN = 0.2;
 /** Height of the edge berm on arenas without a wall (m). */
 const BERM = 0.02;
 /** Ice: the tip barely grips, so the drive and the orbit are weaker. */

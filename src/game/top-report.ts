@@ -14,20 +14,24 @@ export interface TopReport {
   parts: Record<string, number>;
 }
 
-/** Deterministic: same parts, same report. */
-export function reportTops(opponents = 24, arenas = [ARENAS[0], ARENAS[3]]): TopReport {
-  let seed = 23;
-  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+/**
+ * Plays builds [start, end) against random opponents on the given arenas and counts wins and games
+ * for every build involved. Each build's rounds use their own seed, so splitting the builds across
+ * workers gives the same totals as one run.
+ */
+export function playBuilds(start: number, end: number, opponents: number, arenas = ARENAS): { wins: number[]; games: number[] } {
   const builds = allBuilds();
   const specs = builds.map(specFromBuild);
   const wins = builds.map(() => 0);
   const games = builds.map(() => 0);
   const a = new Top(specs[0]);
   const b = new Top(specs[0]);
-  for (const layout of arenas) {
+  arenas.forEach((layout, ai) => {
     const arena = new Arena(layout);
-    const spawn = layout.radius * 0.72;
-    for (let i = 0; i < builds.length; i++) {
+    const spawn = layout.shape === 'oval' ? layout.radius * 0.78 * 0.72 : layout.radius * 0.72;
+    for (let i = start; i < end; i++) {
+      let seed = 23 + i * 7919 + ai * 104729;
+      const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
       for (let k = 0; k < opponents; k++) {
         const j = Math.floor(rnd() * builds.length);
         if (j === i) continue;
@@ -35,7 +39,6 @@ export function reportTops(opponents = 24, arenas = [ARENAS[0], ARENAS[3]]): Top
         a.spec = specs[i];
         b.spec = specs[j];
         // Half the rounds with both spinning the same way.
-        const ha = 1;
         const hb = rnd() < 0.5 ? -1 : 1;
         const pa = 0.5 + rnd() * 0.5;
         const pb = 0.5 + rnd() * 0.5;
@@ -43,7 +46,7 @@ export function reportTops(opponents = 24, arenas = [ARENAS[0], ARENAS[3]]): Top
         const db = LAUNCH_TILT + (rnd() - 0.5) * 0.8;
         const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa);
         const sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
-        a.launch(0, spawn, Math.sin(da) * sa * ha, -Math.cos(da) * sa, 0.55 + 0.45 * pa, ha);
+        a.launch(0, spawn, Math.sin(da) * sa, -Math.cos(da) * sa, 0.55 + 0.45 * pa, 1);
         b.launch(0, -spawn, Math.sin(db) * sb * hb, Math.cos(db) * sb, 0.55 + 0.45 * pb, hb);
         let t = 0;
         while (verdict(a, b, t) === 0) {
@@ -58,7 +61,13 @@ export function reportTops(opponents = 24, arenas = [ARENAS[0], ARENAS[3]]): Top
         else wins[j]++;
       }
     }
-  }
+  });
+  return { wins, games };
+}
+
+/** Win rates per build and per part from summed wins and games. */
+export function summarize(wins: number[], games: number[]): TopReport {
+  const builds = allBuilds();
   const win = builds.map((_, i) => wins[i] / (games[i] || 1));
   const parts: Record<string, number> = {};
   const avg = (pick: (b: TopBuild) => boolean) => {
@@ -72,6 +81,12 @@ export function reportTops(opponents = 24, arenas = [ARENAS[0], ARENAS[3]]): Top
     builds: builds.map((build, i) => ({ build, win: win[i] })).sort((p, q) => q.win - p.win),
     parts,
   };
+}
+
+/** Single-threaded report on every arena (scripts/top-report.ts runs the same work in parallel). */
+export function reportTops(opponents = 24): TopReport {
+  const { wins, games } = playBuilds(0, allBuilds().length, opponents);
+  return summarize(wins, games);
 }
 
 /**

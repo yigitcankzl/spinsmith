@@ -3,7 +3,8 @@ import { reportArena, arenaWarning } from '../src/game/arena-report.ts';
 import { ARENAS } from '../src/game/arenas.ts';
 
 for (const layout of ARENAS) {
-  const r = reportArena(layout, 20);
+  // 48 rounds per type pair: with fewer, a type's win rate swings by 10 points from noise.
+  const r = reportArena(layout, 48);
   const types = Object.entries(r.typeWin)
     .map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`)
     .join(', ');

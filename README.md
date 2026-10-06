@@ -40,7 +40,7 @@ What works:
   floor (bowl, flat, hill, tornado ridge, two tiers), wall (low, standard, high and climbable,
   none with a sumo berm), pockets with 2 or 3 points, dash rails, pillars and pinball bumpers,
   a center vortex, a turntable, a rocking dish that tips under the tops' weight, a ring of
-  embers that closes in after 12 s, and a theme (forge, stone, clockwork, ice; ice is
+  embers that closes in after 16 s, and a theme (forge, stone, clockwork, ice; ice is
   slippery).
 - **Six built-in arenas** (`src/game/arenas.ts`) that together use every knob: Forge Bowl,
   Ember Ring, Zero-G Dish, Clockwork Spire, Frost Oval and Sumo Square. Pick the arena on the home

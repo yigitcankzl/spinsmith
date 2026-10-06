@@ -133,7 +133,7 @@ export const RINGS: Ring[] = [
     id: 'cog',
     name: 'Cog',
     radius: 0.026,
-    punch: 0.74,
+    punch: 0.8,
     knockback: 0.8,
     burstResist: 1.1,
     contact: 'grind',
