@@ -1,22 +1,19 @@
 /**
- * Pure fight simulation: a heightmap arena and spinning tops on it.
+ * Pure fight simulation: an arena built from an ArenaLayout, and spinning tops on it.
  * No three.js here so it can be stepped and checked headlessly.
  * All units are meters and seconds; coordinates are arena-local (center at 0,0).
  */
+import type { ArenaLayout } from './layout.ts';
+import {
+  MAX_RADIUS,
+  normRadius,
+  pocketAt,
+  railAt,
+  rimNormal,
+  rimRadius,
+} from './layout.ts';
+import { ARENAS } from './arenas.ts';
 
-export const ARENA_RADIUS = 0.15;
-
-/**
- * Stadium layout, symmetric for both players (player at +Z, opponent at -Z):
- * a wall around the rim with four pockets on the diagonals and dash rails on the rim between them.
- * Angles are atan2(z, x) in radians.
- */
-export const POCKETS = [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4];
-/** Half-angle of a pocket opening (~6 cm wide at the rim). */
-export const POCKET_HALF = 0.2;
-/** Dash rails between the pockets (sides, and the rim behind each launch spot): center angle and half-angle. */
-export const RAILS = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
-export const RAIL_HALF = 0.45;
 /** Floor dips toward a pocket over this outer band of the radius. */
 const POCKET_BAND = 0.25;
 const POCKET_DEPTH = 0.003;
@@ -25,28 +22,40 @@ const POCKET_DEPTH = 0.003;
  * along the rim passes over the mouth, a hit or a bump sends it in.
  */
 export const POCKET_SPEED = 0.2;
-/** Hitting the wall faster than this (m/s, outward) sends a top over it. */
-const WALL_ESCAPE = 1.1;
-const WALL_BOUNCE = 0.55;
+/** Outward speed (m/s) that carries a top over each kind of wall; high walls are never cleared. */
+const WALL_ESCAPE = { low: 0.7, standard: 1.1, high: Infinity, none: 0 };
+const WALL_BOUNCE = { low: 0.5, standard: 0.55, high: 0.8, none: 0 };
+/** A high wall throws a top that climbed it back toward the middle (m/s). */
+const HIGH_WALL_DROP = 0.18;
 /** Rail dash: speed and the cooldown before the same top can dash again. */
 const DASH_SPEED = 1.1;
 const DASH_COOLDOWN = 1.0;
+/** Pillars deflect; bumpers kick away at this speed (m/s). */
+const PILLAR_BOUNCE = 0.8;
+const BUMPER_KICK = 0.3;
+/** Center features cover this fraction of the radius. */
+const CENTER_ZONE = 0.32;
+/** Turntable grip on a top standing on it (1/s). */
+const SPINNER_GRIP = 3;
+/** Rocking dish: how hard the tops' weight tips it, and its spring and damping. */
+const TILT_WEIGHT = 2.5;
+const TILT_SPRING = 18;
+const TILT_DAMP = 3;
+/** Shrinking ring: starts after this many seconds and closes to this fraction of the radius. */
+const SHRINK_START = 12;
+const SHRINK_TIME = 15;
+const SHRINK_MIN = 0.45;
+/** Spin drained per second while standing in the embers outside the safe zone. */
+const EMBER_DRAIN = 0.35;
+/** Height of the edge berm on arenas without a wall (m). */
+const BERM = 0.02;
+/** Ice: the tip barely grips, so the drive and the orbit are weaker. */
+const ICE_GRIP = 0.45;
 
-/** Smallest angle between two angles (radians). */
-function angleGap(a: number, b: number) {
-  const d = Math.abs(a - b) % (Math.PI * 2);
-  return d > Math.PI ? Math.PI * 2 - d : d;
-}
-
-export function inPocket(angle: number) {
-  return POCKETS.some((p) => angleGap(angle, p) < POCKET_HALF);
-}
-
-export function onRail(angle: number) {
-  return RAILS.some((r) => angleGap(angle, r) < RAIL_HALF);
-}
-const GRID = 32;
-const CELL = (2 * ARENA_RADIUS) / (GRID - 1);
+/** The heightmap grid covers the largest arena. */
+const GRID = 44;
+const EXTENT = MAX_RADIUS + 0.01;
+const CELL = (2 * EXTENT) / (GRID - 1);
 /** Shapes the player makes flatten back with this time constant (~2-3 s to vanish). */
 const RELAX_TAU = 0.8;
 const GRAVITY = 9.81;
@@ -60,8 +69,6 @@ export const TUNING = {
   spinHit: 0.046,
   /** Burst damage per unit of impulse (before the top's burst resistance). */
   burst: 0.37,
-  /** Bowl rise at the rim (m): tops roll toward the center, so they meet. */
-  bowl: 0.011,
   /** How strongly a spinning tip turns radial motion into an orbit around the center (1/s). */
   orbit: 1.44,
 };
@@ -80,33 +87,86 @@ export const LAUNCH_SPEED = 0.5;
 export const LAUNCH_TILT = 0.75;
 
 export class Arena {
-  /** Player-made shape layer, added on top of the bowl. */
+  layout: ArenaLayout;
+  /** Player-made shape layer, added on top of the floor. */
   readonly shape = new Float32Array(GRID * GRID);
+  /** Rocking dish: current tilt (radians around the x and z axes) and its rate. */
+  tiltX = 0;
+  tiltZ = 0;
+  private tiltVX = 0;
+  private tiltVZ = 0;
+  /** Fight clock, for the shrinking ring. */
+  elapsed = 0;
 
-  /** Height of the arena surface at (x, z). */
+  constructor(layout: ArenaLayout = ARENAS[0]) {
+    this.layout = layout;
+  }
+
+  get radius() {
+    return this.layout.radius;
+  }
+
+  /** Safe zone radius as a fraction of the rim (1 = whole arena). */
+  get safe(): number {
+    if (!this.layout.shrink || this.elapsed < SHRINK_START) return 1;
+    const k = Math.min(1, (this.elapsed - SHRINK_START) / SHRINK_TIME);
+    return 1 - (1 - SHRINK_MIN) * k;
+  }
+
+  /** True when (x, z) is inside the rim. */
+  inside(x: number, z: number) {
+    return normRadius(this.layout, x, z) < 1;
+  }
+
+  /** Height of the floor at (x, z), before tilt. */
   height(x: number, z: number): number {
-    const r2 = (x * x + z * z) / (ARENA_RADIUS * ARENA_RADIUS);
-    return TUNING.bowl * r2 + this.pocketDip(x, z) + this.shapeHeight(x, z);
+    return this.floorHeight(normRadius(this.layout, x, z)) + this.pocketDip(x, z) + this.shapeHeight(x, z);
+  }
+
+  /** Floor profile by normalized radius. */
+  floorHeight(n: number): number {
+    // Without a wall, a raised berm at the edge (like a sumo ring's bales) holds tops in unless hit hard.
+    const berm = this.layout.wall === 'none' ? BERM * smoothstep(0.8, 1, n) : 0;
+    return this.profile(Math.min(n, 1.05)) + berm;
+  }
+
+  private profile(r: number): number {
+    const L = this.layout;
+    switch (L.floor) {
+      case 'flat':
+        return L.depth * 0.25 * r * r;
+      case 'hill':
+        // A raised middle that sheds tops toward the rim, inside a shallow bowl.
+        return L.depth * 0.4 * r * r + L.depth * Math.max(0, 1 - r / 0.5) ** 2;
+      case 'ridge':
+        // A bowl with a raised ring to race around without flying out.
+        return L.depth * r * r + L.depth * 0.6 * Math.exp(-(((r - 0.68) / 0.09) ** 2));
+      case 'tiers':
+        // Two levels: a raised outer terrace around a sunken middle, joined by a short step.
+        return L.depth * 0.3 * r * r + L.depth * smoothstep(0.45, 0.6, r);
+      default:
+        return L.depth * r * r;
+    }
   }
 
   /** The floor slopes down into each pocket near the rim, so a top close to a pocket drifts in. */
   pocketDip(x: number, z: number): number {
-    const r = Math.hypot(x, z) / ARENA_RADIUS;
-    if (r < 1 - POCKET_BAND) return 0;
+    const n = normRadius(this.layout, x, z);
+    if (n < 1 - POCKET_BAND) return 0;
     const angle = Math.atan2(z, x);
     let dip = 0;
-    for (const p of POCKETS) {
-      const g = angleGap(angle, p) / (POCKET_HALF * 1.6);
-      if (g < 1) dip = Math.max(dip, (1 - g * g) * ((r - (1 - POCKET_BAND)) / POCKET_BAND));
+    for (const p of this.layout.pockets) {
+      const d = Math.abs(Math.atan2(Math.sin(angle - p.angle), Math.cos(angle - p.angle))) / (p.half * 1.6);
+      if (d < 1) dip = Math.max(dip, (1 - d * d) * ((n - (1 - POCKET_BAND)) / POCKET_BAND));
     }
     return -POCKET_DEPTH * dip;
   }
 
-  /** Surface slope (dh/dx, dh/dz) written into out. */
+  /** Surface slope (dh/dx, dh/dz) written into out, including the dish tilt. */
   slope(x: number, z: number, out: { x: number; z: number }) {
     const e = CELL * 0.5;
-    out.x = (this.height(x + e, z) - this.height(x - e, z)) / (2 * e);
-    out.z = (this.height(x, z + e) - this.height(x, z - e)) / (2 * e);
+    out.x = (this.height(x + e, z) - this.height(x - e, z)) / (2 * e) + this.tiltZ;
+    out.z = (this.height(x, z + e) - this.height(x, z - e)) / (2 * e) - this.tiltX;
   }
 
   /**
@@ -115,12 +175,12 @@ export class Arena {
    */
   stamp(x: number, z: number, amplitude: number, sigma = 0.035) {
     const reach = Math.ceil((sigma * 2.5) / CELL);
-    const ci = Math.round((x + ARENA_RADIUS) / CELL);
-    const cj = Math.round((z + ARENA_RADIUS) / CELL);
+    const ci = Math.round((x + EXTENT) / CELL);
+    const cj = Math.round((z + EXTENT) / CELL);
     for (let j = Math.max(0, cj - reach); j <= Math.min(GRID - 1, cj + reach); j++) {
       for (let i = Math.max(0, ci - reach); i <= Math.min(GRID - 1, ci + reach); i++) {
-        const dx = i * CELL - ARENA_RADIUS - x;
-        const dz = j * CELL - ARENA_RADIUS - z;
+        const dx = i * CELL - EXTENT - x;
+        const dz = j * CELL - EXTENT - z;
         const v = amplitude * Math.exp(-(dx * dx + dz * dz) / (sigma * sigma));
         const k = j * GRID + i;
         this.shape[k] = amplitude > 0 ? Math.max(this.shape[k], v) : Math.min(this.shape[k], v);
@@ -128,9 +188,30 @@ export class Arena {
     }
   }
 
-  relax(dt: number) {
+  /** Per-step arena update: shapes relax, the dish rocks under the tops' weight. */
+  update(dt: number, a: Top, b: Top) {
+    this.elapsed += dt;
     const k = Math.exp(-dt / RELAX_TAU);
     for (let i = 0; i < this.shape.length; i++) this.shape[i] *= k;
+    if (this.layout.tilt > 0) {
+      // The dish dips toward where the spinning tops are (rotation about x tips +z down, and so on).
+      const wx = ((a.alive ? a.x : 0) + (b.alive ? b.x : 0)) / this.radius;
+      const wz = ((a.alive ? a.z : 0) + (b.alive ? b.z : 0)) / this.radius;
+      const targetX = Math.max(-1, Math.min(1, wz * TILT_WEIGHT * 0.5)) * this.layout.tilt;
+      const targetZ = Math.max(-1, Math.min(1, -wx * TILT_WEIGHT * 0.5)) * this.layout.tilt;
+      this.tiltVX += ((targetX - this.tiltX) * TILT_SPRING - this.tiltVX * TILT_DAMP) * dt;
+      this.tiltVZ += ((targetZ - this.tiltZ) * TILT_SPRING - this.tiltVZ * TILT_DAMP) * dt;
+      this.tiltX += this.tiltVX * dt;
+      this.tiltZ += this.tiltVZ * dt;
+    }
+  }
+
+  /** Back to a fresh, level arena for a new round (keeps the layout). */
+  reset(layout = this.layout) {
+    this.layout = layout;
+    this.shape.fill(0);
+    this.tiltX = this.tiltZ = this.tiltVX = this.tiltVZ = 0;
+    this.elapsed = 0;
   }
 
   clear() {
@@ -139,8 +220,8 @@ export class Arena {
 
   /** Bilinear sample of the player-made shape layer (bump > 0, dent < 0). */
   shapeHeight(x: number, z: number): number {
-    const fx = Math.min(GRID - 1.001, Math.max(0, (x + ARENA_RADIUS) / CELL));
-    const fz = Math.min(GRID - 1.001, Math.max(0, (z + ARENA_RADIUS) / CELL));
+    const fx = Math.min(GRID - 1.001, Math.max(0, (x + EXTENT) / CELL));
+    const fz = Math.min(GRID - 1.001, Math.max(0, (z + EXTENT) / CELL));
     const i = Math.floor(fx);
     const j = Math.floor(fz);
     const u = fx - i;
@@ -150,6 +231,11 @@ export class Arena {
     const b = s[(j + 1) * GRID + i] * (1 - u) + s[(j + 1) * GRID + i + 1] * u;
     return a * (1 - v) + b * v;
   }
+}
+
+function smoothstep(e0: number, e1: number, x: number) {
+  const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
 }
 
 /** How a top's type and shape translate into behavior. */
@@ -254,8 +340,12 @@ export class Top {
   finish: Finish = null;
   /** Seconds since the last rail dash (large = none recently). */
   sinceDash = 99;
+  /** Seconds since the last bumper kick (large = none recently). */
+  sinceBump = 99;
   /** Accumulated hit damage; at 1 the top bursts apart. */
   damage = 0;
+  /** Points of the pocket it fell into (pockets can be worth 2 or 3). */
+  pocketPoints = 2;
   /** Sign of the curving direction (tops spin opposite ways). */
   hand = 1;
 
@@ -266,7 +356,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, sinceDash: 99, damage: 0, finish: null, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, sinceDash: 99, sinceBump: 99, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -282,9 +372,11 @@ export interface Clash {
 }
 
 const slopeTmp = { x: 0, z: 0 };
+const normalTmp = { x: 0, z: 0 };
 
 /** Advances one fixed step. Returns a clash event when the two tops collided this step. */
 export function step(arena: Arena, a: Top, b: Top, dt = STEP): Clash | null {
+  arena.update(dt, a, b);
   advance(arena, a, b, dt);
   advance(arena, b, a, dt);
   return a.alive && b.alive ? collide(a, b) : null;
@@ -293,6 +385,8 @@ export function step(arena: Arena, a: Top, b: Top, dt = STEP): Clash | null {
 function advance(arena: Arena, t: Top, other: Top, dt: number) {
   if (!t.alive) return;
   const s = t.spec;
+  const L = arena.layout;
+  const grip = L.theme === 'ice' ? ICE_GRIP : 1;
   arena.slope(t.x, t.z, slopeTmp);
   // Gravity along the slope.
   t.vx -= GRAVITY * slopeTmp.x * dt;
@@ -306,21 +400,37 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
     speed = 1e-3;
   }
   // Spinning tip curves the path sideways (stronger while spinning fast).
-  const curve = (s.roam * t.spin * t.hand * dt) / speed;
+  const curve = (s.roam * t.spin * t.hand * dt * grip) / speed;
   const cvx = t.vx;
   t.vx -= t.vz * curve;
   t.vz += cvx * curve;
   // Spinning tops precess around the stadium: the tip turns radial motion into an orbit
   // in the spin direction, so tops circle instead of swinging through the middle like a pendulum.
   const r = Math.hypot(t.x, t.z);
+  const n = normRadius(L, t.x, t.z);
   if (r > 1e-3) {
     const sp = Math.hypot(t.vx, t.vz);
     const tx = (-t.z / r) * t.hand * sp;
     const tz = (t.x / r) * t.hand * sp;
     // Right after a hit the top flies free; the orbit only takes over again as the kick fades.
-    const k = Math.min(1, TUNING.orbit * Math.max(0, t.spin) * (1 - t.kick) * dt);
+    const k = Math.min(1, TUNING.orbit * grip * Math.max(0, t.spin) * (1 - t.kick) * dt);
     t.vx += (tx - t.vx) * k;
     t.vz += (tz - t.vz) * k;
+    if (n < CENTER_ZONE) {
+      // Vortex: a swirl in the middle that whips tops around faster.
+      if (L.vortex > 0) {
+        t.vx += (-t.z / r) * t.hand * L.vortex * dt;
+        t.vz += (t.x / r) * t.hand * L.vortex * dt;
+      }
+      // Turntable: the floor itself turns and drags the top with it.
+      if (L.spinner > 0) {
+        const fx = -t.z * L.spinner;
+        const fz = t.x * L.spinner;
+        const g = Math.min(1, SPINNER_GRIP * dt);
+        t.vx += (fx - t.vx) * g;
+        t.vz += (fz - t.vz) * g;
+      }
+    }
   }
   // Attack types hunt the opponent: their heading turns toward it.
   if (s.seek > 0 && other.alive) {
@@ -328,7 +438,7 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
     const dz = other.z - t.z;
     const d = Math.hypot(dx, dz) || 1;
     const sp = Math.hypot(t.vx, t.vz);
-    const k = Math.min(1, s.seek * Math.max(0, t.spin) * (1 - t.kick) * dt);
+    const k = Math.min(1, s.seek * grip * Math.max(0, t.spin) * (1 - t.kick) * dt);
     t.vx += ((dx / d) * sp - t.vx) * k;
     t.vz += ((dz / d) * sp - t.vz) * k;
   }
@@ -337,9 +447,10 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
     t.vx -= t.x * s.center * dt;
     t.vz -= t.z * s.center * dt;
   }
-  // Tip drive: speed eases toward the cruise speed for the current spin.
+  // Tip drive: speed eases toward the cruise speed for the current spin (weak on ice).
+  speed = Math.hypot(t.vx, t.vz) || 1e-3;
   const target = s.cruise * Math.max(0, t.spin);
-  const k = 1 + ((target - speed) / speed) * Math.min(1, s.drive * dt);
+  const k = 1 + ((target - speed) / speed) * Math.min(1, s.drive * grip * dt);
   t.vx *= k;
   t.vz *= k;
   const v = Math.hypot(t.vx, t.vz);
@@ -349,14 +460,17 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   }
   t.x += t.vx * dt;
   t.z += t.vz * dt;
-  // Spin drains on its own and faster while scraping across the floor.
+  // Spin drains on its own, faster while scraping across the floor, much faster in the embers.
   t.spin -= (s.spinDrain + v * 0.02) * dt;
+  if (n > arena.safe) t.spin -= EMBER_DRAIN * dt;
   // Visual spin, capped so the body stripes never alias into spinning backwards on screen.
   t.angle += (6 + 22 * Math.max(0, t.spin)) * dt * t.hand;
   t.kick *= Math.exp(-6 * dt);
   t.wobble = Math.min(1, Math.max(0, (0.35 - t.spin) / (0.35 - TOPPLE_SPIN)));
   t.sinceDash += dt;
-  wall(t);
+  t.sinceBump += dt;
+  pillars(arena, t);
+  wall(arena, t);
   if (t.alive && t.spin <= TOPPLE_SPIN) {
     t.spin = 0;
     t.state = 'toppled';
@@ -364,29 +478,73 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   }
 }
 
+/** Pillars deflect a top; bumpers kick it away hard. */
+function pillars(arena: Arena, t: Top) {
+  for (const p of arena.layout.pillars) {
+    const px = p.x * arena.radius;
+    const pz = p.z * arena.radius;
+    let nx = t.x - px;
+    let nz = t.z - pz;
+    const d = Math.hypot(nx, nz);
+    const min = p.r + t.spec.radius;
+    if (d >= min || d < 1e-6) continue;
+    nx /= d;
+    nz /= d;
+    t.x = px + nx * min;
+    t.z = pz + nz * min;
+    const into = t.vx * nx + t.vz * nz;
+    if (into < 0) {
+      t.vx -= (1 + PILLAR_BOUNCE) * into * nx;
+      t.vz -= (1 + PILLAR_BOUNCE) * into * nz;
+    }
+    if (p.bumper) {
+      t.vx += nx * BUMPER_KICK;
+      t.vz += nz * BUMPER_KICK;
+      t.kick = Math.min(1, t.kick + 0.6);
+      t.kickX = nx;
+      t.kickZ = nz;
+      t.sinceBump = 0;
+    }
+  }
+}
+
 /** Rim: pockets swallow, rails dash, a hard enough hit flies over, everything else bounces. */
-function wall(t: Top) {
-  const r = Math.hypot(t.x, t.z);
-  const limit = ARENA_RADIUS - t.spec.radius;
-  if (r < limit) return;
+function wall(arena: Arena, t: Top) {
+  const L = arena.layout;
   const angle = Math.atan2(t.z, t.x);
-  const nx = t.x / r;
-  const nz = t.z / r;
-  const outward = t.vx * nx + t.vz * nz;
-  if (inPocket(angle) && outward > POCKET_SPEED) {
-    t.state = 'out';
-    t.finish = 'pocket';
+  const rim = rimRadius(L, angle);
+  const r = Math.hypot(t.x, t.z);
+  // No wall: crossing the edge is a ring-out (sumo).
+  if (L.wall === 'none') {
+    // Out once its center has crossed the edge (riding the berm is still in).
+    if (r > rim) {
+      t.state = 'out';
+      t.finish = 'over';
+    }
     return;
   }
-  if (outward > WALL_ESCAPE) {
+  const limit = rim - t.spec.radius;
+  if (r < limit) return;
+  rimNormal(L, t.x, t.z, normalTmp);
+  const nx = normalTmp.x;
+  const nz = normalTmp.z;
+  const outward = t.vx * nx + t.vz * nz;
+  const pocket = pocketAt(L, angle);
+  if (pocket && outward > POCKET_SPEED) {
+    t.state = 'out';
+    t.finish = 'pocket';
+    t.pocketPoints = pocket.points;
+    return;
+  }
+  if (outward > WALL_ESCAPE[L.wall]) {
     t.state = 'out';
     t.finish = 'over';
     return;
   }
   // Keep it inside.
-  t.x = nx * limit;
-  t.z = nz * limit;
-  if (onRail(angle) && t.sinceDash > DASH_COOLDOWN && t.spin > 0.2) {
+  t.x = (t.x / r) * limit;
+  t.z = (t.z / r) * limit;
+  if (railAt(L, angle) && t.sinceDash > DASH_COOLDOWN && t.spin > 0.2) {
     // Rail dash: the tip catches the rail and the top shoots along it and into the middle.
     const tx = -nz * t.hand;
     const tz = nx * t.hand;
@@ -397,8 +555,14 @@ function wall(t: Top) {
     return;
   }
   if (outward > 0) {
-    t.vx -= (1 + WALL_BOUNCE) * outward * nx;
-    t.vz -= (1 + WALL_BOUNCE) * outward * nz;
+    const bounce = WALL_BOUNCE[L.wall];
+    t.vx -= (1 + bounce) * outward * nx;
+    t.vz -= (1 + bounce) * outward * nz;
+    // A high wall: the top climbs it and drops back toward the middle with speed.
+    if (L.wall === 'high') {
+      t.vx -= nx * HIGH_WALL_DROP * Math.min(1, outward * 3);
+      t.vz -= nz * HIGH_WALL_DROP * Math.min(1, outward * 3);
+    }
   }
 }
 
@@ -450,8 +614,9 @@ function collide(a: Top, b: Top): Clash | null {
   return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 1.6) };
 }
 
-/** Points the winner scores for a finish: pocket, over the wall or burst 2, out of spin 1. */
+/** Points the winner scores: the pocket's value, 2 for over the wall or a burst, 1 out of spin. */
 export function finishPoints(loser: Top): number {
+  if (loser.finish === 'pocket') return loser.pocketPoints;
   return loser.finish === 'spin' || loser.finish === null ? 1 : 2;
 }
 

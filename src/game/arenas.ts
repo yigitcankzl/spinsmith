@@ -1,0 +1,113 @@
+import type { ArenaLayout } from './layout.ts';
+
+const Q = Math.PI / 4;
+
+/**
+ * The built-in arenas. Between them they use every layout knob: sizes from 12 to 17 cm,
+ * all three shapes, all five floors, all four walls, 2- and 3-point pockets, rails, pillars,
+ * bumpers, a vortex, a turntable, a rocking dish, a shrinking ring and all four themes.
+ */
+export const ARENAS: ArenaLayout[] = [
+  {
+    // The balanced learning arena.
+    name: 'Forge Bowl',
+    theme: 'forge',
+    radius: 0.15,
+    shape: 'circle',
+    floor: 'bowl',
+    depth: 0.011,
+    wall: 'standard',
+    pockets: [Q, 3 * Q, 5 * Q, 7 * Q].map((angle) => ({ angle, half: 0.2, points: 2 })),
+    rails: [0, 2 * Q, 4 * Q, 6 * Q].map((angle) => ({ angle, half: 0.45 })),
+    pillars: [],
+    vortex: 0,
+    spinner: 0,
+    tilt: 0,
+    shrink: false,
+  },
+  {
+    // Small and fast: a tornado ridge to race on, low walls and wide exits, embers closing in.
+    name: 'Ember Ring',
+    theme: 'forge',
+    radius: 0.12,
+    shape: 'circle',
+    floor: 'ridge',
+    depth: 0.012,
+    wall: 'low',
+    pockets: [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((angle) => ({ angle, half: 0.28, points: 2 })),
+    rails: [],
+    pillars: [],
+    vortex: 0,
+    spinner: 0,
+    tilt: 0,
+    shrink: true,
+  },
+  {
+    // A dish that rocks under the tops: the heavy side dips and flings the light side.
+    name: 'Zero-G Dish',
+    theme: 'stone',
+    radius: 0.16,
+    shape: 'circle',
+    floor: 'bowl',
+    depth: 0.011,
+    wall: 'standard',
+    pockets: [0, Math.PI].map((angle) => ({ angle, half: 0.17, points: 3 })),
+    rails: [2 * Q, 6 * Q].map((angle) => ({ angle, half: 0.5 })),
+    pillars: [],
+    vortex: 0,
+    spinner: 0,
+    tilt: 0.06,
+    shrink: false,
+  },
+  {
+    // Big and tall: a central hill on a turntable, four pillars, and a high wall to climb.
+    name: 'Clockwork Spire',
+    theme: 'clockwork',
+    radius: 0.17,
+    shape: 'circle',
+    floor: 'hill',
+    depth: 0.009,
+    wall: 'high',
+    pockets: [Q, 5 * Q].map((angle) => ({ angle, half: 0.18, points: 3 })),
+    rails: [3 * Q, 7 * Q].map((angle) => ({ angle, half: 0.35 })),
+    pillars: [Q, 3 * Q, 5 * Q, 7 * Q].map((a) => ({ x: Math.cos(a) * 0.55, z: Math.sin(a) * 0.55, r: 0.008, bumper: false })),
+    vortex: 0,
+    spinner: 6,
+    tilt: 0,
+    shrink: false,
+  },
+  {
+    // A slippery ice oval with long side rails and a vortex in the middle.
+    name: 'Frost Oval',
+    theme: 'ice',
+    radius: 0.17,
+    shape: 'oval',
+    floor: 'flat',
+    depth: 0.045,
+    wall: 'standard',
+    pockets: [0, Math.PI].map((angle) => ({ angle, half: 0.15, points: 2 })),
+    rails: [2 * Q, 6 * Q].map((angle) => ({ angle, half: 0.6 })),
+    pillars: [],
+    vortex: 0.6,
+    spinner: 0,
+    tilt: 0,
+    shrink: false,
+  },
+  {
+    // Sumo: no walls at all, just a berm at the edge; a sunken middle below a terrace, and pinball bumpers.
+    name: 'Sumo Square',
+    theme: 'stone',
+    radius: 0.16,
+    shape: 'square',
+    floor: 'tiers',
+    depth: 0.007,
+    wall: 'none',
+    pockets: [],
+    rails: [],
+    pillars: [Q, 3 * Q, 5 * Q, 7 * Q].map((a) => ({ x: Math.cos(a) * 0.7, z: Math.sin(a) * 0.7, r: 0.009, bumper: true })),
+    vortex: 0,
+    spinner: 0,
+    tilt: 0,
+    shrink: false,
+  },
+];

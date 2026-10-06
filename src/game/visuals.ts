@@ -3,12 +3,14 @@ import {
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
+  CatmullRomCurve3,
   CircleGeometry,
   Color,
   ConeGeometry,
   CylinderGeometry,
   DataTexture,
   DoubleSide,
+  Float32BufferAttribute,
   Group,
   InstancedMesh,
   LatheGeometry,
@@ -25,11 +27,14 @@ import {
   SphereGeometry,
   SRGBColorSpace,
   TorusGeometry,
+  TubeGeometry,
   Vector2,
   Vector3,
 } from '@iwsdk/core';
 import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena-shell.scene-asset.js';
-import { Arena, ARENA_RADIUS, POCKET_HALF, POCKETS, RAIL_HALF, RAILS, Top, TopSpec } from './sim.js';
+import type { ArenaLayout, Theme, Wall } from './layout.js';
+import { rimRadius } from './layout.js';
+import { Arena, Top, TopSpec } from './sim.js';
 
 /**
  * Visual style: matte clay bodies, light metal parts, a glowing core.
@@ -311,7 +316,7 @@ export class TopView {
       d.mesh.rotation.z += d.spin.z * dt;
       // Bounce on the arena floor while still over it.
       const p = d.mesh.position;
-      if (Math.hypot(p.x, p.z) < ARENA_RADIUS) {
+      if (arena.inside(p.x, p.z)) {
         const floor = arena.height(p.x, p.z) + 0.003;
         if (p.y < floor) {
           p.y = floor;
@@ -325,33 +330,132 @@ export class TopView {
   }
 }
 
-/** A torus arc lying in the floor plane from angle a0 to a1 (atan2(z, x) convention). */
-function arc(radius: number, tube: number, a0: number, a1: number, mat: MeshBasicMaterial | MeshMatcapMaterial, y: number) {
-  const m = new Mesh(new TorusGeometry(radius, tube, 8, Math.max(6, Math.round((a1 - a0) * 30)), a1 - a0).rotateX(Math.PI / 2), mat);
-  // rotateX maps the torus start (+X) to angle 0 and sweeps toward +Z; rotating by -a0 starts it at a0.
-  m.rotation.y = -a0;
-  m.position.y = y;
-  return m;
+/** Colors and materials per arena theme. */
+interface Palette {
+  floor: number;
+  pit: number;
+  wall: DataTexture;
+  rail: number;
+  railHot: number;
+  accent: number;
+  pedestal: number;
 }
 
-/** Arena: a polar mesh following the heightmap, a metal rim and a pedestal underneath. */
+const STONE = makeMatcap('clay', 0x9a948a);
+const FROST = makeMatcap('metal', 0xbfe0f2);
+
+const PALETTES: Record<Theme, Palette> = {
+  forge: { floor: 0xe9dfd0, pit: 0x4a3a33, wall: LIGHT_STEEL, rail: 0xd9a441, railHot: 0xfff0b0, accent: 0xff5a28, pedestal: 0x6f5a4c },
+  stone: { floor: 0xcdc5b8, pit: 0x3b3a40, wall: STONE, rail: 0x8fb7c9, railHot: 0xe6fbff, accent: 0x6fc7ff, pedestal: 0x6b665e },
+  clockwork: { floor: 0xeadcb8, pit: 0x4a3d2a, wall: BRASS, rail: 0x5fc9b8, railHot: 0xd8fff6, accent: 0xffc04a, pedestal: 0x7a6440 },
+  ice: { floor: 0xe4f4fb, pit: 0x34506a, wall: FROST, rail: 0x7fdcff, railHot: 0xffffff, accent: 0x8fe8ff, pedestal: 0x7d93a6 },
+};
+
+/** Wall heights (m) by wall type. */
+const WALL_HEIGHT: Record<Wall, number> = { low: 0.007, standard: 0.012, high: 0.028, none: 0 };
+const POCKET_REACH = 0.03;
+
+/** Points along the rim from angle a0 to a1, pushed out (or in) by `offset`, at height y. */
+function rimPath(layout: ArenaLayout, a0: number, a1: number, offset: number, y: number) {
+  const n = Math.max(4, Math.ceil(((a1 - a0) / (Math.PI * 2)) * 96));
+  const pts: Vector3[] = [];
+  for (let i = 0; i <= n; i++) {
+    const a = a0 + ((a1 - a0) * i) / n;
+    const r = rimRadius(layout, a) + offset;
+    pts.push(new Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
+  }
+  return pts;
+}
+
+function tube(points: Vector3[], radius: number, mat: MeshBasicMaterial | MeshMatcapMaterial) {
+  return new Mesh(new TubeGeometry(new CatmullRomCurve3(points), points.length * 2, radius, 6, false), mat);
+}
+
+/** A vertical band along the rim from a0 to a1 (the wall face), from the floor up to `height`. */
+function band(layout: ArenaLayout, a0: number, a1: number, offset: number, height: number, mat: MeshMatcapMaterial) {
+  const pts = rimPath(layout, a0, a1, offset, 0);
+  const pos: number[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i];
+    const q = pts[i + 1];
+    pos.push(p.x, -0.004, p.z, q.x, -0.004, q.z, q.x, height, q.z, p.x, -0.004, p.z, q.x, height, q.z, p.x, height, p.z);
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return new Mesh(g, mat);
+}
+
+/** A flat wedge outside the rim from a0 to a1 (the pocket's trough). */
+function wedge(layout: ArenaLayout, a0: number, a1: number, mat: MeshBasicMaterial) {
+  const inner = rimPath(layout, a0, a1, -0.004, -0.003);
+  const outer = rimPath(layout, a0, a1, POCKET_REACH, -0.003);
+  const pos: number[] = [];
+  for (let i = 0; i < inner.length - 1; i++) {
+    const [a, b, c, d] = [inner[i], inner[i + 1], outer[i + 1], outer[i]];
+    pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  return new Mesh(g, mat);
+}
+
+/** Canvas texture of a spiral (vortex) or of turntable spokes. */
+function discTexture(kind: 'vortex' | 'spokes', color: string) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  g.translate(64, 64);
+  g.strokeStyle = color;
+  g.lineWidth = kind === 'vortex' ? 5 : 7;
+  for (let arm = 0; arm < (kind === 'vortex' ? 3 : 6); arm++) {
+    g.beginPath();
+    for (let t = 0; t <= 1; t += 0.02) {
+      const a = (arm / (kind === 'vortex' ? 3 : 6)) * Math.PI * 2 + (kind === 'vortex' ? t * 4 : 0);
+      const r = 8 + t * 54;
+      if (t === 0) g.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    g.stroke();
+  }
+  const tex = new CanvasTexture(c);
+  tex.colorSpace = SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * The arena, built from its layout: a floor mesh that follows the heightmap and the rim shape,
+ * walls between the pockets, pocket troughs, dash rails, pillars and bumpers, a vortex or a
+ * turntable in the middle, an ember ring for the shrinking zone, and a themed pedestal.
+ * build() rebuilds everything for a new layout; sync() follows the live floor every frame.
+ */
 export class ArenaView {
   readonly root = new Group();
+  private features = new Group();
   private geo: BufferGeometry;
   private rings = 18;
-  private segs = 56;
+  private segs = 64;
   private colors: Float32Array;
-  private readonly base = new Color(0xe9dfd0);
+  private layout!: ArenaLayout;
+  private palette!: Palette;
+  private readonly base = new Color();
   private readonly warm = new Color(0xffa155);
   private readonly cold = new Color(0x8f8576);
+  private readonly pit = new Color();
+  private readonly ember = new Color(0xff4a12);
   private readonly tmp = new Color();
-  private readonly pit = new Color(0x4a3a33);
-  private readonly railIdle = new Color(0xd9a441);
-  private readonly railHot = new Color(0xfff0b0);
+  private readonly railIdle = new Color();
+  private readonly railHot = new Color();
   private railMats: MeshBasicMaterial[] = [];
-  private railFlash: number[] = RAILS.map(() => 0);
+  private railFlash: number[] = [];
+  private bumperMats: MeshBasicMaterial[] = [];
+  private bumperFlash: number[] = [];
+  private spinnerDisc: Mesh | null = null;
+  private vortexDisc: Mesh | null = null;
+  private disposables: { dispose(): void }[] = [];
+  private time = 0;
 
-  constructor(pedestalHeight: number) {
+  constructor(private readonly pedestalHeight: number) {
     const count = 1 + this.rings * this.segs;
     const pos = new Float32Array(count * 3);
     this.colors = new Float32Array(count * 3);
@@ -374,77 +478,206 @@ export class ArenaView {
     this.geo.setIndex(idx);
     const floor = new Mesh(this.geo, new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0xffffff), vertexColors: true }));
     floor.frustumCulled = false;
-    // Steel wall in arcs between the pockets.
-    const rim = new Group();
-    const steel = new MeshMatcapMaterial({ matcap: LIGHT_STEEL });
-    POCKETS.forEach((p, i) => {
-      const next = POCKETS[(i + 1) % POCKETS.length] + (i === POCKETS.length - 1 ? Math.PI * 2 : 0);
-      rim.add(arc(ARENA_RADIUS + 0.006, 0.006, p + POCKET_HALF, next - POCKET_HALF, steel, 0.011));
-    });
-    // Pockets: a dark trough outside each opening with a hot glowing lip.
-    const trough = new MeshBasicMaterial({ color: 0x1b1412, side: DoubleSide });
-    const lip = new MeshBasicMaterial({ color: 0xff5a28, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false });
-    for (const p of POCKETS) {
-      const hole = new Mesh(new RingGeometry(ARENA_RADIUS - 0.004, ARENA_RADIUS + 0.03, 16, 1, p - POCKET_HALF, POCKET_HALF * 2).rotateX(Math.PI / 2), trough);
-      hole.position.y = -0.002;
-      rim.add(hole, arc(ARENA_RADIUS - 0.003, 0.0018, p - POCKET_HALF, p + POCKET_HALF, lip, 0.003));
+    this.root.add(floor, this.features);
+  }
+
+  /** Rebuilds walls, pockets, rails, pillars, center features and pedestal for a layout. */
+  build(layout: ArenaLayout) {
+    this.layout = layout;
+    const P = (this.palette = PALETTES[layout.theme]);
+    for (const d of this.disposables) d.dispose();
+    this.disposables = [];
+    this.features.clear();
+    this.base.set(P.floor);
+    this.pit.set(P.pit);
+    this.railIdle.set(P.rail);
+    this.railHot.set(P.railHot);
+    const own = <T extends { dispose(): void }>(x: T) => (this.disposables.push(x), x);
+    const add = (m: Mesh) => {
+      own(m.geometry);
+      this.features.add(m);
+      return m;
+    };
+    const wallMat = own(new MeshMatcapMaterial({ matcap: P.wall, side: DoubleSide }));
+    const accent = own(new MeshBasicMaterial({ color: P.accent, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }));
+    const trough = own(new MeshBasicMaterial({ color: 0x15110f, side: DoubleSide }));
+    const H = WALL_HEIGHT[layout.wall];
+
+    // Walls in the gaps between pockets (the whole rim when there are none).
+    const pockets = [...layout.pockets].sort((p, q) => p.angle - q.angle);
+    const gaps: [number, number][] = [];
+    if (layout.wall !== 'none') {
+      if (pockets.length === 0) gaps.push([0, Math.PI * 2]);
+      pockets.forEach((p, i) => {
+        const next = pockets[(i + 1) % pockets.length];
+        const end = next.angle - next.half + (i === pockets.length - 1 ? Math.PI * 2 : 0);
+        gaps.push([p.angle + p.half, end]);
+      });
     }
-    // Dash rails: glowing brass strips just inside the wall; they flash when a top dashes.
-    for (const r of RAILS) {
-      const mat = new MeshBasicMaterial({ color: 0xd9a441 });
+    for (const [a0, a1] of gaps) {
+      if (a1 - a0 < 0.01) continue;
+      add(band(layout, a0, a1, 0.004, H, wallMat));
+      add(tube(rimPath(layout, a0, a1, 0.004, H), 0.004, wallMat));
+    }
+    if (layout.wall === 'none') {
+      // A sumo ring: a bright edge line marks where the berm ends.
+      add(tube(rimPath(layout, 0, Math.PI * 2, 0, this.edgeHeight(1)), 0.0018, accent));
+    }
+
+    // Pockets: dark troughs with a glowing lip; 3-point pockets get a wider, hotter lip.
+    for (const p of layout.pockets) {
+      add(wedge(layout, p.angle - p.half, p.angle + p.half, trough));
+      add(tube(rimPath(layout, p.angle - p.half, p.angle + p.half, -0.003, 0.003), p.points >= 3 ? 0.003 : 0.0018, accent));
+    }
+
+    // Dash rails, just inside the wall; they flash when a top dashes.
+    this.railMats = [];
+    this.railFlash = [];
+    for (const r of layout.rails) {
+      const mat = own(new MeshBasicMaterial({ color: P.rail }));
       this.railMats.push(mat);
-      rim.add(arc(ARENA_RADIUS - 0.004, 0.0025, r - RAIL_HALF, r + RAIL_HALF, mat, 0.012));
+      this.railFlash.push(0);
+      add(tube(rimPath(layout, r.angle - r.half, r.angle + r.half, -0.004, Math.max(0.004, H * 0.9)), 0.0025, mat));
     }
-    const shell = forgeArenaShell.clone(true);
-    shell.scale.y = pedestalHeight / FORGE_SHELL_HEIGHT;
-    this.root.add(shell, floor, rim);
+
+    // Pillars and bumpers.
+    this.bumperMats = [];
+    this.bumperFlash = [];
+    const pillarMat = own(new MeshMatcapMaterial({ matcap: P.wall }));
+    for (const p of layout.pillars) {
+      const x = p.x * layout.radius;
+      const z = p.z * layout.radius;
+      const post = add(new Mesh(new CylinderGeometry(p.r, p.r * 1.15, 0.026, 20), pillarMat));
+      post.position.set(x, 0.011, z);
+      if (p.bumper) {
+        const glow = own(new MeshBasicMaterial({ color: 0xff3b5c }));
+        this.bumperMats.push(glow);
+        this.bumperFlash.push(0);
+        const ring = add(new Mesh(new TorusGeometry(p.r * 1.05, 0.0025, 8, 24).rotateX(Math.PI / 2), glow));
+        ring.position.set(x, 0.02, z);
+      }
+    }
+
+    // Center features.
+    const center = 0.32 * layout.radius;
+    this.vortexDisc = null;
+    this.spinnerDisc = null;
+    if (layout.vortex > 0) {
+      const tex = own(discTexture('vortex', '#ffffff'));
+      const mat = own(new MeshBasicMaterial({ map: tex, color: P.accent, transparent: true, opacity: 0.7, blending: AdditiveBlending, depthWrite: false }));
+      this.vortexDisc = add(new Mesh(new CircleGeometry(center, 40).rotateX(-Math.PI / 2), mat));
+    }
+    if (layout.spinner > 0) {
+      const tex = own(discTexture('spokes', '#5a4a30'));
+      const mat = own(new MeshBasicMaterial({ map: tex, color: P.rail, transparent: true, opacity: 0.55, depthWrite: false }));
+      this.spinnerDisc = add(new Mesh(new CircleGeometry(center, 40).rotateX(-Math.PI / 2), mat));
+    }
+
+    // Pedestal: the forge shell for forge arenas, a plain themed plinth for the others.
+    const sx = layout.shape === 'square' ? 1.12 : 1;
+    const sz = layout.shape === 'oval' ? 0.78 : sx;
+    const scale = layout.radius / 0.15;
+    if (layout.theme === 'forge') {
+      const shell = forgeArenaShell.clone(true);
+      shell.scale.set(scale * sx, this.pedestalHeight / FORGE_SHELL_HEIGHT, scale * sz);
+      this.features.add(shell);
+    } else {
+      const plinth = add(
+        new Mesh(
+          new CylinderGeometry(0.15 + 0.012, 0.15 + 0.03, this.pedestalHeight, 64, 1, true),
+          own(new MeshMatcapMaterial({ matcap: makeMatcap('clay', P.pedestal), side: DoubleSide })),
+        ),
+      );
+      plinth.scale.set(scale * sx, 1, scale * sz);
+      plinth.position.y = -this.pedestalHeight / 2;
+    }
+  }
+
+  /** Height of the floor at a normalized radius on the rim (for the sumo edge line). */
+  private edgeHeight(n: number) {
+    return this.layout.wall === 'none' ? 0.02 * Math.min(1, n) : 0;
   }
 
   /** Lights up the rail nearest to an arena-local point (a top just dashed there). */
   flashRail(x: number, z: number) {
     const a = Math.atan2(z, x);
-    let best = 0;
+    let best = -1;
     let gap = Infinity;
-    RAILS.forEach((r, i) => {
-      const d = Math.abs(Math.atan2(Math.sin(a - r), Math.cos(a - r)));
+    this.layout.rails.forEach((r, i) => {
+      const d = Math.abs(Math.atan2(Math.sin(a - r.angle), Math.cos(a - r.angle)));
       if (d < gap) {
         gap = d;
         best = i;
       }
     });
-    this.railFlash[best] = 1;
+    if (best >= 0) this.railFlash[best] = 1;
   }
 
-  /** Fades rail flashes back to idle. */
-  update(dt: number) {
+  /** Lights up the bumper nearest to an arena-local point. */
+  flashBumper(x: number, z: number) {
+    let best = -1;
+    let gap = Infinity;
+    let bi = 0;
+    for (const p of this.layout.pillars) {
+      if (!p.bumper) continue;
+      const d = Math.hypot(p.x * this.layout.radius - x, p.z * this.layout.radius - z);
+      if (d < gap) {
+        gap = d;
+        best = bi;
+      }
+      bi++;
+    }
+    if (best >= 0) this.bumperFlash[best] = 1;
+  }
+
+  /** Animates flashes and the spinning center discs. (The ember zone shows in the floor colors.) */
+  update(dt: number, arena: Arena) {
+    this.time += dt;
     this.railMats.forEach((m, i) => {
       this.railFlash[i] = Math.max(0, this.railFlash[i] - dt * 3);
       m.color.copy(this.railIdle).lerp(this.railHot, this.railFlash[i]);
     });
+    this.bumperMats.forEach((m, i) => {
+      this.bumperFlash[i] = Math.max(0, this.bumperFlash[i] - dt * 4);
+      m.color.setRGB(1, 0.23 + 0.7 * this.bumperFlash[i], 0.36 + 0.6 * this.bumperFlash[i]);
+    });
+    const center = arena.floorHeight(0) + 0.0012;
+    if (this.vortexDisc) {
+      this.vortexDisc.rotation.y -= dt * 3;
+      this.vortexDisc.position.y = center;
+    }
+    if (this.spinnerDisc) {
+      this.spinnerDisc.rotation.y -= dt * this.layout.spinner;
+      this.spinnerDisc.position.y = center + 0.0004;
+    }
   }
 
   private vi(ring: number, seg: number) {
     return 1 + (ring - 1) * this.segs + seg;
   }
 
-  /** Re-samples heights and tints raised shapes warm, dents cool. */
+  /** Re-samples heights along the rim shape and tints bumps warm, dents cool, pockets dark, embers hot. */
   sync(arena: Arena) {
     const pos = this.geo.attributes.position as BufferAttribute;
+    const L = arena.layout;
+    const safe = arena.safe;
     for (let r = 0; r <= this.rings; r++) {
-      const radius = (r / this.rings) * ARENA_RADIUS;
-      const n = r === 0 ? 1 : this.segs;
-      for (let s = 0; s < n; s++) {
+      const n = r / this.rings;
+      const count = r === 0 ? 1 : this.segs;
+      for (let s = 0; s < count; s++) {
         const a = (s / this.segs) * Math.PI * 2;
+        const radius = n * rimRadius(L, a);
         const x = Math.cos(a) * radius;
         const z = Math.sin(a) * radius;
         const i = r === 0 ? 0 : this.vi(r, s);
-        const h = arena.height(x, z);
-        pos.setXYZ(i, x, h, z);
+        pos.setXYZ(i, x, arena.height(x, z), z);
         const shape = arena.shapeHeight(x, z);
         const dip = -arena.pocketDip(x, z) / 0.003;
         if (shape > 0) this.tmp.copy(this.base).lerp(this.warm, Math.min(1, shape / 0.02));
         else this.tmp.copy(this.base).lerp(this.cold, Math.min(1, -shape / 0.02));
         if (dip > 0) this.tmp.lerp(this.pit, Math.min(1, dip) * 0.8);
+        // Embers: outside the shrinking safe zone the floor glows, pulsing.
+        if (n > safe) this.tmp.lerp(this.ember, 0.45 + 0.15 * Math.sin(this.time * 6));
         this.colors[i * 3] = this.tmp.r;
         this.colors[i * 3 + 1] = this.tmp.g;
         this.colors[i * 3 + 2] = this.tmp.b;

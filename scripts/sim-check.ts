@@ -4,7 +4,28 @@
  * bumps steer, fights end, verdict rules hold).
  */
 import assert from 'node:assert/strict';
-import { Arena, ARENA_RADIUS, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, POCKET_HALF, POCKETS, RAIL_HALF, RAILS, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { ARENAS } from '../src/game/arenas.ts';
+import { cloneLayout, validate } from '../src/game/layout.ts';
+import type { ArenaLayout } from '../src/game/layout.ts';
+import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+
+const FORGE = ARENAS[0];
+const ARENA_RADIUS = FORGE.radius;
+const POCKETS = FORGE.pockets.map((p) => p.angle);
+const POCKET_HALF = FORGE.pockets[0].half;
+const RAILS = FORGE.rails.map((r) => r.angle);
+const RAIL_HALF = FORGE.rails[0].half;
+/** A plain test arena: the Forge Bowl with overrides. */
+const arenaWith = (o: Partial<ArenaLayout>) => new Arena({ ...cloneLayout(FORGE), ...o });
+/** Runs one top alone (the other parked out) for `seconds`. */
+function solo(arena: Arena, t: Top, seconds: number, each?: () => void) {
+  const idle = new Top(DEFENSE);
+  idle.state = 'toppled';
+  for (let s = 0; s < seconds && t.alive; s += STEP) {
+    step(arena, t, idle);
+    each?.();
+  }
+}
 import type { TopSpec } from '../src/game/sim.ts';
 
 function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
@@ -12,7 +33,6 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
   let clashes = 0;
   while (verdict(a, b, t) === 0) {
     bump?.(t);
-    arena.relax(STEP);
     if (step(arena, a, b)) clashes++;
     t += STEP;
   }
@@ -120,7 +140,7 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
 {
   const arena = new Arena();
   arena.stamp(0, 0, 0.03);
-  for (let t = 0; t < 3; t += STEP) arena.relax(STEP);
+  for (let t = 0; t < 3; t += STEP) arena.update(STEP, new Top(DEFENSE), new Top(STAMINA));
   assert.ok(arena.height(0, 0) < 0.003, 'bump should be mostly gone after 3 s');
 }
 
@@ -167,7 +187,7 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
   const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   const winRate = (x: TopSpec, y: TopSpec) => {
     let wins = 0;
-    const n = 60;
+    const n = 120;
     for (let i = 0; i < n; i++) {
       const arena = new Arena();
       const a = new Top(x);
@@ -195,6 +215,93 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
   const sd = winRate(STAMINA, DEFENSE);
   console.log(`type loop: attack>stamina ${as.toFixed(2)}, defense>attack ${da.toFixed(2)}, stamina>defense ${sd.toFixed(2)}`);
   assert.ok(as > 0.55 && da > 0.55 && sd > 0.55, 'each type must beat the one it counters');
+}
+
+// 8. Arena knobs.
+{
+  // Every built-in arena is a valid layout.
+  for (const a of ARENAS) assert.equal(validate(a), null, `${a.name}: ${validate(a)}`);
+
+  // A pillar deflects a top heading at it; a bumper throws it back faster than it came.
+  for (const bumper of [false, true]) {
+    const arena = arenaWith({ pillars: [{ x: 0, z: 0, r: 0.01, bumper }], floor: 'flat', depth: 0 });
+    const t = new Top(STAMINA);
+    t.launch(0.06, 0, -0.3, 0, 1, 1);
+    let rebound = -Infinity;
+    solo(arena, t, 0.15, () => (rebound = Math.max(rebound, t.vx)));
+    assert.ok(rebound > 0.1, `${bumper ? 'bumper' : 'pillar'} must turn the top back`);
+    if (bumper) assert.ok(rebound > 0.5, `the bumper must kick it back faster, got ${rebound.toFixed(2)}`);
+  }
+
+  // A high wall is never cleared, even by a very fast top; with no wall at all, crossing the edge is a ring-out.
+  {
+    const t = new Top(ATTACK);
+    t.launch(0, 0.05, 0, 1.8, 1, 1);
+    solo(arenaWith({ wall: 'high', pockets: [], rails: [] }), t, 0.5);
+    assert.ok(t.alive, 'a high wall must hold');
+    // No wall: the edge berm holds a slow top, a hard-driven one goes over it and is out.
+    const slow = new Top(ATTACK);
+    slow.launch(0, 0.05, 0, 0.3, 0.2, 1);
+    solo(arenaWith({ wall: 'none', pockets: [], rails: [] }), slow, 0.6);
+    assert.ok(slow.state !== 'out', 'the berm must hold a slow top');
+    const fast = new Top(ATTACK);
+    fast.launch(0, 0.05, 0, 1.2, 1, 1);
+    solo(arenaWith({ wall: 'none', pockets: [], rails: [] }), fast, 1);
+    assert.equal(fast.finish, 'over', 'no wall: leaving the edge is a ring-out');
+  }
+
+  // A 3-point pocket scores 3.
+  {
+    const arena = arenaWith({ pockets: [{ angle: Math.PI / 2, half: 0.3, points: 3 }], rails: [] });
+    const t = new Top(STAMINA);
+    t.launch(0, 0.05, 0, 0.6, 1, 1);
+    solo(arena, t, 1);
+    assert.equal(t.finish, 'pocket');
+    assert.equal(finishPoints(t), 3);
+  }
+
+  // Embers drain spin outside the shrinking safe zone.
+  {
+    const calm = new Top(STAMINA);
+    const burned = new Top(STAMINA);
+    const a1 = arenaWith({ shrink: false });
+    const a2 = arenaWith({ shrink: true });
+    a1.elapsed = a2.elapsed = 30;
+    calm.launch(0.12, 0, 0, 0.2, 1, 1);
+    burned.launch(0.12, 0, 0, 0.2, 1, 1);
+    solo(a1, calm, 1);
+    solo(a2, burned, 1);
+    assert.ok(burned.spin < calm.spin - 0.15, 'the embers must drain spin');
+  }
+
+  // A rocking dish tips toward the tops' weight.
+  {
+    const arena = arenaWith({ tilt: 0.12 });
+    const t = new Top(DEFENSE);
+    t.launch(0.1, 0, 0, 0, 1, 1);
+    solo(arena, t, 0.3);
+    assert.ok(arena.tiltZ < -0.01, `the dish must dip toward the top, tiltZ=${arena.tiltZ.toFixed(3)}`);
+  }
+
+  // The vortex speeds a top up in the middle; the turntable drags it around.
+  for (const knob of [{ vortex: 1.5 }, { spinner: 8 }]) {
+    const plain = new Top(DEFENSE);
+    const fast = new Top(DEFENSE);
+    plain.launch(0.02, 0, 0, 0.05, 0.6, 1);
+    fast.launch(0.02, 0, 0, 0.05, 0.6, 1);
+    solo(arenaWith({ floor: 'flat' }), plain, 0.3);
+    solo(arenaWith({ floor: 'flat', ...knob }), fast, 0.3);
+    assert.ok(Math.hypot(fast.vx, fast.vz) > Math.hypot(plain.vx, plain.vz) + 0.02, `${Object.keys(knob)[0]} must add speed`);
+  }
+
+  // Every built-in arena plays: rounds end on their own and nobody gets stuck.
+  for (const layout of ARENAS) {
+    const arena = new Arena(layout);
+    const a = new Top(ATTACK);
+    const b = new Top(STAMINA);
+    const r = fight(arena, a, b);
+    assert.notEqual(r.result, 0, `${layout.name} must produce a result`);
+  }
 }
 
 console.log('sim-check: all passed');

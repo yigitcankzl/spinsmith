@@ -1,7 +1,10 @@
 import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
-import { Arena, ARENA_RADIUS, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TYPES, verdict } from './sim.js';
+import { ARENAS } from './arenas.js';
+import { spawnDistance } from './layout.js';
+import type { ArenaLayout } from './layout.js';
+import { Arena, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TYPES, verdict } from './sim.js';
 import { ANVIL_SHAPE, ArenaView, Cord, Label, NEEDLE_SHAPE, OPPONENT_COLOR, PLAYER_COLOR, Sparks, STRIKER_SHAPE, TopView } from './visuals.js';
 
 /** The arena floor sits this far above the real table, leaving room to press dents. */
@@ -28,7 +31,6 @@ const LAUNCH_REACH = 1.0;
 const MAX_PULL = 0.32;
 /** Launch direction is clamped to this many radians off straight-at-center. */
 const MAX_AIM = 0.6;
-const SPAWN = ARENA_RADIUS * 0.72;
 /** Pinches this close to the floor (vertically) grab it to raise a bump. */
 const SHAPE_GRAB = 0.05;
 const BUMP_MIN = 0.008;
@@ -63,6 +65,11 @@ export class MatchSystem extends createSystem({
   private root = new Group();
   private arena = new Arena();
   private arenaView = new ArenaView(PEDESTAL);
+  /** Everything that tilts with a rocking dish: the arena and what is on it. */
+  private stage = new Group();
+  /** Arenas in rotation (built-ins plus the player's own) and the one in play. */
+  private arenas: ArenaLayout[] = [...ARENAS];
+  private arenaIndex = 0;
   /** The player's top and the opponent's; their type (spec) changes between rounds. */
   private mine = new Top(TYPES[0]);
   private theirs = new Top(TYPES[1]);
@@ -73,6 +80,8 @@ export class MatchSystem extends createSystem({
   private sinceClashSound = 1;
   /** Types for the coming round are chosen once per round, not on every reset. */
   private typesPicked = false;
+  /** A match just ended: the next ready screen moves on to the next arena. */
+  private matchOver = false;
   /** One view per type for each side: shape from the type, color from the owner. */
   private myViews = TYPES.map((t, i) => new TopView(SHAPES[i], t, PLAYER_COLOR));
   private theirViews = TYPES.map((t, i) => new TopView(SHAPES[i], t, OPPONENT_COLOR));
@@ -134,14 +143,15 @@ export class MatchSystem extends createSystem({
     this.label.mesh.position.set(0, 0.17, -0.03);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
-    this.root.add(
+    this.stage.add(
       this.chargeRing,
       this.reticle,
       this.arenaView.root,
       ...[...this.myViews, ...this.theirViews].flatMap((v) => [v.root, v.shadowMesh, v.debris]),
       this.sparks.points,
-      this.label.mesh,
     );
+    this.root.add(this.stage, this.label.mesh);
+    this.setArena(this.arenas[this.arenaIndex]);
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
     this.world.createTransformEntity(this.cord.line);
@@ -152,6 +162,10 @@ export class MatchSystem extends createSystem({
         this.keys.add(e.code);
         if (e.code === 'KeyR') this.toReady();
         if (e.code === 'KeyP') this.phase = 'placing';
+        if (e.code === 'KeyA' && this.phase !== 'fight' && this.phase !== 'pulling') {
+          this.nextArena();
+          this.toReady();
+        }
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
         if (e.code === 'KeyK' && this.phase === 'fight') {
           // Burst the opponent now, to see the burst finish.
@@ -163,7 +177,7 @@ export class MatchSystem extends createSystem({
         this.keys.delete(e.code);
         if (e.code === 'Space' && this.charge > 0 && (this.phase === 'ready' || this.phase === 'result')) {
           // Aim toward where the player is looking, like the slingshot aim.
-          const aim = this.gazeHit.ok ? Math.max(-MAX_AIM, Math.min(MAX_AIM, Math.atan2(this.gazeHit.x, SPAWN - this.gazeHit.z))) : 0;
+          const aim = this.gazeHit.ok ? Math.max(-MAX_AIM, Math.min(MAX_AIM, Math.atan2(this.gazeHit.x, this.SPAWN - this.gazeHit.z))) : 0;
           this.launch(this.charge, aim);
         }
         if (e.code === 'Space') this.charge = 0;
@@ -220,10 +234,28 @@ export class MatchSystem extends createSystem({
     this.syncViews(this.myViews, this.mine, dt);
     this.syncViews(this.theirViews, this.theirs, dt);
     this.sparks.update(dt);
-    this.arenaView.update(dt);
+    this.arenaView.update(dt, this.arena);
+    this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
   }
 
   /** Player's top this round (alternates so both shapes get played). */
+  /** Where the tops start in this arena (on the launch axis). */
+  private get SPAWN() {
+    return spawnDistance(this.arena.layout);
+  }
+
+  /** Switches to another arena layout (rebuilds the visuals). */
+  setArena(layout: ArenaLayout) {
+    this.arena.reset(layout);
+    this.arenaView.build(layout);
+    console.log(`[MATCH] arena ${layout.name}`);
+  }
+
+  private nextArena() {
+    this.arenaIndex = (this.arenaIndex + 1) % this.arenas.length;
+    this.setArena(this.arenas[this.arenaIndex]);
+  }
+
   /** Shows the view for the top's current type and hides the others. */
   private syncViews(views: TopView[], top: Top, dt: number) {
     views.forEach((v, i) => (TYPES[i] === top.spec ? v.sync(top, this.arena, this.time, dt) : v.hide()));
@@ -282,16 +314,22 @@ export class MatchSystem extends createSystem({
 
   private toReady() {
     if (this.phase === 'placing') return;
+    if (this.matchOver) {
+      this.matchOver = false;
+      this.nextArena();
+    }
     this.phase = 'ready';
-    this.arena.clear();
+    this.arena.reset();
     // Both tops wait upright at their spawn points.
     if (!this.typesPicked) this.pickTypes();
     this.typesPicked = true;
-    this.mine.launch(0, SPAWN, 0, 0, 1, 1);
-    this.theirs.launch(0, -SPAWN, 0, 0, 1, -1);
+    this.mine.launch(0, this.SPAWN, 0, 0, 1, 1);
+    this.theirs.launch(0, -this.SPAWN, 0, 0, 1, -1);
     this.puller = null;
     this.cord.set(null);
-    this.label.set(`${this.describe(this.mine.spec)} vs ${this.describe(this.theirs.spec)}\nYou ${this.myPoints} - ${this.theirPoints} · first to ${MATCH_POINTS} · pinch, pull, let go`);
+    this.label.set(
+      `${this.describe(this.mine.spec)} vs ${this.describe(this.theirs.spec)}\n${this.arena.layout.name} · You ${this.myPoints} - ${this.theirPoints} · first to ${MATCH_POINTS}`,
+    );
   }
 
   private toLocal(world: Vector3) {
@@ -361,7 +399,7 @@ export class MatchSystem extends createSystem({
     const pull = end.sub(this.toLocal(this.pullStart));
     let aim = 0;
     if (Math.hypot(pull.x, pull.z) >= 0.03) aim = Math.atan2(-pull.x, pull.z);
-    else if (this.rayFloor(h)) aim = Math.atan2(this.rayHit.x, SPAWN - this.rayHit.z);
+    else if (this.rayFloor(h)) aim = Math.atan2(this.rayHit.x, this.SPAWN - this.rayHit.z);
     this.launch(power, Math.max(-MAX_AIM, Math.min(MAX_AIM, aim)));
   }
 
@@ -391,13 +429,13 @@ export class MatchSystem extends createSystem({
     const perfect = power >= PERFECT;
     playLaunch(power, perfect);
     const dir = aim + LAUNCH_TILT;
-    this.mine.launch(0, SPAWN, Math.sin(dir) * speed, -Math.cos(dir) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, 1);
-    this.sparks.burst(0, this.arena.height(0, SPAWN), SPAWN, perfect ? 1 : power * 0.6);
+    this.mine.launch(0, this.SPAWN, Math.sin(dir) * speed, -Math.cos(dir) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, 1);
+    this.sparks.burst(0, this.arena.height(0, this.SPAWN), this.SPAWN, perfect ? 1 : power * 0.6);
     const aiPower = 0.6 + Math.random() * 0.35;
     const aiAim = (Math.random() - 0.5) * 1.0;
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
     const aiDir = aiAim + LAUNCH_TILT;
-    this.theirs.launch(0, -SPAWN, -Math.sin(aiDir) * aiSpeed, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, -1);
+    this.theirs.launch(0, -this.SPAWN, -Math.sin(aiDir) * aiSpeed, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, -1);
     this.phase = 'fight';
     this.elapsed = 0;
     this.accumulator = 0;
@@ -419,7 +457,7 @@ export class MatchSystem extends createSystem({
         const l = this.toLocal(h.pinch);
         let held = this.shaping[side];
         if (!held && h.justPinched) {
-          if (Math.hypot(l.x, l.z) < ARENA_RADIUS && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
+          if (this.arena.inside(l.x, l.z) && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
             held = this.shaping[side] = { x: l.x, z: l.z, y0: l.y, t: 0, far: false };
           } else if (this.rayFloor(h)) {
             // Far bump: point at the floor and pinch; it rises while the pinch is held.
@@ -441,7 +479,7 @@ export class MatchSystem extends createSystem({
 
   private pressDent(h: HandState) {
     const l = this.toLocal(h.index);
-    if (Math.hypot(l.x, l.z) > ARENA_RADIUS) return;
+    if (!this.arena.inside(l.x, l.z)) return;
     const depth = this.arena.height(l.x, l.z) - l.y;
     if (depth > 0.004) this.arena.stamp(l.x, l.z, -Math.min(DENT_MAX, depth));
   }
@@ -453,7 +491,6 @@ export class MatchSystem extends createSystem({
       this.accumulator -= STEP;
       steps++;
       this.elapsed += STEP;
-      this.arena.relax(STEP);
       const clash = step(this.arena, this.mine, this.theirs);
       if (clash) {
         this.clashes++;
@@ -464,6 +501,11 @@ export class MatchSystem extends createSystem({
         }
       }
       for (const t of this.tops) {
+        if (t.sinceBump === 0) {
+          this.arenaView.flashBumper(t.x, t.z);
+          playClash(0.5);
+          this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.5);
+        }
         if (t.sinceDash !== 0) continue;
         this.arenaView.flashRail(t.x, t.z);
         playDash();
@@ -500,9 +542,10 @@ export class MatchSystem extends createSystem({
       else this.theirPoints += points;
       const score = `You ${this.myPoints} - ${this.theirPoints}`;
       if (this.myPoints >= MATCH_POINTS || this.theirPoints >= MATCH_POINTS) {
-        text = `${this.myPoints > this.theirPoints ? 'You win the match!' : 'You lose the match'}\n${score}`;
+        text = `${this.myPoints > this.theirPoints ? 'You win the match!' : 'You lose the match'}\n${score} · next: ${this.arenas[(this.arenaIndex + 1) % this.arenas.length].name}`;
         this.myPoints = 0;
         this.theirPoints = 0;
+        this.matchOver = true;
       } else {
         text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points}\n${score}`;
       }
@@ -563,7 +606,7 @@ export class MatchSystem extends createSystem({
       const y = o.y + d.y * t;
       const z = o.z + d.z * t;
       if (y <= this.arena.height(x, z)) {
-        if (Math.hypot(x, z) <= ARENA_RADIUS) Object.assign(out, { ok: true, x, z });
+        if (this.arena.inside(x, z)) Object.assign(out, { ok: true, x, z });
         return out.ok;
       }
     }

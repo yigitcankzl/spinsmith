@@ -11,7 +11,8 @@ import {
   TorusGeometry,
   Vector2,
 } from '@iwsdk/core';
-import { ARENA_RADIUS } from '../game/sim.js';
+/** The shell is modelled around a 15 cm arena and scaled to the arena in play. */
+const ARENA_RADIUS = 0.15;
 
 export const FORGE_SHELL_HEIGHT = 0.08;
 

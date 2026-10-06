@@ -23,10 +23,16 @@ What works:
   where your hand points on the floor. In the emulator's play mode, click and flick the
   mouse: the hands move with the view.
 - An AI top launches from the far side at the same time.
-- **Stadium:** a steel wall around the rim with four pockets on the diagonals (the floor
-  dips toward them) and glowing brass dash rails on the rim between them. A top touching a
-  rail shoots along it and back into the middle; a top driven outward into a pocket drops
-  in; a very hard hit sends a top over the wall; anything else bounces off the wall.
+- **Arenas are data** (`src/game/layout.ts`): size (12–18 cm), shape (circle, oval, square),
+  floor (bowl, flat, hill, tornado ridge, two tiers), wall (low, standard, high and climbable,
+  none with a sumo berm), pockets with 2 or 3 points, dash rails, pillars and pinball bumpers,
+  a center vortex, a turntable, a rocking dish that tips under the tops' weight, a ring of
+  embers that closes in after 12 s, and a theme (forge, stone, clockwork, ice; ice is
+  slippery).
+- **Six built-in arenas** (`src/game/arenas.ts`) that together use every knob: Forge Bowl,
+  Ember Ring, Zero-G Dish, Clockwork Spire, Frost Oval and Sumo Square. Each match is played
+  in one arena; the next match moves on to the next. `npm run report:arenas` simulates every
+  type matchup on every arena and reports round length, knockouts and type balance.
 - **Three top types** in a rock-paper-scissors loop: Striker (attack) hunts the opponent,
   Anvil (defense) is heavy and holds the middle, Needle (stamina) spins longest. Attack
   beats stamina, defense beats attack, stamina beats defense. Shape and tip show the
@@ -60,6 +66,7 @@ persistence (see the phase plan in the design document).
 npm install
 npm run dev          # dev server + managed Chromium with the Quest emulator (https://localhost:8081)
 npm run check:sim    # headless sanity check of the fight simulation
+npm run report:arenas # how each built-in arena plays, by simulation
 npm run typecheck
 npm run build
 ```
@@ -80,6 +87,7 @@ with the mouse; a small blue reticle marks where you look on the arena floor.
 | `N` | Hold to press a dent where you are looking (during a fight) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Burst the opponent now (during a fight) |
+| `A` | Switch to the next arena (outside a fight) |
 | `R` | Reset to the ready screen |
 | `P` | Re-place the arena in front of the current head pose |
 
@@ -98,7 +106,10 @@ The console logs `[MATCH]` lines for placement, launches and results.
 ## Layout
 
 ```
-src/game/sim.ts            Fight simulation (no three.js): heightmap arena, tops, collisions, verdict
+src/game/layout.ts         Arena layout data, rim shapes, validation
+src/game/arenas.ts         The built-in arenas
+src/game/arena-report.ts   Simulated play report for a layout
+src/game/sim.ts            Fight simulation (no three.js): arena from a layout, tops, collisions, verdict
 src/game/hands.ts          Pinch and fingertip input from WebXR hand joints
 src/game/visuals.ts        Generated matcaps, top shapes per type, burst debris, arena, sparks, cord, text card
 src/game/audio.ts          Synthesized sound effects and the spin hum
