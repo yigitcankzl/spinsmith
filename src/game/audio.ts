@@ -205,3 +205,28 @@ export function playPlace() {
 export function playRemove() {
   hiss(0.18, 0.2, 1500, 300, 1.5);
 }
+
+/** XP ticking up after a round: a soft rising blip. */
+export function playXp() {
+  tone(880, 0.05, 0.12, 'sine', 0, 1320);
+}
+
+/** Level up: an anvil strike and a rising bell chord. */
+export function playLevelUp() {
+  hiss(0.25, 0.25, 3000, 1500, 2);
+  [523, 659, 784, 1047, 1319].forEach((f, i) => {
+    tone(f, 0.1, 0.9, 'triangle', 0.15 + i * 0.08);
+    tone(f * 2.76, 0.03, 0.5, 'sine', 0.15 + i * 0.08);
+  });
+}
+
+/** A part unlocked: a bright two-note chime. */
+export function playUnlock() {
+  tone(1175, 0.09, 0.6, 'triangle');
+  tone(1760, 0.07, 0.8, 'triangle', 0.12);
+}
+
+/** A locked thing pinched: a dull clunk. */
+export function playLocked() {
+  tone(140, 0.15, 0.15, 'square', 0, 90);
+}

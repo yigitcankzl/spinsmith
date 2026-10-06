@@ -30,7 +30,9 @@ import {
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
-import { playPick, playPlace, playRemove } from './audio.js';
+import { playLocked, playPick, playPlace, playRemove } from './audio.js';
+import { unlockHint } from './progress.js';
+import type { Progress } from './progress.js';
 import { tag } from './builder.js';
 import { CYAN, glass, GLASS_LIGHT, ORANGE, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
@@ -62,7 +64,7 @@ function saveBuild(b: TopBuild) {
   localStorage.setItem(STORE_KEY, JSON.stringify(b));
 }
 
-type Item =
+export type Item =
   | { kind: 'ring' | 'core'; id: string; name: string; blurb: string }
   | { kind: 'tip'; id: TopBuild['tip']; name: string; blurb: string }
   | { kind: 'spin'; value: 1 | -1; name: string; blurb: string }
@@ -70,7 +72,7 @@ type Item =
   | { kind: 'preset'; build: TopBuild; name: string; blurb: string };
 
 /** Shelf rows, front (low) to back (high): label, items, item spacing. */
-const ROWS: [string, Item[], number][] = [
+export const ROWS: [string, Item[], number][] = [
   ['TIPS', TIPS.map((t) => ({ kind: 'tip' as const, id: t.id, name: t.name, blurb: t.blurb })), 0.05],
   ['CORES', CORES.map((c) => ({ kind: 'core' as const, id: c.id, name: c.name, blurb: c.blurb })), 0.06],
   ['RINGS', RINGS.map((r) => ({ kind: 'ring' as const, id: r.id, name: r.name, blurb: r.blurb })), 0.058],
@@ -120,6 +122,17 @@ interface Slot {
   flash: number;
   /** Its scale on the wall. */
   size: number;
+  /** Unlock key ('ring:hook'), or null for things never locked; its LOCKED tag. */
+  key: string | null;
+  lock: Mesh | null;
+  face: MeshBasicMaterial;
+}
+
+/** The unlock key of a shelf item, or null when it is never locked. */
+export function itemKey(item: Item): string | null {
+  if (item.kind === 'ring' || item.kind === 'core' || item.kind === 'tip') return `${item.kind}:${item.id}`;
+  if (item.kind === 'color') return `paint:${TOP_COLORS.indexOf(item.value)}`;
+  return null;
 }
 
 /** Tile frame colors: idle, pointed at, on your top. */
@@ -182,6 +195,7 @@ export class Forge {
   constructor(
     private readonly hooks: ForgeHooks,
     private readonly wall: Wall,
+    private readonly progress: Progress,
   ) {
     this.root.name = 'top-forge';
     this.buildShelf();
@@ -200,9 +214,21 @@ export class Forge {
     this.root.visible = false;
   }
 
+  /** A build with any part you have not unlocked swapped for a starter (old saves, fresh progress). */
+  allowed(b: TopBuild): TopBuild {
+    const open = (key: string) => this.progress.isUnlocked(key) || unlockHint(key) === null;
+    const out = { ...b };
+    if (!open(`ring:${out.ring}`)) out.ring = PRESETS[0].build.ring;
+    if (!open(`core:${out.core}`)) out.core = PRESETS[0].build.core;
+    if (!open(`tip:${out.tip}`)) out.tip = PRESETS[0].build.tip;
+    const paint = TOP_COLORS.indexOf(out.color);
+    if (paint >= 0 && !open(`paint:${paint}`)) out.color = TOP_COLORS[0];
+    return out;
+  }
+
   open() {
     this.floatSet = false;
-    this.build = loadBuild();
+    this.build = this.allowed(loadBuild());
     this.rebuildDisplay();
     this.root.visible = true;
     this.dropAll();
@@ -283,7 +309,10 @@ export class Forge {
       if (t?.kind === 'slot') hovered ??= t.slot;
     }
     for (const s of this.slots) {
-      const on = s === hovered;
+      const locked = this.locked(s);
+      if (s.lock) s.lock.visible = locked;
+      s.face.color.setHex(locked ? 0x07090e : 0x111824);
+      const on = s === hovered && !locked;
       const fitted = this.isOn(s.item);
       s.flash = Math.max(0, s.flash - dt);
       s.equipped.visible = fitted;
@@ -292,7 +321,7 @@ export class Forge {
       if (s.flash > 0) s.frame.color.lerp(this.white, s.flash / 0.8);
       const pulse = s.flash > 0 ? 1 + 0.25 * Math.sin((s.flash / 0.8) * Math.PI) : 1;
       s.model.position.set(s.home.x, s.home.y, s.home.z + (on ? 0.03 + 0.005 * Math.sin(this.time * 8) : 0));
-      s.model.scale.setScalar(s.size * (on ? 1.15 : 1) * pulse);
+      s.model.scale.setScalar(s.size * (on ? 1.15 : 1) * pulse * (locked ? 0.55 : 1));
     }
     if (!this.heldPart) this.showCard(hovered ? this.withItem(hovered.item) : null);
   }
@@ -307,6 +336,11 @@ export class Forge {
       return;
     }
     if (this.heldPart) return;
+    if (this.locked(target.slot)) {
+      playLocked();
+      this.say(`Locked: ${unlockHint(target.slot.key!)}`);
+      return;
+    }
     const item = target.slot.item;
     const model = itemModel(item);
     this.root.add(model);
@@ -396,6 +430,10 @@ export class Forge {
     else if (item.kind === 'preset') return { ...item.build, spin: this.build.spin, color: this.build.color };
     else return null;
     return b;
+  }
+
+  private locked(s: Slot) {
+    return s.key !== null && !this.progress.isUnlocked(s.key) && unlockHint(s.key) !== null;
   }
 
   /** True when the item is part of your top right now. */
@@ -534,7 +572,8 @@ export class Forge {
         const frame = new MeshBasicMaterial({ color: FRAME_IDLE.clone() });
         const border = new Mesh(new PlaneGeometry(w, ROW_GAP - 0.012), frame);
         border.position.set(home.x, y, 0.004);
-        const face = new Mesh(new PlaneGeometry(w - 0.008, ROW_GAP - 0.02), new MeshBasicMaterial({ color: 0x111824 }));
+        const faceMat = new MeshBasicMaterial({ color: 0x111824 });
+        const face = new Mesh(new PlaneGeometry(w - 0.008, ROW_GAP - 0.02), faceMat);
         face.position.set(home.x, y, 0.005);
         const label = tag(item.name, w * 0.95, 40);
         label.position.set(home.x, y - ROW_GAP / 2 + 0.022, 0.007);
@@ -550,8 +589,16 @@ export class Forge {
         // Rings and preset tops are wide: a little smaller, so they stay on their card.
         const size = WALL_SCALE * (item.kind === 'ring' ? 0.98 : item.kind === 'preset' ? 0.78 : item.kind === 'core' ? 0.8 : 1.3);
         model.scale.setScalar(size);
-        this.shelf.add(border, face, label, equipped, model);
-        this.slots.push({ item, model, home, frame, equipped, flash: 0, size });
+        // Locked parts show how they are earned.
+        const key = itemKey(item);
+        const hint = key ? unlockHint(key) : null;
+        let lock: Mesh | null = null;
+        if (hint) {
+          lock = tag(`LOCKED · ${hint}`, w * 0.95, 34);
+          lock.position.set(home.x, y - 0.012, 0.1);
+        }
+        this.shelf.add(border, face, label, equipped, model, ...(lock ? [lock] : []));
+        this.slots.push({ item, model, home, frame, equipped, flash: 0, size, key, lock, face: faceMat });
       });
     });
   }
@@ -585,7 +632,7 @@ export class Forge {
 }
 
 /** The model of a shelf item, sized to be easy to grab. */
-function itemModel(item: Item): Object3D {
+export function itemModel(item: Item): Object3D {
   const g = new Group();
   if (item.kind === 'ring') {
     const ring = RINGS.find((r) => r.id === item.id)!;

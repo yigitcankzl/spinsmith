@@ -1,16 +1,17 @@
-import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
+import { AdditiveBlending, CircleGeometry, createSystem, Group, Matrix4, Mesh, MeshBasicMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { CordTone, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { normRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, verdict } from './sim.js';
-import { Forge, loadBuild } from './forge.js';
-import { Hub } from './hub.js';
+import { Forge, itemKey, itemModel, loadBuild, ROWS } from './forge.js';
+import { Progress } from './progress.js';
+import { Hub, miniArena } from './hub.js';
 import { Wall } from './wall.js';
 import type { WallPlane } from './wall.js';
-import { allBuilds, buildName, PRESETS, roleOf, specFromBuild } from './parts.js';
+import { allBuilds, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, Cord, Label, OPPONENT_COLOR, Sparks, TopView } from './visuals.js';
 
@@ -91,17 +92,27 @@ export class MatchSystem extends createSystem({
     toLocal: (world, out) => this.root.worldToLocal(out.copy(world)),
     floorHeight: (n) => this.arena.floorHeight(n),
   });
+  /** Smith level, XP and unlocks, saved in the browser. */
+  private progress = new Progress(typeof localStorage === 'undefined' ? null : localStorage);
   /** The smithy wall on the real wall ahead: tool panel, scoreboard, arena shelf. */
   private wall = new Wall();
   /** The forge: build your own top from parts. */
   private forge = new Forge({
     done: (build) => this.leaveForge(build),
-  }, this.wall);
+  }, this.wall, this.progress);
   /** A demo round from the workshop's Try it: AI launches, no score, then back to the workshop. */
   private demo = false;
   private hubLogPending = false;
   /** The word in the middle of the wall's match bar. */
   private barMessage = '';
+  /** Points the match bar shows (kept after a match is decided), XP just earned, the last rip. */
+  private barPoints: [number, number] = [0, 0];
+  private xpGained = 0;
+  private lastPerfect = false;
+  private levelUpText = '';
+  /** Unlocks waiting to be shown over the arena, and the one showing. */
+  private reveals: string[] = [];
+  private reveal: { obj: Object3D; t: number } | null = null;
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
   private hub = new Hub();
@@ -200,6 +211,7 @@ export class MatchSystem extends createSystem({
       this.arenaView.root,
       this.sparks.points,
     );
+    this.myBuild = this.forge.allowed(this.myBuild);
     this.setBuilds(this.myBuild, this.theirBuild);
     this.root.add(this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
@@ -321,11 +333,18 @@ export class MatchSystem extends createSystem({
     this.tops.forEach((t, i) => this.hums[i].update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time));
     this.sinceClashSound += dt;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
-      this.wall.bar(this.mine.spin, this.theirs.spin, this.myPoints, this.theirPoints, MATCH_POINTS, ['YOU', 'RIVAL'], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage);
+      const p = this.progress;
+      this.wall.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_POINTS, ['YOU', 'RIVAL'], this.phase === 'fight' && this.barMessage === 'READY' ? 'FIGHT' : this.barMessage, {
+        level: p.level,
+        rank: p.rank,
+        fraction: p.fraction,
+        gained: this.phase === 'result' ? this.xpGained : 0,
+      });
     }
     this.myView.sync(this.mine, this.arena, this.time, dt);
     this.theirView.sync(this.theirs, this.arena, this.time, dt);
     this.sparks.update(dt);
+    this.updateRewards(dt);
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
   }
@@ -386,13 +405,14 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.visible = false;
     // Your top waits on its stand, not in the arena.
     this.mine.state = 'out';
-    this.hub.show(this.arenas, this.arenaIndex, this.myBuild);
+    this.hub.show(this.arenas, this.arenaIndex, this.myBuild, this.progress);
     this.label.set('');
     this.wall.setMode('home');
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
   private updateHub(dt: number) {
+    if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
     this.player.head.getWorldPosition(this.p);
     if (import.meta.env.DEV && this.hubLogPending) {
       this.hubLogPending = false;
@@ -412,6 +432,9 @@ export class MatchSystem extends createSystem({
     } else if (action.kind === 'workshop') {
       this.hub.hide();
       this.openWorkshop();
+    } else if (action.kind === 'locked') {
+      this.label.set(action.text);
+      this.labelTimer = 2;
     } else {
       this.arenaIndex = action.index;
       this.setArena(this.arenas[this.arenaIndex]);
@@ -463,10 +486,20 @@ export class MatchSystem extends createSystem({
   }
 
   /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
+  /**
+   * An opponent for your level: classic tops at first; from level 4 any build, and the higher you
+   * are the more builds it weighs to pick the strongest; mostly the other spin.
+   */
   private randomBuild(): TopBuild {
-    const pool = Math.random() < 0.5 ? PRESETS.map((p) => p.build) : allBuilds();
-    const b = pool[Math.floor(Math.random() * pool.length)];
-    return { ...b, spin: Math.random() < 0.7 ? -1 : 1, color: OPPONENT_COLOR };
+    const level = this.progress.level;
+    const pool = level < 4 ? PRESETS.map((p) => p.build) : allBuilds();
+    const tries = 1 + Math.floor(level / 4);
+    let best = pool[Math.floor(Math.random() * pool.length)];
+    for (let i = 1; i < tries; i++) {
+      const b = pool[Math.floor(Math.random() * pool.length)];
+      if (strength(b) > strength(best)) best = b;
+    }
+    return { ...best, spin: Math.random() < 0.7 ? -1 : 1, color: OPPONENT_COLOR };
   }
 
   private openWorkshop() {
@@ -643,6 +676,7 @@ export class MatchSystem extends createSystem({
     this.label.set('');
     this.wall.setMode('match');
     this.barMessage = 'READY';
+    this.barPoints = [this.myPoints, this.theirPoints];
   }
 
   private toLocal(world: Vector3) {
@@ -742,6 +776,7 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'result') this.toReady();
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
+    this.lastPerfect = perfect;
     playLaunch(power, perfect);
     const mh = this.mine.hand;
     const th = this.theirs.hand;
@@ -749,7 +784,9 @@ export class MatchSystem extends createSystem({
     const dir = aim + LAUNCH_TILT * mh;
     this.mine.launch(0, this.SPAWN, Math.sin(dir) * speed, -Math.cos(dir) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, mh);
     this.sparks.burst(0, this.arena.height(0, this.SPAWN), this.SPAWN, perfect ? 1 : power * 0.6);
-    const aiPower = 0.6 + Math.random() * 0.35;
+    // The rival rips harder as you level up.
+    const aiMin = Math.min(0.75, 0.5 + 0.015 * this.progress.level);
+    const aiPower = aiMin + Math.random() * (0.98 - aiMin);
     const aiAim = (Math.random() - 0.5) * 1.0;
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
     const aiDir = aiAim + LAUNCH_TILT;
@@ -866,8 +903,11 @@ export class MatchSystem extends createSystem({
       const points = finishPoints(loser);
       if (v === 1) this.myPoints += points;
       else this.theirPoints += points;
+      this.barPoints = [this.myPoints, this.theirPoints];
       const score = `You ${this.myPoints} - ${this.theirPoints}`;
-      if (this.myPoints >= MATCH_POINTS || this.theirPoints >= MATCH_POINTS) {
+      const decided = this.myPoints >= MATCH_POINTS || this.theirPoints >= MATCH_POINTS;
+      this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
+      if (decided) {
         text = `${this.myPoints > this.theirPoints ? 'You win the match!' : 'You lose the match'}\n${score}`;
         this.myPoints = 0;
         this.theirPoints = 0;
@@ -882,6 +922,51 @@ export class MatchSystem extends createSystem({
     if (v !== 2) {
       this.round++;
       this.typesPicked = false;
+    }
+  }
+
+  /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */
+  private earn(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
+    const before = this.progress.level;
+    const award = this.progress.award({ won, finish: loser.finish, pocketPoints: loser.pocketPoints, perfect: this.lastPerfect && won, matchOver, matchWon });
+    this.xpGained = award.gained;
+    playXp();
+    console.log(`[XP] +${award.gained} -> Lv ${this.progress.level} (${(this.progress.fraction * 100).toFixed(0)}%)${award.unlocked.length ? ` unlocked ${award.unlocked.join(', ')}` : ''}`);
+    if (award.levels.length) {
+      playLevelUp();
+      for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
+      this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
+    }
+    this.reveals.push(...award.unlocked);
+  }
+
+  /** Shows a level-up, then each new unlock spinning over the arena before it flies off. */
+  private updateRewards(dt: number) {
+    if (this.levelUpText && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+      this.label.set(this.levelUpText);
+      this.levelUpText = '';
+    }
+    if (!this.reveal && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+      const key = this.reveals.shift()!;
+      const obj = unlockModel(key, this.arenas);
+      this.stage.add(obj);
+      this.reveal = { obj, t: 0 };
+      playUnlock();
+      this.label.set(`NEW!\n${unlockName(key)}`);
+      // Keep the result up while it shows.
+      this.resultTimer = Math.max(this.resultTimer, 2.8);
+    }
+    const r = this.reveal;
+    if (!r) return;
+    r.t += dt;
+    const grow = Math.min(1, r.t / 0.3);
+    const leave = Math.max(0, (r.t - 2) / 0.6);
+    r.obj.position.set(0, 0.1 + 0.01 * Math.sin(r.t * 3) + leave * 0.3, 0);
+    r.obj.rotation.y += dt * 2.5;
+    r.obj.scale.setScalar(1.6 * grow * (1 - leave));
+    if (leave >= 1) {
+      r.obj.removeFromParent();
+      this.reveal = null;
     }
   }
 
@@ -939,4 +1024,27 @@ export class MatchSystem extends createSystem({
     }
     return false;
   }
+}
+
+/** A rough strength of a build from its box stats, for picking tougher opponents. */
+function strength(b: TopBuild): number {
+  const st = statsOf(specFromBuild(b));
+  return st.attack + st.defense + st.stamina + 0.5 * (st.dash + st.burst);
+}
+
+/** A readable name for an unlock key. */
+function unlockName(key: string): string {
+  const [kind, id] = key.split(':');
+  if (kind === 'paint') return 'New paint';
+  if (kind === 'arena') return `${id} arena`;
+  const name = kind === 'ring' ? RINGS.find((r) => r.id === id)?.name : kind === 'tip' ? TIPS.find((t) => t.id === id)?.name : id;
+  return `${name} ${kind}`;
+}
+
+/** The model shown when something is unlocked: the part, a paint pot, or the arena's miniature. */
+function unlockModel(key: string, arenas: ArenaLayout[]): Object3D {
+  const [kind, id] = key.split(':');
+  if (kind === 'arena') return miniArena(arenas.find((a) => a.name === id) ?? arenas[0], true);
+  for (const [, items] of ROWS) for (const item of items) if (itemKey(item) === key) return itemModel(item);
+  return new Group();
 }

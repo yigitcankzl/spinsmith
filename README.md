@@ -67,6 +67,16 @@ What works:
   home. A stats card floating to the right of your top shows the build, previews a part's effect (green gains, red losses) and says what
   just happened. `npm run report:tops` plays every build against the others and flags dominant
   builds and dead parts.
+- **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
+  burst, pocket or over finish, a perfect rip, and the match), filling levels 1-20 with ranks
+  (Apprentice, Journeyman, Smith, Master Smith, Legend). Levels open options, never power: you
+  start with the classic tops' parts, two paints and two arenas, and each level opens a part, a
+  paint or an arena; the 9-60 core comes from a first burst win and the Hook ring from a first
+  pocket or over win. Locked parts and arenas show dark with how they are earned. Rivals grow
+  tougher with your level (any build from level 4, stronger picks and harder rips higher up).
+  After a round the match bar shows the XP earned and the level bar; a level-up rings and
+  throws sparks, and each unlock spins over the arena. Your level and rank sit beside the stand.
+  Progress is saved in the browser.
 - **Burst:** hard hits build up damage and a top can burst apart, its parts flying and
   bouncing across the arena.
 - **Arena workshop:** pinch the blueprint on the arena rack. A menu board stands at the rack,

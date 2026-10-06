@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { ARENAS } from '../src/game/arenas.ts';
 import { cloneLayout, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
+import { LEVEL_UNLOCKS, Progress, xpToNext } from '../src/game/progress.ts';
 import { allBuilds, PRESETS, specFromBuild, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
@@ -355,6 +356,26 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
   idle.state = 'toppled';
   solo(rails, t, 0.05);
   assert.equal(t.sinceDash > 50, true, 'a gearless tip must not dash');
+}
+
+// 10. Progression: levels open their unlocks, deeds open theirs, nothing else opens.
+{
+  const p = new Progress();
+  assert.ok(p.isUnlocked('ring:striker') && !p.isUnlocked('ring:saw') && !p.isUnlocked('core:9-60'));
+  assert.equal(p.lockText('ring:saw'), 'Lv 5');
+  const burst = p.award({ won: true, finish: 'burst', perfect: false, matchOver: false, matchWon: false });
+  assert.deepEqual(burst.unlocked, ['core:9-60'], 'a burst win should open the 9-60 core');
+  const again = p.award({ won: true, finish: 'burst', perfect: false, matchOver: false, matchWon: false });
+  assert.ok(!again.unlocked.includes('core:9-60'), 'a deed opens its part once');
+  let total = 0;
+  for (let lv = 1; lv < 5; lv++) total += xpToNext(lv);
+  // Enough lost rounds to reach level 5 from scratch.
+  const q = new Progress();
+  const levels: number[] = [];
+  while (q.level < 5) levels.push(...q.award({ won: false, finish: null, perfect: false, matchOver: false, matchWon: false }).levels);
+  assert.deepEqual(levels, [2, 3, 4, 5]);
+  assert.ok(q.isUnlocked(LEVEL_UNLOCKS[5]) && !q.isUnlocked(LEVEL_UNLOCKS[6]), 'level 5 opens its part, not level 6');
+  assert.ok(total > 0);
 }
 
 console.log('sim-check: all passed');

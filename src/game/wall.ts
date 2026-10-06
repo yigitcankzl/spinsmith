@@ -63,10 +63,10 @@ export class Wall {
     this.board.position.set(WIDTH / 4 + 0.03, 0.12, 0.021);
     this.panel.add(back, sign, this.board, this.tools);
     this.hudCanvas.width = 1400;
-    this.hudCanvas.height = 260;
+    this.hudCanvas.height = 330;
     this.hudTex = new CanvasTexture(this.hudCanvas);
     this.hudTex.colorSpace = SRGBColorSpace;
-    this.hud = new Mesh(new PlaneGeometry(1.6, 0.297), new MeshBasicMaterial({ map: this.hudTex, transparent: true, depthWrite: false }));
+    this.hud = new Mesh(new PlaneGeometry(1.6, 0.377), new MeshBasicMaterial({ map: this.hudTex, transparent: true, depthWrite: false }));
     this.hud.position.y = 0.15;
     this.root.add(this.panel, this.hud);
     this.root.visible = false;
@@ -141,15 +141,15 @@ export class Wall {
    * on the left, the rival's on the right, points toward the match as pips, a message in between.
    * Redraws only when something visible changed.
    */
-  bar(mine: number, theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string) {
+  bar(mine: number, theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string, xp: { level: number; rank: string; fraction: number; gained: number }) {
     const a = Math.round(Math.max(0, Math.min(1, mine)) * 100);
     const b = Math.round(Math.max(0, Math.min(1, theirs)) * 100);
-    const key = [a, b, myPoints, theirPoints, names, message].join('|');
+    const key = [a, b, myPoints, theirPoints, names, message, xp.level, xp.fraction.toFixed(3), xp.gained].join('|');
     if (key === this.hudKey) return;
     this.hudKey = key;
     const g = this.hudCanvas.getContext('2d')!;
     const W = 1400;
-    glass(g, W, 260, ORANGE);
+    glass(g, W, 330, ORANGE);
     const barW = 560;
     const barY = 90;
     const side = (x0: number, dir: 1 | -1, value: number, color: string, name: string, points: number) => {
@@ -184,6 +184,24 @@ export class Wall {
     do g.font = `bold ${size--}px system-ui, sans-serif`;
     while (g.measureText(message).width > 200 && size > 20);
     g.fillText(message, W / 2, 120);
+    // Your smith level along the bottom: level and rank, the XP bar, the XP just earned.
+    g.font = '800 32px system-ui, sans-serif';
+    g.fillStyle = TEXT;
+    g.textAlign = 'left';
+    g.fillText(`Lv ${xp.level}`, 40, 280);
+    g.fillStyle = ORANGE;
+    g.font = '700 26px system-ui, sans-serif';
+    g.fillText(xp.rank.toUpperCase(), 130, 281);
+    g.fillStyle = 'rgba(255,255,255,0.1)';
+    g.fillRect(380, 270, 760, 20);
+    g.fillStyle = CYAN;
+    g.fillRect(380, 270, 760 * xp.fraction, 20);
+    if (xp.gained > 0) {
+      g.fillStyle = CYAN;
+      g.textAlign = 'right';
+      g.font = '800 32px system-ui, sans-serif';
+      g.fillText(`+${xp.gained} XP`, W - 40, 280);
+    }
     this.hudTex.needsUpdate = true;
   }
 }

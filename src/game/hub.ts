@@ -8,6 +8,7 @@
  */
 import {
   BoxGeometry,
+  CanvasTexture,
   CircleGeometry,
   ConeGeometry,
   CylinderGeometry,
@@ -16,17 +17,21 @@ import {
   MeshBasicMaterial,
   MeshMatcapMaterial,
   Object3D,
+  PlaneGeometry,
+  SRGBColorSpace,
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
-import { playPick, playRemove } from './audio.js';
+import { playLocked, playPick, playRemove } from './audio.js';
+import type { Progress } from './progress.js';
+import { CYAN, glass, ORANGE, TEXT } from './ui.js';
 import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import type { ArenaLayout, Theme } from './layout.js';
 import type { TopBuild } from './parts.js';
 import { makeMatcap, TopView } from './visuals.js';
 
-export type HubAction = { kind: 'play' } | { kind: 'arena'; index: number } | { kind: 'forge' } | { kind: 'workshop' };
+export type HubAction = { kind: 'play' } | { kind: 'arena'; index: number } | { kind: 'forge' } | { kind: 'workshop' } | { kind: 'locked'; text: string };
 
 /** Table stations (arena-local): the anvil at the right, the stand at the left, both near the player. */
 export const ANVIL_AT = new Vector3(0.24, 0, 0.06);
@@ -61,6 +66,8 @@ interface Pickable {
   carry: boolean;
   /** Carried things live in the arena's space while held (wall things are reparented). */
   homeParent?: Object3D;
+  /** How a locked thing is earned; locked things cannot be picked up. */
+  locked?: string;
   /** The thing itself, and its spot to return to (both in its parent's space). */
   model: Object3D;
   home: Vector3;
@@ -75,6 +82,9 @@ export class Hub {
   private standHolder = new Group();
   private items: Pickable[] = [];
   private labels: Mesh[] = [];
+  private rankCanvas = document.createElement('canvas');
+  private rankTex!: CanvasTexture;
+  private rankKey = '';
   private names: Mesh[] = [];
   private standTop: TopView | null = null;
   private anvilTop: TopView | null = null;
@@ -102,7 +112,8 @@ export class Hub {
   }
 
   /** Refreshes what the stations show: your top, and one miniature per arena. */
-  show(arenas: ArenaLayout[], current: number, build: TopBuild) {
+  show(arenas: ArenaLayout[], current: number, build: TopBuild, progress: Progress) {
+    this.drawRank(progress);
     this.root.visible = true;
     this.shelf.visible = true;
     const topKey = JSON.stringify(build);
@@ -119,10 +130,11 @@ export class Hub {
       this.anvilTop.root.position.set(0, ANVIL_FACE, 0);
       this.anvil.add(this.anvilTop.root);
     }
-    const arenasKey = JSON.stringify([arenas.map((a) => a.name), current]);
+    const locks = arenas.map((a) => progress.lockText(`arena:${a.name}`));
+    const arenasKey = JSON.stringify([arenas.map((a) => a.name), current, locks]);
     if (arenasKey !== this.arenasKey) {
       this.arenasKey = arenasKey;
-      this.fillRack(arenas, current);
+      this.fillRack(arenas, current, locks);
     }
   }
 
@@ -156,6 +168,10 @@ export class Hub {
       if (!h.tracked || !h.justPinched) continue;
       const it = this.under(h);
       if (!it) continue;
+      if (it.locked) {
+        playLocked();
+        return { kind: 'locked', text: `Locked: ${it.locked}` };
+      }
       playPick();
       if (!it.carry) return it.action;
       // Carried things move into the arena's space; from afar they fly to the hand first.
@@ -257,7 +273,7 @@ export class Hub {
     this.items.push({ action: { kind: 'workshop' }, carry: false, model: blueprint, home });
   }
 
-  private fillRack(arenas: ArenaLayout[], current: number) {
+  private fillRack(arenas: ArenaLayout[], current: number, locks: (string | null)[]) {
     for (const it of this.items.filter((it) => it.action.kind === 'arena')) it.model.removeFromParent();
     this.items = this.items.filter((it) => it.action.kind !== 'arena');
     for (const n of this.names) n.removeFromParent();
@@ -270,11 +286,13 @@ export class Hub {
       // Tipped toward the player so the floor shows.
       model.rotation.x = 0.7;
       model.position.copy(home);
-      const name = tag(layout.name, 0.15, 40);
+      const name = tag(locks[i] ? `${layout.name} · ${locks[i]}` : layout.name, 0.15, 40);
       name.position.set(home.x, home.y + 0.075, 0.06);
       this.shelf.add(model, name);
       this.names.push(name);
-      this.items.push({ action: { kind: 'arena', index: i }, carry: true, model, home, homeParent: this.shelf });
+      // A locked arena is a dark shape until it is earned.
+      if (locks[i]) model.traverse((o) => ((o as Mesh).material as MeshBasicMaterial | undefined)?.color?.setHex(0x1c2230));
+      this.items.push({ action: { kind: 'arena', index: i }, carry: true, model, home, homeParent: this.shelf, locked: locks[i] ?? undefined });
     });
   }
 
@@ -288,14 +306,43 @@ export class Hub {
   }
 
   /** A short brass stand at the near rim holding your top: carry it into the arena to play. */
+  /** Your smith level beside the stand: level, rank and the bar toward the next level. */
+  private drawRank(progress: Progress) {
+    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}`;
+    if (key === this.rankKey) return;
+    this.rankKey = key;
+    const g = this.rankCanvas.getContext('2d')!;
+    glass(g, 512, 150, ORANGE);
+    g.fillStyle = TEXT;
+    g.textBaseline = 'middle';
+    g.font = '800 54px system-ui, sans-serif';
+    g.fillText(`Lv ${progress.level}`, 28, 52);
+    g.fillStyle = ORANGE;
+    g.font = '700 34px system-ui, sans-serif';
+    g.fillText(progress.rank.toUpperCase(), 190, 54);
+    g.fillStyle = 'rgba(255,255,255,0.1)';
+    g.fillRect(28, 100, 456, 20);
+    g.fillStyle = CYAN;
+    g.fillRect(28, 100, 456 * progress.fraction, 20);
+    this.rankTex.needsUpdate = true;
+  }
+
   private buildStand() {
     this.stand.position.copy(STAND_AT);
+    this.rankCanvas.width = 512;
+    this.rankCanvas.height = 150;
+    this.rankTex = new CanvasTexture(this.rankCanvas);
+    this.rankTex.colorSpace = SRGBColorSpace;
+    const rank = new Mesh(new PlaneGeometry(0.1, 0.029), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
+    rank.position.set(0, 0.17, 0);
+    rank.rotation.x = -0.3;
+    this.stand.add(rank);
     const stem = new Mesh(new CylinderGeometry(0.008, 0.016, 0.05, 16), new MeshMatcapMaterial({ matcap: DARK }));
     stem.position.y = 0.025;
     const cup = new Mesh(new TorusGeometry(0.016, 0.003, 8, 32).rotateX(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
     cup.position.y = 0.052;
     this.stand.add(stem, cup);
-    this.label('PLAY', this.stand, 0.12);
+    this.label('PLAY', this.stand, 0.11);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
     this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3() });
@@ -310,7 +357,7 @@ export class Hub {
 }
 
 /** A miniature of an arena: its floor, rim in the theme color, and its pockets. */
-function miniArena(layout: ArenaLayout, current: boolean): Group {
+export function miniArena(layout: ArenaLayout, current: boolean): Group {
   const outer = new Group();
   const g = new Group();
   outer.add(g);
