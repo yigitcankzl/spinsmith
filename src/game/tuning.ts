@@ -26,4 +26,10 @@ export const TUNE = {
   fullSpeed: knob('fullSpeed', 1.0),
   /** Launch power from which a pull is white hot. */
   perfect: knob('perfect', 0.92),
+  /** A well needs the fingertip moving down at least this fast as it presses in (m/s). */
+  wellSpeed: knob('wellSpeed', 0.15),
+  /** No well from a hand this soon after it set a ramp (s): the release dips the fingers. */
+  wellAfterRamp: knob('wellAfterRamp', 0.3),
+  /** A far ramp is set only after a pinch held this long (s); a quick tap does nothing. */
+  farHold: knob('farHold', 0.12),
 };

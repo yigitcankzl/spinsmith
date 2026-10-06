@@ -226,6 +226,10 @@ export class MatchSystem extends createSystem({
   private shaping: Record<Side, { x: number; z: number; y0: number; sx: number; sz: number; t: number; far: boolean; amp: number; dx: number; dz: number } | null> = { left: null, right: null };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
   private pressing: Record<Side, boolean> = { left: false, right: false };
+  /** Each hand's fingertip height last frame (arena-local), and when it last set a ramp. */
+  private tipY: Record<Side, number> = { left: 0, right: 0 };
+  private tipDown: Record<Side, number> = { left: 0, right: 0 };
+  private rampAt: Record<Side, number> = { left: -9, right: -9 };
   /** The shaping economy, the marks for shapes and ghosts, the charge embers at the near rim. */
   private charges = new ShapingCharges();
   private marks = new ShapeMarks(0xff8a2a);
@@ -1086,6 +1090,7 @@ export class MatchSystem extends createSystem({
     this.charges.reset();
     this.lastShape = null;
     this.wellInRound = false;
+    this.rampAt.left = this.rampAt.right = -9;
     if (perfect && !this.demo) this.perfectInMatch = true;
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
@@ -1161,16 +1166,25 @@ export class MatchSystem extends createSystem({
       }
       const d = this.shaping[side];
       if (d) {
-        // Released: the ramp is set, if a charge is left.
+        // Released: the ramp is set, if a charge is left (a far pinch must be held a moment).
         this.shaping[side] = null;
-        this.makeShape('ramp', d.x, d.z, d.amp, side, d.dx, d.dz);
+        if (!d.far || d.t >= TUNE.farHold) {
+          this.makeShape('ramp', d.x, d.z, d.amp, side, d.dx, d.dz);
+          this.rampAt[side] = this.elapsed;
+        }
       }
-      // A fingertip pressed into the floor makes a well, once per press.
+      // A fingertip pressed into the floor makes a well, once per press, if it came down with
+      // intent (a hand resting or drifting down does not) and not just as a ramp was let go.
       const tip = this.toLocal(h.index);
       const depth = this.arena.inside(tip.x, tip.z) ? this.arena.height(tip.x, tip.z) - tip.y : -1;
+      // Downward speed (m/s), smoothed over about 80 ms so tracking jitter is not a press.
+      const raw = ((this.tipY[side] - tip.y) * ARENA_SCALE) / Math.max(1e-3, this.frameDt);
+      this.tipY[side] = tip.y;
+      const down = (this.tipDown[side] += (raw - this.tipDown[side]) * (1 - Math.exp(-this.frameDt / 0.08)));
       if (depth > 0.004 && !this.pressing[side] && open) {
         this.pressing[side] = true;
-        this.makeShape('well', tip.x, tip.z, SHAPE_SIZE.well, side);
+        if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp) this.makeShape('well', tip.x, tip.z, SHAPE_SIZE.well, side);
+        else if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${down.toFixed(2)} m/s down`);
       } else if (depth < 0) this.pressing[side] = false;
     }
   }
