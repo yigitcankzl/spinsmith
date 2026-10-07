@@ -800,6 +800,7 @@ export class MatchSystem extends createSystem({
         gained: this.phase === 'result' ? this.xpGained : 0,
         show: this.phase === 'result',
       });
+      this.bar.animate(this.mine.spin, this.theirs.spin, dt);
     }
     // Visuals only: after a finish your shape caused they slow down for a moment.
     const vdt = this.slowMo > 0 ? dt * SLOW_MO : dt;
@@ -2436,6 +2437,8 @@ export class MatchSystem extends createSystem({
           this.hitStop = clash.strength > 0.85 ? 0.11 : 0.07;
           this.myView.shake(clash.strength);
           this.theirView.shake(clash.strength);
+          this.bar.hit(0);
+          this.bar.hit(1);
           this.roomLight.hit();
           this.accumulator = 0;
           duck(0.5, 0.15);
