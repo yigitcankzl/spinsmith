@@ -1121,7 +1121,7 @@ export class MatchSystem extends createSystem({
     // The forge is the arena transformed: the floor sinks, the anvil and the drawers rise.
     this.bar.mesh.visible = false;
     // The first session's forge visit is about one part: the one just earned.
-    const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:rush' : null;
+    const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:spur' : null;
     this.progress.advance('fit');
     this.forge.open(focus);
   }
@@ -2966,7 +2966,7 @@ export class MatchSystem extends createSystem({
     }
     this.reveals.push(...award.unlocked);
     // The first session's own part goes first: the forge calls for it next.
-    this.reveals.sort((a, b) => Number(b === 'tip:rush') - Number(a === 'tip:rush'));
+    this.reveals.sort((a, b) => Number(b === 'tip:spur') - Number(a === 'tip:spur'));
     if (!this.demo) this.trackComeBack(won, loser, matchOver, matchWon);
     // The first match is over: the anvil appears and calls for the new part.
     if (matchOver && GUIDE_ORDER.indexOf(this.progress.guide) < GUIDE_ORDER.indexOf('forge')) this.progress.advance('forge');

@@ -41,7 +41,7 @@ export interface Core {
   blurb: string;
 }
 
-export type TipShape = 'flat' | 'rush' | 'taper' | 'ball' | 'needle' | 'orb';
+export type TipShape = 'chisel' | 'spur' | 'awl' | 'dome' | 'pin' | 'bead';
 
 export interface Tip {
   id: TipShape;
@@ -176,22 +176,36 @@ export const RINGS: Ring[] = [
 ];
 
 export const CORES: Core[] = [
-  { id: '3-50', name: 'Stub', height: 0.005, lock: 0.9, punch: 1, teeth: 3, weight: 4, blurb: 'Low: hits under, scrapes slopes' },
-  { id: '4-60', name: 'Bolt', height: 0.006, lock: 1, punch: 1, teeth: 4, weight: 5, blurb: 'Standard height and lock' },
-  { id: '9-60', name: 'Clamp', height: 0.006, lock: 1.35, punch: 0.93, teeth: 9, weight: 7, blurb: 'Locked tight: hard to shatter' },
-  { id: '5-80', name: 'Stilt', height: 0.008, lock: 1, punch: 1, teeth: 5, weight: 6, blurb: 'Tall: rides over low hits' },
+  { id: 'stub', name: 'Stub', height: 0.005, lock: 0.9, punch: 1, teeth: 3, weight: 4, blurb: 'Low: hits under, scrapes slopes' },
+  { id: 'bolt', name: 'Bolt', height: 0.006, lock: 1, punch: 1, teeth: 4, weight: 5, blurb: 'Standard height and lock' },
+  { id: 'clamp', name: 'Clamp', height: 0.006, lock: 1.35, punch: 0.93, teeth: 9, weight: 7, blurb: 'Locked tight: hard to shatter' },
+  { id: 'stilt', name: 'Stilt', height: 0.008, lock: 1, punch: 1, teeth: 5, weight: 6, blurb: 'Tall: rides over low hits' },
   // Drifter's signature.
-  { id: '7-70', name: 'Spindle', height: 0.007, lock: 1.15, punch: 0.97, teeth: 7, weight: 6, blurb: 'Mid height, locks well' },
+  { id: 'spindle', name: 'Spindle', height: 0.007, lock: 1.15, punch: 0.97, teeth: 7, weight: 6, blurb: 'Mid height, locks well' },
 ];
 
 export const TIPS: Tip[] = [
-  { id: 'flat', name: 'Chisel', spinDrain: 0.0535, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
-  { id: 'rush', name: 'Spur', spinDrain: 0.0533, roam: 0.45, cruise: 0.58, drive: 2.6, maxSpeed: 1.9, seek: 4, center: 0, gear: 1.25, weight: 4, blurb: 'Aggressive, steers better' },
-  { id: 'taper', name: 'Awl', spinDrain: 0.0523, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
-  { id: 'ball', name: 'Dome', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.84, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
-  { id: 'needle', name: 'Pin', spinDrain: 0.0485, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
-  { id: 'orb', name: 'Bead', spinDrain: 0.0525, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
+  { id: 'chisel', name: 'Chisel', spinDrain: 0.0535, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
+  { id: 'spur', name: 'Spur', spinDrain: 0.0533, roam: 0.45, cruise: 0.58, drive: 2.6, maxSpeed: 1.9, seek: 4, center: 0, gear: 1.25, weight: 4, blurb: 'Aggressive, steers better' },
+  { id: 'awl', name: 'Awl', spinDrain: 0.0523, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
+  { id: 'dome', name: 'Dome', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.84, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
+  { id: 'pin', name: 'Pin', spinDrain: 0.0485, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
+  { id: 'bead', name: 'Bead', spinDrain: 0.0525, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
 ];
+
+/** Part ids before the Oct 8 rename (saves from then still load): old id to new. */
+const OLD_IDS: Record<string, string> = { '3-50': 'stub', '4-60': 'bolt', '9-60': 'clamp', '5-80': 'stilt', '7-70': 'spindle', flat: 'chisel', rush: 'spur', taper: 'awl', ball: 'dome', needle: 'pin', orb: 'bead' };
+
+/** A saved build with today's part ids. */
+export function migrateBuild<T extends { core: string; tip: string }>(b: T): T {
+  return { ...b, core: OLD_IDS[b.core] ?? b.core, tip: OLD_IDS[b.tip] ?? b.tip };
+}
+
+/** An unlock key with today's part ids ('tip:rush' becomes 'tip:spur'). */
+export function migrateKey(key: string): string {
+  const [kind, id] = key.split(':');
+  return (kind === 'core' || kind === 'tip') && OLD_IDS[id] ? `${kind}:${OLD_IDS[id]}` : key;
+}
 
 /** A build must stay at or under this many grams: heavy rings need light cores and tips. */
 export const WEIGHT_LIMIT = 40;
@@ -227,9 +241,9 @@ export const EMBLEM_NAMES = ['Forge orange', 'White heat', 'Violet', 'Gold', 'Gr
 
 /** The three classic tops as builds; the simulation's ATTACK, DEFENSE and STAMINA are made from these. */
 export const PRESETS: { name: string; build: TopBuild }[] = [
-  { name: 'Striker', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: 1, color: 0xe8661c } },
-  { name: 'Anvil', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: 1, color: 0xe8661c } },
-  { name: 'Halo', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: 1, color: 0xe8661c } },
+  { name: 'Striker', build: { ring: 'striker', core: 'bolt', tip: 'chisel', spin: 1, color: 0xe8661c } },
+  { name: 'Anvil', build: { ring: 'anvil', core: 'bolt', tip: 'dome', spin: 1, color: 0xe8661c } },
+  { name: 'Halo', build: { ring: 'halo', core: 'bolt', tip: 'pin', spin: 1, color: 0xe8661c } },
 ];
 
 export const ringOf = (b: TopBuild) => RINGS.find((r) => r.id === b.ring) ?? RINGS[0];
@@ -332,13 +346,13 @@ export interface Rival {
 }
 
 export const RIVALS: Rival[] = [
-  { name: 'Rim Raider', move: 'charge', style: 'hits hard from the rim', title: 'the Ember Runner', intro: 'Keep up if you can.', win: 'Too slow, smith.', lose: 'Next time I go faster.', tip: 'It lives on the rim: ramp it as it comes round', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: -1, color: 0 }, level: 1 },
-  { name: 'Iron Keep', move: 'quake', style: 'holds the middle, hard to move', title: 'the Cinder Champion', intro: 'Move me. I dare you.', win: 'The middle is mine.', lose: 'You moved the mountain.', tip: 'Heavy in the middle: wait for its quake, then strike it out', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: -1, color: 0 }, level: 1 },
-  { name: 'Drifter', move: 'pull', style: 'spins longest, waits you out', title: 'the Long Spin', intro: 'I can wait all day.', win: 'Still spinning.', lose: 'You outlasted the drift.', tip: 'It outlasts: knock it out early, before the spin runs down', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
-  { name: 'Leech', move: 'pull', style: 'opposite spin: steals yours', title: 'the Spin Thief', intro: 'Your spin looks tasty.', win: 'Thanks for the spin.', lose: 'Nothing left to steal.', tip: 'It steals spin: keep away and ramp it into a pit', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
-  { name: 'Hookjaw', move: 'charge', style: 'lifts you over low walls', title: 'the Wall Breaker', intro: 'Walls are suggestions.', win: 'Over you go.', lose: 'You kept your feet.', tip: 'It throws you over low walls: cup your own top when it charges', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
-  { name: 'Sawtooth', move: 'charge', style: 'chips you toward a shatter', title: 'the Iron Champion', intro: 'Every hit takes a piece.', win: 'In pieces.', lose: 'Not a scratch? Fine.', tip: 'Every hit chips you: a Ward or a cup keeps you whole', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
-  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', title: 'the Crown', intro: 'The crown is earned here.', win: 'Not yet, smith.', lose: 'Wear it well.', tip: 'Tall and locked: a Tilt or a ramp under it moves it', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
+  { name: 'Rim Raider', move: 'charge', style: 'hits hard from the rim', title: 'the Ember Runner', intro: 'Keep up if you can.', win: 'Too slow, smith.', lose: 'Next time I go faster.', tip: 'It lives on the rim: ramp it as it comes round', build: { ring: 'striker', core: 'bolt', tip: 'chisel', spin: -1, color: 0 }, level: 1 },
+  { name: 'Iron Keep', move: 'quake', style: 'holds the middle, hard to move', title: 'the Cinder Champion', intro: 'Move me. I dare you.', win: 'The middle is mine.', lose: 'You moved the mountain.', tip: 'Heavy in the middle: wait for its quake, then strike it out', build: { ring: 'anvil', core: 'bolt', tip: 'dome', spin: -1, color: 0 }, level: 1 },
+  { name: 'Drifter', move: 'pull', style: 'spins longest, waits you out', title: 'the Long Spin', intro: 'I can wait all day.', win: 'Still spinning.', lose: 'You outlasted the drift.', tip: 'It outlasts: knock it out early, before the spin runs down', build: { ring: 'halo', core: 'bolt', tip: 'pin', spin: -1, color: 0 }, level: 1 },
+  { name: 'Leech', move: 'pull', style: 'opposite spin: steals yours', title: 'the Spin Thief', intro: 'Your spin looks tasty.', win: 'Thanks for the spin.', lose: 'Nothing left to steal.', tip: 'It steals spin: keep away and ramp it into a pit', build: { ring: 'cog', core: 'clamp', tip: 'awl', spin: -1, color: 0 }, level: 4 },
+  { name: 'Hookjaw', move: 'charge', style: 'lifts you over low walls', title: 'the Wall Breaker', intro: 'Walls are suggestions.', win: 'Over you go.', lose: 'You kept your feet.', tip: 'It throws you over low walls: cup your own top when it charges', build: { ring: 'hook', core: 'stub', tip: 'spur', spin: -1, color: 0 }, level: 6 },
+  { name: 'Sawtooth', move: 'charge', style: 'chips you toward a shatter', title: 'the Iron Champion', intro: 'Every hit takes a piece.', win: 'In pieces.', lose: 'Not a scratch? Fine.', tip: 'Every hit chips you: a Ward or a cup keeps you whole', build: { ring: 'saw', core: 'stub', tip: 'bead', spin: -1, color: 0 }, level: 9 },
+  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', title: 'the Crown', intro: 'The crown is earned here.', win: 'Not yet, smith.', lose: 'Wear it well.', tip: 'Tall and locked: a Tilt or a ramp under it moves it', build: { ring: 'anvil', core: 'stilt', tip: 'pin', spin: -1, color: 0 }, level: 12 },
 ];
 
 /**

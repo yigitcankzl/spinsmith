@@ -36,7 +36,7 @@ import { tag } from './builder.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import { TAB_LINE, traySpot, WORK as REACH_WORK } from './reach.js';
 import type { HandState } from './hands.js';
-import { buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, roleOf, SEAL_BLURBS, SEAL_NAMES, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
+import { buildName, CORES, migrateBuild, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, roleOf, SEAL_BLURBS, SEAL_NAMES, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import { SEALS } from './sim.js';
 import type { Seal } from './sim.js';
 import type { TopBuild, TopStats } from './parts.js';
@@ -54,7 +54,7 @@ export function loadBuild(): TopBuild {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
-      const b = JSON.parse(raw) as TopBuild;
+      const b = migrateBuild(JSON.parse(raw) as TopBuild);
       // The first paint was a salmon before the palette pass: old saves get the new forge orange.
       if (b.color === 0xd6784f) b.color = TOP_COLORS[0];
       if (RINGS.some((r) => r.id === b.ring) && CORES.some((c) => c.id === b.core) && TIPS.some((t) => t.id === b.tip) && weightOf(b) <= WEIGHT_LIMIT) return b;

@@ -411,12 +411,12 @@ TUNING.grace = 0;
 // 10. Progression: levels open their unlocks, deeds open theirs, nothing else opens.
 {
   const p = new Progress();
-  assert.ok(p.isUnlocked('ring:striker') && !p.isUnlocked('ring:saw') && !p.isUnlocked('core:9-60'));
+  assert.ok(p.isUnlocked('ring:striker') && !p.isUnlocked('ring:saw') && !p.isUnlocked('core:clamp'));
   assert.equal(p.lockText('ring:saw'), 'Knock out Sawtooth or Lv 14');
   const burst = p.award({ won: true, finish: 'burst', perfect: false, matchOver: false, matchWon: false });
-  assert.deepEqual(burst.unlocked, ['core:9-60'], 'a burst win should open the 9-60 core');
+  assert.deepEqual(burst.unlocked, ['core:clamp'], 'a burst win should open the 9-60 core');
   const again = p.award({ won: true, finish: 'burst', perfect: false, matchOver: false, matchWon: false });
-  assert.ok(!again.unlocked.includes('core:9-60'), 'a deed opens its part once');
+  assert.ok(!again.unlocked.includes('core:clamp'), 'a deed opens its part once');
   let total = 0;
   for (let lv = 1; lv < 5; lv++) total += xpToNext(lv);
   // Enough lost rounds to reach level 5 from scratch.
@@ -429,7 +429,7 @@ TUNING.grace = 0;
   // The first finished match opens the first-session part, win or lose.
   const first = new Progress();
   const r = first.award({ won: false, finish: null, perfect: false, matchOver: true, matchWon: false });
-  assert.ok(r.unlocked.includes('tip:rush') && first.matches === 1, 'the first match should open the Rush tip');
+  assert.ok(r.unlocked.includes('tip:spur') && first.matches === 1, 'the first match should open the Rush tip');
 }
 
 // 11. The first-session guide only moves forward and survives a save and reload.
@@ -446,7 +446,7 @@ TUNING.grace = 0;
   const again = new Progress(storage);
   assert.equal(again.guide, 'fit', 'the guide resumes where it was after a reload');
   assert.equal(again.matches, 1);
-  assert.ok(again.isUnlocked('tip:rush'));
+  assert.ok(again.isUnlocked('tip:spur'));
   again.advance('done');
   assert.equal(new Progress(storage).guide, 'done');
   // Saves from before the guide existed skip it once the player has played.
@@ -519,17 +519,17 @@ TUNING.grace = 0;
   // Marks: only new marks are reported; champions keep their wins, newest first, at most three.
   assert.equal(p.mark('Iron Keep', MARK.beaten | MARK.knockout), MARK.beaten | MARK.knockout);
   assert.equal(p.mark('Iron Keep', MARK.knockout), 0);
-  const b = (tip: 'flat' | 'ball' | 'needle' | 'orb') => ({ ...PRESETS[0].build, tip });
-  p.recordChampion(b('flat'));
-  p.recordChampion(b('ball'));
-  p.recordChampion(b('flat'));
-  for (const t of ['needle', 'orb'] as const) p.recordChampion(b(t));
+  const b = (tip: 'chisel' | 'ball' | 'needle' | 'orb') => ({ ...PRESETS[0].build, tip });
+  p.recordChampion(b('chisel'));
+  p.recordChampion(b('dome'));
+  p.recordChampion(b('chisel'));
+  for (const t of ['pin', 'bead'] as const) p.recordChampion(b(t));
   assert.equal(p.champions.length, CHAMPIONS);
-  assert.equal(p.champions[0].build.tip, 'orb');
+  assert.equal(p.champions[0].build.tip, 'bead');
   const back = new Progress(st);
   assert.equal(back.stamps, 5, 'stamps survive a reload');
   assert.equal(back.marksOf('Iron Keep'), MARK.beaten | MARK.knockout, 'marks survive a reload');
-  assert.deepEqual(back.champions.map((c) => c.build.tip), ['orb', 'needle', 'flat']);
+  assert.deepEqual(back.champions.map((c) => c.build.tip), ['bead', 'pin', 'chisel']);
   assert.equal(back.champions[2].wins, 2, 'a champion keeps its record');
   // Today's order stays the same all day, even after a level-up opens new rivals, and after a reload.
   const first = back.orderFor('2026-10-07', () => dailyOrder('2026-10-07', ctx));
@@ -860,6 +860,15 @@ TUNING.grace = 0;
   let ten = false;
   for (let i = 0; i < 10; i++) ten = p.wonMatchIn(`Arena ${i % 10}`);
   assert.ok(ten && !new Progress().wonMatchIn('x'), 'ten different arenas');
+}
+
+// 29. Saves from before the part rename load with today's ids.
+{
+  const store = new Map<string, string>([['spinsmith.progress.v1', JSON.stringify({ level: 3, xp: 0, unlocked: ['tip:rush', 'core:9-60'], quests: [], champions: [{ build: { ring: 'striker', core: '4-60', tip: 'flat', spin: 1, color: 0 }, wins: 1 }] })]]);
+  const p = new Progress({ getItem: (k) => store.get(k) ?? null, setItem: (k, v) => void store.set(k, v) });
+  assert.ok(p.isUnlocked('tip:spur') && p.isUnlocked('core:clamp'), 'old unlock keys load as the new ids');
+  assert.equal(p.champions[0].build.tip, 'chisel');
+  assert.equal(p.champions[0].build.core, 'bolt');
 }
 
 // 25. The comfort dial steps through every mode and wraps round.

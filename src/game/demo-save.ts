@@ -35,7 +35,7 @@ export function demoSave(storage: WritableStorage, today = new Date()): Progress
   p.claimSignature('Rim Raider');
   p.claimSignature('Iron Keep');
   const halo: TopBuild = { ...PRESETS[2].build };
-  const striker: TopBuild = { ...PRESETS[0].build, tip: 'rush' };
+  const striker: TopBuild = { ...PRESETS[0].build, tip: 'spur' };
   p.recordChampion(halo);
   p.recordChampion(striker);
   p.recordChampion(striker);

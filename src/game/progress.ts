@@ -6,6 +6,7 @@
  * No three.js or DOM here (storage is passed in).
  */
 import type { TopBuild } from './parts.ts';
+import { migrateBuild, migrateKey } from './parts.ts';
 import type { Order } from './orders.ts';
 
 export const MAX_LEVEL = 20;
@@ -23,15 +24,15 @@ export function rankOf(level: number): string {
   return 'Apprentice';
 }
 
-/** Unlock keys look like 'ring:hook', 'core:9-60', 'tip:orb', 'paint:2', 'arena:Sumo Square'. */
+/** Unlock keys look like 'ring:hook', 'core:clamp', 'tip:bead', 'paint:2', 'arena:Sumo Square'. */
 export const STARTERS = [
   'ring:striker',
   'ring:anvil',
   'ring:halo',
-  'core:4-60',
-  'tip:flat',
-  'tip:ball',
-  'tip:needle',
+  'core:bolt',
+  'tip:chisel',
+  'tip:dome',
+  'tip:pin',
   'paint:0',
   'paint:1',
   'arena:Forge Bowl',
@@ -43,8 +44,8 @@ export const STARTERS = [
 export const LEVEL_UNLOCKS: Record<number, string> = {
   2: 'arena:Zero-G Dish',
   3: 'paint:2',
-  4: 'core:3-50',
-  5: 'tip:taper',
+  4: 'core:stub',
+  5: 'tip:awl',
   6: 'paint:3',
   7: 'arena:Clockwork Spire',
   8: 'paint:4',
@@ -55,7 +56,7 @@ export const LEVEL_UNLOCKS: Record<number, string> = {
   13: 'arena:Sumo Square',
   14: 'ring:saw',
   15: 'emblem:1',
-  16: 'core:5-80',
+  16: 'core:stilt',
   17: 'emblem:2',
   18: 'emblem:3',
   19: 'emblem:4',
@@ -87,11 +88,11 @@ export const ARENA_UNLOCKS: Record<number, string> = {
 export const RIVAL_SIGNATURE: Record<string, string> = {
   'Rim Raider': 'ring:gale',
   'Iron Keep': 'ring:bulwark',
-  Drifter: 'core:7-70',
+  Drifter: 'core:spindle',
   Leech: 'ring:cog',
   Hookjaw: 'ring:hook',
   Sawtooth: 'ring:saw',
-  Bastion: 'core:5-80',
+  Bastion: 'core:stilt',
 };
 
 /** Strike seals (docs/DUEL-DESIGN.md): the Anvil Strike is yours from the start. */
@@ -127,9 +128,9 @@ export const CHAMPIONS = 3;
 /** Parts earned by a deed rather than a level. */
 export const QUEST_UNLOCKS: Record<string, { key: string; text: string }> = {
   // The first session's reward: every new player earns one part, win or lose.
-  first: { key: 'tip:rush', text: 'Finish your first match' },
-  burst: { key: 'core:9-60', text: 'Win a round by SHATTER' },
-  knockout: { key: 'tip:orb', text: 'Win a round by slag pit or throw' },
+  first: { key: 'tip:spur', text: 'Finish your first match' },
+  burst: { key: 'core:clamp', text: 'Win a round by SHATTER' },
+  knockout: { key: 'tip:bead', text: 'Win a round by slag pit or throw' },
 };
 
 /** Feats: ways of winning, each earned once, mostly with your hands. */
@@ -250,13 +251,13 @@ export class Progress {
         this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
         this.level = Math.min(MAX_LEVEL, Math.max(1, s.level | 0));
         this.xp = Math.max(0, s.xp | 0);
-        for (const k of s.unlocked) this.unlocked.add(k);
+        for (const k of s.unlocked) this.unlocked.add(migrateKey(k));
         // Saves from before an unlock was added still get everything their level has opened.
         for (let lv = 2; lv <= this.level; lv++) for (const m of [LEVEL_UNLOCKS, ARENA_UNLOCKS, SEAL_UNLOCKS, RIVAL_UNLOCKS]) if (m[lv]) this.unlocked.add(m[lv]);
         for (const q of s.quests) this.quests.add(q);
         for (const d of s.orders ?? []) this.orders.add(d);
         this.marks = { ...(s.marks ?? {}) };
-        this.champions = (s.champions ?? []).slice(0, CHAMPIONS);
+        this.champions = (s.champions ?? []).slice(0, CHAMPIONS).map((c) => ({ ...c, build: migrateBuild(c.build) }));
         this.order = s.order ?? null;
         this.arenaPin = s.arenaPin ?? null;
         this.recentArenas = s.recentArenas ?? [];

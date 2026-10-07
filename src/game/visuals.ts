@@ -178,7 +178,7 @@ const RATCHET_METAL = new MeshStandardMaterial({ color: 0x6b717d, metalness: 0.8
 /** Bit: the tip below a gear ring that catches the rails. */
 const GEAR_H = 0.003;
 const GEAR_R = 0.0088;
-const TIP_H: Record<TipShape, number> = { flat: 0.004, rush: 0.0045, taper: 0.005, ball: 0.0045, needle: 0.007, orb: 0.005 };
+const TIP_H: Record<TipShape, number> = { chisel: 0.004, spur: 0.0045, awl: 0.005, dome: 0.0045, pin: 0.007, bead: 0.005 };
 /** Chip on top: a dome in the body color with a glowing emblem that heats as spin drains. */
 const CHIP_R = 0.0095;
 const EMBLEM = emblemTexture();
@@ -285,11 +285,11 @@ export function tipHeight(tip: TipShape) {
 export function tipMesh(tip: TipShape, color = 0xe9e6df): Mesh {
   const h = TIP_H[tip];
   const parts: BufferGeometry[] = [];
-  if (tip === 'flat') parts.push(new CylinderGeometry(0.0072, 0.0062, h, 24));
-  else if (tip === 'rush') parts.push(new CylinderGeometry(0.0072, 0.0042, h, 24));
-  else if (tip === 'taper') parts.push(new CylinderGeometry(0.0072, 0.0018, h, 24));
-  else if (tip === 'ball') parts.push(new SphereGeometry(0.0045, 16, 12).translate(0, 0.0005, 0), new CylinderGeometry(0.0072, 0.004, h * 0.5, 24).translate(0, h * 0.25, 0));
-  else if (tip === 'orb') parts.push(new SphereGeometry(0.0062, 18, 12).scale(1, 0.75, 1).translate(0, 0.0005, 0), new CylinderGeometry(0.0072, 0.006, h * 0.4, 24).translate(0, h * 0.3, 0));
+  if (tip === 'chisel') parts.push(new CylinderGeometry(0.0072, 0.0062, h, 24));
+  else if (tip === 'spur') parts.push(new CylinderGeometry(0.0072, 0.0042, h, 24));
+  else if (tip === 'awl') parts.push(new CylinderGeometry(0.0072, 0.0018, h, 24));
+  else if (tip === 'dome') parts.push(new SphereGeometry(0.0045, 16, 12).translate(0, 0.0005, 0), new CylinderGeometry(0.0072, 0.004, h * 0.5, 24).translate(0, h * 0.25, 0));
+  else if (tip === 'bead') parts.push(new SphereGeometry(0.0062, 18, 12).scale(1, 0.75, 1).translate(0, 0.0005, 0), new CylinderGeometry(0.0072, 0.006, h * 0.4, 24).translate(0, h * 0.3, 0));
   else parts.push(new ConeGeometry(0.0055, h, 20).rotateX(Math.PI));
   // The gear ring: twelve teeth that catch the rails.
   parts.push(new CylinderGeometry(GEAR_R, GEAR_R, GEAR_H, 24).translate(0, h / 2 + GEAR_H / 2, 0));
