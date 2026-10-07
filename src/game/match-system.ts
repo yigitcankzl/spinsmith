@@ -662,7 +662,12 @@ export class MatchSystem extends createSystem({
       this.paused = paused;
       setAudioPaused(paused);
     }
-    if (paused) return;
+    if (paused) {
+      // The system menu is up: nothing stays stuck to where the hands were.
+      this.barRings.left.visible = this.barRings.right.visible = this.reticle.visible = this.slapMark.visible = false;
+      this.cord.set(null);
+      return;
+    }
     this.label.update(Math.min(delta, 0.1));
     this.stamp.update(Math.min(delta, 0.1));
     if (this.sealPop.visible) {

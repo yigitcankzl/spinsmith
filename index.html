@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -40,6 +40,9 @@
         margin-top: 8px; padding: 14px 54px; border: 0; border-radius: 6px; background: #ff8a2a; color: #16191e;
         font-family: inherit; font-size: 28px; font-weight: 700; letter-spacing: 4px; cursor: pointer;
       }
+      .how { text-align: left; margin: 26px auto 0; max-width: 520px; color: #c9cdd4; font-size: 17px; line-height: 1.6; }
+      .foot { margin-top: 18px; font-size: 13px; color: #8a909a; }
+      .foot a { color: #ffb347; }
       #enter:hover { background: #ffb347; }
       #enter:disabled { background: #3a3f48; color: #aab0ba; cursor: wait; letter-spacing: 2px; font-size: 22px; }
     </style>
@@ -55,6 +58,12 @@
         <li>Allow spatial data for your table</li>
       </ul>
       <button id="enter" type="button" disabled>HEATING THE FORGE…</button>
+      <ol class="how">
+        <li>Pinch your top in its dock and drop it in the arena.</li>
+        <li>Pinch near it, pull back and let go to rip it.</li>
+        <li>Pinch the floor by the rival: a ramp throws it. Each match teaches one more move.</li>
+      </ol>
+      <p class="foot">New player on a shared headset? Add <code>?fresh</code> to the address. · <a href="./privacy.html">Privacy</a> · Font: Rajdhani (SIL OFL)</p>
     </div>
     <div id="scene-container"></div>
     <script type="module" src="/src/index.ts"></script>

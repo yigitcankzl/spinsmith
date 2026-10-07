@@ -43,7 +43,11 @@ apply(Number(storage()?.getItem(KEY) ?? 0) || 0);
 /** Steps the dial to the next mode, saves it and returns its name. */
 export function nextComfort(): string {
   apply(mode + 1);
-  storage()?.setItem(KEY, String(mode));
+  try {
+    storage()?.setItem(KEY, String(mode));
+  } catch {
+    // Not kept: the dial still works for this session.
+  }
   return COMFORT_MODES[mode].name;
 }
 

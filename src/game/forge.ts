@@ -64,7 +64,11 @@ export function loadBuild(): TopBuild {
 }
 
 export function saveBuild(b: TopBuild) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(b));
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(b));
+  } catch {
+    // Storage full or blocked (a private window): the top lives for this session only.
+  }
 }
 
 export type Item =

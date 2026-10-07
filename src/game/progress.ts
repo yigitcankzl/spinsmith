@@ -465,9 +465,13 @@ export class Progress {
   }
 
   private save() {
-    this.storage?.setItem(
-      KEY,
-      JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn] }),
-    );
+    try {
+      this.storage?.setItem(
+        KEY,
+        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn] }),
+      );
+    } catch {
+      // Storage full or blocked (a private window): progress lives for this session only.
+    }
   }
 }

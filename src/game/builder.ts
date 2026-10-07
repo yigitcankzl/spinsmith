@@ -77,7 +77,11 @@ export function loadArenas(): ArenaLayout[] {
 }
 
 function saveArenas(list: ArenaLayout[]) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(list));
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(list));
+  } catch {
+    // Storage full or blocked: the arenas live for this session only.
+  }
 }
 
 /** A pinchable 3D card with text, lit while pointed at. Used for the few actions (try, save, back). */

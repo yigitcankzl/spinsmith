@@ -48,4 +48,10 @@ loadFonts()
     if (import.meta.env.DEV) void import('./dev-hands.js').then((m) => m.installDevHands());
     // A hand driver for agents and demo shots: window.drive (dev builds only, see src/dev-drive.ts).
     if (import.meta.env.DEV) void import('./dev-drive.js').then((m) => m.installDriver());
+  })
+  .catch((e: unknown) => {
+    // A start that fails says so on the landing page instead of hanging on its loading line.
+    console.error('[START] failed', e);
+    const enter = document.getElementById('enter');
+    if (enter) enter.textContent = 'The forge would not light: reload the page';
   });
