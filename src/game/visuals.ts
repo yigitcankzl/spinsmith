@@ -50,11 +50,11 @@ import { rimRadius } from './layout.js';
 import { Arena, RAMP_SIGMA, Top, WELL_SIGMA } from './sim.js';
 import { FONT, glass, ORANGE, TEXT } from './ui.js';
 import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
-import { TABLE_Y } from './reach.js';
+import { ARENA_SCALE, TABLE_Y } from './reach.js';
 import { insidePoly } from './room.js';
 import type { XZ } from './room.js';
 import { COMFORT } from './comfort.js';
-import { playTick } from './audio.js';
+import { playLand, playTick } from './audio.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
 /**
@@ -549,6 +549,11 @@ export class TopView {
   private throwPos = new Vector3();
   private throwVel = new Vector3();
   private landed = false;
+  /** On the desk after a throw: spin left (0..1), its direction, how far it has gone, and whether it fell off the table. */
+  private deskSpin = 0;
+  private deskHand = 1;
+  private travelled = 0;
+  offDesk = false;
   private fallX = 1;
   private fallZ = 0;
 
@@ -720,7 +725,12 @@ export class TopView {
       this.landed = false;
       this.fall = 0;
       this.throwPos.set(top.x, arena.height(top.x, top.z), top.z);
-      this.throwVel.set(top.vx, 0.3, top.vz);
+      this.throwVel.set(top.vx, 0.19, top.vz);
+      // Still spinning as it flies: on the desk it keeps going for a while.
+      this.deskSpin = Math.max(0.35, top.spin);
+      this.deskHand = top.hand;
+      this.travelled = 0;
+      this.offDesk = false;
     }
     this.outT += dt;
     this.shadow.visible = false;
@@ -733,8 +743,10 @@ export class TopView {
     this.root.visible = true;
     const p = this.throwPos;
     const v = this.throwVel;
+    // Gravity in the arena's own units (it is drawn ARENA_SCALE times life size).
+    const g = GRAVITY / ARENA_SCALE;
     if (!this.landed) {
-      v.y -= GRAVITY * dt;
+      v.y -= g * dt;
       p.addScaledVector(v, dt);
       // Without a known table edge, never farther than a short throw past the rim.
       const r = Math.hypot(p.x, p.z);
@@ -756,23 +768,61 @@ export class TopView {
           p.x *= out / rr;
           p.z *= out / rr;
         }
-        v.y = ground < TABLE_LEVEL ? -v.y * 0.3 : 0;
-        this.landed = ground >= TABLE_LEVEL || Math.abs(v.y) < 0.05;
-        if (import.meta.env.DEV && this.landed) console.log(`[OUT] landed on the ${ground < TABLE_LEVEL ? 'floor' : 'table'} at ${p.x.toFixed(2)},${p.z.toFixed(2)}`);
+        const floor = ground < TABLE_LEVEL;
+        if (floor && !this.offDesk) this.offDesk = true;
+        if (floor) this.deskSpin = 0;
+        playLand(floor ? 'floor' : 'table', p.x, Math.min(1, Math.abs(v.y) * 2));
+        v.y = floor ? -v.y * 0.3 : 0;
+        this.landed = !floor || Math.abs(v.y) < 0.05;
+        if (import.meta.env.DEV && this.landed) console.log(`[OUT] landed on the ${floor ? 'floor' : 'table'} at ${p.x.toFixed(2)},${p.z.toFixed(2)}`);
       }
     } else {
-      // Skids to a stop, then falls over; skidding off the table's edge, it drops again.
-      v.multiplyScalar(Math.exp(-dt * 6));
+      // On the desk it is still a top: it spins on, curving with its spin, slowing as it goes, and
+      // only falls over once its spin is gone. Off the table's edge it drops again.
+      if (this.deskSpin > 0) {
+        this.deskSpin = Math.max(0, this.deskSpin - dt * 0.4);
+        const sp = Math.hypot(v.x, v.z);
+        // The world travel is capped (about 45 cm), so it stays in view.
+        const drag = this.travelled * ARENA_SCALE > 0.45 ? 4 : 0.7;
+        v.multiplyScalar(Math.exp(-dt * drag));
+        const turn = this.deskHand * dt * 1.4;
+        const c = Math.cos(turn);
+        const s = Math.sin(turn);
+        const vx = v.x * c - v.z * s;
+        v.z = v.x * s + v.z * c;
+        v.x = vx;
+        this.travelled += sp * dt;
+        // Never into the pedestal: it bounces off.
+        const r = Math.hypot(p.x, p.z);
+        const edge = arena.radius + 0.035;
+        if (r < edge && (v.x * p.x + v.z * p.z) < 0) {
+          const nx = p.x / r;
+          const nz = p.z / r;
+          const vn = v.x * nx + v.z * nz;
+          v.x -= 1.6 * vn * nx;
+          v.z -= 1.6 * vn * nz;
+        }
+      } else {
+        v.multiplyScalar(Math.exp(-dt * 6));
+        this.fall = Math.min(1, this.fall + dt * 2.2);
+      }
       p.x += v.x * dt;
       p.z += v.z * dt;
       if (roomSurface(p.x, p.z) < p.y - 0.001) {
         this.landed = false;
         v.y = 0;
       }
-      this.fall = Math.min(1, this.fall + dt * 2.2);
     }
     this.root.position.copy(p);
-    this.spinner.rotation.y += dt * 8 * (1 - this.fall);
+    this.spinner.rotation.y += dt * (8 + 50 * this.deskSpin) * (1 - this.fall);
+    // A slowing top wobbles before it falls.
+    if (this.landed && this.deskSpin > 0 && this.deskSpin < 0.25) {
+      const w = (0.25 - this.deskSpin) * 1.2;
+      this.root.rotation.set(w * Math.sin(this.outT * 9), 0, w * Math.cos(this.outT * 9));
+      this.shadow.visible = true;
+      this.shadow.position.set(p.x, p.y + 0.0008, p.z);
+      return;
+    }
     const f = this.fall * this.fall;
     this.root.rotation.set(1.25 * f * this.fallZ, 0, -1.25 * f * this.fallX);
     this.shadow.visible = this.landed;
@@ -804,7 +854,7 @@ export class TopView {
         d.mesh.visible = false;
         continue;
       }
-      d.vel.y -= GRAVITY * dt;
+      d.vel.y -= (GRAVITY / ARENA_SCALE) * dt;
       d.mesh.position.addScaledVector(d.vel, dt);
       d.mesh.rotation.x += d.spin.x * dt;
       d.mesh.rotation.y += d.spin.y * dt;

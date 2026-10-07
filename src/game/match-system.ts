@@ -304,6 +304,8 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** This round's off-the-desk moment has been shown. */
+  private offDeskShown = false;
   /** The last REPLAY_STEPS sim steps of both tops (x, z, angle, wobble, damage each), a ring buffer. */
   private replayBuf = new Float32Array(REPLAY_STEPS * 10);
   private replayAt = 0;
@@ -834,6 +836,13 @@ export class MatchSystem extends createSystem({
     const [ga, gb] = this.replay ? this.ghosts : [this.mine, this.theirs];
     this.myView.sync(ga, this.arena, this.time, vdt);
     this.theirView.sync(gb, this.arena, this.time, vdt);
+    // A thrown rival that skated off the real table's edge: its own moment (cosmetic, never heat).
+    if (this.theirView.offDesk && !this.offDeskShown && !this.replay) {
+      this.offDeskShown = true;
+      this.stamp.later('OFF THE DESK!', 'onto your floor', 'mine', 1.2);
+      this.featDone('offDesk');
+      if (import.meta.env.DEV) console.log('[OUT] off the desk');
+    }
     this.sparks.update(vdt);
     this.impacts.update(vdt);
     this.updateGuide();
@@ -1966,6 +1975,7 @@ export class MatchSystem extends createSystem({
     this.matchLog.rip = Math.max(this.matchLog.rip, power);
     this.replayCount = 0;
     this.replay = null;
+    this.offDeskShown = false;
     // Personal bests are their own small moment (the first record is just kept).
     if (!this.demo && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
     const mh = this.mine.hand;

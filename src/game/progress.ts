@@ -146,6 +146,7 @@ export const FEATS: Record<string, string> = {
   iron: 'Clear the Iron Circuit',
   crown: 'Take the Crown',
   everyArena: 'Win in ten different arenas',
+  offDesk: 'Knock a rival off your real table',
 };
 
 /** XP per round and match. */

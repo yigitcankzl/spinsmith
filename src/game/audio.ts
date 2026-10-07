@@ -246,6 +246,20 @@ export function playResult(won: boolean) {
   } else [392, 330, 262].forEach((f, i) => tone(f, 0.1, 0.3, 'triangle', 0.45 + i * 0.12));
 }
 
+/** A thrown top lands: a woody thock on the table, a bright clatter and bounces on the floor. */
+export function playLand(on: 'table' | 'floor', x = 0, hard = 1) {
+  at(x, () => {
+    if (on === 'table') {
+      tone(160, 0.25 * hard, 0.12, 'sine', 0, 90);
+      hiss(0.15 * hard, 0.1, 500, 300, 1.5);
+    } else {
+      hiss(0.2 * hard, 0.08, 1800, 1500, 3);
+      tone(900 + Math.random() * 300, 0.06 * hard, 0.1, 'triangle', 0.12);
+      tone(700 + Math.random() * 300, 0.04 * hard, 0.08, 'triangle', 0.25);
+    }
+  });
+}
+
 /** A card appears: a soft, short tick. */
 export function playTick() {
   tone(2200, 0.025, 0.05, 'sine');
