@@ -70,6 +70,9 @@ const STEEP_SPIN = 0.12;
 /** Pinches this close to the floor (vertically) grab it to start a ramp. */
 const SHAPE_GRAB = 0.05;
 const RESULT_TIME = 4;
+/** A knockout replay: this many sim steps (2 s) recorded, played back at this speed. */
+const REPLAY_STEPS = 240;
+const REPLAY_SPEED = 0.4;
 /** A finish this soon (s) after the player's shape is credited to it. */
 const CAUSE_WINDOW = 1.5;
 const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', burst: 'SHATTER', spin: 'OUTLAST' };
@@ -301,6 +304,13 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** The last REPLAY_STEPS sim steps of both tops (x, z, angle, wobble, damage each), a ring buffer. */
+  private replayBuf = new Float32Array(REPLAY_STEPS * 10);
+  private replayAt = 0;
+  private replayCount = 0;
+  /** A knockout replay playing (in recorded steps, at REPLAY_SPEED), with stand-in tops to draw. */
+  private replay: { t: number; frames: Float32Array; n: number; out: [Top, Top] } | null = null;
+  private ghosts: [Top, Top] = [new Top(ATTACK), new Top(DEFENSE)];
   /** This match so far, for the report at home: each round's finish (- = the rival's), best rip, XP. */
   private matchLog = { rounds: [] as string[], rip: 0, xp: 0, won: false, score: '' };
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
@@ -815,8 +825,10 @@ export class MatchSystem extends createSystem({
     // Visuals only: after a finish your shape caused they slow down for a moment.
     const vdt = this.slowMo > 0 ? dt * SLOW_MO : dt;
     this.slowMo = Math.max(0, this.slowMo - dt);
-    this.myView.sync(this.mine, this.arena, this.time, vdt);
-    this.theirView.sync(this.theirs, this.arena, this.time, vdt);
+    if (this.replay) this.playReplay(dt);
+    const [ga, gb] = this.replay ? this.ghosts : [this.mine, this.theirs];
+    this.myView.sync(ga, this.arena, this.time, vdt);
+    this.theirView.sync(gb, this.arena, this.time, vdt);
     this.sparks.update(vdt);
     this.impacts.update(vdt);
     this.updateGuide();
@@ -1093,6 +1105,79 @@ export class MatchSystem extends createSystem({
 
   /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
   /** A rival for a new match, from the archetypes your level has reached; the same all match. */
+  /** Keeps the last 2 s of both tops for a replay. */
+  private record() {
+    const b = this.replayBuf;
+    const o = this.replayAt * 10;
+    const m = this.mine;
+    const t = this.theirs;
+    b[o] = m.x; b[o + 1] = m.z; b[o + 2] = m.angle; b[o + 3] = m.wobble; b[o + 4] = m.damage;
+    b[o + 5] = t.x; b[o + 6] = t.z; b[o + 7] = t.angle; b[o + 8] = t.wobble; b[o + 9] = t.damage;
+    this.replayAt = (this.replayAt + 1) % REPLAY_STEPS;
+    this.replayCount = Math.min(REPLAY_STEPS, this.replayCount + 1);
+  }
+
+  /** A knockout your move caused plays again on the table, slowly (a pinch skips it). */
+  private startReplay() {
+    const n = this.replayCount;
+    if (n < 30) return;
+    const frames = new Float32Array(n * 10);
+    for (let i = 0; i < n; i++) {
+      const src = ((this.replayAt - n + i + REPLAY_STEPS) % REPLAY_STEPS) * 10;
+      frames.set(this.replayBuf.subarray(src, src + 10), i * 10);
+    }
+    this.ghosts[0].spec = this.mine.spec;
+    this.ghosts[1].spec = this.theirs.spec;
+    this.ghosts[0].hand = this.mine.hand;
+    this.ghosts[1].hand = this.theirs.hand;
+    // Starts after the slow-motion moment; the result card waits for it.
+    this.replay = { t: -SLOW_MO_TIME - 0.4, frames, n, out: [this.mine, this.theirs] };
+    this.resultTimer = Math.max(this.resultTimer, RESULT_TIME + n / 120 / REPLAY_SPEED + 1.3);
+    this.replayCount = 0;
+  }
+
+  private playReplay(dt: number) {
+    const r = this.replay!;
+    const was = r.t;
+    r.t += dt;
+    if (r.t < 0) {
+      // Not yet: the real tops are still showing the finish.
+      this.ghosts[0].state = this.mine.state;
+      Object.assign(this.ghosts[0], { x: this.mine.x, z: this.mine.z, angle: this.mine.angle, finish: this.mine.finish });
+      Object.assign(this.ghosts[1], { x: this.theirs.x, z: this.theirs.z, angle: this.theirs.angle, finish: this.theirs.finish });
+      this.ghosts[1].state = this.theirs.state;
+      return;
+    }
+    if (was < 0) this.stamp.show('REPLAY', 'pinch to skip', 'neutral', 0.8);
+    const i = Math.floor(r.t * 120 * REPLAY_SPEED);
+    const skip = this.hands.left.justPinched || this.hands.right.justPinched;
+    if (i >= r.n + 100 || skip) {
+      // The end: the real tops (out as they went) are drawn again.
+      this.replay = null;
+      return;
+    }
+    if (i >= r.n) {
+      // The knockout again: the stand-ins go out as the real tops did (sinking, flying, shattering).
+      this.ghosts.forEach((g, k) => {
+        const real = r.out[k];
+        if (g.state !== real.state) Object.assign(g, { state: real.state, finish: real.finish, vx: real.vx, vz: real.vz });
+      });
+      return;
+    }
+    const f = r.frames;
+    this.ghosts.forEach((g, k) => {
+      const o = i * 10 + k * 5;
+      g.state = 'spinning';
+      g.finish = null;
+      g.x = f[o];
+      g.z = f[o + 1];
+      g.angle = f[o + 2];
+      g.wobble = f[o + 3];
+      g.damage = f[o + 4];
+      g.spin = 1;
+    });
+  }
+
   /** The match in two lines: the result and score, then each round's finish, the best rip and the XP. */
   private matchReport() {
     const m = this.matchLog;
@@ -1874,6 +1959,8 @@ export class MatchSystem extends createSystem({
     this.stamp.show(perfect ? 'WHITE HOT!' : 'RIP!', '', 'mine', 0.35);
     if (perfect) this.featDone('whiteHot');
     this.matchLog.rip = Math.max(this.matchLog.rip, power);
+    this.replayCount = 0;
+    this.replay = null;
     // Personal bests are their own small moment (the first record is just kept).
     if (!this.demo && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
     const mh = this.mine.hand;
@@ -2428,6 +2515,7 @@ export class MatchSystem extends createSystem({
       steps++;
       this.elapsed += STEP;
       const clash = step(this.arena, this.mine, this.theirs);
+      this.record();
       if (clash?.hammer) {
         this.stamp.show('CRACKED!', '', this.mine.hammer === 0 ? 'mine' : 'rival', 0.5);
         // The Hammer lands: a heavy ring and a shower of sparks where the rims met.
@@ -2578,7 +2666,8 @@ export class MatchSystem extends createSystem({
       this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause, v === 1 ? 'mine' : 'rival', 1.1);
       if (recent && v === 1) {
         text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
-        // The decisive move plays out slowly for a moment, in a shower of sparks.
+        // The decisive move plays out slowly for a moment, in a shower of sparks, then again as a replay.
+        if (loser.finish !== 'spin' && !this.demo) this.startReplay();
         if (loser.finish !== 'spin') {
           this.slowMo = SLOW_MO_TIME;
           this.sparks.burst(loser.x, this.arena.height(loser.x, loser.z), loser.z, 1);
