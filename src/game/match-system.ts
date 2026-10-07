@@ -25,7 +25,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -294,6 +294,8 @@ export class MatchSystem extends createSystem({
   private viewKeys = ['', ''];
   private cord = new Cord();
   private sparks = new Sparks();
+  /** The ghost hand that shows the first moves. */
+  private ghost = new GhostHand();
   /** Big stamped words over the arena: rounds, finishes, the rip. */
   private stamp = new Stamp(0.2);
   /** The arena forging up out of the table after placing (0..1), and the title over it. */
@@ -483,6 +485,7 @@ export class MatchSystem extends createSystem({
     this.chargeRing.visible = false;
     this.stage.add(
       this.chargeRing,
+      this.ghost.root,
       this.portal,
       this.portalCore,
       ...this.palmPrints,
@@ -2907,6 +2910,15 @@ export class MatchSystem extends createSystem({
   private updateGuide() {
     const g = this.progress.guide;
     const ready = g === 'launch' && this.phase === 'ready' && !this.demo;
+    // A ghost hand shows the move: the rip at the first launch, the ramp in the first fight.
+    let ghost = false;
+    if (ready) {
+      const x = this.mine.x;
+      const z = this.mine.z;
+      const h = this.arena.height(x, z);
+      this.ghost.play([[0, x, h + 0.05, z, 0], [0.5, x, h + 0.015, z, 0], [0.75, x, h + 0.015, z, 1], [1.5, x, h + 0.04, z + 0.09, 1], [1.6, x, h + 0.045, z + 0.1, 0], [2.4, x, h + 0.06, z + 0.11, 0]], this.frameDt);
+      ghost = true;
+    }
     this.ripArrows.visible = ready;
     if (ready) {
       if (this.ripArrows.children.length === 0) {
@@ -2940,6 +2952,12 @@ export class MatchSystem extends createSystem({
       this.bumpMark.scale.setScalar(1 + 0.3 * Math.sin(this.time * 6));
       this.label.set('Pinch the floor at the ring: a ramp rises at once\ndrag to aim it at the rival');
       this.bumpHintShown = true;
+      // The ghost hand: down to the ring, pinch, drag outward past the rival, let go.
+      const ox = x / (Math.hypot(x, z) || 1);
+      const oz = z / (Math.hypot(x, z) || 1);
+      const fy = this.arena.height(x, z);
+      this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.03, fy + 0.006, z + oz * 0.03, 1], [1.35, x + ox * 0.03, fy + 0.03, z + oz * 0.03, 0], [2.2, x + ox * 0.03, fy + 0.05, z + oz * 0.03, 0]], this.frameDt);
+      ghost = true;
     } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.progress.matches === 2 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set('New: jab a fingertip down into the floor\na cup opens and catches the top that rolls in');
     } else if (this.bumpHintShown && g !== 'bump') {
@@ -2947,6 +2965,7 @@ export class MatchSystem extends createSystem({
       this.bumpHintShown = false;
       this.label.set('');
     }
+    if (!ghost) this.ghost.hide();
   }
 
   /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */

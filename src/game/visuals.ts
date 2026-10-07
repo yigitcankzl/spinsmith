@@ -2004,3 +2004,55 @@ export function forgeEnvironment(renderer: WebGLRenderer): Texture {
   pmrem.dispose();
   return env;
 }
+
+/**
+ * A ghost hand that shows a move instead of a card telling it: a glowing fingertip that travels a
+ * path and a ring that closes when it pinches. play() loops keyframes (arena-local points with a
+ * pinch 0..1); hidden when not playing.
+ */
+export class GhostHand {
+  readonly root = new Group();
+  private tip = new Mesh(new SphereGeometry(0.007, 14, 10), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
+  private ring = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.8, depthWrite: false, side: DoubleSide }));
+  private trail = new Mesh(new SphereGeometry(0.0025, 8, 6), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0.4, depthWrite: false }));
+  private t = 0;
+
+  constructor() {
+    this.root.add(this.tip, this.ring, this.trail);
+    this.root.visible = false;
+    this.ring.rotation.x = -Math.PI / 2;
+  }
+
+  /** Plays keyframes [time s, x, y, z, pinch] in a loop (the last time is the loop length). */
+  play(keys: number[][], dt: number) {
+    this.root.visible = true;
+    const len = keys[keys.length - 1][0];
+    this.t = (this.t + dt) % len;
+    let i = 0;
+    while (i < keys.length - 2 && keys[i + 1][0] <= this.t) i++;
+    const a = keys[i];
+    const b = keys[i + 1];
+    const u = Math.max(0, Math.min(1, (this.t - a[0]) / Math.max(1e-6, b[0] - a[0])));
+    const e = u * u * (3 - 2 * u);
+    const x = a[1] + (b[1] - a[1]) * e;
+    const y = a[2] + (b[2] - a[2]) * e;
+    const z = a[3] + (b[3] - a[3]) * e;
+    const pinch = a[4] + (b[4] - a[4]) * e;
+    this.tip.position.set(x, y, z);
+    this.ring.position.set(x, y, z);
+    this.ring.scale.setScalar(0.009 + 0.014 * (1 - pinch));
+    (this.ring.material as MeshBasicMaterial).color.setHex(pinch > 0.8 ? 0xff8a2a : 0xffd23a);
+    // A faint echo a moment behind shows the direction.
+    const back = Math.max(0, u - 0.25);
+    this.trail.position.set(a[1] + (b[1] - a[1]) * back, a[2] + (b[2] - a[2]) * back, a[3] + (b[3] - a[3]) * back);
+    // Fades at the loop's ends.
+    const fade = Math.min(1, this.t / 0.3, (len - this.t) / 0.3);
+    (this.tip.material as MeshBasicMaterial).opacity = 0.8 * fade;
+    (this.ring.material as MeshBasicMaterial).opacity = 0.8 * fade;
+  }
+
+  hide() {
+    this.root.visible = false;
+    this.t = 0;
+  }
+}
