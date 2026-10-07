@@ -1038,7 +1038,9 @@ export class Builder {
       let size = 54;
       do g.font = `700 ${size--}px ${FONT}`;
       while (g.measureText(name).width > ITEM_GAP * k * 0.94 && size > 20);
-      engrave(g, name, W / 2 + s.home.x * k, H / 2 + 2, UI_STEEL);
+      // The end names stay on the strip.
+      const half = g.measureText(name).width / 2 + 16;
+      engrave(g, name, Math.max(half, Math.min(W - half, W / 2 + s.home.x * k)), H / 2 + 2, UI_STEEL);
     }
     this.namesTex.needsUpdate = true;
   }

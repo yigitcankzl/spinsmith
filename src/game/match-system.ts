@@ -1,5 +1,5 @@
 import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, duck, ForgeLoop, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, duck, ForgeLoop, playGong, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -22,10 +22,10 @@ import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
-import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -240,7 +240,7 @@ export class MatchSystem extends createSystem({
   /** Unlocks waiting to be shown over the arena, and the one showing. */
   private reveals: string[] = [];
   private reveal: { obj: Object3D; t: number } | null = null;
-  /** After the first session, one unlock shown per result card; the rest wait for the next ones. */
+  /** One unlock shown per result card (the first session's part first); the rest wait for the next ones. */
   private revealedHere = false;
   private rewardHold = 0;
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
@@ -285,6 +285,8 @@ export class MatchSystem extends createSystem({
   private viewKeys = ['', ''];
   private cord = new Cord();
   private sparks = new Sparks();
+  /** Big stamped words over the arena: rounds, finishes, the rip. */
+  private stamp = new Stamp(0.2);
   /** The arena forging up out of the table after placing (0..1), and the title over it. */
   private rise = 1;
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
@@ -466,6 +468,8 @@ export class MatchSystem extends createSystem({
     this.title.visible = false;
     this.title.renderOrder = 5;
     this.root.add(this.title);
+    this.stamp.mesh.position.set(0, 0.075, -0.05);
+    this.root.add(this.stamp.mesh);
     this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     // The hand driver (src/dev-drive.ts) reads the game through this.
@@ -631,6 +635,7 @@ export class MatchSystem extends createSystem({
     }
     if (paused) return;
     this.label.update(Math.min(delta, 0.1));
+    this.stamp.update(Math.min(delta, 0.1));
     // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
     if (session !== this.xrSession) {
       // Back at home, the print asks for a press again; mid-match, the arena just comes along.
@@ -926,8 +931,10 @@ export class MatchSystem extends createSystem({
     const action = this.hub.update(this.pointers, dt, this.p);
     if (!action) return;
     if (action.kind === 'play') {
-      if (this.progress.guide === 'rematch') this.progress.advance('done');
-      this.startMatch();
+      // The first session's rematch is against the same rival.
+      const rematch = this.progress.guide === 'rematch';
+      if (rematch) this.progress.advance('done');
+      this.startMatch(rematch ? this.rival : undefined);
     } else if (action.kind === 'forge') {
       this.hub.hide();
       this.openForge();
@@ -1037,6 +1044,12 @@ export class MatchSystem extends createSystem({
   /** A rival for a new match, from the archetypes your level has reached; the same all match. */
   private pickRival(): Rival {
     const pool = RIVALS.filter((r) => r.level <= this.progress.level);
+    // The ladder: the next rival in the circuits you can face and have not beaten.
+    for (const c of CIRCUITS)
+      for (const name of c.rivals) {
+        const r = pool.find((x) => x.name === name);
+        if (r && !(this.progress.marksOf(name) & MARK.beaten)) return r;
+      }
     // Newly reached archetypes come up more often.
     const weights = pool.map((r) => 1 + r.level / 4);
     let x = Math.random() * weights.reduce((t, w) => t + w, 0);
@@ -1591,8 +1604,20 @@ export class MatchSystem extends createSystem({
     this.label.mesh.scale.setScalar(1.25);
     // The bar on the far rim shows the match; the card over it only the round's messages,
     // and at a match's start, who the rival is and how it plays.
-    if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name} · ${this.rival.style}${this.taught('tells') ? ` · ${MOVE_WORD[this.rival.move]}` : ''}\n${this.arena.layout.rule ?? this.arena.layout.name}`);
-    else this.label.set('');
+    if (this.myPoints === 0 && this.theirPoints === 0) {
+      // The bout: who, from which circuit, what it says, and how it plays.
+      const c = circuitOf(this.rival.name);
+      this.stamp.show(`VS ${this.rival.name.toUpperCase()}`, c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title, 'rival', 1.6);
+      this.label.set(`${this.rival.name}, ${this.rival.title}: "${this.rival.intro}"\n${this.rival.style}${this.taught('tells') ? ` · ${MOVE_WORD[this.rival.move]}` : ''} · ${this.arena.layout.rule ?? this.arena.layout.name}`);
+    }
+    else {
+      this.label.set('');
+      // Later rounds are framed: the round, or what is at stake.
+      const point = MATCH_HEAT - 1;
+      const word = this.myPoints >= point && this.theirPoints >= point ? 'FINAL ROUND' : this.myPoints >= point || this.theirPoints >= point ? 'MATCH POINT' : `ROUND ${this.round + 1}`;
+      this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
+      playGong();
+    }
     this.bar.mesh.visible = true;
     this.barMessage = 'READY';
     this.barPoints = [this.myPoints, this.theirPoints];
@@ -1768,6 +1793,7 @@ export class MatchSystem extends createSystem({
     if (perfect && !this.demo) this.perfectInMatch = true;
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
+    this.stamp.show(perfect ? 'WHITE HOT!' : 'RIP!', '', 'mine', 0.35);
     const mh = this.mine.hand;
     const th = this.theirs.hand;
     // The launch angles into each top's own orbit direction (mirrored for left spin); aim stays as pulled.
@@ -2000,7 +2026,7 @@ export class MatchSystem extends createSystem({
       const what = { charge: 'a charge', quake: 'a quake', pull: 'a pull' }[this.rival.move];
       if (!this.tellTaught) {
         this.tellTaught = true;
-        this.label.set(`${this.rival.name} winds up ${what}!\n${this.forgeBar.full ? 'Strike now to stop it' : 'Fill your bar to stop it next time'}`);
+        this.label.set(`${this.rival.name} winds up ${what}!\n${this.forgeBar.full ? 'Strike now to stop it' : 'Brace: cup your own top'}`);
         this.labelTimer = 2.5;
       }
       if (import.meta.env.DEV) console.log(`[TELL] ${this.rival.name} ${this.rival.move} at t ${this.elapsed.toFixed(1)}`);
@@ -2057,6 +2083,7 @@ export class MatchSystem extends createSystem({
     if (cut) {
       this.tellAt = -1;
       this.label.set('INTERRUPTED!');
+      this.stamp.show('INTERRUPTED!', '', 'mine', 0.6);
       this.labelTimer = 1.2;
       if (import.meta.env.DEV) console.log('[TELL] interrupted');
     }
@@ -2269,6 +2296,7 @@ export class MatchSystem extends createSystem({
       this.elapsed += STEP;
       const clash = step(this.arena, this.mine, this.theirs);
       if (clash?.hammer) {
+        this.stamp.show('CRACKED!', '', this.mine.hammer === 0 ? 'mine' : 'rival', 0.5);
         // The Hammer lands: a heavy ring and a shower of sparks where the rims met.
         this.sparks.burst(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
         this.impacts.hit(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
@@ -2302,7 +2330,10 @@ export class MatchSystem extends createSystem({
           this.impacts.hit(clash.x, y, clash.z, clash.strength);
           this.myView.flash();
           this.theirView.flash();
-          this.hitStop = HIT_STOP;
+          // Harder hits freeze longer (70-110 ms) and shake both tops (never the view).
+          this.hitStop = clash.strength > 0.85 ? 0.11 : 0.07;
+          this.myView.shake(clash.strength);
+          this.theirView.shake(clash.strength);
           this.roomLight.hit();
           this.accumulator = 0;
           duck(0.5, 0.15);
@@ -2336,7 +2367,7 @@ export class MatchSystem extends createSystem({
   private finish(v: -1 | 1 | 2) {
     this.phase = 'result';
     this.resultTimer = RESULT_TIME;
-    // The first session shows every unlock (its own part among them); later, one per result card.
+    // One unlock per result card; the rest wait for the next ones.
     this.revealedHere = false;
     if (this.demo) {
       // Workshop demo: say how it ended, no points.
@@ -2371,7 +2402,8 @@ export class MatchSystem extends createSystem({
       const decided = this.myPoints >= MATCH_HEAT || this.theirPoints >= MATCH_HEAT;
       this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
       if (decided) {
-        text = `${this.myPoints > this.theirPoints ? 'You win the match!' : 'You lose the match'}\n${score}`;
+        const youWon = this.myPoints > this.theirPoints;
+        text = `${youWon ? 'You win the match!' : 'You lose the match'}\n${this.rival.name}: "${youWon ? this.rival.lose : this.rival.win}"`;
         this.myPoints = 0;
         this.theirPoints = 0;
         this.matchOver = true;
@@ -2381,7 +2413,11 @@ export class MatchSystem extends createSystem({
       // A finish within 1.5 s of the player's shape names it as the cause.
       const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind).toUpperCase() : null;
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
-      if (v === 1 && loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME * 0.5;
+      // Every knockout, yours or theirs, slows for a moment.
+      if (loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME * 0.5;
+      const won = this.myPoints > this.theirPoints || (decided && v === 1);
+      const cause = recent && v === 1 ? `YOUR ${recent}` : theirs && v === -1 && loser.finish !== 'spin' ? `THEIR ${this.rivalShapeKind}`.toUpperCase() : '';
+      this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : 'MATCH LOST') : cause, v === 1 ? 'mine' : 'rival', 1.1);
       if (recent && v === 1) {
         text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
         // The decisive move plays out slowly for a moment, in a shower of sparks.
@@ -2457,6 +2493,8 @@ export class MatchSystem extends createSystem({
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
     }
     this.reveals.push(...award.unlocked);
+    // The first session's own part goes first: the forge calls for it next.
+    this.reveals.sort((a, b) => Number(b === 'tip:rush') - Number(a === 'tip:rush'));
     if (!this.demo) this.trackComeBack(won, loser, matchOver, matchWon);
     // The first match is over: the anvil appears and calls for the new part.
     if (matchOver && GUIDE_ORDER.indexOf(this.progress.guide) < GUIDE_ORDER.indexOf('forge')) this.progress.advance('forge');
@@ -2469,7 +2507,13 @@ export class MatchSystem extends createSystem({
   private trackComeBack(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
     const cause = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? this.lastShape.kind : null;
     const ko = loser.finish === 'pocket' || loser.finish === 'over' || loser.finish === 'burst';
-    if (won) this.progress.mark(this.rival.name, (matchWon ? MARK.beaten : 0) | (ko ? MARK.knockout : 0) | (cause ? MARK.shape : 0));
+    const fresh = won ? this.progress.mark(this.rival.name, (matchWon ? MARK.beaten : 0) | (ko ? MARK.knockout : 0) | (cause ? MARK.shape : 0)) : 0;
+    // Beating a circuit's champion for the first time clears the circuit: a moment of its own.
+    const c = circuitOf(this.rival.name);
+    if (fresh & MARK.beaten && c?.champion) {
+      this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name} is beaten`, 'mine', 2.2);
+      playLevelUp();
+    }
     if (matchWon) this.progress.recordChampion(this.myBuild);
     const o = this.order;
     if (!this.orderMatch || !o || this.progress.hasOrder(o.date)) return;
@@ -2507,7 +2551,7 @@ export class MatchSystem extends createSystem({
       this.resultTimer = Math.max(this.resultTimer, 1.4 + 2.8);
     }
     if (this.rewardHold > 0) this.rewardHold -= dt;
-    else if (!this.reveal && !(this.revealedHere && this.progress.guide === 'done') && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+    else if (!this.reveal && !this.revealedHere && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
       this.revealedHere = true;
       const key = this.reveals.shift()!;
       const obj = unlockModel(key, this.arenas);
@@ -2524,7 +2568,8 @@ export class MatchSystem extends createSystem({
     r.t += dt;
     const grow = Math.min(1, r.t / 0.3);
     const leave = Math.max(0, (r.t - 2) / 0.6);
-    r.obj.position.set(0, 0.1 + 0.01 * Math.sin(r.t * 3) + leave * 0.3, 0);
+    // Low over the arena's middle, clear of the card and the match bar behind it.
+    r.obj.position.set(0, 0.055 + 0.008 * Math.sin(r.t * 3) + leave * 0.3, 0.03);
     r.obj.rotation.y += dt * 2.5;
     r.obj.scale.setScalar(1.6 * grow * (1 - leave));
     if (leave >= 1) {
@@ -2537,8 +2582,6 @@ export class MatchSystem extends createSystem({
         (m.material as MeshBasicMaterial).dispose();
       });
       this.reveal = null;
-      // The first session's result waits for every queued unlock.
-      if (this.reveals.length && this.progress.guide !== 'done') this.resultTimer = Math.max(this.resultTimer, 0.2);
     }
   }
 

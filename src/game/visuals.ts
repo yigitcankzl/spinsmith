@@ -529,6 +529,8 @@ export class TopView {
   private bases: number[] = [];
   private shadow: Mesh;
   private teamRing: Mesh | null = null;
+  private shakeT = 0;
+  private shakeAmp = 0;
   private readonly hot = new Color(0xff5a14);
   private readonly cool: Color;
   private fall = 0;
@@ -575,6 +577,12 @@ export class TopView {
       this.flying.push({ mesh: m, vel: new Vector3(), spin: new Vector3() });
       this.debris.add(m);
     }
+  }
+
+  /** A hard hit shakes the top in place for a moment (real time, so it quivers through hit-stop). */
+  shake(strength: number) {
+    this.shakeT = 0.04 + 0.08 * strength;
+    this.shakeAmp = 0.0006 + 0.0016 * strength;
   }
 
   /** A hard hit: the halo flashes white for about 80 ms. */
@@ -651,6 +659,13 @@ export class TopView {
     if (!visible) return;
     const y = arena.height(top.x, top.z);
     this.root.position.set(top.x, y, top.z);
+    if (this.shakeT > 0) {
+      // Side to side, fading out.
+      this.shakeT = Math.max(0, this.shakeT - dt);
+      const a = this.shakeAmp * (this.shakeT / 0.12) * (Math.floor(this.shakeT * 120) % 2 ? 1 : -1);
+      this.root.position.x += a;
+      this.root.position.z -= a * 0.5;
+    }
     this.shadow.position.set(top.x, y + 0.0008, top.z);
     // The team ring glows with the spin, and flashes with a hit.
     if (this.teamRing) (this.teamRing.material as MeshBasicMaterial).opacity = 0.3 + 0.4 * Math.min(1, Math.max(0, top.spin)) + this.flashT * 6;
@@ -1721,3 +1736,93 @@ export function miniArena(layout: ArenaLayout, current: boolean): Group {
   return mergeByMaterial(outer);
 }
 
+
+/**
+ * A word stamped over the arena (ROUND 2, MATCH POINT, RIP!, SLAG, CRACKED): heavy outlined type,
+ * molten for you and steel-teal for the rival. It punches in with a little overshoot, holds, then
+ * sinks and fades. One at a time; a new one replaces the last.
+ */
+export class Stamp {
+  readonly mesh: Mesh;
+  private canvas = document.createElement('canvas');
+  private tex: CanvasTexture;
+  private t = -1;
+  private hold = 1;
+  private queue: [string, string, 'mine' | 'rival' | 'neutral', number][] = [];
+
+  /** Stamps after whatever shows now (and after anything stamped in the same frame). */
+  later(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1) {
+    this.queue.push([word, sub, side, hold]);
+  }
+
+  constructor(width = 0.2) {
+    this.canvas.width = 1024;
+    this.canvas.height = 256;
+    this.tex = new CanvasTexture(this.canvas);
+    this.tex.colorSpace = SRGBColorSpace;
+    this.mesh = new Mesh(new PlaneGeometry(width, width / 4), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false, depthTest: false }));
+    this.mesh.renderOrder = 30;
+    this.mesh.visible = false;
+  }
+
+  /** Stamps `word` (and a small line under it) for `hold` seconds; side picks the colors. */
+  show(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1) {
+    const g = this.canvas.getContext('2d')!;
+    g.clearRect(0, 0, 1024, 256);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    let size = 150;
+    do g.font = `700 ${size--}px ${FONT}`;
+    while (g.measureText(word).width > 960 && size > 40);
+    const grad = g.createLinearGradient(0, 40, 0, 190);
+    if (side === 'rival') {
+      grad.addColorStop(0, '#e8fbff');
+      grad.addColorStop(1, '#4fd1ff');
+    } else if (side === 'neutral') {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#c9d3e0');
+    } else {
+      grad.addColorStop(0, '#fff1d6');
+      grad.addColorStop(0.5, '#ffd23a');
+      grad.addColorStop(1, '#ff8a2a');
+    }
+    g.lineJoin = 'round';
+    g.lineWidth = 18;
+    g.strokeStyle = 'rgba(10, 12, 16, 0.9)';
+    g.strokeText(word, 512, sub ? 108 : 128);
+    g.fillStyle = grad;
+    g.fillText(word, 512, sub ? 108 : 128);
+    if (sub) {
+      g.font = `700 44px ${FONT}`;
+      g.lineWidth = 10;
+      g.strokeText(sub, 512, 220);
+      g.fillStyle = '#f4f1ea';
+      g.fillText(sub, 512, 220);
+    }
+    this.tex.needsUpdate = true;
+    this.t = 0;
+    this.hold = hold;
+    this.mesh.visible = true;
+  }
+
+  /** Each frame (real time: it keeps moving through hit-stop and slow motion). */
+  update(dt: number) {
+    if (this.t < 0) {
+      const q = this.queue.shift();
+      if (q) this.show(...q);
+      return;
+    }
+    this.t += dt;
+    const t = this.t;
+    const m = this.mesh.material as MeshBasicMaterial;
+    // In over 0.12 s from 1.5x with a 1.08 overshoot, hold, then sink and fade over 0.3 s.
+    const k = t < 0.12 ? 1.5 - 0.5 * (t / 0.12) - 0.08 * Math.sin((t / 0.12) * Math.PI) : 1;
+    const out = Math.max(0, (t - 0.12 - this.hold) / 0.3);
+    this.mesh.scale.setScalar(k * (1 - 0.15 * out));
+    m.opacity = Math.min(1, t / 0.05) * (1 - out);
+    if (out >= 1) {
+      this.t = -1;
+      this.mesh.visible = false;
+    }
+  }
+}

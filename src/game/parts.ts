@@ -317,19 +317,44 @@ export interface Rival {
   name: string;
   /** Its one big move, telegraphed a second ahead (docs/DUEL-DESIGN.md). */
   move: RivalMove;
-  /** How it plays, in a few words. */
+  /** How it plays, in a few plain words. */
   style: string;
+  /** Its title, its line as the match starts, and what it says when it wins and when it loses. */
+  title: string;
+  intro: string;
+  win: string;
+  lose: string;
   build: TopBuild;
   /** Smith level from which it can appear. */
   level: number;
 }
 
 export const RIVALS: Rival[] = [
-  { name: 'Rim Raider', move: 'charge', style: 'aggressive rim attacker', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: -1, color: 0 }, level: 1 },
-  { name: 'Iron Keep', move: 'quake', style: 'heavy center holder', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: -1, color: 0 }, level: 1 },
-  { name: 'Drifter', move: 'pull', style: 'stamina drifter', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
-  { name: 'Leech', move: 'pull', style: 'opposite-spin equalizer', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
-  { name: 'Hookjaw', move: 'charge', style: 'upper attacker, deadly on low walls', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
-  { name: 'Sawtooth', move: 'charge', style: 'chips toward a shatter', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
-  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
+  { name: 'Rim Raider', move: 'charge', style: 'hits hard from the rim', title: 'the Ember Runner', intro: 'Keep up if you can.', win: 'Too slow, smith.', lose: 'Next time I go faster.', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: -1, color: 0 }, level: 1 },
+  { name: 'Iron Keep', move: 'quake', style: 'holds the middle, hard to move', title: 'the Cinder Champion', intro: 'Move me. I dare you.', win: 'The middle is mine.', lose: 'You moved the mountain.', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: -1, color: 0 }, level: 1 },
+  { name: 'Drifter', move: 'pull', style: 'spins longest, waits you out', title: 'the Long Spin', intro: 'I can wait all day.', win: 'Still spinning.', lose: 'You outlasted the drift.', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
+  { name: 'Leech', move: 'pull', style: 'opposite spin: steals yours', title: 'the Spin Thief', intro: 'Your spin looks tasty.', win: 'Thanks for the spin.', lose: 'Nothing left to steal.', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
+  { name: 'Hookjaw', move: 'charge', style: 'lifts you over low walls', title: 'the Wall Breaker', intro: 'Walls are suggestions.', win: 'Over you go.', lose: 'You kept your feet.', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
+  { name: 'Sawtooth', move: 'charge', style: 'chips you toward a shatter', title: 'the Iron Champion', intro: 'Every hit takes a piece.', win: 'In pieces.', lose: 'Not a scratch? Fine.', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
+  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', title: 'the Crown', intro: 'The crown is earned here.', win: 'Not yet, smith.', lose: 'Wear it well.', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
 ];
+
+/**
+ * The circuits: the rivals in the order you climb them, each circuit ending in its champion.
+ * The next bout is the first rival you can face and have not beaten yet; once all are beaten,
+ * any rival (weighted toward the newer ones).
+ */
+export const CIRCUITS: { name: string; rivals: string[] }[] = [
+  { name: 'Cinder Circuit', rivals: ['Drifter', 'Rim Raider', 'Iron Keep'] },
+  { name: 'Iron Circuit', rivals: ['Leech', 'Hookjaw', 'Sawtooth'] },
+  { name: 'Crown', rivals: ['Bastion'] },
+];
+
+/** The circuit a rival belongs to, its bout number in it, and whether it is the champion. */
+export function circuitOf(name: string): { circuit: string; bout: number; of: number; champion: boolean } | null {
+  for (const c of CIRCUITS) {
+    const i = c.rivals.indexOf(name);
+    if (i >= 0) return { circuit: c.name, bout: i + 1, of: c.rivals.length, champion: i === c.rivals.length - 1 };
+  }
+  return null;
+}

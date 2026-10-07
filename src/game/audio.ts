@@ -239,6 +239,14 @@ export function playResult(won: boolean) {
   } else [392, 330, 262].forEach((f, i) => tone(f, 0.1, 0.3, 'triangle', 0.45 + i * 0.12));
 }
 
+/** A round begins: a low gong (a struck plate's partials, decaying over a second and a half). */
+export function playGong() {
+  tone(110, 0.25, 1.5, 'sine');
+  tone(110 * 2.76, 0.08, 1.1, 'sine');
+  tone(110 * 5.4, 0.04, 0.7, 'sine');
+  hiss(0.1, 0.05, 2000, 1500, 1);
+}
+
 /** An order stamp: the motif's first two notes, struck. */
 export function playStamp() {
   tone(140, 0.3, 0.25, 'square', 0, 90);

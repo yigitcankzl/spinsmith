@@ -23,7 +23,7 @@ export const TAB_LINE = { z: 0.18, y: 0.006, gap: 0.066 };
 /** The workshop's five tabs on the same line, a little closer together. */
 export const WORKSHOP_TAB_GAP = 0.06;
 /** The workshop's piece rail, above the near wall. */
-export const RAIL = { z: 0.16, y: 0.06 };
+export const RAIL = { z: 0.16, y: 0.045 };
 /** Home: your top's dock, the forge's small anvil and the blueprint, on the near rim. */
 export const DOCK_AT: Spot = { x: -0.14, y: 0, z: 0.165 };
 export const FORGE_AT: Spot = { x: 0.14, y: 0, z: 0.165 };
