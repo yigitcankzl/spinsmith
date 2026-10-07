@@ -557,6 +557,9 @@ export class Top {
   sinceDash = 99;
   /** Seconds since the last bumper kick (large = none recently). */
   sinceBump = 99;
+  /** Seconds since a hard knock on the wall, and how hard it was (outward m/s): for scrape sparks. */
+  sinceWall = 99;
+  wallHit = 0;
   /** Seconds left of a Rush: the charging top is braced and takes half the knockback. */
   rushing = 0;
   /** Seconds left of a Hammer (the next solid clash shatters harder) and of a Ward (no knockout). */
@@ -584,7 +587,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sincePad: 99, tell: 0, rushing: 0, hammer: 0, guard: 0, anchor: 0, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sinceWall: 99, sincePad: 99, tell: 0, rushing: 0, hammer: 0, guard: 0, anchor: 0, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -720,6 +723,7 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.wobble = Math.min(1, Math.max(0, (0.35 - t.spin) / (0.35 - TOPPLE_SPIN)));
   t.sinceDash += dt;
   t.sinceBump += dt;
+  t.sinceWall += dt;
   t.sincePad += dt;
   t.rushing = Math.max(0, t.rushing - dt);
   t.hammer = Math.max(0, t.hammer - dt);
@@ -809,6 +813,8 @@ export const WARD_TIME = 3;
 /** A clash at least this strong (0..1, as Clash.strength) is solid enough for the Hammer. */
 const HAMMER_MIN = 0.3;
 const HAMMER_FLOOR = 0.22;
+/** A wall knock at least this fast outward (m/s) scrapes sparks off the wall. */
+const WALL_SCRAPE = 0.25;
 /** Your Magnet pulls a little softer than a rival's pull: it lands more often. */
 const MAGNET_SPEED = 0.45;
 /** Your Rush hits harder than a rival's charge: it is your one strike. */
@@ -978,7 +984,11 @@ function wall(arena: Arena, t: Top) {
     t.finish = 'over';
     return;
   }
-  // Keep it inside.
+  // Keep it inside (a hard knock is an event for the view: sparks scraping off the wall).
+  if (outward > WALL_SCRAPE && t.sinceWall > 0.2) {
+    t.sinceWall = 0;
+    t.wallHit = outward;
+  }
   t.x = (t.x / r) * limit;
   t.z = (t.z / r) * limit;
   if (railAt(L, angle) && t.spec.gear > 0 && t.sinceDash > DASH_COOLDOWN && t.spin > 0.2) {

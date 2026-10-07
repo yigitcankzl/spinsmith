@@ -2449,6 +2449,11 @@ export class MatchSystem extends createSystem({
         }
       }
       for (const t of this.tops) {
+        if (t.sinceWall === 0) {
+          // A near miss: the top slams the wall and sparks scrape off it.
+          this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, Math.min(1, t.wallHit * 1.5));
+          if (this.sinceClashSound > 0.06) playClash(0.3 * Math.min(1, t.wallHit * 2), t.x);
+        }
         if (t.sinceBump === 0) {
           this.arenaView.flashBumper(t.x, t.z);
           playClash(0.5, t.x);
