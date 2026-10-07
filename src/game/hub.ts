@@ -273,7 +273,9 @@ export class Hub {
     for (const h of pointers) if (h.tracked) hovered ??= this.under(h);
     this.items.forEach((it, i) => {
       const on = it === hovered;
-      if (it.name) it.name.visible = (this.teaching && !it.quiet) || on;
+      // The three stations always say what they are; the rest only in the first session or when pointed at.
+      const station = it.action.kind === 'play' || it.action.kind === 'forge' || it.action.kind === 'workshop';
+      if (it.name) it.name.visible = (!it.quiet && (this.teaching || station)) || on;
       const p = popIn(this.time - this.shownAt, i);
       const k = (on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1) * Math.max(0.001, p * p * (3 - 2 * p));
       it.model.scale.setScalar(k);
@@ -375,7 +377,7 @@ export class Hub {
   }
 
   private label(text: string, parent: Object3D, y: number): Mesh {
-    const l = tag(text, 0.08, 46);
+    const l = tag(text, 0.06, 46);
     l.position.y = y;
     parent.add(l);
     this.labels.push(l);
@@ -396,8 +398,9 @@ export class Hub {
     const cradle = new Mesh(new BoxGeometry(0.04, 0.012, 0.016).translate(0, 0.006, 0), new MeshMatcapMaterial({ matcap: GRAPHITE }));
     cradle.position.set(BLUEPRINT_AT.x, TABLE_Y, BLUEPRINT_AT.z);
     cradle.rotation.y = -0.5;
-    const build = tag('WORKSHOP', 0.08, 46);
-    build.position.set(home.x, home.y + 0.035, home.z);
+    const build = tag('WORKSHOP', 0.06, 46);
+    // Above the roll and nudged left, clear of the anvil beside it.
+    build.position.set(home.x - 0.02, home.y + 0.05, home.z);
     this.labels.push(build);
     this.blueprint.add(cradle, holder, build);
     this.root.add(this.blueprint);

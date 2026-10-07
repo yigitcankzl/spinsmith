@@ -46,6 +46,8 @@ import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js
 const STORE_KEY = 'spinsmith.top.v1';
 
 /** Body colors on offer: warm, so the player's top never looks like the (cool) opponent. */
+/** The paints' names, shown over their pots. */
+const PAINT_NAMES = ['Forge', 'Ember', 'Brass', 'Rust', 'Bone', 'Plum'];
 export const TOP_COLORS = [0xe8661c, 0xc94a3a, 0xe0a63c, 0xb5654a, 0xe8d6b0, 0x9a5bb0];
 
 export function loadBuild(): TopBuild {
@@ -90,10 +92,10 @@ export const ROWS: [string, Item[], number][] = [
   [
     'STYLE',
     [
-      { kind: 'spin', value: 1, name: 'Spin direction', blurb: 'Tap to turn it: left spin steals spin from right spinners' },
-      ...TOP_COLORS.map((value) => ({ kind: 'color' as const, value, name: 'Paint', blurb: 'Dip your top or tap the pot' })),
+      { kind: 'spin', value: 1, name: 'Spin', blurb: 'Tap to turn it: left spin steals spin from right spinners' },
+      ...TOP_COLORS.map((value, i) => ({ kind: 'color' as const, value, name: PAINT_NAMES[i] ?? 'Paint', blurb: 'Dip your top or tap the pot' })),
       { kind: 'emblem' as const, name: 'Emblem glow', blurb: 'Tap to step through the glows you have earned' },
-      { kind: 'seal' as const, name: 'Strike seal', blurb: 'Tap to choose your strike: Anvil, then Rush (Lv 4) and Magnet (Lv 7)' },
+      { kind: 'seal' as const, name: 'Strike', blurb: 'Tap to choose your strike: Anvil; Rush, Magnet, Tilt, Hammer and Ward open with levels' },
     ],
     0.05,
   ],
@@ -280,6 +282,15 @@ export class Forge {
     const coin = sealModel(this.build.seal ?? 'anvil');
     coin.rotation.x = 0.8;
     slot.model.add(coin);
+    // Its name over it says which strike is set.
+    const seal = this.build.seal ?? 'anvil';
+    if (slot.name.userData.seal !== seal) {
+      slot.name.userData.seal = seal;
+      const old = slot.name as Mesh;
+      const fresh = tag(SEAL_NAMES[seal].toUpperCase(), 0.05, 44);
+      (old.material as MeshBasicMaterial).map?.dispose();
+      old.material = fresh.material;
+    }
   }
 
   /** Opens the forge; with a focus key (the first session's new part) its drawer opens and it pulses. */
