@@ -2794,7 +2794,11 @@ export class MatchSystem extends createSystem({
         if (youWon && this.wasDown) this.featDone('comeback');
         if (youWon && !this.demo && this.progress.wonMatchIn(this.arena.layout.name)) this.featDone('everyArena');
         // A won match: sparks run round the rim for a moment.
-        if (youWon) this.celebrate = 1.6;
+        if (youWon) {
+          this.celebrate = 1.6;
+          // The win leaves the machine: a warm ring rolls out across your room.
+          if (COMFORT.flashes) this.roomLight.wave();
+        }
         // A loss leaves something to try next time.
         text = youWon ? `You win the match!\n${this.rival.name}: "${this.rival.lose}"` : `You lose the match\nTip: ${this.rival.tip}`;
         this.myPoints = 0;
