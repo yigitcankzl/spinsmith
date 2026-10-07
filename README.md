@@ -33,7 +33,8 @@ an arena. First to 3 heat wins a match.
   room's Space Setup labelling a table or desk.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
-  slapped, for trays and shared spaces); Quiet (sound off); and Quiet and calm.
+  slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; and Assist (fights at
+  80% speed, calm).
 
 ## What is in the game
 
@@ -218,7 +219,19 @@ an arena. First to 3 heat wins a match.
   circuit, ten arenas won), counted on the board; personal bests (hardest rip, fastest knockout)
   stamped when beaten; after a match, home shows its report (result, each round's finish, best
   rip, XP). After a loss the rival's card gives a tip against it.
-- **Sound** (`src/game/audio.ts`): one generated room reverb, music that follows the game at 96
+- **The room is the stage:** a rival arrives through a portal beyond the far rim and slams into
+  the arena; a top thrown over the wall keeps spinning across the real desk, curves with its spin
+  and can drop off the table's real edge (OFF THE DESK!); a strike leaves a molten palm print on
+  the desk that cools to a scorch; sparks past the rim land on the desk; your hands cast soft
+  shadows on the arena (a warm glow when the strike is ready); a won match sends a ring of light
+  across the room; the quench turns the room cold blue for a moment.
+- **Hands, shown not told:** a pinch ring at each hand closes as the fingers do and lights when
+  the game counts a pinch; a ghost hand shows the first rip and the first ramp.
+- **Challenge codes** (`src/game/challenge.ts`): the board shows your top's code; a friend adds
+  `?vs=CODE` to the address and their next match is against your top.
+- **Store basics:** a service worker keeps the installed game working offline; `privacy.html`; a
+  maskable icon; the landing page has how-to-play and credits; a failed start says so.
+- **Sound** (`src/game/audio.ts`): spatial (HRTF) placement of hums, clashes and landings; one generated room reverb, music that follows the game at 96
   bpm in D minor on the game's four-note motif (home: drone and anvil; getting ready: bass;
   fight: toms; tension: hats and the motif), ducked under big hits; clashes ring at each ring's
   own pitch (an Anvil clangs lower than a Striker).

@@ -9,51 +9,45 @@ submission form; the hosted link, cover image and video come later.
 
 ## Project description (under 500 words)
 
-SpinSmith is a seated, hands-first mixed reality spinning-top battler. Your arena sits on your
-real table; everything you do in it, you do with your hands.
+SpinSmith is a seated, hands-first mixed reality spinning-top battler, and it has one idea no top
+game has had: **you fight by reshaping the arena.** The arena stands on your real table; everything
+you do in it, you do with your hands.
 
-**Forge.** Pinch the small anvil and the arena turns into a forge: the floor sinks, an anvil rises
-with your top on it and drawers slide out of the rim. There you build your top from three parts: a metal ring that decides how it
-hits, a core that sets its height and how hard it is to shatter, and a tip that decides how it
-moves. Pinch a part from the drawer and press it onto the top; the stats change as it clicks in.
-Eight rings, five cores and six tips make 226 legal builds, and each one plays differently:
-Striker smashes, Anvil absorbs, Halo outlasts.
+**Rip.** Pinch near your top and pull back like a rip cord. The harder and straighter the pull,
+the more spin. A white-hot pull earns extra.
 
-**Rip.** Place your top in the arena, pinch near it and pull back toward you like a rip cord. The
-harder and straighter the pull, the more spin it starts with. A white-hot pull earns extra spin.
+**Reshape.** During the fight, pinch the arena floor and a ramp rises at once; drag to aim it, and
+throw your rival into a slag pit or over the wall. Press a fingertip in to open a cup that catches
+a top; pinch it, pull back and let go to sling it. Shapes affect both tops, so a careless ramp can
+throw your own top out. When your move decides a round, the arena says so, and plays it again.
 
-**Reshape.** This is what no other top game has. During the fight you shape the arena floor itself.
-Pinch the floor and a ramp rises there at once; drag while you hold to aim which way it throws. Press a fingertip in to open a cup that catches the next top to roll in; pinch the caught top, pull back and let go to sling it the other way, into a slag pit if you aim near one. Shapes affect both
-tops and relax back to flat in two or three seconds, so a well-placed ramp can throw your rival
-into a slag pit, and a careless one can throw your own top out. Two charges keep it a decision,
-not a reflex: clashing refills them. When a shape decides a round, the result says so: "YOUR
-RAMP → SLAG".
+**Strike the table.** A forge bar glows on the back of your hand. Full, slap your palm on the real
+table beside the arena: a shockwave runs through the floor, and your palm leaves a molten print on
+your desk. Six strikes to choose from: Anvil, Rush, Magnet, Tilt (the arena dips toward your
+palm), Hammer and Ward. Rivals wind up big moves of their own; strike first and cut them short.
 
-**Strike the table.** Your forge bar, a glowing ring on the back of your hand, fills over each
-round and with every solid clash, faster while your top is behind on spin. Full, press your palm on the real table beside the arena: a shockwave
-runs out through the floor and throws the tops near the rim, the hot ones furthest. Choose your
-strike in the forge, six in all: the Anvil Strike, a Rush straight at the rival, a Magnet that
-drags it toward a slag pit, a Tilt that dips the arena toward your palm, a Hammer that makes your
-next hit crack, or a Ward that keeps your top in. A gentler press-and-hold strike is one turn of the comfort dial away. Rivals have a big move of their own, and you see it coming: a second of
-flashing and a rising whine. Strike first and you cut it short.
+**Your room is the stage.** A rival arrives through a portal and slams into the arena. A top
+thrown over the wall keeps spinning across your real desk and can drop off its real edge. Your
+hands cast shadows on the arena, a win sends a wave of light across your room, and every sound
+comes from where it happens.
 
-**Read the arena.** Fifteen arenas change the fight: a balanced bowl with slag pits and kick
-rails, a ring of embers that closes in, a dish that tips under weight, a crater to duel in, twin
-basins split by a ridge, a speedway of boost pads, bumpers that circle the floor, and Colossus
-Bowl, an arena over a metre across that opens out on your table when the match starts. Each
-says at the start who it favours. Rivals have their own styles, lines and moves: rim raiders
-charge, center holders quake the floor, drifters pull you toward the pits. You climb them as
-circuits, each with a champion to beat. Knock one out and its signature part is yours.
+**Forge.** Pinch the small anvil and the arena becomes a forge. Build your top from 226 legal
+combinations of ring, core and tip; each changes the physics, not just a number. Quench it to
+save, and the room turns cold blue for a breath.
 
-**Come back.** Every day the Smith's board posts a new order: a rival, an arena and one way to win, such as ramping Iron Keep out of the ring. Doing it strikes a stamp into your ledger; missed days cost nothing. Rivals carry medallions with three marks to earn, and the tops that won stand as champions.
+**Climb.** Seven rivals with their own lines and moves, climbed as circuits with a champion each;
+fifteen arenas, from a balanced bowl to a ring of closing embers to a stadium over a metre
+across; daily Smith Orders, twelve feats, personal bests, and an arena workshop with live
+balance dials. Levels open options, never power. Share your top as a challenge code and a friend
+fights it.
 
-**Grow.** Every round gives Smith XP. Levels unlock new parts, paints and arenas, and the first
-match teaches the whole loop in five minutes: rip, ramp, win or lose, forge a new tip, rematch.
-Each match after it adds one move: the strike, then the cup and sling, then the rivals' tells.
+**Learn by doing.** The first match teaches one move, the rip and the ramp, with a ghost hand
+showing it; each match after adds one more. A comfort dial turns off sound or flashes, makes the
+strike a gentle press, or slows fights to 80%.
 
-Built with the Immersive Web SDK, SpinSmith runs in the Quest browser with no install. A
-deterministic simulation drives the fight and our balance reports: every part, arena and shaping
-strategy is measured over thousands of rounds.
+Built with the Immersive Web SDK, SpinSmith runs in the Quest browser with no install and works
+offline once loaded. A deterministic simulation drives the fight and the balance: every part,
+arena and strike is measured over thousands of rounds.
 
 ## Hands-first interaction
 
