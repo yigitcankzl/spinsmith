@@ -32,6 +32,7 @@ import { playDrawer, playLocked, playMachine, playPick, playPlace, playRemove } 
 import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
 import { ORANGE, TEXT_DIM } from './ui.js';
+import { tag } from './builder.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import { TAB_LINE, traySpot, WORK as REACH_WORK } from './reach.js';
 import type { HandState } from './hands.js';
@@ -140,6 +141,8 @@ interface Slot {
   item: Item;
   drawer: Drawer;
   model: Object3D;
+  /** Its name, below it on the tray. */
+  name: Object3D;
   home: Vector3;
   /** Its pedestal: the instance in the shared pedestal mesh. */
   pad: number;
@@ -312,7 +315,7 @@ export class Forge {
     this.drawerT = 0;
     // Only the open drawer's parts and pedestals show; the others' pedestals shrink to nothing.
     for (const s of this.slots) {
-      s.model.visible = s.drawer === d;
+      s.model.visible = s.name.visible = s.drawer === d;
       this.pads.setMatrixAt(s.pad, this.m.makeScale(s.drawer === d ? 1 : 0, 1, s.drawer === d ? 1 : 0).setPosition(s.home.x, s.home.y - 0.016, s.home.z));
     }
     this.pads.instanceMatrix.needsUpdate = true;
@@ -767,10 +770,16 @@ export class Forge {
         model.add(inner);
         model.position.copy(home);
         model.visible = false;
+        // Its name over it, tipped toward the player (parts, paints and tokens alike).
+        const name = tag(item.name.toUpperCase(), 0.05, 44);
+        name.position.set(home.x, home.y + 0.028, home.z);
+        name.rotation.x = -0.35;
+        name.visible = false;
+        this.tray.add(name);
         const size = item.kind === 'ring' ? 0.62 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
         this.tray.add(model);
         const key = itemKey(item);
-        this.slots.push({ item, drawer, model, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null });
+        this.slots.push({ item, drawer, model, name, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null });
         pads.push(home);
       });
     }
@@ -788,6 +797,10 @@ export class Forge {
   private buildQuench() {
     this.quench.position.copy(QUENCH_AT);
     this.quench.add(rimSlot());
+    const name = tag('QUENCH TO SAVE', 0.07, 40);
+    name.position.set(0, 0.03, 0);
+    name.rotation.x = -0.4;
+    this.quench.add(name);
   }
 
   /** Dev: world positions of the top, the tabs, the open drawer's parts and the quench slot. */
