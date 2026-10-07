@@ -38,23 +38,24 @@ export const STARTERS = [
   'arena:Ember Ring',
 ];
 
-/** What each level opens (14-20: cosmetics only). */
+/** What each level opens. A rival's signature part opens by level a few levels after that rival
+ * arrives, so knocking the rival out is the early way to it. */
 export const LEVEL_UNLOCKS: Record<number, string> = {
   2: 'arena:Zero-G Dish',
   3: 'paint:2',
   4: 'core:3-50',
-  5: 'ring:saw',
-  6: 'tip:taper',
+  5: 'tip:taper',
+  6: 'paint:3',
   7: 'arena:Clockwork Spire',
-  8: 'core:5-80',
-  9: 'ring:cog',
-  10: 'tip:orb',
+  8: 'paint:4',
+  9: 'paint:5',
+  10: 'ring:hook',
   11: 'arena:Frost Oval',
-  12: 'paint:3',
+  12: 'ring:cog',
   13: 'arena:Sumo Square',
-  14: 'paint:4',
+  14: 'ring:saw',
   15: 'emblem:1',
-  16: 'paint:5',
+  16: 'core:5-80',
   17: 'emblem:2',
   18: 'emblem:3',
   19: 'emblem:4',
@@ -125,7 +126,7 @@ export const QUEST_UNLOCKS: Record<string, { key: string; text: string }> = {
   // The first session's reward: every new player earns one part, win or lose.
   first: { key: 'tip:rush', text: 'Finish your first match' },
   burst: { key: 'core:9-60', text: 'Win a round by SHATTER' },
-  knockout: { key: 'ring:hook', text: 'Win a round by slag pit or throw' },
+  knockout: { key: 'tip:orb', text: 'Win a round by slag pit or throw' },
 };
 
 /** XP per round and match. */
@@ -143,11 +144,12 @@ export const XP = {
 
 /** How a key is earned ('Lv 6', or a deed), or null for starters and things never locked. */
 export function unlockHint(key: string): string | null {
-  for (const [lv, k] of [...Object.entries(LEVEL_UNLOCKS), ...Object.entries(ARENA_UNLOCKS), ...Object.entries(SEAL_UNLOCKS)]) if (k === key) return `Lv ${lv}`;
-  for (const [n, k] of Object.entries(STAMP_UNLOCKS)) if (k === key) return `${n} order stamps`;
-  for (const q of Object.values(QUEST_UNLOCKS)) if (q.key === key) return q.text;
-  for (const [rival, k] of Object.entries(RIVAL_SIGNATURE)) if (k === key) return `Knock out ${rival}`;
-  return null;
+  const ways: string[] = [];
+  for (const [rival, k] of Object.entries(RIVAL_SIGNATURE)) if (k === key) ways.push(`Knock out ${rival}`);
+  for (const q of Object.values(QUEST_UNLOCKS)) if (q.key === key) ways.push(q.text);
+  for (const [n, k] of Object.entries(STAMP_UNLOCKS)) if (k === key) ways.push(`${n} order stamps`);
+  for (const [lv, k] of [...Object.entries(LEVEL_UNLOCKS), ...Object.entries(ARENA_UNLOCKS), ...Object.entries(SEAL_UNLOCKS)]) if (k === key) ways.push(`Lv ${lv}`);
+  return ways.length ? ways.join(' or ') : null;
 }
 
 /**

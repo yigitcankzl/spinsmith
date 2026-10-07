@@ -6,6 +6,7 @@
  */
 import { BackSide, Color, Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from '@iwsdk/core';
 import { TUNE } from './tuning.js';
+import { COMFORT } from './comfort.js';
 
 export class RoomLight {
   readonly mesh: Mesh;
@@ -61,7 +62,7 @@ export class RoomLight {
 
   /** A hard hit: the room flashes warm for a moment. */
   hit() {
-    this.flash = 1;
+    if (COMFORT.flashes) this.flash = 1;
   }
 
   /**

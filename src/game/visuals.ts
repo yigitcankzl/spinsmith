@@ -47,6 +47,7 @@ import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
 import { TABLE_Y } from './reach.js';
 import { insidePoly } from './room.js';
 import type { XZ } from './room.js';
+import { COMFORT } from './comfort.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
 /**
@@ -574,7 +575,7 @@ export class TopView {
 
   /** A hard hit: the halo flashes white for about 80 ms. */
   flash() {
-    this.flashT = 0.08;
+    if (COMFORT.flashes) this.flashT = 0.08;
   }
 
   /**

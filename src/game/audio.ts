@@ -3,6 +3,8 @@
  * The context starts on first use; entering XR is a user gesture, so it is allowed to play.
  */
 
+import { COMFORT } from './comfort.js';
+
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noise: AudioBuffer | null = null;
@@ -50,7 +52,13 @@ function audio(): AudioContext | null {
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
   if (ctx.state === 'suspended' && !pausedAudio) void ctx.resume();
+  master!.gain.value = COMFORT.sound ? 0.7 : 0;
   return ctx;
+}
+
+/** Applies the comfort dial's sound setting at once (hums keep running). */
+export function applySound() {
+  if (master) master.gain.value = COMFORT.sound ? 0.7 : 0;
 }
 
 /** Pauses (suspends) or resumes every sound at once, for the headset menu. */

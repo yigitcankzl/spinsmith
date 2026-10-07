@@ -40,7 +40,7 @@ import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
 import { RIVALS } from './parts.js';
 import { SmithBoard } from './board.js';
-import { BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
+import { COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
 import { MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
@@ -52,6 +52,7 @@ export type HubAction =
   | { kind: 'order' }
   | { kind: 'champion'; index: number }
   | { kind: 'reset' }
+  | { kind: 'comfort' }
   | { kind: 'armReset' }
   | { kind: 'newSmith' }
   | { kind: 'locked'; text: string };
@@ -126,6 +127,7 @@ export class Hub {
   private teaching = true;
   /** The blueprint, its cradle and name: the workshop comes after the first match. */
   private blueprint = new Group();
+  private comfortKnob = new Group();
   /** Starting over: the hand holding the level plate and for how long, then a short window to confirm. */
   private hold: { hand: HandState; t: number } | null = null;
   private armed = 0;
@@ -145,6 +147,7 @@ export class Hub {
     this.buildAnvil();
     this.buildStand();
     this.buildBlueprint();
+    this.buildComfort();
     this.beacon.rotation.x = -Math.PI / 2;
     this.board.mesh.position.copy(BOARD_AT);
     this.board.mesh.rotation.x = -0.25;
@@ -363,6 +366,26 @@ export class Hub {
     this.blueprint.add(cradle, holder, build);
     this.root.add(this.blueprint);
     this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home, name: build });
+  }
+
+  /** The comfort dial: a brass knob; each pinch turns it to the next mode (sound, flashes, the strike's gesture). */
+  private buildComfort() {
+    const knob = new Group();
+    const brass = new MeshMatcapMaterial({ matcap: BRASS });
+    knob.add(new Mesh(new CylinderGeometry(0.011, 0.012, 0.008, 20).translate(0, 0.004, 0), brass));
+    // The pointer notch shows the mode the dial is on.
+    const notch = new Mesh(new BoxGeometry(0.003, 0.002, 0.009).translate(0, 0.009, 0.005), new MeshBasicMaterial({ color: ORANGE }));
+    knob.add(notch);
+    const home = new Vector3(COMFORT_AT.x, TABLE_Y, COMFORT_AT.z);
+    knob.position.copy(home);
+    this.comfortKnob = knob;
+    this.root.add(knob);
+    this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, name: this.label('COMFORT', knob, 0.03) });
+  }
+
+  /** Turns the dial's notch to mode i of n. */
+  setComfort(i: number, n: number) {
+    this.comfortKnob.rotation.y = -(i / n) * Math.PI * 1.5;
   }
 
   /** The small anvil on the near rim: pinch it to turn the arena into the forge. */

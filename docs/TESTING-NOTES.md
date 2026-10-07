@@ -31,23 +31,30 @@ Draft (Oct 7, 2026); final text before the deadline. For judges and anyone tryin
    ring), pull back and let go: the top rips
    in. A white-hot pull adds spin.
 3. After the opening seconds a ring marks a spot beside the rival: pinch the floor there and a
-   ramp rises at once; drag to aim it. Your ramp throws the rival toward the rim.
-   Press a fingertip into the floor ahead of a top and a cup opens: it catches the first top to
-   roll in. Pinch the caught top, pull back and let go: it flies the other way (aimed near a slag
-   pit, it goes straight in). An empty or unused cup lets go after 2 seconds.
-4. A glowing ring on the back of your hand is the forge bar: it fills as the tops clash. When it
-   is full, press your palm on the table beside the arena: the Anvil Strike throws the tops near
-   the rim (red-hot ones furthest). From the second match on, a rival flashes and whines for a
-   second before its big move: strike first to cut it short.
-5. First to 3 heat wins: outlasting the rival scores 1, a knockout (into a slag pit, over the
+   ramp rises at once; drag to aim it. Your ramp throws the rival toward the rim. The first
+   match teaches only this; each later match adds one move (steps 4 and 5).
+4. Second match: a glowing ring on the back of your hand is the forge bar: it fills over the
+   round and as the tops clash. When it is full, slap your palm on the table beside the arena
+   (a glowing handprint shows where): the Anvil Strike throws the tops near the rim (red-hot ones
+   furthest).
+5. Third match: press a fingertip into the floor ahead of a top and a cup opens: it catches the
+   first top to roll in. Pinch the caught top, pull back and let go: it flies the other way
+   (aimed near a slag pit, it goes straight in). An empty or unused cup lets go after 2 seconds.
+   After that, a rival flashes and whines for a second before its big move: strike first to cut
+   it short. `?demo` has all of this open at once.
+6. First to 3 heat wins: outlasting the rival scores 1, a knockout (into a slag pit, over the
    wall, or shattering it) scores 2. A finish your ramp or sling caused says so: YOUR RAMP → SLAG.
-6. After the match the small anvil calls: pinch it and the arena turns into the forge. The Tip
+7. After the first match the small anvil calls: pinch it and the arena turns into the forge. The Tip
    drawer is open with your new part pulsing; pinch it, bring it to your top, let go. Drop your top
    in the glowing slot on the right to save it.
-7. Back home, the Smith's board shows today's order, the rivals' medallions and your ledger.
+8. Back home, the Smith's board shows today's order, the rivals' medallions and your ledger.
 
 ## Known limits
 
+- Without a table labelled in the Quest's Space Setup, the arena floats in front of you after
+  8 seconds and says so; press your palm on the table to place it there instead.
+- The brass dial beside your dock is the comfort dial: sound, hit flashes, and a gentle strike
+  (press and hold instead of a slap).
 - On a small table the arena moves in from the edge by at most 15 cm; if it still hangs over,
   pull it back with the handle.
 - Rivals from level 6 use ramps too; you meet them only after some play, or at once with `?demo`

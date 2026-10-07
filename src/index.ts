@@ -23,7 +23,13 @@ loadFonts()
     world.registerSystem(MatchSystem);
     // The landing page (index.html): Enter starts the session; the page hides while in XR.
     const landing = document.getElementById('landing');
-    document.getElementById('enter')?.addEventListener('click', () => world.launchXR());
+    const enter = document.getElementById('enter');
+    enter?.addEventListener('click', async () => {
+      // Without immersive AR (a desktop browser) the launch fails silently: say where the game runs.
+      const ar = await navigator.xr?.isSessionSupported('immersive-ar').catch(() => false);
+      if (ar) world.launchXR();
+      else if (enter) enter.textContent = 'Open this page on a Meta Quest';
+    });
     world.visibilityState.subscribe((v) => landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive));
     // Emulator helper: move one hand at a time with the mouse (dev builds only).
     if (import.meta.env.DEV) void import('./dev-hands.js').then((m) => m.installDevHands());

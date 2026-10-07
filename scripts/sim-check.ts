@@ -412,7 +412,7 @@ TUNING.grace = 0;
 {
   const p = new Progress();
   assert.ok(p.isUnlocked('ring:striker') && !p.isUnlocked('ring:saw') && !p.isUnlocked('core:9-60'));
-  assert.equal(p.lockText('ring:saw'), 'Lv 5');
+  assert.equal(p.lockText('ring:saw'), 'Knock out Sawtooth or Lv 14');
   const burst = p.award({ won: true, finish: 'burst', perfect: false, matchOver: false, matchWon: false });
   assert.deepEqual(burst.unlocked, ['core:9-60'], 'a burst win should open the 9-60 core');
   const again = p.award({ won: true, finish: 'burst', perfect: false, matchOver: false, matchWon: false });
@@ -791,4 +791,14 @@ TUNING.grace = 0;
   assert.ok(!run([...hold(0.95, 0.2), ...move(0.95, 0.75, 0.8), ...hold(0.75, 1)]), 'a hand set down to rest is not');
 }
 
+// 25. The comfort dial steps through every mode and wraps round.
+{
+  const { COMFORT, COMFORT_MODES, nextComfort } = await import('../src/game/comfort.ts');
+  const seen = new Set<string>();
+  for (let i = 0; i < COMFORT_MODES.length; i++) seen.add(nextComfort());
+  assert.equal(seen.size, COMFORT_MODES.length, 'the dial reaches every mode');
+  assert.ok(COMFORT.sound && COMFORT.flashes && !COMFORT.gentle, 'a full turn is back to standard');
+}
+
 console.log('sim-check: all passed');
+

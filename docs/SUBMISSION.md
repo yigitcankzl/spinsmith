@@ -16,7 +16,7 @@ real table; everything you do in it, you do with your hands.
 with your top on it and drawers slide out of the rim. There you build your top from three parts: a metal ring that decides how it
 hits, a core that sets its height and how hard it is to shatter, and a tip that decides how it
 moves. Pinch a part from the drawer and press it onto the top; the stats change as it clicks in.
-Six rings, four cores and six tips make 136 legal builds, and each one plays differently:
+Eight rings, five cores and six tips make 226 legal builds, and each one plays differently:
 Striker smashes, Anvil absorbs, Halo outlasts.
 
 **Rip.** Place your top in the arena, pinch near it and pull back toward you like a rip cord. The
@@ -29,11 +29,11 @@ into a slag pit, and a careless one can throw your own top out. Two charges keep
 not a reflex: clashing refills them. When a shape decides a round, the result says so: "YOUR
 RAMP → SLAG".
 
-**Strike the table.** Solid clashes fill your forge bar, a glowing ring on the back of your hand,
-faster when you are losing. Full, press your palm on the real table beside the arena: a shockwave
+**Strike the table.** Your forge bar, a glowing ring on the back of your hand, fills over each
+round and with every solid clash, faster while your top is behind on spin. Full, press your palm on the real table beside the arena: a shockwave
 runs out through the floor and throws the tops near the rim, the hot ones furthest. Choose your
 strike in the forge: the Anvil Strike, a Rush straight at the rival, or a Magnet that drags it
-toward a slag pit. Rivals have a big move of their own, and you see it coming: a second of
+toward a slag pit. A gentler press-and-hold strike is one turn of the comfort dial away. Rivals have a big move of their own, and you see it coming: a second of
 flashing and a rising whine. Strike first and you cut it short.
 
 **Read the arena.** Fifteen arenas change the fight: a balanced bowl with slag pits and kick
@@ -48,6 +48,7 @@ signature part is yours.
 
 **Grow.** Every round gives Smith XP. Levels unlock new parts, paints and arenas, and the first
 match teaches the whole loop in five minutes: rip, ramp, win or lose, forge a new tip, rematch.
+Each match after it adds one move: the strike, then the cup and sling, then the rivals' tells.
 
 Built with the Immersive Web SDK, SpinSmith runs in the Quest browser with no install. A
 deterministic simulation drives the fight and our balance reports: every part, arena and shaping
@@ -55,8 +56,9 @@ strategy is measured over thousands of rounds.
 
 ## Hands-first interaction
 
-- **No controllers, no menus to aim at.** Every action is a pinch, a pull or a press on an object:
-  the part in the drawer, the top in its dock, the floor of the arena. The arena, the forge and
+- **No controllers, no menus.** Every action is a pinch, a pull or a press on an object: the part
+  in the drawer, the top in its dock, the floor of the arena. The hand ray is only a reach
+  extender: for a ramp on the arena's far side and the small Menu button. The arena, the forge and
   the score are one machine on the table, so the hands never switch between touching and pointing.
 - **Pinch and pull to launch:** the rip is the motion of pulling a cord, with arrows showing the
   direction the first time.
@@ -68,8 +70,11 @@ strategy is measured over thousands of rounds.
   at the table's true height, and during a fight, with the forge bar full, the same press beside
   the arena is your strike. It is the same detector (down, then still), so a hand resting on the
   table is never a press.
-- **Seated:** everything touched sits within a seated arm's reach (about 0.35-0.55 m); only the
-  score and the stats, which are read, sit on the far rim.
+- **Seated:** everything touched sits within a seated arm's reach (the check
+  keeps every touch target between 0.32 and 0.67 m from the eyes); only the score and the stats,
+  which are read, sit on the far rim.
+- **Comfort dial:** sound off, no hit flashes, and the strike as a palm pressed and held instead
+  of slapped (for a fold-down tray or a shared room).
 - **Forgiving by design:** tracking loss shorter than a tenth of a second is ignored, and a lost
   hand cancels a half-made shape instead of committing it.
 
@@ -89,8 +94,8 @@ reshape the arena to win.*
 | 0:45-0:55 | Home: the Smith's board with today's order; pinch it, ramp the rival out, ORDER DONE and a stamp strikes the ledger | A new order every day |
 | 0:55-1:15 | The cup: catching the rival and slinging it into a slag pit | Two verbs: ramp and cup |
 | 1:15-1:25 | Hookjaw ramps you: the cyan ramp, THEIR RAMP → SLAG | Rivals use the arena too |
-| 1:25-1:45 | Three arenas in quick cuts: embers closing in, the tipping dish, the sumo square | Six arenas |
-| 1:45-2:15 | Forge close-ups: rings, cores, tips; stats changing as parts click in | 136 builds |
+| 1:25-1:45 | Three arenas in quick cuts: embers closing in, the tipping dish, the sumo square | Fifteen arenas |
+| 1:45-2:15 | Forge close-ups: rings, cores, tips; stats changing as parts click in | 226 builds |
 | 2:15-2:40 | A full round from the pull to a shatter | |
 | 2:40-2:50 | End card: logo, "Play in the Quest browser", the link | |
 

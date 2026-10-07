@@ -60,8 +60,8 @@ const CELL = (2 * EXTENT) / (GRID - 1);
 /** Shapes the player makes flatten back with this time constant (~2-3 s to vanish). */
 const RELAX_TAU = 1.0;
 /** Player shapes: a ramp's and a well's width (sigma, m), and how hard a fresh well slows a top (1/s). */
-/** A ramp's footprint (arena-local): about 11 cm across in the world, wide enough to meet a moving top. */
-export const RAMP_SIGMA = 0.045;
+/** A ramp's footprint (arena-local): about 13 cm across in the world, wide enough to meet a moving top. */
+export const RAMP_SIGMA = 0.052;
 /** The smaller ramp of a rival, so it does not end rounds too fast. */
 export const RIVAL_RAMP_SIGMA = 0.03;
 export const WELL_SIGMA = 0.022;

@@ -20,7 +20,7 @@ export const SHAPING = {
  * Shape sizes (arena-local m): a ramp's height grows with the lift from min to max (the far
  * version grows while held); a well has one depth. The shaping report uses max and well.
  */
-export const SHAPE_SIZE = { rampMin: 0.02, ramp: 0.06, well: 0.02 };
+export const SHAPE_SIZE = { rampMin: 0.02, ramp: 0.065, well: 0.02 };
 
 export class ShapingCharges {
   charges = SHAPING.charges;

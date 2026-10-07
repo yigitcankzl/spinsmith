@@ -525,3 +525,37 @@ hosted public URL and its freeze, the demo video, cover and logo, and Quest Stor
 When they are done, the storyboard in `SUBMISSION.md` should be revised to match current content
 (15 arenas, 226 builds, the strike and tells), and the cold open should be the real-table ramp
 throw.
+
+---
+
+## 14. Follow-up (Oct 7, the same day)
+
+Done without the headset:
+
+- **One verb per match** (item 2): match 1 is rip and ramp only; match 2 adds the strike (its
+  later rounds start with the bar nearly full); match 3 the cup and sling, with a first-time hint;
+  tells from match 4 (match 3 once a strike has landed). After the first session, one NEW! card
+  per result screen; the rest wait for the next ones.
+- **Hero moment** (item 3, the part that needs no device): every knockout win slows down for a
+  moment; one your own move caused slows for 0.9 s in a shower of sparks. The fight-time scale
+  stays a device decision.
+- **Agency** (item 4): the ramp is a little taller and wider; ramp + cup 58% → 60%, Anvil 64%
+  against masher 49%. "Own KO" turned out not to be caused by your own shapes (halving their
+  push on your top changed it by a point), so no bracing was added.
+- **Docs truth pass** (item 5): README "Try it" block; 226 builds, 5 cores, 15 arenas, 68 cm,
+  8 s, the table outline, "no menus" reworded, the reach range, the comeback claim dropped.
+  Planning docs were not moved (it would break their cross-links); brand mentions remain only
+  in research citations in internal docs.
+- **Visible fallbacks** (item 6): "No table found: the arena floats here" card; ENTER on a
+  browser without immersive AR says "Open this page on a Meta Quest"; anchors, mesh detection,
+  hit test and environment raycast removed; a warning if IWSDK's private `_plane` disappears.
+- **Balance** (item 7): Gale 56% → 50%, Cog 43% → 48%, Hook 44% → 46%; Ember Ring 79/24 → 68/47,
+  Sumo Square Halo 20% → 40%; Rush within 3 of the Anvil. Chisel was left at 44%: it is the
+  attack preset's tip and the type loop depends on it. Hookjaw's, Sawtooth's and Bastion's
+  signatures now open by level only after those rivals arrive (Lv 10, 14, 16; Cog Lv 12), the
+  first-knockout deed gives the Bead tip, and lock hints list every way ("Knock out Sawtooth or
+  Lv 14").
+- **Comfort** (item 8): a brass comfort dial on the near rim: Standard, Calm (no hit flashes,
+  press-and-hold strike), Quiet (sound off), Quiet and calm.
+- **Small bugs** (item 9): the seal drawer was already right (the tray coin follows the build);
+  the per-frame allocations left are small and wait for a device profile.

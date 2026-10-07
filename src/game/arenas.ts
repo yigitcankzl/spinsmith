@@ -33,12 +33,12 @@ export const ARENAS: ArenaLayout[] = [
   {
     // Small and fast: a tornado ridge to race on, low walls and wide exits, embers closing in.
     name: 'Ember Ring',
-    rule: 'Embers close in after 16 s: attackers win fast',
+    rule: 'Embers close in after 19 s: attackers win fast',
     theme: 'forge',
     radius: 0.12,
     shape: 'circle',
     floor: 'ridge',
-    depth: 0.012,
+    depth: 0.009,
     wall: 'low',
     pockets: [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((angle) => ({ angle, half: 0.28, points: 2 })),
     rails: [],
@@ -47,6 +47,7 @@ export const ARENAS: ArenaLayout[] = [
     spinner: 0,
     tilt: 0,
     shrink: true,
+    shrinkStart: 19,
   },
   {
     // A dish that rocks under the tops: the heavy side dips and flings the light side.
@@ -107,7 +108,7 @@ export const ARENAS: ArenaLayout[] = [
     name: 'Sumo Square',
     rule: 'No walls: heavy tops hold, light spinners get pushed off',
     theme: 'stone',
-    radius: 0.16,
+    radius: 0.17,
     shape: 'square',
     floor: 'tiers',
     depth: 0.007,

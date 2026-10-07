@@ -28,6 +28,8 @@ export const RAIL = { z: 0.16, y: 0.06 };
 export const DOCK_AT: Spot = { x: -0.14, y: 0, z: 0.165 };
 export const FORGE_AT: Spot = { x: 0.14, y: 0, z: 0.165 };
 export const BLUEPRINT_AT: Spot = { x: 0.08, y: 0, z: 0.185 };
+/** The comfort dial (sound, flashes, the strike's gesture), between the dock and the level plate. */
+export const COMFORT_AT: Spot = { x: -0.075, y: 0, z: 0.2 };
 /** The forge: where your top stands on the anvil, and the part tray: an arc of this radius around it, spanning this angle toward the player. */
 export const WORK: Spot = { x: 0, y: 0.07, z: 0.06 };
 export const TRAY = { r: 0.105, y: 0.035, gap: 0.047 };
@@ -68,5 +70,6 @@ export function touchTargets(): [string, Spot][] {
     ['dock', { ...DOCK_AT, y: TABLE_Y + 0.04 }],
     ['anvil', { ...FORGE_AT, y: TABLE_Y + 0.06 }],
     ['blueprint', { ...BLUEPRINT_AT, y: TABLE_Y + 0.02 }],
+    ['comfort dial', { ...COMFORT_AT, y: TABLE_Y + 0.012 }],
   ];
 }

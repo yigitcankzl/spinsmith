@@ -98,6 +98,13 @@ Built and in the repo, measured with `npm run report:shaping` (rows "masher + st
   measure is noisy, 0-22% across nearby settings, and rounds that fall far behind rarely turn);
   Rush 60%, Magnet 63%; against a charging rival 62% with the strike, 43% without.
 - `npm run report:arenas`: no warnings on any of the fifteen arenas (KO 16-53%, medians 15-22 s).
+- After the full evaluation (`docs/reviews/FULL-EVALUATION.md`): the player's ramp is a little
+  taller and wider (0.065 high, sigma 0.052), Ember Ring's embers start at 19 s and Sumo Square
+  is wider. `report:shaping` now: masher 48%, human ramp 58%, ramp + cup 60% (median 14.7 s),
+  Anvil 64% against masher + strike 49% (+15), median 12.5 s; Rush 62%, Magnet 65%. Comeback
+  stays at 0-5%, so the docs no longer promise one. `report:arenas`: no warnings (Ember Ring
+  Striker 68% / Halo 47%, Sumo Square 60% / 40%). `report:tops`: 226 builds, parts 44-55%, no
+  warnings (Gale 50%, Cog 48%).
 - Not built: combo counter, rival memory, the weekly rare-part order. Needs the headset: the slap
   thresholds (`?slapDown=` etc.) and whether a tracking jump can look like a slap.
 

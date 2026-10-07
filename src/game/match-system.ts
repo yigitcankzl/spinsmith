@@ -1,5 +1,6 @@
 import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, ForgeLoop, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, ForgeLoop, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -86,7 +87,7 @@ const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magn
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
 /** A finish your shape caused plays its visuals at SLOW_MO speed for this long (real s). */
-const SLOW_MO_TIME = 0.6;
+const SLOW_MO_TIME = 0.9;
 const SLOW_MO = 0.3;
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
@@ -236,6 +237,8 @@ export class MatchSystem extends createSystem({
   /** Unlocks waiting to be shown over the arena, and the one showing. */
   private reveals: string[] = [];
   private reveal: { obj: Object3D; t: number } | null = null;
+  /** After the first session, one unlock shown per result card; the rest wait for the next ones. */
+  private revealedHere = false;
   private rewardHold = 0;
   /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
@@ -332,6 +335,8 @@ export class MatchSystem extends createSystem({
   private fullSince = -1;
   /** A strike has landed this session: the hint stops. */
   private struckOnce = false;
+  /** A cup made this session (its first-time hint goes then). */
+  private cuppedOnce = false;
   /** Where the shockwave starts (arena-local, on the rim beside the palm). */
   private shockAt = { x: 0, z: 0 };
   /** The bar on the back of each hand: ten segments around a ring that faces the eyes. */
@@ -446,6 +451,7 @@ export class MatchSystem extends createSystem({
     this.setBuilds(this.myBuild, this.theirBuild);
     this.buildHandle();
     this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
+    this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
     this.menuButton.mesh.rotation.y = 0.4;
     this.menuButton.set('Menu');
@@ -859,20 +865,26 @@ export class MatchSystem extends createSystem({
     this.labelTimer = 0;
     this.bar.mesh.visible = false;
     // The first session says where to reach next.
-    const guide = this.progress.guide;
-    if (guide === 'launch') this.label.set('Your top waits in its dock\nPut it in the arena to play');
-    else if (guide === 'bump' || guide === 'match') this.label.set('Finish your first match\nPut your top in the arena');
-    else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Spur tip!\nPinch the small anvil to forge');
-    else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
+    this.label.set(this.guideNote());
     // Notes hang over the far rim; the beacon marks the dock or the anvil.
     this.label.mesh.position.copy(LABEL_AT);
     this.label.mesh.scale.setScalar(1.25);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
 
+  /** The first session's note at home: where to reach next ('' once the guide is done). */
+  private guideNote() {
+    const guide = this.progress.guide;
+    if (guide === 'launch') return 'Your top waits in its dock\nPut it in the arena to play';
+    if (guide === 'bump' || guide === 'match') return 'Finish your first match\nPut your top in the arena';
+    if (guide === 'forge' || guide === 'fit') return 'New part: Spur tip!\nPinch the small anvil to forge';
+    if (guide === 'rematch') return 'Your top is ready\nPut it in the arena for a rematch';
+    return '';
+  }
+
   private updateHub(dt: number) {
     if (this.moveArena()) return;
-    if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
+    if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set(this.guideNote());
     this.player.head.getWorldPosition(this.p);
     if (import.meta.env.DEV && this.hubLogPending) {
       this.hubLogPending = false;
@@ -915,6 +927,13 @@ export class MatchSystem extends createSystem({
       this.labelTimer = 2.5;
     } else if (action.kind === 'reset') {
       return;
+    } else if (action.kind === 'comfort') {
+      const name = nextComfort();
+      applySound();
+      this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
+      this.label.set(`Comfort: ${name}\nPinch the dial again for the next`);
+      this.labelTimer = 3;
+      if (import.meta.env.DEV) console.log(`[HUB] comfort ${name}`);
     } else if (action.kind === 'armReset') {
       this.label.set('Start over as a new smith?\nPinch the level plate again');
       this.labelTimer = 3;
@@ -1172,6 +1191,11 @@ export class MatchSystem extends createSystem({
   private place() {
     this.placeRoot();
     this.toHub();
+    if (!this.onTable) {
+      // No table found (or none labelled one): say so, then the first session's note returns.
+      this.label.set('No table found: the arena floats here\nMove it by its brass handle');
+      this.labelTimer = 5;
+    }
   }
 
   /**
@@ -1391,10 +1415,16 @@ export class MatchSystem extends createSystem({
   }
 
   /** Centers of the detected horizontal table and desk planes (world). */
+  private warnedPlane = false;
   private tables(): Point[] {
     const out: Point[] = [];
     for (const e of this.queries.planes.entities) {
       const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
+      // ponytail: '_plane' is IWSDK-internal (pinned 1.0.1); an update that renames it shows up here.
+      if (!plane && !this.warnedPlane) {
+        this.warnedPlane = true;
+        console.warn('[MATCH] XRPlane has no _plane: table detection is off (IWSDK changed?)');
+      }
       if (plane?.orientation !== 'horizontal' || !/table|desk/.test(plane.semanticLabel ?? '')) continue;
       const p = e.object3D!.getWorldPosition(new Vector3());
       out.push({ x: p.x, y: p.y, z: p.z });
@@ -1499,7 +1529,7 @@ export class MatchSystem extends createSystem({
     this.label.mesh.scale.setScalar(1.25);
     // The bar on the far rim shows the match; the card over it only the round's messages,
     // and at a match's start, who the rival is and how it plays.
-    if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name} · ${this.rival.style}${this.progress.matches >= 1 ? ` · ${MOVE_WORD[this.rival.move]}` : ''}\n${this.arena.layout.rule ?? this.arena.layout.name}`);
+    if (this.myPoints === 0 && this.theirPoints === 0) this.label.set(`Rival: ${this.rival.name} · ${this.rival.style}${this.taught('tells') ? ` · ${MOVE_WORD[this.rival.move]}` : ''}\n${this.arena.layout.rule ?? this.arena.layout.name}`);
     else this.label.set('');
     this.bar.mesh.visible = true;
     this.barMessage = 'READY';
@@ -1661,8 +1691,8 @@ export class MatchSystem extends createSystem({
     this.lastPerfect = perfect;
     this.charges.reset();
     this.forgeBar.reset();
-    // A first match's later rounds start nearly full, so the strike shows in the first few minutes.
-    if (this.progress.matches === 0 && this.myPoints + this.theirPoints > 0 && !this.demo) this.forgeBar.value = 0.8;
+    // The strike's first match: later rounds start nearly full, so it shows in the first few minutes.
+    if (this.progress.matches === 1 && this.myPoints + this.theirPoints > 0 && !this.demo) this.forgeBar.value = 0.8;
     this.barWasFull = false;
     this.rivalBar.reset();
     this.tellAt = -1;
@@ -1793,10 +1823,21 @@ export class MatchSystem extends createSystem({
       const down = (this.tipDown[side] += (raw - this.tipDown[side]) * (1 - Math.exp(-this.frameDt / 0.08)));
       if (depth > 0.004 && !this.pressing[side] && open) {
         this.pressing[side] = true;
-        if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp) this.makeCup(side, tip.x, tip.z);
+        if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
         else if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${down.toFixed(2)} m/s down`);
       } else if (depth < 0) this.pressing[side] = false;
     }
+  }
+
+  /**
+   * One new verb per match in the first session: the ramp in the first, the strike in the second,
+   * the cup and sling in the third; rival tells after that (sooner once a strike has landed).
+   */
+  private taught(verb: 'strike' | 'cup' | 'tells') {
+    const m = this.progress.matches;
+    if (verb === 'strike') return m >= 1;
+    if (verb === 'cup') return m >= 2;
+    return m >= 3 || (m >= 2 && this.struckOnce);
   }
 
   /**
@@ -1804,7 +1845,12 @@ export class MatchSystem extends createSystem({
    * outside the arena's rim. Also keeps the bar on the back of each hand and the shockwave going.
    */
   private updateStrike(dt: number) {
-    // No strike in a workshop try-out.
+    // No strike in a workshop try-out, nor before its match in the first session.
+    if (!this.taught('strike')) {
+      this.barRings.left.visible = this.barRings.right.visible = this.slapMark.visible = false;
+      this.arenaView.charge = 0;
+      return;
+    }
     const full = this.forgeBar.full && this.elapsed >= TUNING.grace && !this.demo;
     if (full && !this.barWasFull) {
       playBarFull();
@@ -1814,7 +1860,7 @@ export class MatchSystem extends createSystem({
     // The hint stays until the first strike lands (the first session's ramp hint goes first).
     if (full && !this.struckOnce && !this.demo && this.progress.guide !== 'bump' && this.labelTimer <= 0) {
       this.strikeTaught = true;
-      this.label.set(`Forge bar full: ${SEAL_NAMES[this.myBuild.seal ?? 'anvil']}!\nSlap your palm down beside the arena`);
+      this.label.set(`Forge bar full: ${SEAL_NAMES[this.myBuild.seal ?? 'anvil']}!\n${COMFORT.gentle ? 'Press your palm flat beside the arena and hold' : 'Slap your palm down beside the arena'}`);
     }
     const armed = full && this.elapsed - this.fullSince > 0.5;
     // The print sits on the table off the near-right rim (any spot beside the arena works).
@@ -1831,7 +1877,7 @@ export class MatchSystem extends createSystem({
       const h = this.hands[side];
       const l = h.tracked ? this.toLocal(h.index) : null;
       const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > 1.05;
-      const hit = this.strikeTouch[side].update(outside ? h.low : null, dt, tableY - 0.05, tableY + 0.05);
+      const hit = (COMFORT.gentle ? this.touches : this.strikeTouch)[side].update(outside ? h.low : null, dt, tableY - 0.05, tableY + 0.05);
       if (hit === null) continue;
       if (!armed) {
         if (import.meta.env.DEV) console.log(`[STRIKE] pressed with the bar at ${Math.round(this.forgeBar.value * 100)}%`);
@@ -1880,8 +1926,7 @@ export class MatchSystem extends createSystem({
    * move lands, unless your Anvil Strike cut it short.
    */
   private rivalTell(clash: number) {
-    // Tells come once the strike that answers them has been met: after a first strike, or from the third match.
-    if (this.demo || this.progress.matches < 1 || (!this.struckOnce && this.progress.matches < 2)) return;
+    if (this.demo || !this.taught('tells')) return;
     this.rivalBar.update(STEP, false);
     if (clash) this.rivalBar.clash(clash, this.elapsed, false);
     const them = this.theirs;
@@ -1987,6 +2032,8 @@ export class MatchSystem extends createSystem({
   private makeCup(side: Side, x: number, z: number) {
     const shape = this.makeShape('well', x, z, CUP_DEPTH, `${side}-cup`, 0, 0, CUP_SIGMA);
     if (!shape) return;
+    if (!this.cuppedOnce && this.label.current.startsWith('New: jab')) this.label.set('');
+    this.cuppedOnce = true;
     shape.trap = shape.held = true;
     this.cups[side] = { shape, at: this.elapsed, caught: false };
   }
@@ -2208,6 +2255,8 @@ export class MatchSystem extends createSystem({
   private finish(v: -1 | 1 | 2) {
     this.phase = 'result';
     this.resultTimer = RESULT_TIME;
+    // The first session shows every unlock (its own part among them); later, one per result card.
+    this.revealedHere = false;
     if (this.demo) {
       // Workshop demo: say how it ended, no points.
       const loser = v === 1 ? this.theirs : this.mine;
@@ -2248,10 +2297,14 @@ export class MatchSystem extends createSystem({
       // A finish within 1.5 s of the player's shape names it as the cause.
       const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind).toUpperCase() : null;
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
+      if (v === 1 && loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME * 0.5;
       if (recent && v === 1) {
         text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
-        // The decisive move plays out slowly for a moment.
-        if (loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME;
+        // The decisive move plays out slowly for a moment, in a shower of sparks.
+        if (loser.finish !== 'spin') {
+          this.slowMo = SLOW_MO_TIME;
+          this.sparks.burst(loser.x, this.arena.height(loser.x, loser.z), loser.z, 1);
+        }
       } else if (recent && v === -1 && loser.finish !== 'spin' && !(theirs && this.rivalShapeAt > this.lastShape!.t)) text = `YOUR ${recent} BACKFIRED\n${text}`;
       else if (theirs && v === -1 && loser.finish !== 'spin') text = `THEIR ${this.rivalShapeKind} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
     }
@@ -2298,6 +2351,8 @@ export class MatchSystem extends createSystem({
       this.bumpMark.scale.setScalar(1 + 0.3 * Math.sin(this.time * 6));
       this.label.set('Pinch the floor at the ring: a ramp rises at once\ndrag to aim it at the rival');
       this.bumpHintShown = true;
+    } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.progress.matches === 2 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
+      this.label.set('New: jab a fingertip down into the floor\na cup opens and catches the top that rolls in');
     } else if (this.bumpHintShown && g !== 'bump') {
       // The first move is made: the hint goes.
       this.bumpHintShown = false;
@@ -2368,7 +2423,8 @@ export class MatchSystem extends createSystem({
       this.resultTimer = Math.max(this.resultTimer, 1.4 + 2.8);
     }
     if (this.rewardHold > 0) this.rewardHold -= dt;
-    else if (!this.reveal && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+    else if (!this.reveal && !(this.revealedHere && this.progress.guide === 'done') && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+      this.revealedHere = true;
       const key = this.reveals.shift()!;
       const obj = unlockModel(key, this.arenas);
       this.stage.add(obj);
@@ -2397,8 +2453,8 @@ export class MatchSystem extends createSystem({
         (m.material as MeshBasicMaterial).dispose();
       });
       this.reveal = null;
-      // The result waits for every queued unlock.
-      if (this.reveals.length) this.resultTimer = Math.max(this.resultTimer, 0.2);
+      // The first session's result waits for every queued unlock.
+      if (this.reveals.length && this.progress.guide !== 'done') this.resultTimer = Math.max(this.resultTimer, 0.2);
     }
   }
 

@@ -8,6 +8,14 @@ Entry for the Meta VR Start Developer Competition 2026 (Gaming – New Experienc
 Current direction: [docs/GAMEPLAY-DIRECTION.md](docs/GAMEPLAY-DIRECTION.md); the remaining work:
 [docs/ACTION-PLAN.md](docs/ACTION-PLAN.md).
 
+## Try it (judges)
+
+1. Sit at a table on a Meta Quest 3 or 3S, hands free (no controllers), and open the hosted URL in the Quest Browser.
+2. Press **ENTER** and allow spatial data: the arena stands on your table (without a table it floats in front of you, and says so).
+3. Pinch your top in its dock and drop it in the arena, then pinch near it, pull back and let go to rip it.
+4. In the fight, pinch the floor beside the rival: a ramp rises and throws it. Each new match teaches one more move: the palm-slap strike in the second, the cup and sling in the third.
+5. Add `?fresh` to start as a new player, or `?demo` for a level-8 smith with more unlocked. The brass dial on the near rim sets sound, flashes and a gentle press-and-hold strike.
+
 ## How to play
 
 Sit at a table, enable hand tracking, and allow spatial data so the arena can stand on your
@@ -21,15 +29,19 @@ an arena. First to 3 heat wins a match.
   start over.
 - **Move the arena:** at home, pinch the brass handle on the pedestal's near face and carry it.
   Leaving and re-entering, or recentering the headset, places it in front of you again.
-- **Known limits:** nothing has been measured on a headset yet; the arena stands on the nearest
-  table plane but does not yet know the table's edge.
+- **Known limits:** nothing has been measured on a headset yet; table detection relies on the
+  room's Space Setup labelling a table or desk.
+- **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
+  steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
+  slapped, for trays and shared spaces); Quiet (sound off); and Quiet and calm.
 
 ## What is in the game
 
-- The arena is placed about 60 cm in front of the seated player (its near rim about 30 cm), on a
+- The arena is placed about 68 cm in front of the seated player (its near rim about 30 cm), on a
   pedestal 8 cm above the nearest detected table, or on a floating tray when there is no table or
-  the table is far below the eyes (standing over a coffee table). It waits up to 5 s for a table,
-  and moves onto one that appears later.
+  the table is far below the eyes (standing over a coffee table). It waits up to 8 s for a table
+  (or a palm pressed on it), says when there is none, and moves onto one that appears later. It
+  fits the arena inside the table's outline.
 - **One machine on the table** (`src/game/hub.ts`, `src/game/rim.ts`): the arena sits on your
   table, drawn 2.4 times its simulation size (about 72 cm across), and everything else is built into
   it. At home, your top waits in its dock on the near rim's left (carry it into the arena or tap
@@ -74,8 +86,8 @@ an arena. First to 3 heat wins a match.
   type matchup on every arena and reports round length, knockouts and type balance.
 - **Build your top from parts** (`src/game/parts.ts`, design in `docs/TOP-CUSTOMIZATION.md`):
   a Ring (contact style and mass: Striker, Hook, Anvil, Halo, Saw, Cog, Gale, Bulwark), a Core (height and
-  shatter lock: Stub, Bolt, Clamp, Stilt), a Tip (movement and rail gear: Chisel, Spur, Awl,
-  Dome, Pin, Bead), spin direction and color, under a 40 g weight limit (136 legal builds).
+  shatter lock: Stub, Bolt, Clamp, Stilt, Spindle), a Tip (movement and rail gear: Chisel, Spur, Awl,
+  Dome, Pin, Bead), spin direction and color, under a 40 g weight limit (226 legal builds).
   The parts change the fight: a lower top hits under a taller one, low tops scrape on steep
   slopes, upper rings lift tops over walls, opposite spins pass spin from the faster top to
   the slower (Cog rings much more), same spins grind each other down, tips dash on rails by
@@ -99,16 +111,19 @@ an arena. First to 3 heat wins a match.
   finished the home is just your top in its dock (a breathing ring calls you to it) and the
   arena; the anvil and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
-  the rival where lifting would push it, until your first ramp. Finishing the first match, won or
+  the rival where lifting would push it, until your first ramp. One new move per match: the
+  first match is the rip and the ramp only, the second adds the strike (its later rounds start
+  with the bar nearly full), the third the cup and sling; rival tells come after that. Finishing the first match, won or
   lost, earns the Spur tip: the anvil appears and calls for it, the forge highlights only that
   part, and after saving the dock calls you back for the rematch.
 - **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
   knockout, a white-hot pull, and the match), filling levels 1-20 with ranks
   (Apprentice, Journeyman, Smith, Master Smith, Legend). Levels open options, never power: you
   start with the classic tops' parts, two paints and two arenas, and each level opens a part, a
-  paint, an arena or a rival, and levels 14-20 give paints and emblem glows (cosmetic only),
-  ending in a gilded ledger; the Clamp core comes from a first shatter win and the Hook ring from a
-  first slag or throw win. Locked parts and arenas show dark with how they are earned. A match is
+  paint, an arena, a seal or a rival, with emblem glows near the top, ending in a gilded ledger;
+  the Clamp core comes from a first shatter win and the Bead tip from a first slag or throw win.
+  A rival's signature part also opens by level, a few levels after that rival arrives: knocking
+  the rival out is the early way to it. Locked parts and arenas show dark with how they are earned. A match is
   against one rival archetype that keeps its build and spin for every round (Rim Raider, Iron
   Keep and Drifter at first; Leech, Hookjaw, Sawtooth and Bastion join with levels, announced as
   NEW RIVAL); its name and style show at the start. Higher levels make rivals rip harder and aim steadier, never
@@ -170,13 +185,14 @@ an arena. First to 3 heat wins a match.
   emulator's play mode a left click is a pinch, so the game is playable by looking
   around with the mouse and click-holding.
 - **The duel layer** (`docs/DUEL-DESIGN.md`): a forge bar (the ring on the back of each hand)
-  fills from solid clashes, three times as fast while your top is behind on spin. Full, press
+  starts each round a third full, fills on its own in 24 s and from solid clashes, three times
+  as fast while your top is behind on spin. Full, press
   your palm on the table beside the arena: your strike. The seal you engrave in the forge's
   Style drawer picks it: the Anvil Strike (a shockwave from the middle that throws tops near the
   rim, hot ones further; your own top is braced), the Rush (Lv 4: your top charges the rival) or
   the Magnet (Lv 7: the rival is dragged toward a slag pit). A top that has taken a beating
   glows red: it flies further.
-- **Rival tells:** after your first match each rival has one big move (a charge, a quake or a
+- **Rival tells:** from the fourth match (the third, once you have struck) each rival has one big move (a charge, a quake or a
   pull). Its own bar fills like yours; when full it flashes and whines for a second, then the
   move lands, unless your strike cuts it short ("INTERRUPTED!").
 - **Rival signature parts:** knock a rival out once and its part is yours (Rim Raider's Gale
