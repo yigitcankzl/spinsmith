@@ -154,8 +154,8 @@ export class Hub {
   }
 
   /** Refreshes what the stations show: your top, and one miniature per arena. */
-  show(build: TopBuild, progress: Progress, order: Order | null, tomorrow: Order | null = null) {
-    this.drawRank(progress);
+  show(build: TopBuild, progress: Progress, order: Order | null, tomorrow: Order | null = null, nextMatch: string | null = null) {
+    this.drawRank(progress, nextMatch);
     this.root.visible = true;
     // Before the first match the smithy is just your top and the arena: the anvil, the arena
     // shelf and the workshop come once the player knows a fight.
@@ -381,13 +381,13 @@ export class Hub {
 
   /** A short brass stand at the near rim holding your top: carry it into the arena to play. */
   /** Your smith level beside the stand: level, rank and the bar toward the next level. */
-  private drawRank(progress: Progress) {
+  private drawRank(progress: Progress, nextMatch: string | null) {
     const next = progress.next;
-    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}`;
+    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}|${nextMatch}`;
     if (key === this.rankKey) return;
     this.rankKey = key;
     const g = this.rankCanvas.getContext('2d')!;
-    glass(g, 512, 200, ORANGE);
+    glass(g, 512, 250, ORANGE);
     g.fillStyle = TEXT;
     g.textBaseline = 'middle';
     g.font = `700 54px ${FONT}`;
@@ -403,6 +403,14 @@ export class Hub {
     g.fillStyle = TEXT;
     g.font = `600 28px ${FONT}`;
     g.fillText(next ? `Next: ${unlockLabel(next.key)} at Lv ${next.level}` : 'Every part is yours', 28, 160);
+    // Who and where the next match is (picked at home: the rotation or your pinned arena).
+    if (nextMatch) {
+      g.fillStyle = ORANGE;
+      let size = 28;
+      do g.font = `700 ${size--}px ${FONT}`;
+      while (g.measureText(`Next match: ${nextMatch}`).width > 456 && size > 16);
+      g.fillText(`Next match: ${nextMatch}`, 28, 210);
+    }
     this.rankTex.needsUpdate = true;
   }
 
@@ -410,10 +418,10 @@ export class Hub {
   private buildStand() {
     this.stand.position.set(DOCK_AT.x, TABLE_Y, DOCK_AT.z);
     this.rankCanvas.width = 512;
-    this.rankCanvas.height = 200;
+    this.rankCanvas.height = 250;
     this.rankTex = new CanvasTexture(this.rankCanvas);
     this.rankTex.colorSpace = SRGBColorSpace;
-    const rank = new Mesh(new PlaneGeometry(0.1, 0.039), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
+    const rank = new Mesh(new PlaneGeometry(0.1, 0.049), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
     rank.rotation.x = -1;
     rank.scale.setScalar(0.8);
     // Held for 2 s, then pinched again, the level plate starts over as a new smith (shared headsets).

@@ -172,6 +172,10 @@ export class Progress {
   champions: Champion[] = [];
   /** Today's order, kept once made so a level-up mid-day does not change it. */
   private order: Order | null = null;
+  /** The arena the player pinned (null: the rotation picks), arenas played most recent first, and every arena played once. */
+  arenaPin: string | null = null;
+  recentArenas: string[] = [];
+  playedArenas: string[] = [];
   private readonly storage: Storage | null;
 
   constructor(storage: Storage | null = null) {
@@ -179,7 +183,7 @@ export class Progress {
     try {
       const raw = storage?.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; champions?: Champion[]; order?: Order };
+        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; champions?: Champion[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[] };
         this.matches = s.matches ?? 0;
         // Saves from before the guide existed skip it.
         this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
@@ -191,6 +195,9 @@ export class Progress {
         this.marks = { ...(s.marks ?? {}) };
         this.champions = (s.champions ?? []).slice(0, CHAMPIONS);
         this.order = s.order ?? null;
+        this.arenaPin = s.arenaPin ?? null;
+        this.recentArenas = s.recentArenas ?? [];
+        this.playedArenas = s.playedArenas ?? [];
       }
     } catch {
       // A broken save starts over.
@@ -313,6 +320,19 @@ export class Progress {
     this.save();
   }
 
+  /** A match starts in this arena: it becomes the most recent and counts as played. */
+  playedArena(name: string) {
+    this.recentArenas = [name, ...this.recentArenas.filter((a) => a !== name)].slice(0, 8);
+    if (!this.playedArenas.includes(name)) this.playedArenas.push(name);
+    this.save();
+  }
+
+  /** Pins an arena for every match (null: back to the rotation). */
+  pinArena(name: string | null) {
+    this.arenaPin = name;
+    this.save();
+  }
+
   /** Starts over as a new smith: level 1, the first session, nothing earned. */
   reset() {
     this.level = 1;
@@ -325,6 +345,9 @@ export class Progress {
     this.marks = {};
     this.champions = [];
     this.order = null;
+    this.arenaPin = null;
+    this.recentArenas = [];
+    this.playedArenas = [];
     this.save();
   }
 
@@ -338,7 +361,7 @@ export class Progress {
   private save() {
     this.storage?.setItem(
       KEY,
-      JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order }),
+      JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas }),
     );
   }
 }

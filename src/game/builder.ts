@@ -4,6 +4,7 @@ import {
   BufferGeometry,
   CanvasTexture,
   CircleGeometry,
+  ConeGeometry,
   CylinderGeometry,
   Float32BufferAttribute,
   Group,
@@ -318,8 +319,10 @@ export interface BuilderHooks {
   floorHeight(n: number): number;
   /** Every arena on offer, in order: built-in first, then yours. */
   arenas(): { layout: ArenaLayout; lock: string | null; own: boolean; current: boolean }[];
-  /** Make this arena the one played. */
+  /** Pin this arena for every match (-1: back to the rotation). */
   selectArena(index: number): void;
+  /** True while an arena is pinned (otherwise the rotation picks). */
+  pinned(): boolean;
   /** One of your arenas was thrown away (already gone from storage). */
   removedArena(name: string): void;
 }
@@ -424,6 +427,9 @@ export class Builder {
     this.fold('out');
     playMachine();
     this.say('Pinch a piece and drop it on the arena');
+    // The drawers open where they were left, the arenas at their first page.
+    this.arenaPage = 0;
+    this.showTab(this.tab, false);
     this.hooks.preview(this.draft);
     this.rebuildGuides();
     this.drawNames();
@@ -890,6 +896,7 @@ export class Builder {
   /** A piece's name on the rail; an arena shows its own name, or how it is earned while locked. */
   private nameOf(p: Piece): string {
     if (p.kind !== 'arena') return pieceName(p, this.draft);
+    if (p.index < 0) return this.hooks.pinned() ? 'Rotation' : 'Rotation (on)';
     const a = this.hooks.arenas()[p.index];
     return a ? (a.lock ? `${a.layout.name} · ${a.lock}` : a.layout.name) : '';
   }
@@ -901,17 +908,18 @@ export class Builder {
       s.model.traverse((o) => (o as Mesh).geometry?.dispose());
     }
     this.slots = this.slots.filter((x) => x.tab !== ARENA_TAB);
-    const list = this.hooks.arenas();
+    // The rotation comes first: index -1.
+    const list = [null, ...this.hooks.arenas()];
     const pages = Math.max(1, Math.ceil(list.length / ARENAS_PER_PAGE));
     const page = ((this.arenaPage % pages) + pages) % pages;
     const shown = list.slice(page * ARENAS_PER_PAGE, (page + 1) * ARENAS_PER_PAGE);
     shown.forEach((a, c) => {
-      const index = page * ARENAS_PER_PAGE + c;
+      const index = page * ARENAS_PER_PAGE + c - 1;
       const home = new Vector3((c - (shown.length - 1) / 2) * ITEM_GAP, RAIL_Y, RAIL_Z);
       const model = new Group();
-      const mini = miniArena(a.layout, a.current);
+      const mini = a ? miniArena(a.layout, a.current) : rotationModel(!this.hooks.pinned());
       mini.scale.setScalar(0.4);
-      if (a.lock) mini.traverse((o) => ((o as Mesh).material as MeshBasicMaterial | undefined)?.color?.setHex(0x1c2230));
+      if (a?.lock) mini.traverse((o) => ((o as Mesh).material as MeshBasicMaterial | undefined)?.color?.setHex(0x1c2230));
       model.add(mini);
       model.rotation.x = 0.6;
       model.position.copy(home);
@@ -925,6 +933,14 @@ export class Builder {
 
   /** Plays this arena from now on, and starts the draft from it. */
   private useArena(index: number) {
+    if (index < 0) {
+      this.hooks.selectArena(-1);
+      playPlace();
+      this.say('Rotation: each match picks its arena, new ones first');
+      this.fillArenas();
+      this.showTab(ARENA_TAB, false);
+      return;
+    }
     const a = this.hooks.arenas()[index];
     if (!a) return;
     this.hooks.selectArena(index);
@@ -932,7 +948,7 @@ export class Builder {
     this.draft.name = 'My Arena';
     delete this.draft.rule;
     playPlace();
-    this.changed(`${a.layout.name}: it is the arena you play now`);
+    this.changed(`${a.layout.name}: pinned for every match (Rotation undoes it)`);
     if (import.meta.env.DEV) console.log(`[BUILD] selected ${a.layout.name}`);
     this.fillArenas();
     this.showTab(ARENA_TAB, false);
@@ -978,6 +994,20 @@ export class Builder {
     }
     this.namesTex.needsUpdate = true;
   }
+}
+
+/** The rotation's plate: a brass ring with arrows chasing round it, lit while the rotation is on. */
+function rotationModel(on: boolean): Group {
+  const g = new Group();
+  const color = on ? 0xff8a2a : 0x8a919c;
+  const base = new Mesh(new CylinderGeometry(0.034, 0.036, 0.012, 32), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57) }));
+  base.position.y = 0.006;
+  const ring = new Mesh(new TorusGeometry(0.022, 0.003, 8, 40, Math.PI * 1.6).rotateX(Math.PI / 2), new MeshBasicMaterial({ color }));
+  ring.position.y = 0.014;
+  const head = new Mesh(new ConeGeometry(0.007, 0.012, 12).rotateZ(-Math.PI / 2), new MeshBasicMaterial({ color }));
+  head.position.set(0.022, 0.014, -0.004);
+  g.add(base, ring, head);
+  return g;
 }
 
 /** Blueprint lines: thin, light steel, see-through. */

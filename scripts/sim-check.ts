@@ -12,6 +12,7 @@ import { CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STA
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
+import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
@@ -607,6 +608,27 @@ TUNING.grace = 0;
       assert.ok(v.below <= 63, `${name} at drop ${drop}: ${v.below.toFixed(0)} degrees below the eyes`);
     }
   }
+}
+
+// 17. The arena rotation: a newly opened arena comes first, then the rival's home unless it was
+// just played, then the one played longest ago; never the same arena twice in a row.
+{
+  for (const [rival, home] of Object.entries(RIVAL_HOME)) {
+    assert.ok(RIVALS.some((r) => r.name === rival), `${rival} is a rival`);
+    assert.ok(ARENAS.some((a) => a.name === home), `${home} is an arena`);
+  }
+  const open = ['Forge Bowl', 'Ember Ring', 'Zero-G Dish'];
+  assert.equal(nextArena(open, ['Forge Bowl'], ['Forge Bowl', 'Ember Ring'], 'Drifter'), 'Zero-G Dish', 'a never-played arena first');
+  assert.equal(nextArena(open, ['Forge Bowl'], open, 'Hookjaw'), 'Ember Ring', "the rival's home next");
+  assert.equal(nextArena(open, ['Ember Ring', 'Forge Bowl'], open, 'Hookjaw'), 'Zero-G Dish', 'not the home just played: the oldest');
+  let recent = ['Forge Bowl'];
+  const rivals = ['Rim Raider', 'Iron Keep', 'Drifter', 'Hookjaw'];
+  for (let i = 0; i < 40; i++) {
+    const a = nextArena(open, recent, open, rivals[i % rivals.length]);
+    assert.notEqual(a, recent[0], 'never the same arena twice in a row');
+    recent = [a, ...recent.filter((x) => x !== a)];
+  }
+  assert.equal(nextArena(['Forge Bowl'], ['Forge Bowl'], ['Forge Bowl'], 'Drifter'), 'Forge Bowl', 'one arena: that one');
 }
 
 console.log('sim-check: all passed');

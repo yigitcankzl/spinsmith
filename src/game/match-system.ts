@@ -10,6 +10,7 @@ import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
 import { GUIDE_ORDER, MARK, Progress } from './progress.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
+import { nextArena } from './rotation.js';
 import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
 import { anvilModel, Hub, standModel } from './hub.js';
@@ -132,9 +133,14 @@ export class MatchSystem extends createSystem({
     toLocal: (world, out) => this.root.worldToLocal(out.copy(world)),
     floorHeight: (n) => this.arena.floorHeight(n),
     arenas: () =>
-      this.arenas.map((layout, i) => ({ layout, lock: this.progress.lockText(`arena:${layout.name}`), own: !ARENAS.includes(layout), current: i === this.arenaIndex })),
+      this.arenas.map((layout, i) => ({ layout, lock: this.progress.lockText(`arena:${layout.name}`), own: !ARENAS.includes(layout), current: this.progress.arenaPin !== null && i === this.arenaIndex })),
+    pinned: () => this.progress.arenaPin !== null,
     // The arena is set for real when the workshop closes (leaveBuilder).
-    selectArena: (i) => (this.arenaIndex = i),
+    selectArena: (i) => {
+      // -1: back to the rotation; otherwise this arena for every match until changed.
+      this.progress.pinArena(i < 0 ? null : this.arenas[i].name);
+      if (i >= 0) this.arenaIndex = i;
+    },
     removedArena: (name) => {
       const current = this.arenas[this.arenaIndex];
       this.arenas = this.arenas.filter((a) => a.name !== name);
@@ -282,6 +288,8 @@ export class MatchSystem extends createSystem({
   private launchFrom: { x: number; z: number } | null = null;
   /** The rival's spot this round: an angle around the arena's far half. */
   private rivalAngle = -Math.PI / 2;
+  /** The next match's rival, picked at home and shown there with its arena. */
+  private nextRival: Rival | null = null;
   /** While ready: a faint line on the floor around where you can launch from. */
   private launchZone = new Mesh(new BufferGeometry(), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0.5, depthWrite: false, side: 2 }));
   /** Seconds left before a transient fight message clears. */
@@ -569,6 +577,28 @@ export class MatchSystem extends createSystem({
     return spawnDistance(this.arena.layout);
   }
 
+  /**
+   * Picks the next match once (it stays until played): the rival, then its arena, the pinned one
+   * or the rotation's (rotation.ts). The first session stays in its first arena.
+   */
+  private prepareNext() {
+    if (this.progress.guide !== 'done') {
+      this.nextRival = null;
+      return;
+    }
+    this.nextRival ??= this.pickRival();
+    const pin = this.progress.arenaPin;
+    let index = pin ? this.arenas.findIndex((a) => a.name === pin) : -1;
+    if (pin && index < 0) this.progress.pinArena(null);
+    if (index < 0) {
+      const open = this.arenas.filter((a) => ARENAS.includes(a) && this.progress.isUnlocked(`arena:${a.name}`)).map((a) => a.name);
+      const name = nextArena(open, this.progress.recentArenas, this.progress.playedArenas, this.nextRival.name);
+      index = Math.max(0, this.arenas.findIndex((a) => a.name === name));
+    }
+    this.arenaIndex = index;
+    if (import.meta.env.DEV) console.log(`[MATCH] next: ${this.nextRival.name} in ${this.arenas[index].name}${pin ? ' (pinned)' : ''}`);
+  }
+
   /** Switches to another arena layout (rebuilds the visuals). */
   setArena(layout: ArenaLayout) {
     this.arena.reset(layout);
@@ -612,10 +642,12 @@ export class MatchSystem extends createSystem({
   private toHub() {
     this.phase = 'hub';
     this.matchOver = false;
+    this.prepareNext();
     this.arena.reset(this.arenas[this.arenaIndex]);
     this.arenaDirty = true;
     this.arenaView.build(this.arena.layout);
-    this.setBuilds(this.myBuild, this.theirBuild);
+    // The next rival's top already waits in the next arena.
+    this.setBuilds(this.myBuild, this.nextRival ? { ...this.nextRival.build, color: OPPONENT_COLOR } : this.theirBuild);
     this.mine.launch(0, this.SPAWN, 0, 0, 1, this.myBuild.spin);
     this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirBuild.spin);
     this.cord.set(null);
@@ -634,7 +666,7 @@ export class MatchSystem extends createSystem({
     this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
     // A teaser of tomorrow's order once today's is done (as things stand now).
     const tomorrow = this.progress.hasOrder(today) ? dailyOrder(localDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)), ctx) : null;
-    this.hub.show(this.myBuild, this.progress, this.order, tomorrow);
+    this.hub.show(this.myBuild, this.progress, this.order, tomorrow, this.nextRival ? `${this.nextRival.name} in ${this.arenas[this.arenaIndex].name}` : null);
     if (import.meta.env.DEV) console.log(`[ORDER] today ${this.order.date}: ${this.order.text} in ${this.order.arena}${this.progress.hasOrder(this.order.date) ? ' (done)' : ''} · ${this.progress.stamps} stamps`);
     this.label.set('');
     // A message still timing out must not wipe the note set below.
@@ -868,7 +900,9 @@ export class MatchSystem extends createSystem({
     this.forge.close();
     this.stage.visible = true;
     this.demo = false;
-    this.rival = rival ?? this.pickRival();
+    this.rival = rival ?? this.nextRival ?? this.pickRival();
+    this.nextRival = null;
+    this.progress.playedArena(this.arena.layout.name);
     this.perfectInMatch = false;
     this.myPoints = 0;
     this.theirPoints = 0;

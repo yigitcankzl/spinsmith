@@ -35,8 +35,12 @@ an arena. First to 3 heat wins a match.
   it. At home, your top waits in its dock on the near rim's left (carry it into the arena or tap
   it to play), a small anvil on the near rim's right opens the forge, a blueprint beside it opens
   the arena workshop, your level sits on a plate between them; their names show during the
-  first session and afterwards only while pointed at. The arena you play is chosen in the
-  workshop's Arenas drawer. In a match a fighting-game bar is set into the far rim
+  first session and afterwards only while pointed at. The next match is picked at home and shown
+  on the level plate ("Next match: Hookjaw in Ember Ring"), its arena already on the table: a
+  newly opened arena first, else the rival's home arena (Iron Keep in Sumo Square, Drifter in
+  Zero-G Dish, ...) unless it was just played, else the one played longest ago
+  (`src/game/rotation.ts`). Pin an arena, or go back to the rotation, in the workshop's Arenas
+  drawer. In a match a fighting-game bar is set into the far rim
   (`src/game/match-bar.ts`: each top's spin draining as a health bar, points as pips, the
   round's result in the middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
   the match ends back home when a side reaches 3 heat.
@@ -123,9 +127,9 @@ an arena. First to 3 heat wins a match.
   blueprint and the arena turns into a drafting table: blueprint lines draw over its floor, brass
   knobs mark the rim, five drawer tabs fold out in a row on the near rim as in the forge
   (Pieces; Floor; Form: circle, oval, square, and one wall and one theme piece that step on each
-  tap; Extras; Arenas: every arena, built-in and yours, as miniatures five to a page, pinch the
-  tab again for the next page; tap one to play it and start a draft from it, drop one of yours off
-  the arena to throw it away), a brass rail no wider than the arena holds the open drawer's pieces (at most five)
+  tap; Extras; Arenas: the Rotation plate, then every arena, built-in and yours, as miniatures
+  five to a page, pinch the tab again for the next page; tap one to pin it for every match and
+  start a draft from it, tap Rotation to unpin, drop one of yours off the arena to throw it away), a brass rail no wider than the arena holds the open drawer's pieces (at most five)
   with their names engraved below, Back sits on the left rim, Try and Save on the right, Save in
   front of a stamp slot set into the rim, and a plate on the far rim shows the draft's name and form with three dials: median round length,
   knockout rate and type balance. The draft is checked in a worker (`src/game/check-worker.ts`)
