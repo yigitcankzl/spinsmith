@@ -8,6 +8,13 @@ import { demoSave, freshSave } from './game/demo-save.js';
 // For shared headsets: ?fresh starts as a new player (the first session again), ?demo as a prepared
 // level-8 smith. The flag is then dropped from the address, so a reload keeps the progress made.
 const params = new URLSearchParams(location.search);
+// ?vs=CODE: the next match is against a friend's top (src/game/challenge.ts).
+if (params.has('vs')) {
+  sessionStorage.setItem('spinsmith.vs', params.get('vs') ?? '');
+  params.delete('vs');
+  const query = params.toString();
+  history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+}
 if (params.has('fresh') || params.has('demo')) {
   if (params.has('fresh')) freshSave(localStorage);
   else demoSave(localStorage);

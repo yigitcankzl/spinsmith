@@ -389,6 +389,10 @@ export function installDriver() {
       await glide(side, point, new Vector3(...(to as [number, number, number])), dur);
     },
     pinch: setPinch,
+    /** Sets a challenge code (as ?vs=CODE would) for the next match. */
+    challenge(code: string) {
+      sessionStorage.setItem('spinsmith.vs', code);
+    },
     /** Presses a dev key (README: 'KeyJ' fills the bar, 'KeyK' shatters the rival, 'KeyT' starts its tell). */
     key(code: string, shift = false) {
       window.dispatchEvent(new KeyboardEvent('keydown', { code, key: code.replace('Key', '').toLowerCase(), shiftKey: shift }));

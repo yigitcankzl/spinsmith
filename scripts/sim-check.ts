@@ -871,6 +871,19 @@ TUNING.grace = 0;
   assert.equal(p.champions[0].build.core, 'bolt');
 }
 
+// 30. Challenge codes: every legal build survives a round trip; nonsense is rejected.
+{
+  const { encodeBuild, decodeBuild } = await import('../src/game/challenge.ts');
+  for (const b of allBuilds().slice(0, 60)) {
+    for (const spin of [1, -1]) {
+      const build = { ...b, spin, color: 0xc94a3a };
+      assert.deepEqual(decodeBuild(encodeBuild(build)), build, `round trip ${encodeBuild(build)}`);
+    }
+  }
+  assert.equal(decodeBuild('HELLO'), null);
+  assert.equal(decodeBuild('ZZZZ-0'), null);
+}
+
 // 25. The comfort dial steps through every mode and wraps round.
 {
   const { COMFORT, COMFORT_MODES, nextComfort } = await import('../src/game/comfort.ts');

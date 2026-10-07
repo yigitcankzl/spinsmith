@@ -5,6 +5,7 @@ import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { titleMesh } from './ui.js';
+import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
@@ -1405,6 +1406,20 @@ export class MatchSystem extends createSystem({
     return ` · ${c.circuit} ${c.champion ? 'champion' : `${c.bout}/${c.of}`}`;
   }
 
+  /** A friend's top from a challenge code (?vs=CODE), as a rival for one match; null when none waits. */
+  private challenger(): Rival | null {
+    let code = '';
+    try {
+      code = sessionStorage.getItem('spinsmith.vs') ?? '';
+      sessionStorage.removeItem('spinsmith.vs');
+    } catch {
+      return null;
+    }
+    const build = code ? decodeBuild(code) : null;
+    if (!build) return null;
+    return { name: 'Challenger', move: 'charge', style: 'a friend\'s top', title: `code ${code.toUpperCase()}`, intro: 'Your friend forged me. Beat me.', win: 'Tell them I won.', lose: 'Tell them you won.', tip: 'Read its parts in the intro: a heavy ring holds, a light one hits', build: { ...build, color: OPPONENT_COLOR }, level: 1 };
+  }
+
   private pickRival(): Rival {
     const pool = RIVALS.filter((r) => r.level <= this.progress.level);
     // The ladder: the next rival in the circuits you can face and have not beaten.
@@ -1518,7 +1533,9 @@ export class MatchSystem extends createSystem({
     this.forge.close();
     this.stage.visible = true;
     this.demo = false;
-    this.rival = rival ?? this.nextRival ?? this.pickRival();
+    // A friend's challenge goes first (after the first session).
+    const friend = !rival && this.progress.guide === 'done' ? this.challenger() : null;
+    this.rival = rival ?? friend ?? this.nextRival ?? this.pickRival();
     this.nextRival = null;
     this.progress.playedArena(this.arena.layout.name);
     this.perfectInMatch = false;
