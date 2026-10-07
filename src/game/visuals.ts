@@ -39,6 +39,10 @@ import {
   TubeGeometry,
   Vector2,
   Vector3,
+  PMREMGenerator,
+  Scene,
+  Texture,
+  WebGLRenderer,
 } from '@iwsdk/core';
 import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena-shell.scene-asset.js';
 import type { ArenaLayout, Theme, Wall } from './layout.js';
@@ -1898,4 +1902,29 @@ function palmTexture(): CanvasTexture {
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
   return t;
+}
+
+/**
+ * The forge's light for metal (the environment map): a dark room with a warm, low softbox on one
+ * side, a cool steel strip high behind and a thin bright line overhead, so spinning blades sweep
+ * a warm and a cool highlight instead of a grey studio. Rendered once at load.
+ */
+export function forgeEnvironment(renderer: WebGLRenderer): Texture {
+  const scene = new Scene();
+  scene.background = new Color(0x0b0c10);
+  const box = (w: number, h: number, color: number, x: number, y: number, z: number, ry = 0) => {
+    const m = new Mesh(new PlaneGeometry(w, h), new MeshBasicMaterial({ color, side: DoubleSide }));
+    m.position.set(x, y, z);
+    m.lookAt(0, 0, 0);
+    m.rotation.z += ry;
+    scene.add(m);
+  };
+  box(3, 1.4, 0xffa060, -3, 0.4, 1, 0); // warm softbox, low on the left
+  box(5, 0.5, 0x8fb7ff, 1.5, 2.2, -3); // cool strip behind
+  box(4, 0.12, 0xffffff, 0, 3, 0.5); // bright line overhead
+  box(2, 1, 0x40261a, 3, -0.5, 1); // a dim ember bounce on the right
+  const pmrem = new PMREMGenerator(renderer);
+  const env = pmrem.fromScene(scene, 0.02).texture;
+  pmrem.dispose();
+  return env;
 }

@@ -2,6 +2,7 @@ import { VisibilityState, World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { MatchSystem } from './game/match-system.js';
 import { loadFonts } from './game/ui.js';
+import { forgeEnvironment } from './game/visuals.js';
 import { demoSave, freshSave } from './game/demo-save.js';
 
 // For shared headsets: ?fresh starts as a new player (the first session again), ?demo as a prepared
@@ -20,6 +21,10 @@ if (params.has('fresh') || params.has('demo')) {
 loadFonts()
   .then(() => World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions))
   .then((world) => {
+    // Metal reflects the forge's light (a warm and a cool highlight), and the view's edges are
+    // rendered at lower resolution (fixed foveation) to pay for it on the headset.
+    world.scene.environment = forgeEnvironment(world.renderer);
+    world.renderer.xr.setFoveation?.(0.5);
     world.registerSystem(MatchSystem);
     // The landing page (index.html): Enter starts the session; the page hides while in XR.
     const landing = document.getElementById('landing');

@@ -1,12 +1,7 @@
 {
   "version": "iwsdk.scene.v1",
   "units": "meters",
-  "components": {
-    "com.iwsdk.components.IBLTexture": {
-      "src": "room",
-      "intensity": 1
-    }
-  },
+  "components": {},
   "resources": {},
   "nodes": []
 }
