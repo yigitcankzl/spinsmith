@@ -80,19 +80,25 @@ reshape the arena to win.*
 
 | Time | Shot | On screen |
 |---|---|---|
-| 0:00-0:08 | Cold open on a real wooden table: a ramp throws the rival over the wall, it lands on the table beside the arena, skids and falls over (slow motion) | YOUR RAMP → THROWN |
-| 0:08-0:12 | Over the shoulder: the whole arena on the table | Title: SpinSmith |
-| 0:12-0:18 | The arena transforms into the forge; hands pinch a tip from the drawer and press it onto the top | "Forge it by hand" |
-| 0:18-0:28 | Pinch and pull back; the top rips into the arena | "Rip it into your real table" |
-| 0:28-0:40 | Pinch the floor ahead of the rival, drag to aim: the ramp throws it into a slag pit | "Reshape the arena to win" · YOUR RAMP → SLAG |
-| 0:40-0:45 | XP fills, LEVEL 2, a new part spins over the arena | Rematch |
-| 0:45-0:55 | Home: the Smith's board with today's order; pinch it, ramp the rival out, ORDER DONE and a stamp strikes the ledger | A new order every day |
-| 0:55-1:15 | The cup: catching the rival and slinging it into a slag pit | Two verbs: ramp and cup |
-| 1:15-1:25 | Hookjaw ramps you: the cyan ramp, THEIR RAMP → SLAG | Rivals use the arena too |
-| 1:25-1:45 | Three arenas in quick cuts: embers closing in, the tipping dish, the sumo square | Fifteen arenas |
-| 1:45-2:15 | Forge close-ups: rings, cores, tips; stats changing as parts click in | 226 builds |
-| 2:15-2:40 | A full round from the pull to a shatter | |
-| 2:40-2:50 | End card: logo, "Play in the Quest browser", the link | |
+| 0:00-0:08 | Cold open on a real wooden table: a ramp throws the rival over the wall; it keeps spinning across the desk and drops off the table's edge (slow motion) | OFF THE DESK! |
+| 0:08-0:13 | The arena forges up out of the table, SPINSMITH rises over it | Title |
+| 0:13-0:20 | A portal burns open on the wall; the rival arcs out and slams into the arena | VS HOOKJAW |
+| 0:20-0:30 | Pinch and pull back; the top rips in. The first ramp throws the rival into a slag pit, then the replay turns the arena | "Reshape the arena to win" · SLAG! · REPLAY |
+| 0:30-0:42 | The forge bar fills on the back of the hand; a palm slaps the real desk: shockwave, a molten handprint left on the wood | ANVIL STRIKE! |
+| 0:42-0:52 | The cup catches the rival; pinch, pull, let go: slung into a pit | SLUNG! |
+| 0:52-1:05 | The forge: a part flies to the hand and clicks on; quench, the room turns cold blue | FORGED! |
+| 1:05-1:20 | Rivals and circuits: the champion comes through huge; a won match sends a wave of light across the room | CINDER CIRCUIT CLEARED! |
+| 1:20-1:40 | Quick cuts: six strikes (Tilt dips the arena, Hammer cracks, Ward holds), arenas (embers, the tipping dish, Colossus) | Six strikes · fifteen arenas |
+| 1:40-2:00 | Home: the board, feats, a challenge code a friend types in | Come back every day |
+| 2:00-2:15 | A full round from the pull to a shatter, in one take | |
+| 2:15-2:25 | End card: logo, "Play in the Quest browser, no install", the link | |
+
+Footage: label each shot with where it was captured. On a Quest: passthrough, daylight, a real
+wooden table near its edge (for the off-the-desk shot), a wall behind it (the portal), in-headset
+audio, two takes each. In the emulator, every shot can be staged and recorded with the hand
+driver (`DRIVE_VIDEO=... scripts/drive.sh ...`, see `.claude/skills/spinsmith-drive/SKILL.md`):
+for example the replay shot is `["rip",{"power":0.9}]`, `["wait",3.2]`, `["ramp",{"hold":0.15}]`,
+`["key","KeyK"]`, `["wait",9]`; the strike is `["key","KeyJ"]`, `["wait",0.7]`, `["slap"]`.
 
 Capture: on a Quest in passthrough, daylight, a real wooden table, in-headset audio; two takes
 per shot; use `?demo` for the progression shots and dev key `H` (dev build) or a level-6 save for
