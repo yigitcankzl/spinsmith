@@ -389,6 +389,11 @@ export function installDriver() {
       await glide(side, point, new Vector3(...(to as [number, number, number])), dur);
     },
     pinch: setPinch,
+    /** Presses a dev key (README: 'KeyJ' fills the bar, 'KeyK' shatters the rival, 'KeyT' starts its tell). */
+    key(code: string, shift = false) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code, key: code.replace('Key', '').toLowerCase(), shiftKey: shift }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code, key: code.replace('Key', '').toLowerCase(), shiftKey: shift }));
+    },
     /** A game field by dotted path ('hub.held', 'theirs.spin'), for debugging. */
     peek(path: string) {
       const v = path.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], game());

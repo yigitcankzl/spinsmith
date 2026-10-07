@@ -293,6 +293,8 @@ export class MatchSystem extends createSystem({
   private stamp = new Stamp(0.2);
   /** The arena forging up out of the table after placing (0..1), and the title over it. */
   private rise = 1;
+  /** The strike's seal coin, rising off your top as it lands. */
+  private sealPop = Object.assign(new Group(), { visible: false });
   /** A rival's tell drawn on the floor: the lane of a charge, the line of a pull toward its pit. */
   private lane = new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }));
   /** Seconds left of a won match's celebration (sparks round the rim). */
@@ -441,6 +443,7 @@ export class MatchSystem extends createSystem({
     this.stage.add(
       this.chargeRing,
       this.lane,
+      this.sealPop,
       this.reticle,
       this.aura,
       this.arenaView.root,
@@ -648,6 +651,14 @@ export class MatchSystem extends createSystem({
     if (paused) return;
     this.label.update(Math.min(delta, 0.1));
     this.stamp.update(Math.min(delta, 0.1));
+    if (this.sealPop.visible) {
+      const t = (this.sealPop.userData.t += Math.min(delta, 0.1));
+      const me = this.mine;
+      this.sealPop.position.set(me.x, this.arena.height(me.x, me.z) + 0.03 + t * 0.05, me.z);
+      this.sealPop.rotation.set(1.2, t * 8, 0);
+      this.sealPop.scale.setScalar(2.2 * Math.min(1, t / 0.12) * Math.max(0, 1 - Math.max(0, t - 0.5) / 0.3));
+      if (t > 0.8) this.sealPop.visible = false;
+    }
     if (this.celebrate > 0) {
       const before = this.celebrate;
       this.celebrate -= Math.min(delta, 0.1);
@@ -2205,8 +2216,14 @@ export class MatchSystem extends createSystem({
     }
     this.roomLight.hit();
     duck(0.3, 0.4);
-    this.hitStop = HIT_STOP;
+    // The super freeze: the fight holds for a beat while the seal rises off your top.
+    this.hitStop = 0.25;
     this.accumulator = 0;
+    this.sealPop.clear();
+    this.sealPop.add(sealModel(seal));
+    this.sealPop.userData.t = 0;
+    this.sealPop.visible = true;
+    this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', '', 'mine', 0.5);
     if (!cut && this.label.current.startsWith('Forge bar full')) this.label.set('');
     if (import.meta.env.DEV) console.log(`[STRIKE] ${seal} at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
   }

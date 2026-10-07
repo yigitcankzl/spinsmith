@@ -45,6 +45,7 @@ last step (or the last step's return value). Long sequences: `DRIVE_TIMEOUT=1200
 | `["sling", {angle, pull, side}]` | pinch the top held in a cup, pull back, let go: it flies along `angle` (degrees; default outward) |
 | `["slap", {gentle, side}]` | palm slapped (or pressed and held) on the table beside the near-right rim: the strike when the bar is full. From the second match |
 | `["move", side, [x,y,z], dur, point]`, `["pinch", side, true/false]` | low level; point is `pinch`, `index` or `low` |
+| `["key", "KeyJ", shift?]` | a dev key inside a sequence (KeyJ fill the bar, KeyK shatter the rival, KeyO throw it, KeyT start its tell, KeyC cup under it) |
 | `["wait", s]`, `["rest"]` | pause; give the hands back to the emulator UI |
 | `["demo"]`, `["fresh"]` | level-8 save / new player; the page reloads, then `scripts/emu.sh enter` |
 | `["peek", "path"]` | a game field (`theirs.vx`, `progress.guide`, `hub.items.0.action`) for debugging |
