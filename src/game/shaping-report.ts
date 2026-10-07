@@ -322,15 +322,15 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
     }
     charges.update(STEP);
     rivalCharges.update(STEP);
-    const behind = t >= TUNING.grace && behindOn(a, b);
-    bar.update(STEP, behind);
+    const lagging = t >= TUNING.grace && behindOn(a, b);
+    bar.update(STEP, lagging);
     rivalBar.update(STEP, false);
     if (t > 5 && a.alive && b.alive && a.spin < 0.6 * b.spin) behind = true;
     const clash = step(arena, a, b);
     if (clash) {
       charges.clash(clash.strength, t);
       rivalCharges.clash(clash.strength, t);
-      bar.clash(clash.strength, t, behind);
+      bar.clash(clash.strength, t, lagging);
       rivalBar.clash(clash.strength, t, false);
     }
     t += STEP;
