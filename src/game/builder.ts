@@ -25,7 +25,8 @@ import { arenaWarning } from './arena-report.js';
 import type { ArenaReport } from './arena-report.js';
 import { engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
-import { RAIL, TAB_LINE } from './reach.js';
+import { RAIL, TAB_LINE, WORKSHOP_TAB_GAP } from './reach.js';
+import { miniArena } from './visuals.js';
 import { playDrawer, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
@@ -57,7 +58,8 @@ type Piece =
   | { kind: 'floor'; value: Floor }
   | { kind: 'wall' }
   | { kind: 'theme' }
-  | { kind: 'extra'; value: 'vortex' | 'spinner' | 'tilt' | 'shrink' };
+  | { kind: 'extra'; value: 'vortex' | 'spinner' | 'tilt' | 'shrink' }
+  | { kind: 'arena'; index: number };
 
 /** Saved player arenas from this browser. */
 export function loadArenas(): ArenaLayout[] {
@@ -262,12 +264,16 @@ const THEMES: Theme[] = ['forge', 'stone', 'clockwork', 'ice'];
 const PLACED = new Set(['pocket', 'rail', 'pillar', 'bumper']);
 /** Arena-local layout of the drafting table (the arena center is the origin, +Z toward the player). */
 /** The drawer tabs in a row on the near rim (as in the forge), and the actions on the side rims. */
-const PLATES = [...TRAY.map(([label]) => label.toUpperCase()), 'BACK', 'TRY', 'SAVE'];
-const DRAWERS = TRAY.length;
-const PLATE_GAP = TAB_LINE.gap;
+const PLATES = [...TRAY.map(([label]) => label.toUpperCase()), 'ARENAS', 'BACK', 'TRY', 'SAVE'];
+/** The last drawer holds the arenas, built-in and yours, five to a page. */
+const ARENA_TAB = TRAY.length;
+const DRAWERS = TRAY.length + 1;
+const ARENAS_PER_PAGE = 5;
+/** Five tabs share the forge's tab line, a little closer together. */
+const PLATE_GAP = WORKSHOP_TAB_GAP;
 const PLATE_Z = TAB_LINE.z;
 const PLATE_Y = TAB_LINE.y;
-const PLATE_W = 0.058;
+const PLATE_W = 0.054;
 const PLATE_H = 0.024;
 /** Back on the left rim, Try and Save on the right; Save's plate sits in front of its stamp slot. */
 const SAVE_AT = new Vector3(0.205, -0.006, 0.0);
@@ -310,6 +316,12 @@ export interface BuilderHooks {
   /** World point to arena-local (writes into and returns out). */
   toLocal(world: Vector3, out: Vector3): Vector3;
   floorHeight(n: number): number;
+  /** Every arena on offer, in order: built-in first, then yours. */
+  arenas(): { layout: ArenaLayout; lock: string | null; own: boolean; current: boolean }[];
+  /** Make this arena the one played. */
+  selectArena(index: number): void;
+  /** One of your arenas was thrown away (already gone from storage). */
+  removedArena(name: string): void;
 }
 
 /**
@@ -348,6 +360,7 @@ export class Builder {
   private dial = new DialPlate();
   private guides = new Group();
   private tab = 0;
+  private arenaPage = 0;
   private tabT = 1;
   private held: Held | null = null;
   private message = '';
@@ -469,7 +482,7 @@ export class Builder {
     this.plates.draw((i) => ({ on: i === this.tab, hover: i === hoveredPlate }));
     this.actions.draw((i) => ({ hover: i + DRAWERS === hoveredPlate || (i === 2 && hoveredPlate === PLATES.length), hot: i > 0 }));
     this.saveSlot.scale.setScalar(hoveredPlate >= PLATES.length - 1 ? 1.15 : 1);
-    this.hint(hovered ? pieceName(hovered.piece, this.draft) : null);
+    this.hint(hovered ? this.nameOf(hovered.piece) : null);
 
     // A new pinch: a plate, a rail piece, a piece on the arena, or the rim to resize. A hand
     // touching a plate or piece goes first, so a ray or the dev gaze can't take its pinch.
@@ -479,7 +492,10 @@ export class Builder {
         const plate = this.plateUnder(h, touchOnly);
         if (plate >= 0) return this.press(plate);
         const slot = this.slotUnder(h, touchOnly);
-        if (slot) return this.grab(slot.piece, h, 'tray', 2);
+        if (slot) {
+          if (slot.piece.kind === 'arena' && this.hooks.arenas()[slot.piece.index]?.lock) return this.reject(`Locked: ${this.hooks.arenas()[slot.piece.index].lock}`);
+          return this.grab(slot.piece, h, 'tray', 2);
+        }
         if (touchOnly) continue;
         const at = this.hooks.arenaPoint(h);
         if (at && this.pickFromArena(at.x, at.z, h)) return;
@@ -526,7 +542,7 @@ export class Builder {
     // The rail lifts away while a piece is carried, so the near rim stays in view.
     this.tools.visible = false;
     playPick();
-    this.say(`${pieceName(piece)}: drop it on the arena${from === 'arena' ? ', or off it to remove' : ''}`);
+    this.say(piece.kind === 'arena' ? `${this.nameOf(piece)}: let go to play it${this.hooks.arenas()[piece.index]?.own ? ', or drop it off the arena to throw it away' : ''}` : `${pieceName(piece)}: drop it on the arena${from === 'arena' ? ', or off it to remove' : ''}`);
   }
 
   /** While holding: the piece follows the pointer over the arena; letting go drops it. */
@@ -581,6 +597,7 @@ export class Builder {
     const tapped = this.time - held.start < TAP_TIME && h.pinch.distanceTo(held.startAt) < TAP_MOVE;
     if (held.from === 'tray' && tapped && !PLACED.has(held.piece.kind)) return this.place(held.piece, 0, 0, 2);
     if (!at) {
+      if (held.piece.kind === 'arena' && !tapped) return this.removeArena(held.piece.index);
       if (held.from === 'arena') {
         playRemove();
         this.changed(`${pieceName(held.piece)} removed`);
@@ -626,6 +643,8 @@ export class Builder {
       case 'theme':
         L.theme = THEMES[(THEMES.indexOf(L.theme) + 1) % THEMES.length];
         break;
+      case 'arena':
+        return this.useArena(piece.index);
       case 'extra':
         if (piece.value === 'vortex') L.vortex = L.vortex > 0 ? 0 : 0.6;
         if (piece.value === 'spinner') L.spinner = L.spinner > 0 ? 0 : 6;
@@ -719,6 +738,11 @@ export class Builder {
   private press(i: number) {
     if (i < DRAWERS) {
       if (i !== this.tab) this.showTab(i, true);
+      else if (i === ARENA_TAB) {
+        // The open arenas drawer again: its next page.
+        this.arenaPage++;
+        this.showTab(i, true);
+      }
       return;
     }
     if (PLATES[i] === 'BACK') {
@@ -735,7 +759,9 @@ export class Builder {
     }
     const saved = loadArenas();
     const layout = cloneLayout(this.draft);
-    layout.name = `My Arena ${saved.length + 1}`;
+    // The next free number, so a name never repeats after one is thrown away.
+    const used = saved.map((a) => Number(/^My Arena (\d+)$/.exec(a.name)?.[1] ?? 0));
+    layout.name = `My Arena ${Math.max(0, ...used) + 1}`;
     saved.push(layout);
     saveArenas(saved);
     playPlace();
@@ -852,6 +878,7 @@ export class Builder {
 
   /** Switches the rail to a drawer; its pieces pop up one after another. */
   private showTab(t: number, sound: boolean) {
+    if (t === ARENA_TAB) this.fillArenas();
     this.tab = t;
     this.tabT = 0;
     for (const s of this.slots) s.model.visible = s.tab === t;
@@ -860,10 +887,78 @@ export class Builder {
     this.logged = false;
   }
 
+  /** A piece's name on the rail; an arena shows its own name, or how it is earned while locked. */
+  private nameOf(p: Piece): string {
+    if (p.kind !== 'arena') return pieceName(p, this.draft);
+    const a = this.hooks.arenas()[p.index];
+    return a ? (a.lock ? `${a.layout.name} · ${a.lock}` : a.layout.name) : '';
+  }
+
+  /** The arenas drawer: this page of arena miniatures on the rail (locked ones dark). */
+  private fillArenas() {
+    for (const s of this.slots.filter((x) => x.tab === ARENA_TAB)) {
+      s.model.removeFromParent();
+      s.model.traverse((o) => (o as Mesh).geometry?.dispose());
+    }
+    this.slots = this.slots.filter((x) => x.tab !== ARENA_TAB);
+    const list = this.hooks.arenas();
+    const pages = Math.max(1, Math.ceil(list.length / ARENAS_PER_PAGE));
+    const page = ((this.arenaPage % pages) + pages) % pages;
+    const shown = list.slice(page * ARENAS_PER_PAGE, (page + 1) * ARENAS_PER_PAGE);
+    shown.forEach((a, c) => {
+      const index = page * ARENAS_PER_PAGE + c;
+      const home = new Vector3((c - (shown.length - 1) / 2) * ITEM_GAP, RAIL_Y, RAIL_Z);
+      const model = new Group();
+      const mini = miniArena(a.layout, a.current);
+      mini.scale.setScalar(0.4);
+      if (a.lock) mini.traverse((o) => ((o as Mesh).material as MeshBasicMaterial | undefined)?.color?.setHex(0x1c2230));
+      model.add(mini);
+      model.rotation.x = 0.6;
+      model.position.copy(home);
+      model.visible = false;
+      this.items.add(model);
+      this.slots.push({ piece: { kind: 'arena', index }, tab: ARENA_TAB, model, home });
+    });
+    if (pages > 1) this.say(`Arenas ${page + 1} of ${pages}: pinch ARENAS again for more`);
+    this.namesKey = '';
+  }
+
+  /** Plays this arena from now on, and starts the draft from it. */
+  private useArena(index: number) {
+    const a = this.hooks.arenas()[index];
+    if (!a) return;
+    this.hooks.selectArena(index);
+    this.draft = cloneLayout(a.layout);
+    this.draft.name = 'My Arena';
+    delete this.draft.rule;
+    playPlace();
+    this.changed(`${a.layout.name}: it is the arena you play now`);
+    if (import.meta.env.DEV) console.log(`[BUILD] selected ${a.layout.name}`);
+    this.fillArenas();
+    this.showTab(ARENA_TAB, false);
+  }
+
+  /** Throws one of your arenas away (built-in ones stay). */
+  private removeArena(index: number) {
+    const a = this.hooks.arenas()[index];
+    if (!a?.own) {
+      playRemove();
+      this.say('Built-in arenas stay');
+      return;
+    }
+    saveArenas(loadArenas().filter((x) => x.name !== a.layout.name));
+    this.hooks.removedArena(a.layout.name);
+    playRemove();
+    this.say(`${a.layout.name} thrown away`);
+    if (import.meta.env.DEV) console.log(`[BUILD] removed ${a.layout.name}`);
+    this.fillArenas();
+    this.showTab(ARENA_TAB, false);
+  }
+
   /** The names under the rail's pieces, engraved on one strip. */
   private drawNames() {
     const shown = this.slots.filter((s) => s.tab === this.tab);
-    const key = shown.map((s) => pieceName(s.piece, this.draft)).join('|');
+    const key = shown.map((s) => this.nameOf(s.piece)).join('|');
     if (key === this.namesKey) return;
     this.namesKey = key;
     const g = this.namesCanvas.getContext('2d')!;
@@ -875,7 +970,7 @@ export class Builder {
     const k = W / RAIL_W;
     for (const s of shown) {
       // Each name fits the space under its own piece.
-      const name = pieceName(s.piece, this.draft).toUpperCase();
+      const name = this.nameOf(s.piece).toUpperCase();
       let size = 54;
       do g.font = `700 ${size--}px ${FONT}`;
       while (g.measureText(name).width > ITEM_GAP * k * 0.94 && size > 20);

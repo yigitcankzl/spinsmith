@@ -1551,3 +1551,34 @@ export class ChargePips {
     });
   }
 }
+
+/** Arena miniatures: the theme's rim color and floor tint. */
+const MINI_R = 0.03;
+const MINI_THEME: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff };
+const MINI_FLOOR: Record<Theme, number> = { forge: 0xe8dcc4, stone: 0xb9b3a8, clockwork: 0xd9c9a3, ice: 0xdff1fa };
+
+/** A miniature of an arena: its floor, rim in the theme color, and its pockets. */
+export function miniArena(layout: ArenaLayout, current: boolean): Group {
+  const outer = new Group();
+  const g = new Group();
+  outer.add(g);
+  const square = layout.shape === 'square';
+  const base = new Mesh(new CylinderGeometry(MINI_R + 0.004, MINI_R + 0.006, 0.014, square ? 4 : 32, 1), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57) }));
+  base.position.y = 0.007;
+  const floor = new Mesh(new CircleGeometry(MINI_R, square ? 4 : 32).rotateX(-Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', MINI_FLOOR[layout.theme]) }));
+  floor.position.y = 0.0142;
+  const rim = new Mesh(new TorusGeometry(MINI_R, current ? 0.003 : 0.002, 8, square ? 4 : 40).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: MINI_THEME[layout.theme] }));
+  rim.position.y = 0.015;
+  if (square) {
+    base.rotation.y = floor.rotation.y = rim.rotation.y = Math.PI / 4;
+  }
+  g.add(base, floor, rim);
+  for (const p of layout.pockets) {
+    const pocket = new Mesh(new BoxGeometry(0.008, 0.004, 0.008), new MeshBasicMaterial({ color: 0x120c08 }));
+    pocket.position.set(Math.cos(p.angle) * MINI_R * 0.85, 0.0145, Math.sin(p.angle) * MINI_R * 0.85);
+    g.add(pocket);
+  }
+  if (layout.shape === 'oval') g.scale.set(1, 1, 0.78);
+  return mergeByMaterial(outer);
+}
+

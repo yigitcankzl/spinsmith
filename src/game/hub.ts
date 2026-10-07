@@ -37,7 +37,6 @@ import type { Progress } from './progress.js';
 import { FONT, glass, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { tag } from './builder.js';
 import type { HandState } from './hands.js';
-import type { ArenaLayout, Theme } from './layout.js';
 import type { TopBuild } from './parts.js';
 import { RIVALS } from './parts.js';
 import { SmithBoard } from './board.js';
@@ -48,7 +47,6 @@ import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js'
 
 export type HubAction =
   | { kind: 'play' }
-  | { kind: 'arena'; index: number }
   | { kind: 'forge' }
   | { kind: 'workshop' }
   | { kind: 'order' }
@@ -73,12 +71,6 @@ const RIM_SCALE = 0.42;
 /** Starting over: hold the level plate this long (s), then pinch it again within this long. */
 const RESET_HOLD = 2;
 const RESET_CONFIRM = 3;
-/** Miniatures on the arena shelf: this much larger than on a table, this far apart, this many a row. */
-const WALL_MINI_SCALE = 2.4;
-const WALL_MINI_GAP = 0.17;
-const WALL_ROW = 4;
-/** A miniature arena's radius (m). */
-const MINI_R = 0.03;
 /** Pinch reach (world m): touching an object, and a pointing ray passing this close to it. */
 const GRAB_NEAR = 0.08;
 const GRAB_RAY = 0.06;
@@ -89,8 +81,6 @@ export const FLY_TIME = 0.3;
 /** Let go where it was picked up: a tap. */
 const TAP_MOVE = 0.03;
 
-const THEME_COLOR: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff };
-const FLOOR_COLOR: Record<Theme, number> = { forge: 0xe8dcc4, stone: 0xb9b3a8, clockwork: 0xd9c9a3, ice: 0xdff1fa };
 const IRON = makeMatcap('metal', 0x9aa1ad);
 /** The forged-tech set: graphite bodies, light steel, brass trim, orange heat. */
 const GRAPHITE = makeMatcap('metal', 0x4a4e57);
@@ -117,7 +107,6 @@ interface Pickable {
 
 export class Hub {
   readonly root = new Group();
-  private shelf = new Group();
   private anvil = new Group();
   private stand = new Group();
   /** Holds the stand's top; it is what gets carried into the arena. */
@@ -129,10 +118,8 @@ export class Hub {
   private rankCanvas = document.createElement('canvas');
   private rankTex!: CanvasTexture;
   private rankKey = '';
-  private names: Mesh[] = [];
   private standTop: TopView | null = null;
   private topKey = '';
-  private arenasKey = '';
   private held: { item: Pickable; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   private time = 0;
   /** The first session: every station shows its name. */
@@ -155,30 +142,24 @@ export class Hub {
 
   constructor() {
     this.root.name = 'smithy';
-    this.buildShelf();
     this.buildAnvil();
     this.buildStand();
     this.buildBlueprint();
-    // The miniatures float in a row behind the arena's far rim, to the right of the notes (drawn at
-    // wall size: the arena's space is twice as large as the world).
-    this.shelf.position.set(0.2, 0.13, -0.28);
-    this.shelf.scale.setScalar(0.5);
     this.beacon.rotation.x = -Math.PI / 2;
     this.board.mesh.position.copy(BOARD_AT);
     this.board.mesh.rotation.x = -0.25;
     this.items.push({ action: { kind: 'order' }, carry: false, model: this.board.mesh, home: BOARD_AT.clone() });
-    this.root.add(this.anvil, this.stand, this.shelf, this.beacon, this.board.mesh, this.champions);
+    this.root.add(this.anvil, this.stand, this.beacon, this.board.mesh, this.champions);
     this.root.visible = false;
   }
 
   /** Refreshes what the stations show: your top, and one miniature per arena. */
-  show(arenas: ArenaLayout[], current: number, build: TopBuild, progress: Progress, order: Order | null, tomorrow: Order | null = null) {
+  show(build: TopBuild, progress: Progress, order: Order | null, tomorrow: Order | null = null) {
     this.drawRank(progress);
     this.root.visible = true;
     // Before the first match the smithy is just your top and the arena: the anvil, the arena
     // shelf and the workshop come once the player knows a fight.
     const first = progress.matches === 0;
-    this.shelf.visible = !first;
     this.anvil.visible = !first;
     this.blueprint.visible = !first;
     // Every unfinished guide step points somewhere: the dock to play, the anvil for the new part.
@@ -210,12 +191,6 @@ export class Hub {
       this.standTop = new TopView(build, build.color);
       this.standTop.root.position.y = DOCK_TOP;
       this.standHolder.add(this.standTop.root);
-    }
-    const locks = arenas.map((a) => progress.lockText(`arena:${a.name}`));
-    const arenasKey = JSON.stringify([arenas.map((a) => a.name), current, locks]);
-    if (arenasKey !== this.arenasKey) {
-      this.arenasKey = arenasKey;
-      this.fillRack(arenas, current, locks);
     }
   }
 
@@ -261,7 +236,7 @@ export class Hub {
     for (const it of this.items) {
       const on = it === hovered;
       if (it.name) it.name.visible = this.teaching || on;
-      const k = (on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1) * (it.homeParent ? WALL_MINI_SCALE : 1);
+      const k = on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1;
       it.model.scale.setScalar(k);
       if (it.carry) it.model.position.set(it.home.x, it.home.y + (on ? 0.01 : 0), it.home.z);
     }
@@ -286,7 +261,6 @@ export class Hub {
       if (!it.carry) return it.action;
       // Carried things move into the arena's space; from afar they fly to the hand first.
       const from = it.model.getWorldPosition(new Vector3());
-      if (it.homeParent) this.root.attach(it.model);
       this.held = { item: it, hand: h, startAt: this.pointAt(h, new Vector3()), from, fly: h.pinch.distanceTo(from) > 0.3 ? 0 : 1, lost: 0 };
       return null;
     }
@@ -323,9 +297,8 @@ export class Hub {
   }
 
   private returnHome(it: Pickable) {
-    if (it.homeParent) it.homeParent.add(it.model);
     it.model.position.copy(it.home);
-    it.model.rotation.set(it.homeParent ? 0.7 : 0, 0, 0);
+    it.model.rotation.set(0, 0, 0);
   }
 
   /** The pinch itself when the hand is near the stations, else along its ray as far as the arena. */
@@ -370,20 +343,6 @@ export class Hub {
     return l;
   }
 
-  /** The arena shelf behind the arena: a glowing ledge under each row of miniatures. */
-  private buildShelf() {
-    const wood = new MeshMatcapMaterial({ matcap: GRAPHITE });
-    for (let r = 0; r < 2; r++) {
-      // A thin glowing ledge under each row.
-      const plank = new Mesh(new BoxGeometry(WALL_MINI_GAP * WALL_ROW + 0.06, 0.008, 0.09), wood);
-      plank.position.set(0, -r * 0.2 - 0.045, 0.045);
-      this.shelf.add(plank);
-    }
-    const label = tag('ARENAS', 0.2, 46);
-    label.position.set(-WALL_MINI_GAP * 1.5, 0.12, 0.01);
-    this.shelf.add(label);
-  }
-
   /** The blueprint: a rolled-up plan on the near rim, between the level plate and the anvil. */
   private buildBlueprint() {
     const blueprint = new Group();
@@ -404,29 +363,6 @@ export class Hub {
     this.blueprint.add(cradle, holder, build);
     this.root.add(this.blueprint);
     this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home, name: build });
-  }
-
-  private fillRack(arenas: ArenaLayout[], current: number, locks: (string | null)[]) {
-    for (const it of this.items.filter((it) => it.action.kind === 'arena')) it.model.removeFromParent();
-    this.items = this.items.filter((it) => it.action.kind !== 'arena');
-    for (const n of this.names) n.removeFromParent();
-    this.names = [];
-    arenas.slice(0, WALL_ROW * 2 - 1).forEach((layout, i) => {
-      const row = Math.floor(i / WALL_ROW);
-      const home = new Vector3((i % WALL_ROW - (WALL_ROW - 1) / 2) * WALL_MINI_GAP, -row * 0.2 - 0.04, 0.05);
-      const model = miniArena(layout, i === current);
-      model.scale.multiplyScalar(WALL_MINI_SCALE);
-      // Tipped toward the player so the floor shows.
-      model.rotation.x = 0.7;
-      model.position.copy(home);
-      const name = tag(locks[i] ? `${layout.name} · ${locks[i]}` : layout.name, 0.15, 40);
-      name.position.set(home.x, home.y + 0.075, 0.06);
-      this.shelf.add(model, name);
-      this.names.push(name);
-      // A locked arena is a dark shape until it is earned.
-      if (locks[i]) model.traverse((o) => ((o as Mesh).material as MeshBasicMaterial | undefined)?.color?.setHex(0x1c2230));
-      this.items.push({ action: { kind: 'arena', index: i }, carry: true, model, home, homeParent: this.shelf, locked: locks[i] ?? undefined });
-    });
   }
 
   /** The small anvil on the near rim: pinch it to turn the arena into the forge. */
@@ -529,33 +465,8 @@ export class Hub {
   debugPositions(): string {
     this.root.updateWorldMatrix(true, true);
     const at = (o: Object3D) => o.getWorldPosition(new Vector3()).toArray().map((v) => v.toFixed(3)).join(',');
-    return this.items.map((it) => `${it.action.kind}${it.action.kind === 'arena' ? it.action.index : ''}@${at(it.model)}`).join(' ');
+    return this.items.map((it) => `${it.action.kind}@${at(it.model)}`).join(' ');
   }
-}
-
-/** A miniature of an arena: its floor, rim in the theme color, and its pockets. */
-export function miniArena(layout: ArenaLayout, current: boolean): Group {
-  const outer = new Group();
-  const g = new Group();
-  outer.add(g);
-  const square = layout.shape === 'square';
-  const base = new Mesh(new CylinderGeometry(MINI_R + 0.004, MINI_R + 0.006, 0.014, square ? 4 : 32, 1), new MeshMatcapMaterial({ matcap: GRAPHITE }));
-  base.position.y = 0.007;
-  const floor = new Mesh(new CircleGeometry(MINI_R, square ? 4 : 32).rotateX(-Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', FLOOR_COLOR[layout.theme]) }));
-  floor.position.y = 0.0142;
-  const rim = new Mesh(new TorusGeometry(MINI_R, current ? 0.003 : 0.002, 8, square ? 4 : 40).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: THEME_COLOR[layout.theme] }));
-  rim.position.y = 0.015;
-  if (square) {
-    base.rotation.y = floor.rotation.y = rim.rotation.y = Math.PI / 4;
-  }
-  g.add(base, floor, rim);
-  for (const p of layout.pockets) {
-    const pocket = new Mesh(new BoxGeometry(0.008, 0.004, 0.008), new MeshBasicMaterial({ color: 0x120c08 }));
-    pocket.position.set(Math.cos(p.angle) * MINI_R * 0.85, 0.0145, Math.sin(p.angle) * MINI_R * 0.85);
-    g.add(pocket);
-  }
-  if (layout.shape === 'oval') g.scale.set(1, 1, 0.78);
-  return mergeByMaterial(outer);
 }
 
 /** Height of the anvil's face (m): a top set on the anvil stands here. */

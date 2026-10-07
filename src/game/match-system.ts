@@ -12,12 +12,12 @@ import { GUIDE_ORDER, MARK, Progress } from './progress.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
 import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
-import { anvilModel, Hub, miniArena, standModel } from './hub.js';
+import { anvilModel, Hub, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
 import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, OPPONENT_COLOR, ShapeMarks, Sparks, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ShapeMarks, Sparks, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { SHAPE_SIZE, ShapingCharges } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena } from './placement.js';
@@ -131,6 +131,15 @@ export class MatchSystem extends createSystem({
     arenaPoint: (h) => this.arenaPoint(h),
     toLocal: (world, out) => this.root.worldToLocal(out.copy(world)),
     floorHeight: (n) => this.arena.floorHeight(n),
+    arenas: () =>
+      this.arenas.map((layout, i) => ({ layout, lock: this.progress.lockText(`arena:${layout.name}`), own: !ARENAS.includes(layout), current: i === this.arenaIndex })),
+    // The arena is set for real when the workshop closes (leaveBuilder).
+    selectArena: (i) => (this.arenaIndex = i),
+    removedArena: (name) => {
+      const current = this.arenas[this.arenaIndex];
+      this.arenas = this.arenas.filter((a) => a.name !== name);
+      this.arenaIndex = Math.max(0, this.arenas.indexOf(current));
+    },
   });
   /** Smith level, XP and unlocks, saved in the browser. */
   private progress = new Progress(typeof localStorage === 'undefined' ? null : localStorage);
@@ -625,7 +634,7 @@ export class MatchSystem extends createSystem({
     this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
     // A teaser of tomorrow's order once today's is done (as things stand now).
     const tomorrow = this.progress.hasOrder(today) ? dailyOrder(localDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)), ctx) : null;
-    this.hub.show(this.arenas, this.arenaIndex, this.myBuild, this.progress, this.order, tomorrow);
+    this.hub.show(this.myBuild, this.progress, this.order, tomorrow);
     if (import.meta.env.DEV) console.log(`[ORDER] today ${this.order.date}: ${this.order.text} in ${this.order.arena}${this.progress.hasOrder(this.order.date) ? ' (done)' : ''} · ${this.progress.stamps} stamps`);
     this.label.set('');
     // A message still timing out must not wipe the note set below.
@@ -637,8 +646,8 @@ export class MatchSystem extends createSystem({
     else if (guide === 'bump' || guide === 'match') this.label.set('Finish your first match\nPut your top in the arena');
     else if (guide === 'forge' || guide === 'fit') this.label.set('New part: Spur tip!\nPinch the small anvil to forge');
     else if (guide === 'rematch') this.label.set('Your top is ready\nPut it in the arena for a rematch');
-    // Notes hang over the far rim, left of the arena shelf; the beacon marks the dock or the anvil.
-    this.label.mesh.position.set(-0.16, LABEL_AT.y, LABEL_AT.z);
+    // Notes hang over the far rim; the beacon marks the dock or the anvil.
+    this.label.mesh.position.copy(LABEL_AT);
     this.label.mesh.scale.setScalar(1.25);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
@@ -705,10 +714,6 @@ export class MatchSystem extends createSystem({
     } else if (action.kind === 'locked') {
       this.label.set(action.text);
       this.labelTimer = 2;
-    } else {
-      this.arenaIndex = action.index;
-      this.setArena(this.arenas[this.arenaIndex]);
-      this.toHub();
     }
   }
 

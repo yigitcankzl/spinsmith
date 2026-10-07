@@ -31,13 +31,12 @@ an arena. First to 3 heat wins a match.
   the table is far below the eyes (standing over a coffee table). It waits up to 5 s for a table,
   and moves onto one that appears later.
 - **One machine on the table** (`src/game/hub.ts`, `src/game/rim.ts`): the arena sits on your
-  table, drawn twice its simulation size (about 60 cm across), and everything else is built into
+  table, drawn 2.4 times its simulation size (about 72 cm across), and everything else is built into
   it. At home, your top waits in its dock on the near rim's left (carry it into the arena or tap
   it to play), a small anvil on the near rim's right opens the forge, a blueprint beside it opens
   the arena workshop, your level sits on a plate between them; their names show during the
-  first session and afterwards only while pointed at, and a row of arena miniatures
-  floats behind the arena: point at one and pinch, it flies to your hand; drop it on the arena
-  (or tap it) to switch. In a match a fighting-game bar is set into the far rim
+  first session and afterwards only while pointed at. The arena you play is chosen in the
+  workshop's Arenas drawer. In a match a fighting-game bar is set into the far rim
   (`src/game/match-bar.ts`: each top's spin draining as a health bar, points as pips, the
   round's result in the middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
   the match ends back home when a side reaches 3 heat.
@@ -88,7 +87,7 @@ an arena. First to 3 heat wins a match.
   builds and dead parts.
 - **First session** (docs/GAMEPLAY-DIRECTION.md, section 12): until the first match is
   finished the home is just your top in its dock (a breathing ring calls you to it) and the
-  arena; the anvil, the arena shelf and the workshop come after. The first launch shows arrows
+  arena; the anvil and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
   the rival where lifting would push it, until your first ramp. Finishing the first match, won or
   lost, earns the Spur tip: the anvil appears and calls for it, the forge highlights only that
@@ -122,9 +121,11 @@ an arena. First to 3 heat wins a match.
   bouncing across the arena.
 - **Arena workshop** (`src/game/builder.ts`, `docs/ARENA-WORKSHOP-RIM.md`): pinch the
   blueprint and the arena turns into a drafting table: blueprint lines draw over its floor, brass
-  knobs mark the rim, four drawer tabs fold out in a row on the near rim as in the forge
+  knobs mark the rim, five drawer tabs fold out in a row on the near rim as in the forge
   (Pieces; Floor; Form: circle, oval, square, and one wall and one theme piece that step on each
-  tap; Extras), a brass rail no wider than the arena holds the open drawer's pieces (at most five)
+  tap; Extras; Arenas: every arena, built-in and yours, as miniatures five to a page, pinch the
+  tab again for the next page; tap one to play it and start a draft from it, drop one of yours off
+  the arena to throw it away), a brass rail no wider than the arena holds the open drawer's pieces (at most five)
   with their names engraved below, Back sits on the left rim, Try and Save on the right, Save in
   front of a stamp slot set into the rim, and a plate on the far rim shows the draft's name and form with three dials: median round length,
   knockout rate and type balance. The draft is checked in a worker (`src/game/check-worker.ts`)
