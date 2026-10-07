@@ -40,6 +40,7 @@ import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
 import { RIVALS } from './parts.js';
 import { SmithBoard } from './board.js';
+import { popIn } from './rim.js';
 import { COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
 import { MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
@@ -125,6 +126,8 @@ export class Hub {
   private topKey = '';
   private held: { item: Pickable; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   private time = 0;
+  /** When home last appeared (for the stations' pop-in). */
+  private shownAt = -10;
   /** The first session: every station shows its name. */
   private teaching = true;
   /** The blueprint, its cradle and name: the workshop comes after the first match. */
@@ -161,6 +164,8 @@ export class Hub {
   /** Refreshes what the stations show: your top, and one miniature per arena. */
   show(build: TopBuild, progress: Progress, order: Order | null, tomorrow: Order | null = null, nextMatch: string | null = null) {
     this.drawRank(progress, nextMatch);
+    // Coming home, the stations pop up one after another.
+    if (!this.root.visible) this.shownAt = this.time;
     this.root.visible = true;
     // Before the first match the smithy is just your top and the arena: the anvil, the arena
     // shelf and the workshop come once the player knows a fight.
@@ -238,13 +243,14 @@ export class Hub {
 
     let hovered: Pickable | null = null;
     for (const h of pointers) if (h.tracked) hovered ??= this.under(h);
-    for (const it of this.items) {
+    this.items.forEach((it, i) => {
       const on = it === hovered;
       if (it.name) it.name.visible = (this.teaching && !it.quiet) || on;
-      const k = on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1;
+      const p = popIn(this.time - this.shownAt, i);
+      const k = (on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1) * Math.max(0.001, p * p * (3 - 2 * p));
       it.model.scale.setScalar(k);
       if (it.carry) it.model.position.set(it.home.x, it.home.y + (on ? 0.01 : 0), it.home.z);
-    }
+    });
     for (const h of pointers) {
       if (!h.tracked || !h.justPinched) continue;
       const it = this.under(h);

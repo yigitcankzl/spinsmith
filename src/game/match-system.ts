@@ -291,6 +291,8 @@ export class MatchSystem extends createSystem({
   private stamp = new Stamp(0.2);
   /** The arena forging up out of the table after placing (0..1), and the title over it. */
   private rise = 1;
+  /** Seconds left of a won match's celebration (sparks round the rim). */
+  private celebrate = 0;
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
   private titleShown = false;
   private titleT = 0;
@@ -639,6 +641,17 @@ export class MatchSystem extends createSystem({
     if (paused) return;
     this.label.update(Math.min(delta, 0.1));
     this.stamp.update(Math.min(delta, 0.1));
+    if (this.celebrate > 0) {
+      const before = this.celebrate;
+      this.celebrate -= Math.min(delta, 0.1);
+      // A burst every 0.1 s, chasing round the rim.
+      if (Math.floor(before * 10) !== Math.floor(this.celebrate * 10)) {
+        const a = this.celebrate * 9;
+        const r = rimRadius(this.arena.layout, a);
+        this.sparks.burst(Math.cos(a) * r, this.arena.floorHeight(1), Math.sin(a) * r, 0.7);
+      }
+      this.arenaView.charge = 0.6 + 0.4 * Math.sin(this.time * 14);
+    }
     // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
     if (session !== this.xrSession) {
       // Back at home, the print asks for a press again; mid-match, the arena just comes along.
@@ -899,7 +912,7 @@ export class MatchSystem extends createSystem({
     this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
     // A teaser of tomorrow's order once today's is done (as things stand now).
     const tomorrow = this.progress.hasOrder(today) ? dailyOrder(localDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)), ctx) : null;
-    this.hub.show(this.myBuild, this.progress, this.order, tomorrow, this.nextRival ? `${this.nextRival.name} in ${this.arenas[this.arenaIndex].name}` : null);
+    this.hub.show(this.myBuild, this.progress, this.order, tomorrow, this.nextRival ? `${this.nextRival.name} in ${this.arenas[this.arenaIndex].name}${this.boutText(this.nextRival.name)}` : null);
     if (import.meta.env.DEV) console.log(`[ORDER] today ${this.order.date}: ${this.order.text} in ${this.order.arena}${this.progress.hasOrder(this.order.date) ? ' (done)' : ''} · ${this.progress.stamps} stamps`);
     this.label.set('');
     // A message still timing out must not wipe the note set below.
@@ -1051,6 +1064,13 @@ export class MatchSystem extends createSystem({
 
   /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
   /** A rival for a new match, from the archetypes your level has reached; the same all match. */
+  /** ' · Cinder Circuit champion' or ' · Cinder Circuit 2/3' for a rival not beaten yet; '' otherwise. */
+  private boutText(name: string) {
+    const c = circuitOf(name);
+    if (!c || this.progress.marksOf(name) & MARK.beaten) return '';
+    return ` · ${c.circuit} ${c.champion ? 'champion' : `${c.bout}/${c.of}`}`;
+  }
+
   private pickRival(): Rival {
     const pool = RIVALS.filter((r) => r.level <= this.progress.level);
     // The ladder: the next rival in the circuits you can face and have not beaten.
@@ -2414,6 +2434,8 @@ export class MatchSystem extends createSystem({
       this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
       if (decided) {
         const youWon = this.myPoints > this.theirPoints;
+        // A won match: sparks run round the rim for a moment.
+        if (youWon) this.celebrate = 1.6;
         text = `${youWon ? 'You win the match!' : 'You lose the match'}\n${this.rival.name}: "${youWon ? this.rival.lose : this.rival.win}"`;
         this.myPoints = 0;
         this.theirPoints = 0;
