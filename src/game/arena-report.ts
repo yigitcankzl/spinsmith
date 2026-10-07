@@ -85,6 +85,7 @@ export function reportArena(layout: ArenaLayout, roundsPerPair = 12): ArenaRepor
 export function arenaWarning(r: ArenaReport): string | null {
   if (r.quick > 0.35) return 'Rounds end too abruptly';
   if (r.median > 30) return 'Rounds drag on';
+  if (r.knockout < 0.15) return 'Rounds rarely end in a knockout';
   const best = Object.entries(r.typeWin).sort((p, q) => q[1] - p[1])[0];
   if (best[1] > 0.8) return `${best[0]} wins almost every time here`;
   return null;

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { ARENAS } from '../src/game/arenas.ts';
 import { cloneLayout, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
-import { SHAPING, ShapingCharges } from '../src/game/shaping.ts';
+import { SHAPING, ShapingCharges, STRIKE_BAR, StrikeBar } from '../src/game/shaping.ts';
 import { CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, xpToNext } from '../src/game/progress.ts';
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
@@ -19,7 +19,7 @@ import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { strike, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -703,6 +703,37 @@ TUNING.grace = 0;
   assert.equal(run([...hold(1.0, 0.3), ...move(1.0, TABLE + 0.15, 0.3), ...hold(TABLE + 0.15, 1)]), null, 'a hold 15 cm above the table is not a press');
   assert.ok(run([...hold(0.9, 0.3), null, null, ...hold(TABLE + 0.005, 0.1), ...hold(TABLE + 0.005, 0.5)]) === null, 'a hand reappearing still on the table is not a press');
   assert.equal(run([...hold(0.9, 0.3), ...move(0.9, TABLE + 0.005, 0.4), ...hold(TABLE + 0.005, 0.15), 0.9]), null, 'a touch let go before the hold is not a press');
+}
+
+// 21. The duel layer: the forge bar fills from clashes (twice as fast when behind) and spends whole;
+// the Anvil Strike throws a top near the rim far more than one in the middle, a hot one further,
+// and the player's own top less.
+{
+  const bar = new StrikeBar();
+  assert.ok(!bar.spend(5, 2.5), 'an empty bar does not strike');
+  for (let t = 3; t < 3 + 1 / STRIKE_BAR.clash + 2; t += 1.1) bar.clash(0.9, t, false);
+  assert.ok(bar.full, 'solid clashes fill the bar');
+  assert.ok(!bar.spend(1, 2.5), 'no strike in the opening grace');
+  assert.ok(bar.spend(20, 2.5) && bar.value === 0, 'a strike spends the whole bar');
+  const slow = new StrikeBar();
+  const fast = new StrikeBar();
+  slow.update(5, false);
+  fast.update(5, true);
+  assert.ok(Math.abs(fast.value - 2 * slow.value) < 1e-9, 'behind, the bar fills twice as fast');
+  const arena = new Arena(FORGE);
+  const outer = new Top(ATTACK);
+  const inner = new Top(ATTACK);
+  outer.launch(0, -0.12, 0, 0, 1, 1);
+  inner.launch(0.02, 0, 0, 0, 1, -1);
+  strike(arena, inner, outer);
+  assert.ok(Math.hypot(outer.vx, outer.vz) > 4 * Math.hypot(inner.vx, inner.vz), 'the strike throws the top near the rim, barely the one in the middle');
+  const hot = new Top(ATTACK);
+  const cold = new Top(ATTACK);
+  hot.launch(0, -0.12, 0, 0, 1, 1);
+  cold.launch(0, 0.12, 0, 0, 1, -1);
+  hot.damage = 0.8;
+  strike(new Arena(FORGE), cold, hot);
+  assert.ok(hot.vz < 0 && Math.abs(hot.vz) > Math.abs(cold.vz) * 1.5, 'a hot rival flies further than your own cold top');
 }
 
 console.log('sim-check: all passed');

@@ -357,6 +357,11 @@ export class Builder {
   readonly root = new Group();
   /** The arena shows shrunk by this much (a big arena at home size); arena-point hooks give true units. */
   viewScale = 1;
+
+  /** A hand is pulling the rim to resize the draft. */
+  get resizing() {
+    return this.held?.mode === 'resize';
+  }
   draft!: ArenaLayout;
   /** 0 folded .. 1 open. */
   opened = 0;

@@ -1,5 +1,5 @@
 import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, ForgeLoop, playCrunch, playLocked, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, ForgeLoop, playCrunch, playLocked, playMachine, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -17,7 +17,7 @@ import { anvilModel, Hub, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
 import { RoomLight } from './room-light.js';
-import { fitToTable } from './room.js';
+import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
 import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
@@ -128,6 +128,13 @@ export class MatchSystem extends createSystem({
   /** A big arena: how much it shows shrunk (1 = full size) and how far it has slid back for a match (m). */
   private viewK = 1;
   private pushed = 0;
+  /** A match arena's own scale (shrunk to fit a small table) and its slide, worked out once per arena and placement. */
+  private rootK = 1;
+  private matchScale = 1;
+  private matchPush = 0;
+  private fitKey = '';
+  /** The arena is not opening, sliding or shrinking: a pull may start. */
+  private sizeSettled = true;
   /** Press to place: a glowing print on the table where the arena will rise, and each hand's press detector. */
   private print = new Group();
   private printLabel = new Label(0.2);
@@ -1092,11 +1099,23 @@ export class MatchSystem extends createSystem({
     const p = this.phase;
     const match = p === 'ready' || p === 'pulling' || p === 'fight' || p === 'result';
     const rim = maxRim(L);
-    const k = match ? 1 : Math.min(1, DISPLAY_RIM / rim);
-    const push = match ? Math.max(0, rimRadius(L, Math.PI / 2) - NEAR_RIM) * ARENA_SCALE : 0;
+    if (match) {
+      const key = `${L.name}:${L.radius}:${this.placedAt}`;
+      if (key !== this.fitKey) {
+        this.fitKey = key;
+        this.fitMatch(L, rim);
+      }
+    } else this.fitKey = '';
+    // While the workshop resizes, the shown size holds still so the rim follows the hand.
+    const k = match ? 1 : this.builder.resizing ? this.viewK : Math.min(1, DISPLAY_RIM / rim);
+    const scale = match ? this.matchScale : 1;
+    const push = match ? this.matchPush : 0;
     const e = Math.min(1, dt * 3);
-    this.viewK = Math.abs(k - this.viewK) < 1e-4 ? k : this.viewK + (k - this.viewK) * e;
-    const next = Math.abs(push - this.pushed) < 1e-4 ? push : this.pushed + (push - this.pushed) * e;
+    const ease = (v: number, to: number, eps: number) => (Math.abs(to - v) < eps ? to : v + (to - v) * e);
+    const was = this.sizeSettled;
+    this.viewK = ease(this.viewK, k, 1e-4);
+    this.rootK = ease(this.rootK, scale, 1e-4);
+    const next = ease(this.pushed, push, 1e-4);
     if (next !== this.pushed) {
       // Away from the player: the arena's local -Z.
       const d = next - this.pushed;
@@ -1106,14 +1125,45 @@ export class MatchSystem extends createSystem({
       this.pushed = next;
       if (next === push) this.setRoom();
     }
-    this.arenaView.root.scale.setScalar(this.viewK);
+    this.sizeSettled = this.viewK === k && this.rootK === scale && this.pushed === push;
+    // The arena opening out for a match is a moment: a machine sound as it moves, a thud as it lands.
+    if (was && !this.sizeSettled) playMachine();
+    else if (!was && this.sizeSettled && match) playPlace();
+    this.root.scale.setScalar(ARENA_SCALE * this.rootK);
+    this.stage.scale.setScalar(this.viewK);
     this.builder.viewScale = this.viewK;
     const far = rimRadius(L, -Math.PI / 2) * this.viewK;
     this.label.mesh.position.z = Math.min(LABEL_AT.z, -(far + 0.04));
     this.bar.mesh.position.z = Math.min(-0.205, -(far + 0.035));
-    const f = Math.max(1, (rim * this.viewK + 0.05) / 0.244);
-    this.menuButton.mesh.position.set(-0.2 * f, 0.05, 0.14 * f);
-    this.roomLight.setPool(rim * this.viewK * ARENA_SCALE);
+    // Further away, the card and the bar grow so they read the same.
+    const reach = TUNE.reach / ARENA_SCALE;
+    const grow = Math.max(1, (reach + this.pushed / ARENA_SCALE + far) / (reach + 0.17));
+    this.label.mesh.scale.setScalar(1.25 * grow);
+    this.bar.mesh.scale.setScalar(0.17 * grow);
+    // The menu stays where the hand finds it, however far the arena slid.
+    this.menuButton.mesh.position.set(-0.2, 0.05, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
+    this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
+  }
+
+  /**
+   * How a match arena fits: full size, slid back so its near rim stays at NEAR_RIM; on a known
+   * table, shrunk in steps (to 70% at most) until it stays on the wood.
+   */
+  private fitMatch(L: ArenaLayout, rim: number) {
+    const yaw = this.root.rotation.y;
+    const bx = this.root.position.x + Math.sin(yaw) * this.pushed;
+    const bz = this.root.position.z + Math.cos(yaw) * this.pushed;
+    const near = rimRadius(L, Math.PI / 2);
+    const table = this.onTable ? this.tableShape() : null;
+    for (let k = 1; ; k -= 0.05) {
+      this.matchScale = k;
+      this.matchPush = Math.max(0, near * k - NEAR_RIM) * ARENA_SCALE;
+      if (!table || k <= 0.7) break;
+      const cx = bx - Math.sin(yaw) * this.matchPush;
+      const cz = bz - Math.cos(yaw) * this.matchPush;
+      if (insidePoly(table.poly, cx, cz) && edgeDistance(table.poly, cx, cz) >= rim * k * ARENA_SCALE + RIM_MARGIN) break;
+    }
+    if (import.meta.env.DEV) console.log(`[MATCH] fit ${L.name}: scale ${this.matchScale.toFixed(2)}, slide ${this.matchPush.toFixed(3)} m${table ? '' : ' (no table)'}`);
   }
 
   /** Puts the arena a comfortable reach ahead, on a table if there is one, facing the head. */
@@ -1286,6 +1336,8 @@ export class MatchSystem extends createSystem({
    */
   private moveArena(): boolean {
     const d = this.dragging;
+    // Not while a big arena eases back home (the slide would be left in its position).
+    if (!d && this.pushed > 1e-4) return false;
     if (!d) {
       for (const h of [this.hands.right, this.hands.left]) {
         if (!h.tracked || !h.justPinched) continue;
@@ -1370,6 +1422,8 @@ export class MatchSystem extends createSystem({
   private updateReadyPinch() {
     // After the deciding round the result card leads back home, not into another round.
     if (this.matchOver) return;
+    // Not while the arena is still opening out under the hand.
+    if (!this.sizeSettled) return;
     let pick: Side | null = null;
     let best = Infinity;
     for (const side of ['left', 'right'] as const) {
@@ -1751,10 +1805,10 @@ export class MatchSystem extends createSystem({
     this.rivalCharges.update(STEP);
     const me = this.mine;
     const r = Math.hypot(me.x, me.z);
-    if (!me.alive || r < this.arena.radius * 0.6 || r < 1e-3 || this.elapsed - this.rivalShapeAt < RIVAL_SHAPE_GAP) return;
+    if (!me.alive || normRadius(this.arena.layout, me.x, me.z) < 0.6 || r < 1e-3 || this.elapsed - this.rivalShapeAt < RIVAL_SHAPE_GAP) return;
     const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
     if (!f) return;
-    this.arena.addShape('ramp', me.x - (me.x / r) * 0.012, me.z - (me.z / r) * 0.012, SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r, RIVAL_RAMP_SIGMA);
+    this.arena.addShape('ramp', me.x - (me.x / r) * 0.012 * (this.arena.radius / 0.17), me.z - (me.z / r) * 0.012 * (this.arena.radius / 0.17), SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r, RIVAL_RAMP_SIGMA);
     this.rivalShapeAt = this.elapsed;
     playThock();
     if (import.meta.env.DEV) console.log(`[SHAPE] rival ramp at ${me.x.toFixed(3)},${me.z.toFixed(3)} t ${this.elapsed.toFixed(1)}`);
@@ -1808,6 +1862,13 @@ export class MatchSystem extends createSystem({
       steps++;
       this.elapsed += STEP;
       const clash = step(this.arena, this.mine, this.theirs);
+      for (const t of [this.mine, this.theirs]) {
+        if (t.sincePad !== 0) continue;
+        // A boost pad fired: it flashes, sparks fly along it, a whoosh.
+        this.arenaView.flashPad(t.x, t.z);
+        this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.5);
+        playDash(t.x);
+      }
       this.charges.update(STEP);
       this.rivalShaping();
       if (clash) {

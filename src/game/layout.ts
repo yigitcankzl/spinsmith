@@ -65,6 +65,8 @@ export interface ArenaLayout {
   tilt: number;
   /** After a while, embers close in from the rim and drain spin outside a shrinking safe zone. */
   shrink: boolean;
+  /** Seconds before the embers start closing in (default 16). */
+  shrinkStart?: number;
   /** Pillars circle the center at this speed (rad/s; 0 or absent = they stand still). */
   orbit?: number;
   /** Boost pads on the floor. */
@@ -163,6 +165,9 @@ export function validate(layout: ArenaLayout): string | null {
     // Orbiting pillars sweep their whole circle, so they must stay off the launch radius.
     if (layout.orbit) {
       if (Math.abs(Math.hypot(p.x, p.z) - spawn) < 0.25) return 'A circling pillar crosses a launch spot';
+      for (let i = 0; i < 32; i++) {
+        if (Math.hypot(p.x, p.z) * layout.radius > rimRadius(layout, (i / 32) * Math.PI * 2) * 0.85) return 'A circling pillar would run into the wall';
+      }
     } else if (Math.hypot(p.x, Math.abs(p.z) - spawn) < 0.25) return 'A pillar blocks a launch spot';
     if (Math.hypot(p.x, p.z) > 0.85) return 'A pillar is too close to the rim';
   }

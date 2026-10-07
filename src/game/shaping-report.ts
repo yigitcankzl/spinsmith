@@ -3,12 +3,12 @@
  * equal rival on every arena and type matchup, under the real shaping economy.
  */
 import { ARENAS } from './arenas.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, strike, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
-import { SHAPE_SIZE, ShapingCharges } from './shaping.ts';
+import { SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.ts';
 
 
-type Policy = (arena: Arena, me: Top, rival: Top, t: number, charges: ShapingCharges, rnd: () => number, owner?: string) => void;
+type Policy = (arena: Arena, me: Top, rival: Top, t: number, charges: ShapingCharges, rnd: () => number, owner?: string, bar?: StrikeBar) => void;
 
 export const POLICIES: Record<string, Policy> = {
   none: () => {},
@@ -55,6 +55,8 @@ export interface ShapingResult {
   flipsLost: number;
   /** Share of the shaper's shapes no top ever came near while they were strong. */
   untouched: number;
+  /** Of the rounds where the player fell well behind on spin, the share they still won. */
+  comeback: number;
 }
 
 /**
@@ -170,6 +172,42 @@ export function humanBoth(rampDelay = 0.35): Policy {
   };
 }
 
+/** A top with less than this share of its rival's spin counts as behind: its bar fills twice as fast (the comeback). */
+export const BEHIND_SHARE = 0.7;
+export const behindOn = (me: Top, rival: Top) => me.alive && rival.alive && me.spin < BEHIND_SHARE * rival.spin;
+
+/**
+ * The Anvil Strike on top of another policy, as a player would use it: when the bar is full and
+ * the rival is out near the rim or hot (and further out or hotter than your own top), strike after
+ * the human lag.
+ */
+export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking): Policy {
+  let at = -1;
+  let lastT = Infinity;
+  return (arena, me, rival, t, charges, rnd, owner = 'me', bar) => {
+    base(arena, me, rival, t, charges, rnd, owner);
+    if (!bar) return;
+    if (t < lastT) at = -1;
+    lastT = t;
+    if (at >= 0 && t >= at) {
+      at = -1;
+      if (bar.spend(t, TUNING.grace)) strike(arena, me, rival);
+      return;
+    }
+    if (at >= 0) return;
+    const nr = Math.hypot(rival.x, rival.z) / arena.radius;
+    const nm = Math.hypot(me.x, me.z) / arena.radius;
+    const good = rival.alive && (nr > 0.55 || rival.damage > 0.35) && nr + rival.damage > nm + me.damage + 0.15;
+    if (bar.full && t >= TUNING.grace && good) at = t + delay;
+  };
+}
+
+/** A masher with the strike: random shapes, and the strike at a random moment once the bar is full. */
+export const masherStrike: Policy = (arena, me, rival, t, charges, rnd, owner = 'me', bar) => {
+  if (bar?.full && rnd() < 0.01 && bar.spend(t, TUNING.grace)) strike(arena, me, rival);
+  POLICIES.random(arena, me, rival, t, charges, rnd, owner);
+};
+
 /** Where a top caught at (x, z) should go: the nearest slag-pit mouth, else straight out over the wall. */
 function nearestExit(t: Top, arena: Arena): { x: number; z: number } {
   const L = arena.layout;
@@ -213,6 +251,7 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
   const arena = new Arena(s.layout);
   const charges = new ShapingCharges();
   const rivalCharges = new ShapingCharges();
+  const bar = new StrikeBar();
   const a = new Top(s.a);
   const b = new Top(s.b);
   a.launch(...s.launchA);
@@ -220,10 +259,11 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
   let t = 0;
   let lastShape = -99;
   let shapes = 0;
+  let behind = false;
   const mine: { s: (typeof arena.shapes)[number]; touched: boolean }[] = [];
   while (verdict(a, b, t) === 0) {
     const before = new Set(arena.shapes);
-    policy(arena, a, b, t, charges, rnd);
+    policy(arena, a, b, t, charges, rnd, 'me', bar);
     rivalPolicy(arena, b, a, t, rivalCharges, rnd, 'rival');
     for (const sh of arena.shapes) {
       if (before.has(sh) || !sh.owner.startsWith('me')) continue;
@@ -238,14 +278,17 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
     }
     charges.update(STEP);
     rivalCharges.update(STEP);
+    bar.update(STEP, behindOn(a, b));
+    if (t > 5 && a.alive && b.alive && a.spin < 0.6 * b.spin) behind = true;
     const clash = step(arena, a, b);
     if (clash) {
       charges.clash(clash.strength, t);
       rivalCharges.clash(clash.strength, t);
+      bar.clash(clash.strength, t, behindOn(a, b));
     }
     t += STEP;
   }
-  return { v: verdict(a, b, t), t, a, b, shapes, lastShape, untouched: mine.filter((m) => !m.touched).length };
+  return { v: verdict(a, b, t), t, a, b, shapes, lastShape: Math.max(lastShape, arena.lastStrike), untouched: mine.filter((m) => !m.touched).length, behind };
 }
 
 /**
@@ -259,7 +302,7 @@ export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: P
   let pseed = 7;
   const rnd = () => ((pseed = (pseed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   const types = [ATTACK, DEFENSE, STAMINA];
-  let wins = 0, n = 0, points = 0, ko = 0, shapes = 0, ownKo = 0, flipsWon = 0, flipsLost = 0, untouched = 0;
+  let wins = 0, n = 0, points = 0, ko = 0, shapes = 0, ownKo = 0, flipsWon = 0, flipsLost = 0, untouched = 0, behindN = 0, comebacks = 0;
   const lengths: number[] = [];
   for (const layout of ARENAS) {
     const spawn = layout.shape === 'oval' ? layout.radius * 0.78 * 0.72 : layout.radius * 0.72;
@@ -289,6 +332,10 @@ export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: P
             points += finishPoints(r.b);
             if (r.b.finish !== 'spin') ko++;
           } else if (r.v === -1 && r.a.finish !== 'spin' && r.t - r.lastShape < 1.5) ownKo++;
+          if (r.behind) {
+            behindN++;
+            if (r.v === 1) comebacks++;
+          }
           if (r.v === 1 && twin.v !== 1) flipsWon++;
           if (r.v !== 1 && twin.v === 1) flipsLost++;
         }
@@ -304,5 +351,6 @@ export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: P
     flipsWon: flipsWon / n,
     flipsLost: flipsLost / n,
     untouched: shapes ? untouched / shapes : 0,
+    comeback: behindN ? comebacks / behindN : 0,
   };
 }

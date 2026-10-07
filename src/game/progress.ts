@@ -71,13 +71,13 @@ export const RIVAL_UNLOCKS: Record<number, string> = {
 
 /** The newer arenas, opened beside a level's part or paint (the classics come with LEVEL_UNLOCKS). */
 export const ARENA_UNLOCKS: Record<number, string> = {
+  2: 'arena:Titan Crater',
   3: 'arena:Orbit Foundry',
   5: 'arena:Twin Basins',
   6: 'arena:Ripple Pool',
-  8: 'arena:Titan Crater',
+  8: 'arena:Glacier Steps',
   10: 'arena:Neon Speedway',
   14: 'arena:Meteor Pit',
-  16: 'arena:Glacier Steps',
   18: 'arena:Colossus Bowl',
   20: 'arena:Grand Anvil',
 };
@@ -203,6 +203,8 @@ export class Progress {
         this.level = Math.min(MAX_LEVEL, Math.max(1, s.level | 0));
         this.xp = Math.max(0, s.xp | 0);
         for (const k of s.unlocked) this.unlocked.add(k);
+        // Saves from before an unlock was added still get everything their level has opened.
+        for (let lv = 2; lv <= this.level; lv++) for (const m of [LEVEL_UNLOCKS, ARENA_UNLOCKS, RIVAL_UNLOCKS]) if (m[lv]) this.unlocked.add(m[lv]);
         for (const q of s.quests) this.quests.add(q);
         for (const d of s.orders ?? []) this.orders.add(d);
         this.marks = { ...(s.marks ?? {}) };
@@ -233,8 +235,7 @@ export class Progress {
   /** The next level unlock ahead of you: its key and level, or null when all are open. */
   get next(): { key: string; level: number } | null {
     for (let lv = this.level + 1; lv <= MAX_LEVEL; lv++) {
-      const key = LEVEL_UNLOCKS[lv];
-      if (key && !this.unlocked.has(key)) return { key, level: lv };
+      for (const key of [LEVEL_UNLOCKS[lv], ARENA_UNLOCKS[lv]]) if (key && !this.unlocked.has(key)) return { key, level: lv };
     }
     return null;
   }

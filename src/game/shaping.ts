@@ -72,3 +72,46 @@ export class ShapingCharges {
     return factor;
   }
 }
+
+/**
+ * The forge bar (docs/DUEL-DESIGN.md): fills from solid clashes and slowly on its own, twice as
+ * fast while your top is behind on spin; when full, the Anvil Strike is ready. Separate from the
+ * shaping charges, so the strike adds a decision (when) without taking ramps away.
+ */
+export const STRIKE_BAR = {
+  /** Seconds to fill on its own. */
+  passive: 30,
+  /** Filled per solid clash (strength at least SHAPING.clashMin), at most once per clashGap. */
+  clash: 0.07,
+};
+
+export class StrikeBar {
+  value = 0;
+  private lastClash = -99;
+
+  reset() {
+    this.value = 0;
+    this.lastClash = -99;
+  }
+
+  get full() {
+    return this.value >= 1;
+  }
+
+  update(dt: number, behind: boolean) {
+    this.value = Math.min(1, this.value + (dt / STRIKE_BAR.passive) * (behind ? 2 : 1));
+  }
+
+  clash(strength: number, t: number, behind: boolean) {
+    if (strength < SHAPING.clashMin || t - this.lastClash < SHAPING.clashGap) return;
+    this.lastClash = t;
+    this.value = Math.min(1, this.value + STRIKE_BAR.clash * (behind ? 2 : 1));
+  }
+
+  /** Spends the full bar at fight time t; false when it is not full or still the opening grace. */
+  spend(t: number, grace: number): boolean {
+    if (t < grace || !this.full) return false;
+    this.value = 0;
+    return true;
+  }
+}

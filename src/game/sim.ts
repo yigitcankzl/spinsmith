@@ -30,9 +30,9 @@ const DASH_COOLDOWN = 1.0;
 /** Pillars deflect; bumpers kick away at this speed (m/s). */
 const PILLAR_BOUNCE = 0.8;
 const BUMPER_KICK = 0.3;
-/** Boost pads: their reach (fraction of the radius), the speed they add (m/s) and how soon a top can take the same pad again (s). */
+/** Boost pads: their reach (fraction of the radius), the speed they bring a top up to along their arrow (m/s) and how soon a top can take one again (s). */
 export const PAD_R = 0.09;
-const PAD_KICK = 0.35;
+const PAD_TOP = 0.55;
 const PAD_COOLDOWN = 0.8;
 /** Center features cover this fraction of the radius. */
 const CENTER_ZONE = 0.32;
@@ -108,6 +108,12 @@ export const TUNING = {
   shapeHold: 1.0,
   /** Seconds after the launch during which pockets and walls hold every top (no instant finishes). */
   grace: 2.5,
+  /** Hot metal: the strike throws a top this much further at full burst damage (docs/DUEL-DESIGN.md). Clashes are not
+   * scaled: that tipped the type loop toward attack. */
+  hot: 0.6,
+  /** Anvil Strike: outward speed (m/s) it gives a top at the rim, cold; the player's own top takes `strikeOwn` of it. */
+  strike: 1.2,
+  strikeOwn: 0.6,
 };
 /** Height rule: a height gap this large (m) gives the lower top its full lift on the taller one. */
 const HEIGHT_GAP = 0.002;
@@ -153,6 +159,8 @@ export class Arena {
   private tiltVZ = 0;
   /** Fight clock, for the shrinking ring. */
   elapsed = 0;
+  /** Fight time of the last Anvil Strike (-99: none this round). */
+  lastStrike = -99;
   /** Live player-made shapes (ramps and wells); each fades as it relaxes. */
   shapes: FloorShape[] = [];
 
@@ -166,8 +174,9 @@ export class Arena {
 
   /** Safe zone radius as a fraction of the rim (1 = whole arena). */
   get safe(): number {
-    if (!this.layout.shrink || this.elapsed < SHRINK_START) return 1;
-    const k = Math.min(1, (this.elapsed - SHRINK_START) / SHRINK_TIME);
+    const start = this.layout.shrinkStart ?? SHRINK_START;
+    if (!this.layout.shrink || this.elapsed < start) return 1;
+    const k = Math.min(1, (this.elapsed - start) / SHRINK_TIME);
     return 1 - (1 - SHRINK_MIN) * k;
   }
 
@@ -185,7 +194,7 @@ export class Arena {
   /** Twin basins: a ridge along the launch axis splits the bowl into a left and a right basin. */
   private twinRidge(x: number, n: number): number {
     const w = 0.16 * this.layout.radius;
-    return this.layout.depth * 0.6 * Math.exp(-((x / w) ** 2)) * (1 - smoothstep(0.75, 0.65, n));
+    return this.layout.depth * 0.6 * Math.exp(-((x / w) ** 2)) * (1 - smoothstep(0.75, 0.95, n));
   }
 
   /** Floor profile by normalized radius. */
@@ -404,6 +413,7 @@ export class Arena {
     this.shapes = [];
     this.tiltX = this.tiltZ = this.tiltVX = this.tiltVZ = 0;
     this.elapsed = 0;
+    this.lastStrike = -99;
   }
 
   clear() {
@@ -693,14 +703,46 @@ function pads(arena: Arena, t: Top) {
   if (!L.pads || t.sincePad < PAD_COOLDOWN) return;
   for (const p of L.pads) {
     if (Math.hypot(t.x - p.x * L.radius, t.z - p.z * L.radius) > PAD_R * L.radius) continue;
-    t.vx += Math.cos(p.angle) * PAD_KICK;
-    t.vz += Math.sin(p.angle) * PAD_KICK;
+    // Topped up to the pad's speed, never stacked past it.
+    const c = Math.cos(p.angle);
+    const s = Math.sin(p.angle);
+    const add = Math.max(0, PAD_TOP - (t.vx * c + t.vz * s));
+    if (add <= 0) continue;
+    t.vx += c * add;
+    t.vz += s * add;
     t.kick = Math.min(1, t.kick + 0.5);
     t.kickX = Math.cos(p.angle);
     t.kickZ = Math.sin(p.angle);
     t.sincePad = 0;
     return;
   }
+}
+
+/**
+ * The Anvil Strike (docs/DUEL-DESIGN.md): the player's palm on the table sends a shockwave out from
+ * the arena's middle. Every top is thrown outward, harder near the rim and the hotter it is, and
+ * lifted for a moment (walls and pits take less to clear); the player's own top, braced, takes only
+ * TUNING.strikeOwn of it. A caught top is let go first.
+ */
+export function strike(arena: Arena, mine: Top, rival: Top) {
+  for (const s of arena.shapes) if (s.caught) arena.free(s);
+  for (const t of [mine, rival]) {
+    if (!t.alive) continue;
+    const r = Math.hypot(t.x, t.z);
+    const n = Math.min(1, normRadius(arena.layout, t.x, t.z));
+    // A top in the very middle goes the way it was already moving.
+    const ux = r > 1e-4 ? t.x / r : t.vx / (Math.hypot(t.vx, t.vz) || 1);
+    const uz = r > 1e-4 ? t.z / r : t.vz / (Math.hypot(t.vx, t.vz) || 1);
+    // Felt mostly out near the rim: a top in the middle barely moves, so when you strike matters.
+    const k = TUNING.strike * n * n * (1 + TUNING.hot * t.damage) * (t === mine ? TUNING.strikeOwn : 1);
+    t.vx += ux * k;
+    t.vz += uz * k;
+    t.kick = 1;
+    t.kickX = ux;
+    t.kickZ = uz;
+    t.lifted = LIFT_TIME;
+  }
+  arena.lastStrike = arena.elapsed;
 }
 
 /** Pillars deflect a top; bumpers kick it away hard. Orbiting pillars also shove it along. */
@@ -719,15 +761,13 @@ function pillars(arena: Arena, t: Top) {
     nz /= d;
     t.x = px + nx * min;
     t.z = pz + nz * min;
-    const into = t.vx * nx + t.vz * nz;
+    // Bounce off the pillar as it moves (a circling one sweeps the top along with it).
+    const vpx = L.orbit ? -pz * L.orbit : 0;
+    const vpz = L.orbit ? px * L.orbit : 0;
+    const into = (t.vx - vpx) * nx + (t.vz - vpz) * nz;
     if (into < 0) {
       t.vx -= (1 + PILLAR_BOUNCE) * into * nx;
       t.vz -= (1 + PILLAR_BOUNCE) * into * nz;
-    }
-    if (L.orbit) {
-      // The pillar's own sweep pushes the top along with it.
-      t.vx += -pz * L.orbit;
-      t.vz += px * L.orbit;
     }
     if (p.bumper) {
       t.vx += nx * BUMPER_KICK;

@@ -996,6 +996,8 @@ export class ArenaView {
   /** Pillars that circle the center turn together in this group; boost pads pulse. */
   private orbit = new Group();
   private padMats: MeshBasicMaterial[] = [];
+  private padFlash: number[] = [];
+  private padMeshes: Mesh[] = [];
   private vortexDisc: Mesh | null = null;
   private disposables: { dispose(): void }[] = [];
   private time = 0;
@@ -1132,6 +1134,8 @@ export class ArenaView {
 
     // Boost pads: a glowing chevron flat on the floor, pointing the way it flings.
     this.padMats = [];
+    this.padFlash = [];
+    this.padMeshes = [];
     const probe = new Arena(layout);
     for (const p of layout.pads ?? []) {
       const mat = own(new MeshBasicMaterial({ color: 0x4ad8ff, transparent: true, opacity: 0.8, blending: AdditiveBlending, depthWrite: false }));
@@ -1143,6 +1147,8 @@ export class ArenaView {
       const mesh = add(new Mesh(new ShapeGeometry(chevron).rotateX(-Math.PI / 2), mat));
       mesh.position.set(x, probe.height(x, z) + 0.0012, z);
       mesh.rotation.y = -p.angle;
+      this.padFlash.push(0);
+      this.padMeshes.push(mesh);
     }
 
     // Center features.
@@ -1209,6 +1215,20 @@ export class ArenaView {
     if (best >= 0) this.railFlash[best] = 1;
   }
 
+  /** Lights up the boost pad nearest to an arena-local point (a top was just flung by it). */
+  flashPad(x: number, z: number) {
+    let best = -1;
+    let gap = Infinity;
+    (this.layout.pads ?? []).forEach((p, i) => {
+      const d = Math.hypot(p.x * this.layout.radius - x, p.z * this.layout.radius - z);
+      if (d < gap) {
+        gap = d;
+        best = i;
+      }
+    });
+    if (best >= 0) this.padFlash[best] = 1;
+  }
+
   /** Lights up the bumper nearest to an arena-local point. */
   flashBumper(x: number, z: number) {
     let best = -1;
@@ -1246,9 +1266,14 @@ export class ArenaView {
       this.spinnerDisc.rotation.y -= dt * this.layout.spinner;
       this.spinnerDisc.position.y = center + 0.0004;
     }
-    // three.js turns +y counter to atan2(z, x), so the group turns by minus the sim's angle.
-    this.orbit.rotation.y = -(this.layout.orbit ?? 0) * arena.elapsed;
-    for (const m of this.padMats) m.opacity = 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(this.time * 5));
+    // three.js turns +y counter to atan2(z, x), so the group turns by minus the sim's angle. Outside
+    // a fight (the clock stands at 0) they circle on the view's own clock, so they read before a match.
+    this.orbit.rotation.y = -(this.layout.orbit ?? 0) * (arena.elapsed > 0 ? arena.elapsed : this.time);
+    this.padMats.forEach((m, i) => {
+      this.padFlash[i] = Math.max(0, this.padFlash[i] - dt * 4);
+      m.opacity = Math.min(1, 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(this.time * 5)) + this.padFlash[i]);
+      this.padMeshes[i].scale.setScalar(1 + 0.4 * this.padFlash[i]);
+    });
   }
 
   private vi(ring: number, seg: number) {
