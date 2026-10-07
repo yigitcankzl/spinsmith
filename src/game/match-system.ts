@@ -1,5 +1,5 @@
 import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, duck, ForgeLoop, playGong, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, duck, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -304,6 +304,10 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** The rival's entrance at a match's start (s into it), and the VS words it lands with. */
+  private entrance: { t: number; vs: string; sub: string } | null = null;
+  private portal = Object.assign(new Mesh(new RingGeometry(0.7, 1, 48), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide })), { visible: false });
+  private portalCore = Object.assign(new Mesh(new CircleGeometry(0.7, 48), new MeshBasicMaterial({ color: 0x0a1a24, transparent: true, opacity: 0.85, depthWrite: false, side: DoubleSide })), { visible: false });
   /** Each hand's mark on the arena floor under it: a soft shadow, or a warm glow when the strike is ready. */
   private handAt = new Vector3();
   private handMarks = (['left', 'right'] as const).map(() =>
@@ -466,6 +470,8 @@ export class MatchSystem extends createSystem({
     this.chargeRing.visible = false;
     this.stage.add(
       this.chargeRing,
+      this.portal,
+      this.portalCore,
       ...this.palmPrints,
       ...this.handMarks,
       this.lane,
@@ -848,6 +854,7 @@ export class MatchSystem extends createSystem({
     const [ga, gb] = this.replay ? this.ghosts : [this.mine, this.theirs];
     this.myView.sync(ga, this.arena, this.time, vdt);
     this.theirView.sync(gb, this.arena, this.time, vdt);
+    this.updateEntrance(dt);
     // A thrown rival that skated off the real table's edge: its own moment (cosmetic, never heat).
     if (this.theirView.offDesk && !this.offDeskShown && !this.replay) {
       this.offDeskShown = true;
@@ -1205,6 +1212,53 @@ export class MatchSystem extends createSystem({
       g.damage = f[o + 4];
       g.spin = 1;
     });
+  }
+
+  /**
+   * The rival's entrance: a cyan portal opens in the dark behind the far rim (0.4 s), the rival's top
+   * flies out of it in an arc trailing embers (0.9 s), slams down on its spot with a ring of sparks
+   * and the VS stamp, and the portal closes. The fight waits for nothing: pinching starts as usual.
+   */
+  private updateEntrance(dt: number) {
+    const e = this.entrance;
+    const show = !!e && (this.phase === 'ready' || this.phase === 'pulling');
+    this.portal.visible = this.portalCore.visible = show;
+    if (!e || !show) {
+      this.entrance = null;
+      return;
+    }
+    e.t += dt;
+    const far = -(maxRim(this.arena.layout) + 0.22);
+    const open = Math.min(1, e.t / 0.4) * (e.t > 1.6 ? Math.max(0, 1 - (e.t - 1.6) / 0.4) : 1);
+    // Off to the far right, clear of the card and the match bar over the far rim.
+    const px = 0.24;
+    this.portal.position.set(px, 0.16, far);
+    this.portalCore.position.set(px, 0.16, far - 0.001);
+    this.portal.scale.setScalar(0.001 + 0.09 * open);
+    this.portalCore.scale.setScalar(0.001 + 0.09 * open);
+    this.portal.rotation.z += dt * 3;
+    (this.portal.material as MeshBasicMaterial).opacity = 0.6 + 0.4 * Math.sin(e.t * 20) * 0.5;
+    const them = this.theirs;
+    const u = (e.t - 0.4) / 0.9;
+    const view = this.theirView.root;
+    if (u < 0) view.visible = false;
+    else if (u < 1) {
+      // From the portal to its spot: a high arc.
+      const y = this.arena.height(them.x, them.z);
+      view.visible = true;
+      view.position.set(px + (them.x - px) * u, 0.16 + (y - 0.16) * u + 0.12 * Math.sin(u * Math.PI), far + (them.z - far) * u);
+      view.rotation.set(0.6 * (1 - u), 0, 0);
+      this.theirView.shadowMesh.visible = false;
+      if (Math.floor(e.t * 30) !== Math.floor((e.t - dt) * 30)) this.sparks.burst(view.position.x, view.position.y - 0.01, view.position.z, 0.1);
+    } else if (u - dt / 0.9 < 1) {
+      // Touchdown.
+      this.sparks.burst(them.x, this.arena.height(them.x, them.z), them.z, 1);
+      this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 1);
+      playLand('table', them.x, 1);
+      duck(0.4, 0.3);
+      this.stamp.show(e.vs, e.sub, 'rival', 1.6);
+    }
+    if (e.t > 2.1) this.entrance = null;
   }
 
   /**
@@ -1863,7 +1917,11 @@ export class MatchSystem extends createSystem({
     if (this.myPoints === 0 && this.theirPoints === 0) {
       // The bout: who, from which circuit, what it says, and how it plays.
       const c = circuitOf(this.rival.name);
-      this.stamp.show(`VS ${this.rival.name.toUpperCase()}`, c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title, 'rival', 1.6);
+      // The rival arrives: a portal burns open beyond the far rim and its top arcs in; VS as it lands.
+      const vs = `VS ${this.rival.name.toUpperCase()}`;
+      const sub = c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title;
+      if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
+      else this.entrance = { t: 0, vs, sub };
       this.label.set(`${this.rival.name}, ${this.rival.title}: "${this.rival.intro}"\n${this.rival.style}${this.taught('tells') ? ` · ${MOVE_WORD[this.rival.move]}` : ''} · ${this.arena.layout.rule ?? this.arena.layout.name}`);
     }
     else {
