@@ -749,6 +749,31 @@ export function strike(arena: Arena, mine: Top, rival: Top) {
   rival.tell = 0;
 }
 
+/**
+ * The player's strike, chosen in the forge (the seal engraved on the top): Anvil, the shockwave;
+ * Rush, your top charges the rival; Magnet, the rival is dragged toward a pit. Every one cuts a
+ * rival's tell short. (A spin refill was tried: even a small one decided spin finishes.)
+ */
+export type Seal = 'anvil' | 'rush' | 'magnet';
+export const SEALS: Seal[] = ['anvil', 'rush', 'magnet'];
+/** Your Magnet pulls a little softer than a rival's pull: it lands more often. */
+const MAGNET_SPEED = 0.45;
+/** Your Rush hits harder than a rival's charge: it is your one strike. */
+const RUSH_SPEED = 1.5;
+
+export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal) {
+  if (seal === 'anvil') return strike(arena, mine, rival);
+  if (seal === 'magnet') rivalMove(arena, mine, rival, 'pull', MAGNET_SPEED);
+  else {
+    rivalMove(arena, mine, rival, 'charge');
+    const v = Math.hypot(mine.vx, mine.vz) || 1;
+    mine.vx *= RUSH_SPEED / v;
+    mine.vz *= RUSH_SPEED / v;
+  }
+  arena.lastStrike = arena.elapsed;
+  rival.tell = 0;
+}
+
 /** A rival's one big move, by its style (docs/DUEL-DESIGN.md); shown TELL_TIME ahead by a glow and a sound. */
 export type RivalMove = 'charge' | 'quake' | 'pull';
 export const TELL_TIME = 1;
@@ -762,7 +787,7 @@ const PULL_SPEED = 0.6;
  * shockwave (as the Anvil Strike, with the rival braced). Pull:
  * your top is dragged toward the nearest slag pit (or the rim) and lifted.
  */
-export function rivalMove(arena: Arena, rival: Top, you: Top, kind: RivalMove) {
+export function rivalMove(arena: Arena, rival: Top, you: Top, kind: RivalMove, pull = PULL_SPEED) {
   if (!rival.alive) return;
   const braced = arena.shapes.some((s) => s.caught === you);
   if (kind === 'charge') {
@@ -793,8 +818,8 @@ export function rivalMove(arena: Arena, rival: Top, you: Top, kind: RivalMove) {
       const tx = Math.cos(a) * arena.radius - you.x;
       const tz = Math.sin(a) * arena.radius - you.z;
       const d = Math.hypot(tx, tz) || 1;
-      you.vx += (tx / d) * PULL_SPEED;
-      you.vz += (tz / d) * PULL_SPEED;
+      you.vx += (tx / d) * pull;
+      you.vz += (tz / d) * pull;
       you.lifted = LIFT_TIME;
     }
   }

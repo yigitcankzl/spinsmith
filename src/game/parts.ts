@@ -4,7 +4,7 @@
  * fight stats of a build are put together from its rows, like the stats on a toy's box.
  * No three.js here, so builds can be checked and balanced headlessly.
  */
-import type { Contact, RivalMove, TopSpec } from './sim.ts';
+import type { Contact, RivalMove, Seal, TopSpec } from './sim.ts';
 
 export interface Ring {
   id: string;
@@ -174,7 +174,17 @@ export interface TopBuild {
   color: number;
   /** Emblem glow (index into EMBLEM_COLORS); unset is the first. */
   emblem?: number;
+  /** The strike engraved on it (docs/DUEL-DESIGN.md); unset is the Anvil Strike. */
+  seal?: Seal;
 }
+
+/** What each seal's strike is called on the cards. */
+export const SEAL_NAMES: Record<Seal, string> = { anvil: 'Anvil Strike', rush: 'Rush', magnet: 'Magnet' };
+export const SEAL_BLURBS: Record<Seal, string> = {
+  anvil: 'A shockwave from the middle: hot tops near the rim fly',
+  rush: 'Your top charges straight at the rival',
+  magnet: 'The rival is dragged toward the nearest slag pit',
+};
 
 /** Emblem glows: the forge's orange first; the rest are earned (levels 15-19, order stamps). Never cyan, the rival's color. */
 export const EMBLEM_COLORS = [0xffb347, 0xf4f1ea, 0xb07cff, 0xffd34a, 0x6fe36f, 0xff5a5a, 0x4a72ff, 0xff8fc8];

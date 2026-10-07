@@ -5,9 +5,9 @@ import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
-import type { FloorShape, ShapeKind } from './sim.js';
-import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
+import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import type { FloorShape, Seal, ShapeKind } from './sim.js';
+import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { GUIDE_ORDER, MARK, Progress } from './progress.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
 import { nextArena } from './rotation.js';
@@ -20,7 +20,7 @@ import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
-import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_NAMES, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, TopView } from './visuals.js';
@@ -1853,7 +1853,8 @@ export class MatchSystem extends createSystem({
   private doStrike() {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
     const cut = this.tellAt >= 0 && this.theirs.tell > 0;
-    strike(this.arena, this.mine, this.theirs);
+    const seal = this.myBuild.seal ?? 'anvil';
+    sealStrike(this.arena, this.mine, this.theirs, seal);
     if (cut) {
       this.tellAt = -1;
       this.label.set('INTERRUPTED!');
@@ -1865,15 +1866,30 @@ export class MatchSystem extends createSystem({
       this.slings[s] = null;
     }
     this.lastShape = { t: this.elapsed, kind: 'strike' };
-    this.shockT = 0;
-    for (const t of [this.mine, this.theirs]) if (t.alive) this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
-    this.impacts.hit(0, this.arena.floorHeight(0), 0, 1);
+    // Each seal reads its own way: the anvil's shockwave from the middle, the rush's sparks trailing
+    // your top, the magnet's rings closing on the rival.
+    const me = this.mine;
+    const them = this.theirs;
+    if (seal === 'anvil') {
+      this.shockT = 0;
+      this.impacts.hit(0, this.arena.floorHeight(0), 0, 1);
+      for (const t of [me, them]) if (t.alive) this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
+      playStrike();
+    } else if (seal === 'rush') {
+      this.sparks.burst(me.x, this.arena.height(me.x, me.z), me.z, 1);
+      this.myView.flash();
+      playDash(me.x);
+      playStrike();
+    } else {
+      this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 1);
+      this.theirView.flash();
+      playTell();
+    }
     this.roomLight.hit();
     this.hitStop = HIT_STOP * 2;
     this.accumulator = 0;
-    playStrike();
     if (!cut && this.strikeTaught && this.label.mesh.visible) this.label.set('');
-    if (import.meta.env.DEV) console.log(`[STRIKE] at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
+    if (import.meta.env.DEV) console.log(`[STRIKE] ${seal} at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
   }
 
   /** A fingertip press: a cup that holds the first top to roll in, until it is slung or TUNE.cupHold passes. */
@@ -2138,7 +2154,7 @@ export class MatchSystem extends createSystem({
         text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points} heat\n${score}`;
       }
       // A finish within 1.5 s of the player's shape names it as the cause.
-      const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? this.lastShape.kind.toUpperCase() : null;
+      const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind).toUpperCase() : null;
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
       if (recent && v === 1) {
         text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
@@ -2373,6 +2389,7 @@ function unlockName(key: string): string {
   if (kind === 'ledger') return 'Gilded ledger';
   if (kind === 'rival') return `${id} rival`;
   if (kind === 'arena') return `${id} arena`;
+  if (kind === 'seal') return `${SEAL_NAMES[id as Seal]} strike`;
   const name = kind === 'ring' ? RINGS.find((r) => r.id === id)?.name : kind === 'tip' ? TIPS.find((t) => t.id === id)?.name : kind === 'core' ? CORES.find((c) => c.id === id)?.name : id;
   return `${name} ${kind}`;
 }
@@ -2381,6 +2398,7 @@ function unlockName(key: string): string {
 function unlockModel(key: string, arenas: ArenaLayout[]): Object3D {
   const [kind, id] = key.split(':');
   if (kind === 'arena') return miniArena(arenas.find((a) => a.name === id) ?? arenas[0], true);
+  if (kind === 'seal') return sealModel(id as Seal);
   if (kind === 'rival') {
     const r = RIVALS.find((x) => x.name === id);
     if (r) return new TopView(r.build, OPPONENT_COLOR).root;

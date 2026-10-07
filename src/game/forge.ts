@@ -12,6 +12,7 @@
  * - Drop the top in the quench slot beside the anvil to save it and go home.
  */
 import {
+  BoxGeometry,
   Color,
   CircleGeometry,
   ConeGeometry,
@@ -34,7 +35,9 @@ import { ORANGE, TEXT_DIM } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import { TAB_LINE, traySpot, WORK as REACH_WORK } from './reach.js';
 import type { HandState } from './hands.js';
-import { buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
+import { buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, roleOf, SEAL_BLURBS, SEAL_NAMES, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
+import { SEALS } from './sim.js';
+import type { Seal } from './sim.js';
 import type { TopBuild, TopStats } from './parts.js';
 import { ANVIL_FACE, anvilModel } from './hub.js';
 import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js';
@@ -67,6 +70,7 @@ export type Item =
   | { kind: 'spin'; value: 1 | -1; name: string; blurb: string }
   | { kind: 'color'; value: number; name: string; blurb: string }
   | { kind: 'emblem'; name: string; blurb: string }
+  | { kind: 'seal'; name: string; blurb: string }
   | { kind: 'preset'; build: TopBuild; name: string; blurb: string };
 
 export type Drawer = 'ring' | 'core' | 'tip' | 'style';
@@ -82,6 +86,7 @@ export const ROWS: [string, Item[], number][] = [
       { kind: 'spin', value: 1, name: 'Spin direction', blurb: 'Tap to turn it: left spin steals spin from right spinners' },
       ...TOP_COLORS.map((value) => ({ kind: 'color' as const, value, name: 'Paint', blurb: 'Dip your top or tap the pot' })),
       { kind: 'emblem' as const, name: 'Emblem glow', blurb: 'Tap to step through the glows you have earned' },
+      { kind: 'seal' as const, name: 'Strike seal', blurb: 'Tap to choose your strike: Anvil, then Rush (Lv 4) and Magnet (Lv 7)' },
     ],
     0.05,
   ],
@@ -254,6 +259,7 @@ export class Forge {
     const paint = TOP_COLORS.indexOf(out.color);
     if (paint >= 0 && !open(`paint:${paint}`)) out.color = TOP_COLORS[0];
     if (out.emblem && !this.progress.isUnlocked(`emblem:${out.emblem}`)) out.emblem = 0;
+    if (out.seal && out.seal !== 'anvil' && !this.progress.isUnlocked(`seal:${out.seal}`)) out.seal = 'anvil';
     return out;
   }
 
@@ -551,6 +557,8 @@ export class Forge {
         return b.color === item.value;
       case 'emblem':
         return (b.emblem ?? 0) > 0;
+      case 'seal':
+        return (b.seal ?? 'anvil') !== 'anvil';
       default:
         return b.ring === item.build.ring && b.core === item.build.core && b.tip === item.build.tip;
     }
@@ -567,6 +575,12 @@ export class Forge {
     } else if (item.kind === 'color') {
       this.build = { ...this.build, color: item.value };
       this.say('Painted');
+    } else if (item.kind === 'seal') {
+      // The next strike you have earned (the Anvil Strike is always yours).
+      const owned = SEALS.filter((s) => s === 'anvil' || this.progress.isUnlocked(`seal:${s}`));
+      const seal = owned[(owned.indexOf(this.build.seal ?? 'anvil') + 1) % owned.length];
+      this.build = { ...this.build, seal };
+      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : 'Earn more strikes: Rush at Lv 4, Magnet at Lv 7');
     } else if (item.kind === 'emblem') {
       // The next glow you have earned (the forge's orange is always yours).
       const owned = EMBLEM_COLORS.map((_, i) => i).filter((i) => i === 0 || this.progress.isUnlocked(`emblem:${i}`));
@@ -776,6 +790,32 @@ export class Forge {
 }
 
 /** The model of a shelf item, sized to be easy to grab. */
+/** A struck coin with the seal's mark: a hammer head (anvil), an arrow (rush), a horseshoe (magnet). */
+export function sealModel(seal: Seal): Object3D {
+  const g = new Group();
+  const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x8a6a3a) }));
+  g.add(coin);
+  const mat = new MeshBasicMaterial({ color: 0xffb04a });
+  if (seal === 'anvil') {
+    const head = new Mesh(new BoxGeometry(0.016, 0.004, 0.007), mat);
+    const handle = new Mesh(new BoxGeometry(0.003, 0.003, 0.014), mat);
+    head.position.set(0, 0.003, -0.004);
+    handle.position.set(0, 0.003, 0.005);
+    g.add(head, handle);
+  } else if (seal === 'rush') {
+    const shaft = new Mesh(new BoxGeometry(0.003, 0.003, 0.014), mat);
+    const tip = new Mesh(new ConeGeometry(0.005, 0.008, 3).rotateX(-Math.PI / 2), mat);
+    shaft.position.set(0, 0.003, 0.003);
+    tip.position.set(0, 0.003, -0.007);
+    g.add(shaft, tip);
+  } else {
+    const shoe = new Mesh(new TorusGeometry(0.007, 0.0022, 6, 20, Math.PI).rotateX(-Math.PI / 2), mat);
+    shoe.position.y = 0.003;
+    g.add(shoe);
+  }
+  return g;
+}
+
 export function itemModel(item: Item): Object3D {
   const g = new Group();
   if (item.kind === 'ring') {
@@ -815,6 +855,8 @@ export function itemModel(item: Item): Object3D {
       dot.position.set(Math.cos(a) * 0.009, 0.003, Math.sin(a) * 0.009);
       g.add(dot);
     });
+  } else if (item.kind === 'seal') {
+    g.add(sealModel('anvil'));
   } else if (item.kind === 'preset') {
     const view = new TopView(item.build, item.build.color);
     g.add(view.root);

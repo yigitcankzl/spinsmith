@@ -82,6 +82,12 @@ export const ARENA_UNLOCKS: Record<number, string> = {
   20: 'arena:Grand Anvil',
 };
 
+/** Strike seals (docs/DUEL-DESIGN.md): the Anvil Strike is yours from the start. */
+export const SEAL_UNLOCKS: Record<number, string> = {
+  4: 'seal:rush',
+  7: 'seal:magnet',
+};
+
 /** Emblem glows earned by Smith Order stamps: this many stamps, this glow. */
 export const STAMP_UNLOCKS: Record<number, string> = {
   5: 'emblem:5',
@@ -126,7 +132,7 @@ export const XP = {
 
 /** How a key is earned ('Lv 6', or a deed), or null for starters and things never locked. */
 export function unlockHint(key: string): string | null {
-  for (const [lv, k] of [...Object.entries(LEVEL_UNLOCKS), ...Object.entries(ARENA_UNLOCKS)]) if (k === key) return `Lv ${lv}`;
+  for (const [lv, k] of [...Object.entries(LEVEL_UNLOCKS), ...Object.entries(ARENA_UNLOCKS), ...Object.entries(SEAL_UNLOCKS)]) if (k === key) return `Lv ${lv}`;
   for (const [n, k] of Object.entries(STAMP_UNLOCKS)) if (k === key) return `${n} order stamps`;
   for (const q of Object.values(QUEST_UNLOCKS)) if (q.key === key) return q.text;
   return null;
@@ -204,7 +210,7 @@ export class Progress {
         this.xp = Math.max(0, s.xp | 0);
         for (const k of s.unlocked) this.unlocked.add(k);
         // Saves from before an unlock was added still get everything their level has opened.
-        for (let lv = 2; lv <= this.level; lv++) for (const m of [LEVEL_UNLOCKS, ARENA_UNLOCKS, RIVAL_UNLOCKS]) if (m[lv]) this.unlocked.add(m[lv]);
+        for (let lv = 2; lv <= this.level; lv++) for (const m of [LEVEL_UNLOCKS, ARENA_UNLOCKS, SEAL_UNLOCKS, RIVAL_UNLOCKS]) if (m[lv]) this.unlocked.add(m[lv]);
         for (const q of s.quests) this.quests.add(q);
         for (const d of s.orders ?? []) this.orders.add(d);
         this.marks = { ...(s.marks ?? {}) };
@@ -270,6 +276,8 @@ export class Progress {
       if (key) this.unlock(key, out);
       const arena = ARENA_UNLOCKS[this.level];
       if (arena) this.unlock(arena, out);
+      const seal = SEAL_UNLOCKS[this.level];
+      if (seal) this.unlock(seal, out);
       const rival = RIVAL_UNLOCKS[this.level];
       if (rival) this.unlock(rival, out);
     }

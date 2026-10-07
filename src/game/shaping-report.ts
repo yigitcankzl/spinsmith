@@ -3,7 +3,7 @@
  * equal rival on every arena and type matchup, under the real shaping economy.
  */
 import { ARENAS } from './arenas.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, strike, TELL_TIME, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
 import { SHAPE_SIZE, ShapingCharges, StrikeBar, behindOn } from './shaping.ts';
 
@@ -178,7 +178,7 @@ export function humanBoth(rampDelay = 0.35): Policy {
  * the rival is out near the rim or hot (and further out or hotter than your own top), strike after
  * the human lag.
  */
-export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking): Policy {
+export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking, seal: import('./sim.ts').Seal = 'anvil'): Policy {
   let at = -1;
   let lastT = Infinity;
   return (arena, me, rival, t, charges, rnd, owner = 'me', bar) => {
@@ -188,14 +188,18 @@ export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture
     lastT = t;
     if (at >= 0 && t >= at) {
       at = -1;
-      if (bar.spend(t, TUNING.grace)) strike(arena, me, rival);
+      if (bar.spend(t, TUNING.grace)) sealStrike(arena, me, rival, seal);
       return;
     }
     if (at >= 0) return;
     const nr = Math.hypot(rival.x, rival.z) / arena.radius;
     const nm = Math.hypot(me.x, me.z) / arena.radius;
     // A rival's tell is a reason too: the strike cuts its move short.
-    const good = rival.alive && (rival.tell > 0 || ((nr > 0.55 || rival.damage > 0.35) && nr + rival.damage > nm + me.damage + 0.15));
+    // When each seal pays: the anvil and the magnet with the rival out and hotter than you, the rush
+    // with the rival near the rim.
+    const out = (nr > 0.55 || rival.damage > 0.35) && nr + rival.damage > nm + me.damage + 0.15;
+    const when = seal === 'rush' ? nr > 0.6 : out;
+    const good = rival.alive && (rival.tell > 0 || when);
     if (bar.full && t >= TUNING.grace && good) at = t + delay;
   };
 }
