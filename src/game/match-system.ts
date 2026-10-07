@@ -82,7 +82,7 @@ const LABEL_AT = new Vector3(0, 0.115, -0.21);
 const NEAR_RIM = 0.17;
 const MOVE_WORD = { charge: 'charges', quake: 'quakes the floor', pull: 'pulls you to the pits' } as const;
 /** The forge bar's color by seal, so the chosen strike shows on the wrist. */
-const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magnet: 0x5ab8ff };
+const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magnet: 0x5ab8ff, tilt: 0x7de07d, hammer: 0xffe066, bulwark: 0xd9d4ff };
 /** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
@@ -282,6 +282,8 @@ export class MatchSystem extends createSystem({
   private viewKeys = ['', ''];
   private cord = new Cord();
   private sparks = new Sparks();
+  /** A ring around your top while a Hammer is armed (gold) or a Bulwark holds (pale violet). */
+  private aura = new Mesh(new TorusGeometry(0.016, 0.0016, 8, 40).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffe066, transparent: true, depthWrite: false, blending: AdditiveBlending }));
   private label = new Label();
   private round = 0;
   /** Match score in heat: first to MATCH_HEAT wins the match. */
@@ -421,6 +423,7 @@ export class MatchSystem extends createSystem({
     this.stage.add(
       this.chargeRing,
       this.reticle,
+      this.aura,
       this.arenaView.root,
       this.sparks.points,
       this.impacts.root,
@@ -760,6 +763,17 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'build') this.arena.orbitT = 0;
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
+    const me = this.mine;
+    const armed = this.phase === 'fight' && me.alive && (me.hammer > 0 || me.guard > 0);
+    this.aura.visible = armed;
+    if (armed) {
+      const guard = me.guard > 0;
+      (this.aura.material as MeshBasicMaterial).color.setHex(guard ? 0xd9d4ff : 0xffe066);
+      (this.aura.material as MeshBasicMaterial).opacity = guard ? 0.55 + 0.3 * Math.sin(this.time * 10) : 0.8;
+      this.aura.position.set(me.x, this.arena.height(me.x, me.z) + (guard ? 0.012 : 0.02), me.z);
+      this.aura.scale.set(guard ? 1.25 : 0.9, guard ? 4 : 1, guard ? 1.25 : 0.9);
+      this.aura.rotation.y += dt * (guard ? 1 : 6);
+    }
   }
 
   /** The rival's launch spot this round (arena-local), at the spawn distance on its far half. */
@@ -2021,6 +2035,15 @@ export class MatchSystem extends createSystem({
       this.myView.flash();
       playDash(me.x);
       playStrike();
+    } else if (seal === 'tilt') {
+      // The arena tips toward the palm (the stage follows the sim's tilt); a thud where the hand hit.
+      this.impacts.hit(ox, this.arena.floorHeight(1), oz, 1);
+      playStrike();
+      playMachine();
+    } else if (seal === 'hammer' || seal === 'bulwark') {
+      this.sparks.burst(me.x, this.arena.height(me.x, me.z), me.z, 0.7);
+      this.myView.flash();
+      playStrike();
     } else {
       this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 1);
       this.theirView.flash();
@@ -2199,7 +2222,15 @@ export class MatchSystem extends createSystem({
       this.accumulator -= STEP;
       steps++;
       this.elapsed += STEP;
+      const hammer = this.mine.hammer > 0;
       const clash = step(this.arena, this.mine, this.theirs);
+      if (hammer && clash && this.mine.hammer === 0) {
+        // The Hammer lands: a heavy ring and a shower of sparks where the rims met.
+        this.sparks.burst(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
+        this.impacts.hit(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
+        playBurst(clash.x);
+        if (import.meta.env.DEV) console.log(`[STRIKE] hammer landed: rival damage ${this.theirs.damage.toFixed(2)}`);
+      }
       // Behind counts once the opening grace is over (a weaker launch is not a comeback).
       const behind = this.elapsed >= TUNING.grace && behindOn(this.mine, this.theirs);
       this.forgeBar.update(STEP, behind);

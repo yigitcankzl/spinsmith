@@ -190,8 +190,9 @@ export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture
     if (at >= 0 && t >= at) {
       at = -1;
       if (bar.spend(t, TUNING.grace)) {
-        // The palm goes down on the near half of the rim, across from the rival.
-        const o = strikeOrigin(arena, Math.atan2(-rival.z, -rival.x));
+        // The palm goes down on the near half of the rim, across from the rival; for a Tilt,
+        // beyond the rival (the arena dips toward the palm).
+        const o = seal === 'tilt' ? { x: rival.x, z: rival.z } : strikeOrigin(arena, Math.atan2(-rival.z, -rival.x));
         sealStrike(arena, me, rival, seal, o.x, o.z);
       }
       return;
@@ -203,7 +204,13 @@ export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture
     // When each seal pays: the anvil and the magnet with the rival out and hotter than you, the rush
     // with the rival near the rim.
     const out = (nr > 0.55 || rival.damage > 0.35) && nr + rival.damage > nm + me.damage + 0.15;
-    const when = seal === 'rush' ? nr > 0.6 && nm < 0.5 : out;
+    const near = Math.hypot(me.x - rival.x, me.z - rival.z) < 0.06;
+    const when =
+      seal === 'rush' ? nr > 0.6 && nm < 0.5
+      : seal === 'tilt' ? nr > 0.55 && nm < 0.45
+      : seal === 'hammer' ? near
+      : seal === 'bulwark' ? nm > 0.7 || me.damage > 0.6
+      : out;
     const good = rival.alive && (rival.tell > 0 || when);
     if (bar.full && t >= TUNING.grace && good) at = t + delay;
   };

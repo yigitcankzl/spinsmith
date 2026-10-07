@@ -592,7 +592,7 @@ export class Forge {
       const owned = SEALS.filter((s) => s === 'anvil' || this.progress.isUnlocked(`seal:${s}`));
       const seal = owned[(owned.indexOf(this.build.seal ?? 'anvil') + 1) % owned.length];
       this.build = { ...this.build, seal };
-      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : 'Earn more strikes: Rush at Lv 4, Magnet at Lv 7');
+      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : 'Earn more strikes: Rush at Lv 4, Magnet at Lv 7, Tilt at Lv 10, Hammer at Lv 13, Bulwark at Lv 16');
       this.showSeal();
     } else if (item.kind === 'emblem') {
       // The next glow you have earned (the forge's orange is always yours).
@@ -821,6 +821,26 @@ export function sealModel(seal: Seal): Object3D {
     shaft.position.set(0, 0.003, 0.003);
     tip.position.set(0, 0.003, -0.007);
     g.add(shaft, tip);
+  } else if (seal === 'tilt') {
+    // A tipped bar on a pivot.
+    const bar = new Mesh(new BoxGeometry(0.018, 0.002, 0.004), mat);
+    bar.position.y = 0.006;
+    bar.rotation.z = 0.35;
+    const pivot = new Mesh(new ConeGeometry(0.004, 0.005, 3), mat);
+    pivot.position.y = 0.003;
+    g.add(bar, pivot);
+  } else if (seal === 'hammer') {
+    // A sledge: a heavy head across a long handle.
+    const head = new Mesh(new BoxGeometry(0.008, 0.005, 0.012), mat);
+    const handle = new Mesh(new BoxGeometry(0.003, 0.003, 0.016), mat);
+    head.position.set(0, 0.003, -0.006);
+    handle.position.set(0, 0.003, 0.004);
+    g.add(head, handle);
+  } else if (seal === 'bulwark') {
+    // A ring wall.
+    const wall = new Mesh(new TorusGeometry(0.008, 0.0025, 6, 24).rotateX(-Math.PI / 2), mat);
+    wall.position.y = 0.003;
+    g.add(wall);
   } else {
     const shoe = new Mesh(new TorusGeometry(0.007, 0.0022, 6, 20, Math.PI).rotateX(-Math.PI / 2), mat);
     shoe.position.y = 0.003;

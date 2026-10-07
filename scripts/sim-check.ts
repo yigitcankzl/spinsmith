@@ -19,7 +19,7 @@ import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -789,6 +789,47 @@ TUNING.grace = 0;
   const move = (a: number, b: number, s: number) => Array.from({ length: Math.round(s / dt) }, (_, i) => a + ((b - a) * (i + 1)) / Math.round(s / dt));
   assert.ok(run([...hold(0.95, 0.2), ...move(0.95, 0.75, 0.12), ...hold(0.75, 0.2)]), 'a hard slap is a strike');
   assert.ok(!run([...hold(0.95, 0.2), ...move(0.95, 0.75, 0.8), ...hold(0.75, 1)]), 'a hand set down to rest is not');
+}
+
+// 26. The newer strikes: a Tilt slides tops toward the palm, a Hammer's next clash shatters three
+// times as hard, a Bulwark keeps a top in through a hit that would knock it out.
+{
+  const flat = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
+  flat.elapsed = 5;
+  const t = new Top(DEFENSE);
+  t.launch(0, 0, 0, 0, 1, 1);
+  const parked = new Top(DEFENSE);
+  parked.state = 'toppled';
+  sealStrike(flat, t, parked, 'tilt', 1, 0);
+  solo(flat, t, 0.8);
+  assert.ok(t.x > 0.01, `a tilt toward +x slides a top that way (x ${t.x.toFixed(3)})`);
+
+  const clashDamage = (hammer: boolean) => {
+    const arena = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
+    arena.elapsed = 5;
+    const a = new Top(ATTACK);
+    const b = new Top(DEFENSE);
+    a.launch(-0.04, 0, 0.6, 0, 1, 1);
+    b.launch(0.04, 0, -0.6, 0, 1, -1);
+    if (hammer) a.hammer = 5;
+    for (let i = 0; i < 240; i++) if (step(arena, a, b)) break;
+    return b.damage;
+  };
+  const plain = clashDamage(false);
+  const hammered = clashDamage(true);
+  assert.ok(plain > 0 && hammered > 2.5 * plain, `a hammer clash shatters harder (${plain.toFixed(3)} vs ${hammered.toFixed(3)})`);
+
+  const outward = (guard: boolean) => {
+    const top = new Top(ATTACK);
+    top.launch(0, 0.05, 0, 1.2, 1, 1);
+    if (guard) top.guard = 3;
+    const arena = arenaWith({ wall: 'none', pockets: [], rails: [] });
+    arena.elapsed = 5;
+    solo(arena, top, 0.6);
+    return top.state;
+  };
+  assert.equal(outward(false), 'out', 'without a bulwark a hard-driven top goes over the edge');
+  assert.notEqual(outward(true), 'out', 'a bulwark holds it in');
 }
 
 // 25. The comfort dial steps through every mode and wraps round.

@@ -26,5 +26,8 @@ line('masher + strike', reportShaping(masherStrike, 12));
 line('human + anvil strike', reportShaping(humanStrike(humanBoth()), 12), 'beats masher + strike by >= 12, median 12-20 s');
 line('human + rush', reportShaping(humanStrike(humanBoth(), undefined, 'rush'), 12), 'within 3 of the anvil');
 line('human + magnet', reportShaping(humanStrike(humanBoth(), undefined, 'magnet'), 12), 'within 3 of the anvil');
+line('human + tilt', reportShaping(humanStrike(humanBoth(), undefined, 'tilt'), 12), 'within 3 of the anvil');
+line('human + hammer', reportShaping(humanStrike(humanBoth(), undefined, 'hammer'), 12), 'within 3 of the anvil');
+line('human + bulwark', reportShaping(humanStrike(humanBoth(), undefined, 'bulwark'), 12), 'within 3 of the anvil');
 line('none vs a charging rival', reportShaping(POLICIES.none, 12, rivalWithMove('charge')));
 line('human + strike vs charging', reportShaping(humanStrike(humanBoth()), 12, rivalWithMove('charge')));

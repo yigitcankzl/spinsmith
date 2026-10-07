@@ -157,6 +157,8 @@ export class Arena {
   /** Rocking dish: current tilt (radians around the x and z axes) and its rate. */
   tiltX = 0;
   tiltZ = 0;
+  /** A Tilt strike: the direction the arena dips toward (unit, arena-local) and seconds left. */
+  shove: { x: number; z: number; t: number } | null = null;
   private tiltVX = 0;
   private tiltVZ = 0;
   /** Fight clock, for the shrinking ring. */
@@ -398,12 +400,16 @@ export class Arena {
       for (const s of this.shapes) s.age += dt;
       this.shapes = this.shapes.filter((s) => Arena.strength(s) > 0.03);
     }
-    if (this.layout.tilt > 0) {
-      // The dish dips toward where the spinning tops are (rotation about x tips +z down, and so on).
+    if (this.shove && (this.shove.t -= dt) <= 0) this.shove = null;
+    if (this.layout.tilt > 0 || this.shove || this.tiltX || this.tiltZ) {
+      // The dish dips toward where the spinning tops are (rotation about x tips +z down, and so on);
+      // a Tilt strike dips it toward the palm.
       const wx = ((a.alive ? a.x : 0) + (b.alive ? b.x : 0)) / this.radius;
       const wz = ((a.alive ? a.z : 0) + (b.alive ? b.z : 0)) / this.radius;
-      const targetX = Math.max(-1, Math.min(1, wz * TILT_WEIGHT * 0.5)) * this.layout.tilt;
-      const targetZ = Math.max(-1, Math.min(1, -wx * TILT_WEIGHT * 0.5)) * this.layout.tilt;
+      const sx = this.shove ? this.shove.z * TILT.shove : 0;
+      const sz = this.shove ? -this.shove.x * TILT.shove : 0;
+      const targetX = Math.max(-1, Math.min(1, wz * TILT_WEIGHT * 0.5)) * this.layout.tilt + sx;
+      const targetZ = Math.max(-1, Math.min(1, -wx * TILT_WEIGHT * 0.5)) * this.layout.tilt + sz;
       this.tiltVX += ((targetX - this.tiltX) * TILT_SPRING - this.tiltVX * TILT_DAMP) * dt;
       this.tiltVZ += ((targetZ - this.tiltZ) * TILT_SPRING - this.tiltVZ * TILT_DAMP) * dt;
       this.tiltX += this.tiltVX * dt;
@@ -417,6 +423,7 @@ export class Arena {
     this.shape.fill(0);
     this.shapes = [];
     this.tiltX = this.tiltZ = this.tiltVX = this.tiltVZ = 0;
+    this.shove = null;
     this.elapsed = 0;
     this.lastStrike = -99;
   }
@@ -544,6 +551,9 @@ export class Top {
   sinceBump = 99;
   /** Seconds left of a Rush: the charging top is braced and takes half the knockback. */
   rushing = 0;
+  /** Seconds left of a Hammer (the next solid clash shatters harder) and of a Bulwark (no knockout). */
+  hammer = 0;
+  guard = 0;
   /** Seconds left of a telegraphed big move (a rival's tell; 0 = none). An Anvil Strike cuts it short. */
   tell = 0;
   /** Seconds since a boost pad flung it. */
@@ -695,6 +705,8 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.sinceBump += dt;
   t.sincePad += dt;
   t.rushing = Math.max(0, t.rushing - dt);
+  t.hammer = Math.max(0, t.hammer - dt);
+  t.guard = Math.max(0, t.guard - dt);
   pillars(arena, t);
   pads(arena, t);
   wall(arena, t);
@@ -767,8 +779,17 @@ export function strike(arena: Arena, mine: Top, rival: Top, ox = 0, oz = 0) {
  * Rush, your top charges the rival; Magnet, the rival is dragged toward a pit. Every one cuts a
  * rival's tell short. (A spin refill was tried: even a small one decided spin finishes.)
  */
-export type Seal = 'anvil' | 'rush' | 'magnet';
-export const SEALS: Seal[] = ['anvil', 'rush', 'magnet'];
+export type Seal = 'anvil' | 'rush' | 'magnet' | 'tilt' | 'hammer' | 'bulwark';
+export const SEALS: Seal[] = ['anvil', 'rush', 'magnet', 'tilt', 'hammer', 'bulwark'];
+/** Tilt: the arena dips toward the palm by this slope for TILT_TIME s (tops slide that way). */
+export const TILT = { shove: 0.16, time: 1.6 };
+/** Hammer: for HAMMER_TIME s, your next solid clash deals HAMMER times the burst damage. */
+export const HAMMER = 3;
+export const HAMMER_TIME = 5;
+/** Bulwark: for BULWARK_TIME s your top cannot be knocked out and takes half the knockback. */
+export const BULWARK_TIME = 3;
+/** A clash at least this strong (0..1, as Clash.strength) is solid enough for the Hammer. */
+const HAMMER_MIN = 0.3;
 /** Your Magnet pulls a little softer than a rival's pull: it lands more often. */
 const MAGNET_SPEED = 0.45;
 /** Your Rush hits harder than a rival's charge: it is your one strike. */
@@ -777,6 +798,13 @@ const RUSH_SPEED = 1.2;
 export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox = 0, oz = 0) {
   if (seal === 'anvil') return strike(arena, mine, rival, ox, oz);
   if (seal === 'magnet') rivalMove(arena, mine, rival, 'pull', MAGNET_SPEED);
+  else if (seal === 'tilt') {
+    // The arena dips toward the palm: everything slides that way (a hand on the far side of a pit
+    // tips the rival into it).
+    const d = Math.hypot(ox, oz) || 1;
+    arena.shove = { x: ox / d, z: oz / d, t: TILT.time };
+  } else if (seal === 'hammer') mine.hammer = HAMMER_TIME;
+  else if (seal === 'bulwark') mine.guard = BULWARK_TIME;
   else {
     rivalMove(arena, mine, rival, 'charge');
     const v = Math.hypot(mine.vx, mine.vz) || 1;
@@ -885,12 +913,14 @@ function wall(arena: Arena, t: Top) {
   const angle = Math.atan2(t.z, t.x);
   const rim = rimRadius(L, angle);
   const r = Math.hypot(t.x, t.z);
+  // A Bulwark holds the top in as the opening grace does.
+  const open = arena.elapsed >= TUNING.grace && t.guard <= 0;
   // No wall: crossing the edge is a ring-out (sumo).
   if (L.wall === 'none') {
     // Out once its center has crossed the edge (riding the berm is still in); during the opening
     // grace the edge bounces it back instead.
     if (r > rim) {
-      if (arena.elapsed >= TUNING.grace) {
+      if (open) {
         t.state = 'out';
         t.finish = 'over';
       } else {
@@ -915,7 +945,6 @@ function wall(arena: Arena, t: Top) {
   const ease = t.lifted > 0 ? LIFT_ESCAPE : 1;
   // Opening grace: right after the launch the rim holds everything, so no round is decided by
   // the first collision before anyone can read it.
-  const open = arena.elapsed >= TUNING.grace;
   if (open && pocket && outward > TUNING.pocket * ease) {
     t.state = 'out';
     t.finish = 'pocket';
@@ -982,8 +1011,8 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   const liftA = gap > 0 ? gap * HEIGHT_LIFT : 0;
   const liftB = gap < 0 ? -gap * HEIGHT_LIFT : 0;
   // A top braced in a well is knocked back less.
-  const braceA = (arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(a.x, a.z) : 1) * (a.rushing > 0 ? 0.5 : 1);
-  const braceB = (arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(b.x, b.z) : 1) * (b.rushing > 0 ? 0.5 : 1);
+  const braceA = (arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(a.x, a.z) : 1) * (a.rushing > 0 || a.guard > 0 ? 0.5 : 1);
+  const braceB = (arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(b.x, b.z) : 1) * (b.rushing > 0 || b.guard > 0 ? 0.5 : 1);
   const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA) * braceA;
   const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB) * braceB;
   a.vx -= nx * ja;
@@ -1015,8 +1044,13 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
     b.spin += flow;
   }
   // Hard hits crack the top; enough damage bursts it apart.
-  a.damage += (TUNING.burst * impulse * impulse * b.spec.punch * b.spec.chip) / a.spec.burstResist;
-  b.damage += (TUNING.burst * impulse * impulse * a.spec.punch * a.spec.chip) / b.spec.burstResist;
+  // A Hammer lands on the first solid clash after it is struck.
+  const solid = impulse * 1.6 >= HAMMER_MIN;
+  const hitA = solid && b.hammer > 0 ? HAMMER : 1;
+  const hitB = solid && a.hammer > 0 ? HAMMER : 1;
+  if (solid) a.hammer = b.hammer = 0;
+  a.damage += (TUNING.burst * impulse * impulse * b.spec.punch * b.spec.chip * hitA) / a.spec.burstResist;
+  b.damage += (TUNING.burst * impulse * impulse * a.spec.punch * a.spec.chip * hitB) / b.spec.burstResist;
   if (a.damage >= 1) burstApart(a);
   if (b.damage >= 1) burstApart(b);
   return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 1.6) };
