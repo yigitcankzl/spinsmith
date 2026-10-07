@@ -41,6 +41,7 @@
         font-family: inherit; font-size: 28px; font-weight: 700; letter-spacing: 4px; cursor: pointer;
       }
       #enter:hover { background: #ffb347; }
+      #enter:disabled { background: #3a3f48; color: #aab0ba; cursor: wait; letter-spacing: 2px; font-size: 22px; }
     </style>
   </head>
   <body>
@@ -53,7 +54,7 @@
         <li>Hands only, no controllers</li>
         <li>Allow spatial data for your table</li>
       </ul>
-      <button id="enter" type="button">ENTER</button>
+      <button id="enter" type="button" disabled>HEATING THE FORGE…</button>
     </div>
     <div id="scene-container"></div>
     <script type="module" src="/src/index.ts"></script>

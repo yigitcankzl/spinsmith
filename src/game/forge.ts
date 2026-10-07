@@ -45,13 +45,15 @@ import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js
 const STORE_KEY = 'spinsmith.top.v1';
 
 /** Body colors on offer: warm, so the player's top never looks like the (cool) opponent. */
-export const TOP_COLORS = [0xd6784f, 0xc94a3a, 0xe0a63c, 0xb5654a, 0xe8d6b0, 0x9a5bb0];
+export const TOP_COLORS = [0xe8661c, 0xc94a3a, 0xe0a63c, 0xb5654a, 0xe8d6b0, 0x9a5bb0];
 
 export function loadBuild(): TopBuild {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const b = JSON.parse(raw) as TopBuild;
+      // The first paint was a salmon before the palette pass: old saves get the new forge orange.
+      if (b.color === 0xd6784f) b.color = TOP_COLORS[0];
       if (RINGS.some((r) => r.id === b.ring) && CORES.some((c) => c.id === b.core) && TIPS.some((t) => t.id === b.tip) && weightOf(b) <= WEIGHT_LIMIT) return b;
     }
   } catch {

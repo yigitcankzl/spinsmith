@@ -227,9 +227,9 @@ export const EMBLEM_NAMES = ['Forge orange', 'White heat', 'Violet', 'Gold', 'Gr
 
 /** The three classic tops as builds; the simulation's ATTACK, DEFENSE and STAMINA are made from these. */
 export const PRESETS: { name: string; build: TopBuild }[] = [
-  { name: 'Striker', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: 1, color: 0xd6784f } },
-  { name: 'Anvil', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: 1, color: 0xd6784f } },
-  { name: 'Halo', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: 1, color: 0xd6784f } },
+  { name: 'Striker', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: 1, color: 0xe8661c } },
+  { name: 'Anvil', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: 1, color: 0xe8661c } },
+  { name: 'Halo', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: 1, color: 0xe8661c } },
 ];
 
 export const ringOf = (b: TopBuild) => RINGS.find((r) => r.id === b.ring) ?? RINGS[0];

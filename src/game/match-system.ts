@@ -4,6 +4,7 @@ import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
+import { titleMesh } from './ui.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
@@ -21,10 +22,10 @@ import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
-import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_NAMES, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -88,6 +89,8 @@ const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magn
 const RIVAL_SHAPE_GAP = 3;
 /** A finish your shape caused plays its visuals at SLOW_MO speed for this long (real s). */
 const SLOW_MO_TIME = 0.9;
+/** Seconds the placed arena takes to forge up out of the table. */
+const RISE_TIME = 1.1;
 const SLOW_MO = 0.3;
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
@@ -282,6 +285,11 @@ export class MatchSystem extends createSystem({
   private viewKeys = ['', ''];
   private cord = new Cord();
   private sparks = new Sparks();
+  /** The arena forging up out of the table after placing (0..1), and the title over it. */
+  private rise = 1;
+  private title = titleMesh('SPINSMITH', 0.26, 0.06);
+  private titleShown = false;
+  private titleT = 0;
   /** A ring around your top while a Hammer is armed (gold) or a Bulwark holds (pale violet). */
   private aura = new Mesh(new TorusGeometry(0.016, 0.0016, 8, 40).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffe066, transparent: true, depthWrite: false, blending: AdditiveBlending }));
   private label = new Label();
@@ -455,6 +463,9 @@ export class MatchSystem extends createSystem({
     this.myBuild = this.forge.allowed(this.myBuild);
     this.setBuilds(this.myBuild, this.theirBuild);
     this.buildHandle();
+    this.title.visible = false;
+    this.title.renderOrder = 5;
+    this.root.add(this.title);
     this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     // The hand driver (src/dev-drive.ts) reads the game through this.
@@ -619,6 +630,7 @@ export class MatchSystem extends createSystem({
       setAudioPaused(paused);
     }
     if (paused) return;
+    this.label.update(Math.min(delta, 0.1));
     // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
     if (session !== this.xrSession) {
       // Back at home, the print asks for a press again; mid-match, the arena just comes along.
@@ -1010,6 +1022,7 @@ export class MatchSystem extends createSystem({
       const old = i === 0 ? this.myView : this.theirView;
       old?.dispose();
       const view = new TopView(build, color);
+      view.team(i === 0 ? TEAM_MINE : TEAM_RIVAL, ringOf(build).radius);
       view.root.name = i === 0 ? 'my-top' : 'their-top';
       this.stage.add(view.root, view.shadowMesh, view.debris);
       if (i === 0) this.myView = view;
@@ -1210,6 +1223,13 @@ export class MatchSystem extends createSystem({
   private place() {
     this.placeRoot();
     this.toHub();
+    // Once a session the name stands over the far rim as the arena rises.
+    if (!this.titleShown) {
+      this.titleShown = true;
+      this.titleT = 0;
+      this.title.visible = true;
+      playLevelUp();
+    }
     if (!this.onTable) {
       // No table found (or none labelled one): say so, then the first session's note returns.
       this.label.set('No table found: the arena floats here\nMove it by its brass handle');
@@ -1259,7 +1279,14 @@ export class MatchSystem extends createSystem({
     // The arena opening out for a match is a moment: a machine sound as it moves, a thud as it lands.
     if (was && !this.sizeSettled) playMachine();
     else if (!was && this.sizeSettled && match) playPlace();
-    this.root.scale.setScalar(ARENA_SCALE * this.rootK);
+    // A placed arena forges up out of the table: it grows from a glowing point with a little overshoot.
+    const rising = this.rise < 1;
+    this.rise = Math.min(1, this.rise + dt / RISE_TIME);
+    if (rising && this.rise >= 1) playPlace();
+    const u = this.rise - 1;
+    const up = 1 + 2.2 * u * u * u + 1.2 * u * u;
+    this.root.scale.setScalar(ARENA_SCALE * this.rootK * Math.max(0.001, up));
+    this.updateTitle(dt);
     // A shrunk arena's pedestal is shorter: lower it so it still stands on the table.
     const drop = PEDESTAL * (1 - this.rootK);
     this.root.position.y -= drop - this.lowered;
@@ -1319,6 +1346,8 @@ export class MatchSystem extends createSystem({
       }
     }
     this.root.position.set(at.x, at.y, at.z);
+    this.rise = 0;
+    playMachine();
     this.pushed = 0;
     this.lowered = 0;
     this.root.scale.setScalar(ARENA_SCALE);
@@ -1434,6 +1463,17 @@ export class MatchSystem extends createSystem({
   }
 
   /** Centers of the detected horizontal table and desk planes (world). */
+  /** The title fades in over the far rim, holds, then rises away (about 3.5 s). */
+  private updateTitle(dt: number) {
+    if (!this.title.visible) return;
+    this.titleT += dt;
+    const t = this.titleT;
+    const m = this.title.material as MeshBasicMaterial;
+    m.opacity = Math.min(1, Math.max(0, (t - 0.6) / 0.4)) * Math.min(1, Math.max(0, (3.6 - t) / 0.6));
+    this.title.position.set(0, 0.2 + Math.max(0, t - 3) * 0.05, -0.22);
+    if (t > 3.6) this.title.visible = false;
+  }
+
   private warnedPlane = false;
   private tables(): Point[] {
     const out: Point[] = [];

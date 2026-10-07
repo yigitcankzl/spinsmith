@@ -474,8 +474,11 @@ function topHeight(ring: Ring, base: number) {
   return base + (tops.get(ring.id) ?? 0.008);
 }
 
-export const PLAYER_COLOR = 0xd6784f;
-export const OPPONENT_COLOR = 0x4f9fb0;
+export const PLAYER_COLOR = 0xe8661c;
+export const OPPONENT_COLOR = 0x2a9fc4;
+/** Team colors for what marks whose top it is (the floor ring): the UI's orange and the rival's cyan. */
+export const TEAM_MINE = 0xff8a2a;
+export const TEAM_RIVAL = 0x4fd1ff;
 
 const GRAVITY = 9.81;
 const DEBRIS_LIFE = 4;
@@ -525,6 +528,7 @@ export class TopView {
   private kinds: ('ring' | 'core' | 'tip')[] = [];
   private bases: number[] = [];
   private shadow: Mesh;
+  private teamRing: Mesh | null = null;
   private readonly hot = new Color(0xff5a14);
   private readonly cool: Color;
   private fall = 0;
@@ -605,6 +609,18 @@ export class TopView {
     this.debris.removeFromParent();
   }
 
+  /** A ring of light on the floor in the team's color (orange yours, cyan the rival's): whose top it is at a glance. */
+  team(color: number, radius: number) {
+    const ring = new Mesh(
+      new RingGeometry(radius * 1.25, radius * 1.55, 40).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: AdditiveBlending, depthWrite: false }),
+    );
+    ring.position.y = 0.0003;
+    ring.renderOrder = 2;
+    this.teamRing = ring;
+    this.shadow.add(ring);
+  }
+
   /** The shadow lives on the arena floor, not on the tilting top. */
   get shadowMesh() {
     return this.shadow;
@@ -636,6 +652,8 @@ export class TopView {
     const y = arena.height(top.x, top.z);
     this.root.position.set(top.x, y, top.z);
     this.shadow.position.set(top.x, y + 0.0008, top.z);
+    // The team ring glows with the spin, and flashes with a hit.
+    if (this.teamRing) (this.teamRing.material as MeshBasicMaterial).opacity = 0.3 + 0.4 * Math.min(1, Math.max(0, top.spin)) + this.flashT * 6;
     this.spinner.rotation.y = top.angle;
     if (top.state === 'toppled') {
       // Falls over in about half a second instead of snapping flat.
@@ -1471,11 +1489,20 @@ export class Label {
     return this.text;
   }
 
+  /** Each frame: a new message fades in over 0.16 s. */
+  update(dt: number) {
+    const m = this.mesh.material as MeshBasicMaterial;
+    if (m.opacity < 1) m.opacity = Math.min(1, m.opacity + dt / 0.16);
+  }
+
   set(text: string) {
     if (text === this.text) return;
+    const appearing = !this.text;
     this.text = text;
     if (import.meta.env.DEV && text) console.log(`[LABEL] ${text.replace('\n', ' / ')}`);
     this.mesh.visible = text.length > 0;
+    // A card appearing fades in (update()); a changing one (a pull's percent) just redraws.
+    if (appearing) (this.mesh.material as MeshBasicMaterial).opacity = 0;
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, 512, 160);
     if (!text) return;
@@ -1487,7 +1514,8 @@ export class Label {
     lines.forEach((line, i) => {
       // Shrink each line until it fits the card.
       let size = i === 0 ? 56 : 34;
-      const weight = i === 0 ? 'bold ' : '';
+      // The two loaded weights (ui.ts loadFonts): bold for the headline, semibold below.
+      const weight = i === 0 ? '700 ' : '600 ';
       do g.font = `${weight}${size--}px ${FONT}`;
       while (g.measureText(line).width > 470 && size > 12);
       g.fillText(line, 256, 80 + (i - (lines.length - 1) / 2) * 58);

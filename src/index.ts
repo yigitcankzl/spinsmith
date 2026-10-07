@@ -23,7 +23,12 @@ loadFonts()
     world.registerSystem(MatchSystem);
     // The landing page (index.html): Enter starts the session; the page hides while in XR.
     const landing = document.getElementById('landing');
-    const enter = document.getElementById('enter');
+    const enter = document.getElementById('enter') as HTMLButtonElement | null;
+    // Ready: the button wakes up (it waits while the fonts and the world load).
+    if (enter) {
+      enter.disabled = false;
+      enter.textContent = 'ENTER';
+    }
     enter?.addEventListener('click', async () => {
       // Without immersive AR (a desktop browser) the launch fails silently: say where the game runs.
       const ar = await navigator.xr?.isSessionSupported('immersive-ar').catch(() => false);

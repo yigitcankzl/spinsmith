@@ -101,6 +101,8 @@ interface Pickable {
   locked?: string;
   /** Its name over it: shown during the first session, afterwards only while pointed at. */
   name?: Mesh;
+  /** A side control (the comfort dial): its name only while pointed at, even in the first session. */
+  quiet?: boolean;
   /** The thing itself, and its spot to return to (both in its parent's space). */
   model: Object3D;
   home: Vector3;
@@ -238,7 +240,7 @@ export class Hub {
     for (const h of pointers) if (h.tracked) hovered ??= this.under(h);
     for (const it of this.items) {
       const on = it === hovered;
-      if (it.name) it.name.visible = this.teaching || on;
+      if (it.name) it.name.visible = (this.teaching && !it.quiet) || on;
       const k = on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1;
       it.model.scale.setScalar(k);
       if (it.carry) it.model.position.set(it.home.x, it.home.y + (on ? 0.01 : 0), it.home.z);
@@ -380,7 +382,7 @@ export class Hub {
     knob.position.copy(home);
     this.comfortKnob = knob;
     this.root.add(knob);
-    this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, name: this.label('COMFORT', knob, 0.03) });
+    this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, name: this.label('COMFORT', knob, 0.03), quiet: true });
   }
 
   /** Turns the dial's notch to mode i of n. */
@@ -406,7 +408,7 @@ export class Hub {
   /** Your smith level beside the stand: level, rank and the bar toward the next level. */
   private drawRank(progress: Progress, nextMatch: string | null) {
     const next = progress.next;
-    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}|${nextMatch}`;
+    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}|${nextMatch}|${progress.guide}`;
     if (key === this.rankKey) return;
     this.rankKey = key;
     const g = this.rankCanvas.getContext('2d')!;
@@ -425,7 +427,8 @@ export class Hub {
     // Where progress leads next.
     g.fillStyle = TEXT;
     g.font = `600 28px ${FONT}`;
-    g.fillText(next ? `Next: ${unlockLabel(next.key)} at Lv ${next.level}` : 'Every part is yours', 28, 160);
+    // The first session has one goal (its match); the level road shows after it.
+    if (progress.guide === 'done') g.fillText(next ? `Next: ${unlockLabel(next.key)} at Lv ${next.level}` : 'Every part is yours', 28, 160);
     // Who and where the next match is (picked at home: the rotation or your pinned arena).
     if (nextMatch) {
       g.fillStyle = ORANGE;
