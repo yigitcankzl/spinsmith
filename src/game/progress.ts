@@ -69,6 +69,19 @@ export const RIVAL_UNLOCKS: Record<number, string> = {
   12: 'rival:Bastion',
 };
 
+/** The newer arenas, opened beside a level's part or paint (the classics come with LEVEL_UNLOCKS). */
+export const ARENA_UNLOCKS: Record<number, string> = {
+  3: 'arena:Orbit Foundry',
+  5: 'arena:Twin Basins',
+  6: 'arena:Ripple Pool',
+  8: 'arena:Titan Crater',
+  10: 'arena:Neon Speedway',
+  14: 'arena:Meteor Pit',
+  16: 'arena:Glacier Steps',
+  18: 'arena:Colossus Bowl',
+  20: 'arena:Grand Anvil',
+};
+
 /** Emblem glows earned by Smith Order stamps: this many stamps, this glow. */
 export const STAMP_UNLOCKS: Record<number, string> = {
   5: 'emblem:5',
@@ -113,7 +126,7 @@ export const XP = {
 
 /** How a key is earned ('Lv 6', or a deed), or null for starters and things never locked. */
 export function unlockHint(key: string): string | null {
-  for (const [lv, k] of Object.entries(LEVEL_UNLOCKS)) if (k === key) return `Lv ${lv}`;
+  for (const [lv, k] of [...Object.entries(LEVEL_UNLOCKS), ...Object.entries(ARENA_UNLOCKS)]) if (k === key) return `Lv ${lv}`;
   for (const [n, k] of Object.entries(STAMP_UNLOCKS)) if (k === key) return `${n} order stamps`;
   for (const q of Object.values(QUEST_UNLOCKS)) if (q.key === key) return q.text;
   return null;
@@ -254,6 +267,8 @@ export class Progress {
       out.levels.push(this.level);
       const key = LEVEL_UNLOCKS[this.level];
       if (key) this.unlock(key, out);
+      const arena = ARENA_UNLOCKS[this.level];
+      if (arena) this.unlock(arena, out);
       const rival = RIVAL_UNLOCKS[this.level];
       if (rival) this.unlock(rival, out);
     }

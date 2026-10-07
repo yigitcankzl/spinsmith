@@ -6,9 +6,9 @@
  */
 
 export type Shape = 'circle' | 'oval' | 'square';
-export type Floor = 'bowl' | 'flat' | 'hill' | 'ridge' | 'tiers';
+export type Floor = 'bowl' | 'flat' | 'hill' | 'ridge' | 'tiers' | 'crater' | 'waves' | 'twin';
 export type Wall = 'low' | 'standard' | 'high' | 'none';
-export type Theme = 'forge' | 'stone' | 'clockwork' | 'ice';
+export type Theme = 'forge' | 'stone' | 'clockwork' | 'ice' | 'lava' | 'void';
 
 export interface Pocket {
   angle: number;
@@ -33,12 +33,21 @@ export interface Pillar {
   bumper: boolean;
 }
 
+/** A boost pad on the floor: a top crossing it is flung the way its chevrons point. */
+export interface Pad {
+  /** Center in fractions of the arena radius. */
+  x: number;
+  z: number;
+  /** Push direction, atan2(z, x). */
+  angle: number;
+}
+
 export interface ArenaLayout {
   name: string;
   /** The arena's main rule in a few words, shown before a match (built-in arenas). */
   rule?: string;
   theme: Theme;
-  /** Arena radius in meters (the long side for an oval). 0.12 to 0.18 fits a seated reach. */
+  /** Arena radius (arena-local, the long side for an oval). 0.12 to 0.26; past 0.18 it slides back for a match. */
   radius: number;
   shape: Shape;
   floor: Floor;
@@ -56,10 +65,27 @@ export interface ArenaLayout {
   tilt: number;
   /** After a while, embers close in from the rim and drain spin outside a shrinking safe zone. */
   shrink: boolean;
+  /** Pillars circle the center at this speed (rad/s; 0 or absent = they stand still). */
+  orbit?: number;
+  /** Boost pads on the floor. */
+  pads?: Pad[];
 }
 
 export const MIN_RADIUS = 0.12;
-export const MAX_RADIUS = 0.18;
+export const MAX_RADIUS = 0.26;
+/**
+ * Arenas up to this far-reaching rim (corners included) show at full size everywhere; a bigger one
+ * shows shrunk to it at home, in the forge and in the workshop, where the props stand around a
+ * small arena, and opens out to full size for a match.
+ */
+export const DISPLAY_RIM = 0.19;
+
+/** The farthest the rim reaches from the center in any direction (a square's corners). */
+export function maxRim(layout: ArenaLayout): number {
+  let m = 0;
+  for (let i = 0; i < 32; i++) m = Math.max(m, rimRadius(layout, (i / 32) * Math.PI * 2));
+  return m;
+}
 /** Oval arenas are this much shorter front to back than side to side. */
 const OVAL_RATIO = 0.78;
 /** Square arenas are a superellipse with this exponent (rounded corners). */
@@ -110,6 +136,15 @@ export function railAt(layout: ArenaLayout, angle: number): Rail | null {
   return layout.rails.find((r) => angleGap(angle, r.angle) < r.half) ?? null;
 }
 
+/** Where pillar `p` stands at fight time `t` (arena-local m): turned round the center by the orbit. */
+export function pillarAt(layout: ArenaLayout, p: Pillar, t: number, out: { x: number; z: number }) {
+  const a = (layout.orbit ?? 0) * t;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  out.x = (p.x * c - p.z * s) * layout.radius;
+  out.z = (p.x * s + p.z * c) * layout.radius;
+}
+
 /** Where each side's top starts: on the launch axis, most of the way to the rim. */
 export function spawnDistance(layout: ArenaLayout) {
   return rimRadius(layout, Math.PI / 2) * 0.72;
@@ -125,7 +160,10 @@ export function validate(layout: ArenaLayout): string | null {
   const spawn = spawnDistance(layout) / layout.radius;
   for (const p of layout.pillars) {
     // Keep both launch spots clear.
-    if (Math.hypot(p.x, Math.abs(p.z) - spawn) < 0.25) return 'A pillar blocks a launch spot';
+    // Orbiting pillars sweep their whole circle, so they must stay off the launch radius.
+    if (layout.orbit) {
+      if (Math.abs(Math.hypot(p.x, p.z) - spawn) < 0.25) return 'A circling pillar crosses a launch spot';
+    } else if (Math.hypot(p.x, Math.abs(p.z) - spawn) < 0.25) return 'A pillar blocks a launch spot';
     if (Math.hypot(p.x, p.z) > 0.85) return 'A pillar is too close to the rim';
   }
   return null;

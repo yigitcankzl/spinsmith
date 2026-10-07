@@ -8,6 +8,7 @@ import {
   MAX_RADIUS,
   normRadius,
   pocketAt,
+  pillarAt,
   railAt,
   rimNormal,
   rimRadius,
@@ -29,6 +30,10 @@ const DASH_COOLDOWN = 1.0;
 /** Pillars deflect; bumpers kick away at this speed (m/s). */
 const PILLAR_BOUNCE = 0.8;
 const BUMPER_KICK = 0.3;
+/** Boost pads: their reach (fraction of the radius), the speed they add (m/s) and how soon a top can take the same pad again (s). */
+export const PAD_R = 0.09;
+const PAD_KICK = 0.35;
+const PAD_COOLDOWN = 0.8;
 /** Center features cover this fraction of the radius. */
 const CENTER_ZONE = 0.32;
 /** Turntable grip on a top standing on it (1/s). */
@@ -49,7 +54,7 @@ const BERM = 0.02;
 const ICE_GRIP = 0.45;
 
 /** The heightmap grid covers the largest arena. */
-const GRID = 44;
+const GRID = 64;
 const EXTENT = MAX_RADIUS + 0.01;
 const CELL = (2 * EXTENT) / (GRID - 1);
 /** Shapes the player makes flatten back with this time constant (~2-3 s to vanish). */
@@ -173,7 +178,14 @@ export class Arena {
 
   /** Height of the floor at (x, z), before tilt. */
   height(x: number, z: number): number {
-    return this.floorHeight(normRadius(this.layout, x, z)) + this.pocketDip(x, z) + this.shapeHeight(x, z);
+    const n = normRadius(this.layout, x, z);
+    return this.floorHeight(n) + this.pocketDip(x, z) + this.shapeHeight(x, z) + (this.layout.floor === 'twin' ? this.twinRidge(x, n) : 0);
+  }
+
+  /** Twin basins: a ridge along the launch axis splits the bowl into a left and a right basin. */
+  private twinRidge(x: number, n: number): number {
+    const w = 0.16 * this.layout.radius;
+    return this.layout.depth * 0.6 * Math.exp(-((x / w) ** 2)) * (1 - smoothstep(0.75, 0.65, n));
   }
 
   /** Floor profile by normalized radius. */
@@ -197,6 +209,12 @@ export class Arena {
       case 'tiers':
         // Two levels: a raised outer terrace around a sunken middle, joined by a short step.
         return L.depth * 0.3 * r * r + L.depth * smoothstep(0.45, 0.6, r);
+      case 'crater':
+        // A deep pit in the middle behind a raised lip: tops that fall in duel at the bottom.
+        return L.depth * 0.7 * r * r - L.depth * 0.7 * Math.exp(-((r / 0.28) ** 2)) + L.depth * 0.35 * Math.exp(-(((r - 0.5) / 0.1) ** 2));
+      case 'waves':
+        // Ripples like a dropped stone: tops hop from ring to ring on their way out.
+        return L.depth * 0.8 * r * r + L.depth * 0.14 * (1 - Math.cos(r * Math.PI * 4)) * (1 - r * 0.5);
       default:
         return L.depth * r * r;
     }
@@ -509,6 +527,8 @@ export class Top {
   sinceDash = 99;
   /** Seconds since the last bumper kick (large = none recently). */
   sinceBump = 99;
+  /** Seconds since a boost pad flung it. */
+  sincePad = 99;
   /** Accumulated hit damage; at 1 the top bursts apart. */
   damage = 0;
   /** Seconds left of being lifted by an upper hit (walls and pockets take less to clear). */
@@ -525,7 +545,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sincePad: 99, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -654,7 +674,9 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.wobble = Math.min(1, Math.max(0, (0.35 - t.spin) / (0.35 - TOPPLE_SPIN)));
   t.sinceDash += dt;
   t.sinceBump += dt;
+  t.sincePad += dt;
   pillars(arena, t);
+  pads(arena, t);
   wall(arena, t);
   if (t.alive && t.spin <= TOPPLE_SPIN) {
     t.spin = 0;
@@ -663,11 +685,31 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   }
 }
 
-/** Pillars deflect a top; bumpers kick it away hard. */
+const pillarTmp = { x: 0, z: 0 };
+
+/** Boost pads fling a top crossing them the way they point. */
+function pads(arena: Arena, t: Top) {
+  const L = arena.layout;
+  if (!L.pads || t.sincePad < PAD_COOLDOWN) return;
+  for (const p of L.pads) {
+    if (Math.hypot(t.x - p.x * L.radius, t.z - p.z * L.radius) > PAD_R * L.radius) continue;
+    t.vx += Math.cos(p.angle) * PAD_KICK;
+    t.vz += Math.sin(p.angle) * PAD_KICK;
+    t.kick = Math.min(1, t.kick + 0.5);
+    t.kickX = Math.cos(p.angle);
+    t.kickZ = Math.sin(p.angle);
+    t.sincePad = 0;
+    return;
+  }
+}
+
+/** Pillars deflect a top; bumpers kick it away hard. Orbiting pillars also shove it along. */
 function pillars(arena: Arena, t: Top) {
-  for (const p of arena.layout.pillars) {
-    const px = p.x * arena.radius;
-    const pz = p.z * arena.radius;
+  const L = arena.layout;
+  for (const p of L.pillars) {
+    pillarAt(L, p, arena.elapsed, pillarTmp);
+    const px = pillarTmp.x;
+    const pz = pillarTmp.z;
     let nx = t.x - px;
     let nz = t.z - pz;
     const d = Math.hypot(nx, nz);
@@ -681,6 +723,11 @@ function pillars(arena: Arena, t: Top) {
     if (into < 0) {
       t.vx -= (1 + PILLAR_BOUNCE) * into * nx;
       t.vz -= (1 + PILLAR_BOUNCE) * into * nz;
+    }
+    if (L.orbit) {
+      // The pillar's own sweep pushes the top along with it.
+      t.vx += -pz * L.orbit;
+      t.vz += px * L.orbit;
     }
     if (p.bumper) {
       t.vx += nx * BUMPER_KICK;

@@ -8,6 +8,7 @@ import {
   CircleGeometry,
   Color,
   ConeGeometry,
+  ShapeGeometry,
   CylinderGeometry,
   DataTexture,
   DoubleSide,
@@ -791,6 +792,8 @@ interface Palette {
 
 const STONE = makeMatcap('clay', 0x9a948a);
 const FROST = makeMatcap('metal', 0xbfe0f2);
+const BASALT = makeMatcap('clay', 0x5a4c48);
+const VOID_METAL = makeMatcap('metal', 0x8a7ab0);
 
 const PALETTES: Record<Theme, Palette> = {
   // Three layers at the rim: a dark body, a metal lip (walls and rails), one accent light.
@@ -798,6 +801,8 @@ const PALETTES: Record<Theme, Palette> = {
   stone: { floor: 0x606369, pit: 0x26262b, wall: STONE, rail: 0x9aa1ad, railHot: 0xffe2b8, accent: 0xf2e6d2, pedestal: 0x3d3f45 },
   clockwork: { floor: 0x675d4d, pit: 0x2e2618, wall: BRASS, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0x463b2c },
   ice: { floor: 0x6a7f8f, pit: 0x22303e, wall: FROST, rail: 0xb8c6d2, railHot: 0xffffff, accent: 0xe8f4ff, pedestal: 0x3e4a56 },
+  lava: { floor: 0x4a3a36, pit: 0x3a0c04, wall: BASALT, rail: 0x8a7a72, railHot: 0xff5a10, accent: 0xff3a0a, pedestal: 0x2a201e },
+  void: { floor: 0x3c3a4e, pit: 0x120c22, wall: VOID_METAL, rail: 0x9a8ab8, railHot: 0xe0b8ff, accent: 0xb86cff, pedestal: 0x252238 },
 };
 
 /**
@@ -988,6 +993,9 @@ export class ArenaView {
   private bumperMats: MeshBasicMaterial[] = [];
   private bumperFlash: number[] = [];
   private spinnerDisc: Mesh | null = null;
+  /** Pillars that circle the center turn together in this group; boost pads pulse. */
+  private orbit = new Group();
+  private padMats: MeshBasicMaterial[] = [];
   private vortexDisc: Mesh | null = null;
   private disposables: { dispose(): void }[] = [];
   private time = 0;
@@ -1092,18 +1100,49 @@ export class ArenaView {
     this.bumperMats = [];
     this.bumperFlash = [];
     const pillarMat = own(new MeshMatcapMaterial({ matcap: P.wall }));
+    this.orbit.clear();
+    this.orbit.rotation.y = 0;
+    this.features.add(this.orbit);
+    const onOrbit = (m: Mesh) => {
+      this.features.remove(m);
+      this.orbit.add(m);
+      return m;
+    };
     for (const p of layout.pillars) {
       const x = p.x * layout.radius;
       const z = p.z * layout.radius;
-      const post = add(new Mesh(new CylinderGeometry(p.r, p.r * 1.15, 0.026, 20), pillarMat));
+      const post = onOrbit(add(new Mesh(new CylinderGeometry(p.r, p.r * 1.15, 0.026, 20), pillarMat)));
       post.position.set(x, 0.011, z);
       if (p.bumper) {
         const glow = own(new MeshBasicMaterial({ color: 0xff3b5c }));
         this.bumperMats.push(glow);
         this.bumperFlash.push(0);
-        const ring = add(new Mesh(new TorusGeometry(p.r * 1.05, 0.0025, 8, 24).rotateX(Math.PI / 2), glow));
+        const ring = onOrbit(add(new Mesh(new TorusGeometry(p.r * 1.05, 0.0025, 8, 24).rotateX(Math.PI / 2), glow)));
         ring.position.set(x, 0.02, z);
       }
+    }
+    if (layout.orbit) {
+      // The track the circling pillars run on.
+      const track = own(new MeshBasicMaterial({ color: P.rail, transparent: true, opacity: 0.35, depthWrite: false }));
+      for (const r of new Set(layout.pillars.map((p) => Math.round(Math.hypot(p.x, p.z) * 100) / 100))) {
+        const ring = add(new Mesh(new RingGeometry(r * layout.radius - 0.0015, r * layout.radius + 0.0015, 64).rotateX(-Math.PI / 2), track));
+        ring.position.y = new Arena(layout).floorHeight(r) + 0.0008;
+      }
+    }
+
+    // Boost pads: a glowing chevron flat on the floor, pointing the way it flings.
+    this.padMats = [];
+    const probe = new Arena(layout);
+    for (const p of layout.pads ?? []) {
+      const mat = own(new MeshBasicMaterial({ color: 0x4ad8ff, transparent: true, opacity: 0.8, blending: AdditiveBlending, depthWrite: false }));
+      this.padMats.push(mat);
+      const x = p.x * layout.radius;
+      const z = p.z * layout.radius;
+      const chevron = new Shape();
+      chevron.moveTo(0.012, 0).lineTo(-0.008, 0.01).lineTo(-0.003, 0).lineTo(-0.008, -0.01).lineTo(0.012, 0);
+      const mesh = add(new Mesh(new ShapeGeometry(chevron).rotateX(-Math.PI / 2), mat));
+      mesh.position.set(x, probe.height(x, z) + 0.0012, z);
+      mesh.rotation.y = -p.angle;
     }
 
     // Center features.
@@ -1207,6 +1246,9 @@ export class ArenaView {
       this.spinnerDisc.rotation.y -= dt * this.layout.spinner;
       this.spinnerDisc.position.y = center + 0.0004;
     }
+    // three.js turns +y counter to atan2(z, x), so the group turns by minus the sim's angle.
+    this.orbit.rotation.y = -(this.layout.orbit ?? 0) * arena.elapsed;
+    for (const m of this.padMats) m.opacity = 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(this.time * 5));
   }
 
   private vi(ring: number, seg: number) {
@@ -1585,8 +1627,8 @@ export class ChargePips {
 
 /** Arena miniatures: the theme's rim color and floor tint. */
 const MINI_R = 0.03;
-const MINI_THEME: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff };
-const MINI_FLOOR: Record<Theme, number> = { forge: 0xe8dcc4, stone: 0xb9b3a8, clockwork: 0xd9c9a3, ice: 0xdff1fa };
+const MINI_THEME: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff, lava: 0xff2a0a, void: 0xb86cff };
+const MINI_FLOOR: Record<Theme, number> = { forge: 0xe8dcc4, stone: 0xb9b3a8, clockwork: 0xd9c9a3, ice: 0xdff1fa, lava: 0x8a6a60, void: 0x9a94b8 };
 
 /** A miniature of an arena: its floor, rim in the theme color, and its pockets. */
 export function miniArena(layout: ArenaLayout, current: boolean): Group {

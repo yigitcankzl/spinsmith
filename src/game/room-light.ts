@@ -53,6 +53,12 @@ export class RoomLight {
     this.mesh.frustumCulled = false;
   }
 
+  /** The lit pool fits an arena whose rim is `rim` metres from its center. */
+  setPool(rim: number) {
+    this.uniforms.uR0.value = rim - 0.01;
+    this.uniforms.uR1.value = rim + 0.45;
+  }
+
   /** A hard hit: the room flashes warm for a moment. */
   hit() {
     this.flash = 1;

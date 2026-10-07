@@ -3,7 +3,7 @@ import { CordTone, ForgeLoop, playCrunch, playLocked, playPick, playPlace, playT
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
-import { normRadius, rimRadius, spawnDistance } from './layout.js';
+import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
@@ -77,6 +77,8 @@ const INTRO_TIME = 2.5;
 const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
 const LABEL_AT = new Vector3(0, 0.115, -0.21);
+/** A match arena's near rim stays this far out (arena-local, as the 0.17 arenas): a bigger one slides back. */
+const NEAR_RIM = 0.17;
 /** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
@@ -123,6 +125,9 @@ export class MatchSystem extends createSystem({
 }) {
   private phase: Phase = 'placing';
   private settle = 0;
+  /** A big arena: how much it shows shrunk (1 = full size) and how far it has slid back for a match (m). */
+  private viewK = 1;
+  private pushed = 0;
   /** Press to place: a glowing print on the table where the arena will rise, and each hand's press detector. */
   private print = new Group();
   private printLabel = new Label(0.2);
@@ -425,6 +430,11 @@ export class MatchSystem extends createSystem({
         this.keys.add(e.code);
         // C: a cup right under the rival, to try the sling.
         if (e.code === 'KeyC' && this.phase === 'fight') this.makeCup('right', this.theirs.x, this.theirs.z);
+        // A: the next arena, locked or not (to look at every arena).
+        if (e.code === 'KeyA' && this.phase === 'hub') {
+          this.arenaIndex = (this.arenaIndex + 1) % this.arenas.length;
+          this.setArena(this.arenas[this.arenaIndex]);
+        }
         if (e.code === 'KeyR') {
           if (this.phase === 'hub' || this.phase === 'forge' || this.phase === 'build') this.startMatch();
           else this.toReady();
@@ -543,6 +553,7 @@ export class MatchSystem extends createSystem({
       this.placeRoot();
     }
     this.easeToTable(dt);
+    this.updateSize(dt);
     this.loop.update(this.phase === 'hub' || this.phase === 'forge' || this.phase === 'build' ? 0.6 : this.phase === 'ready' ? 0.3 : 0.1);
     this.handle.visible = this.phase === 'hub';
     {
@@ -951,11 +962,13 @@ export class MatchSystem extends createSystem({
 
   /** Where a hand points at the arena (near pinch first, else its ray), including just past the rim. */
   private arenaPoint(h: HandState): { x: number; z: number } | null {
-    const l = this.toLocal(h.pinch);
+    // A shrunk arena: what the hand touches, in the arena's true units.
+    const k = this.viewK;
+    const l = this.toLocal(h.pinch).divideScalar(k);
     const L = this.arena.layout;
     if (normRadius(L, l.x, l.z) < 1.3 && Math.abs(l.y - this.arena.floorHeight(Math.min(1, normRadius(L, l.x, l.z)))) < 0.04) return { x: l.x, z: l.z };
     if (!h.hasRay) return null;
-    const o = this.root.worldToLocal(this.rayLocalO.copy(h.rayOrigin));
+    const o = this.root.worldToLocal(this.rayLocalO.copy(h.rayOrigin)).divideScalar(k);
     const d = this.rayLocalD.copy(h.rayDir).transformDirection(this.rootInverse.copy(this.root.matrixWorld).invert());
     for (let t = 0.02; t < 2; t += 0.004) {
       const x = o.x + d.x * t;
@@ -1069,6 +1082,40 @@ export class MatchSystem extends createSystem({
     this.toHub();
   }
 
+  /**
+   * A big arena opens out to full size and slides back for a match, so its near rim stays where a
+   * small one's is; at home, in the forge and the workshop it shows shrunk to home size. The round
+   * card, the match bar, the menu and the light pool follow its rim.
+   */
+  private updateSize(dt: number) {
+    const L = this.arena.layout;
+    const p = this.phase;
+    const match = p === 'ready' || p === 'pulling' || p === 'fight' || p === 'result';
+    const rim = maxRim(L);
+    const k = match ? 1 : Math.min(1, DISPLAY_RIM / rim);
+    const push = match ? Math.max(0, rimRadius(L, Math.PI / 2) - NEAR_RIM) * ARENA_SCALE : 0;
+    const e = Math.min(1, dt * 3);
+    this.viewK = Math.abs(k - this.viewK) < 1e-4 ? k : this.viewK + (k - this.viewK) * e;
+    const next = Math.abs(push - this.pushed) < 1e-4 ? push : this.pushed + (push - this.pushed) * e;
+    if (next !== this.pushed) {
+      // Away from the player: the arena's local -Z.
+      const d = next - this.pushed;
+      const yaw = this.root.rotation.y;
+      this.root.position.x -= Math.sin(yaw) * d;
+      this.root.position.z -= Math.cos(yaw) * d;
+      this.pushed = next;
+      if (next === push) this.setRoom();
+    }
+    this.arenaView.root.scale.setScalar(this.viewK);
+    this.builder.viewScale = this.viewK;
+    const far = rimRadius(L, -Math.PI / 2) * this.viewK;
+    this.label.mesh.position.z = Math.min(LABEL_AT.z, -(far + 0.04));
+    this.bar.mesh.position.z = Math.min(-0.205, -(far + 0.035));
+    const f = Math.max(1, (rim * this.viewK + 0.05) / 0.244);
+    this.menuButton.mesh.position.set(-0.2 * f, 0.05, 0.14 * f);
+    this.roomLight.setPool(rim * this.viewK * ARENA_SCALE);
+  }
+
   /** Puts the arena a comfortable reach ahead, on a table if there is one, facing the head. */
   private placeRoot() {
     const head = this.player.head;
@@ -1088,6 +1135,7 @@ export class MatchSystem extends createSystem({
       }
     }
     this.root.position.set(at.x, at.y, at.z);
+    this.pushed = 0;
     this.root.scale.setScalar(ARENA_SCALE);
     // Local +Z points back at the player.
     this.root.rotation.set(0, at.yaw, 0);

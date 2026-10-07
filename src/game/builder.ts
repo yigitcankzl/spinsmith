@@ -26,7 +26,7 @@ import { arenaWarning } from './arena-report.js';
 import type { ArenaReport } from './arena-report.js';
 import { engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
-import { RAIL, TAB_LINE, WORKSHOP_TAB_GAP } from './reach.js';
+import { ARENA_SCALE, RAIL, TAB_LINE, WORKSHOP_TAB_GAP } from './reach.js';
 import { miniArena } from './visuals.js';
 import { playDrawer, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
@@ -44,7 +44,9 @@ import { makeMatcap } from './visuals.js';
  * and click-and-drag in the emulator.
  */
 
-const FLOOR_DEPTH: Record<Floor, number> = { bowl: 0.011, flat: 0.03, hill: 0.009, ridge: 0.012, tiers: 0.007 };
+const FLOOR_DEPTH: Record<Floor, number> = { bowl: 0.011, flat: 0.03, hill: 0.009, ridge: 0.012, tiers: 0.007, crater: 0.012, waves: 0.01, twin: 0.011 };
+/** The wild floors share one stepping piece (the drawers hold five pieces at most). */
+const WILD: Floor[] = ['tiers', 'crater', 'waves', 'twin'];
 const STORE_KEY = 'spinsmith.arenas.v1';
 /** A pinch this close to a piece (m) grabs it; a ray this close to it grabs it from afar. */
 const GRAB_NEAR = 0.035;
@@ -54,12 +56,13 @@ const TAP_TIME = 0.3;
 const TAP_MOVE = 0.015;
 
 type Piece =
-  | { kind: 'pocket' | 'rail' | 'pillar' | 'bumper' }
+  | { kind: 'pocket' | 'rail' | 'pillar' | 'bumper' | 'pad' }
+  | { kind: 'wild' }
   | { kind: 'shape'; value: Shape }
   | { kind: 'floor'; value: Floor }
   | { kind: 'wall' }
   | { kind: 'theme' }
-  | { kind: 'extra'; value: 'vortex' | 'spinner' | 'tilt' | 'shrink' }
+  | { kind: 'extra'; value: 'vortex' | 'spinner' | 'tilt' | 'shrink' | 'orbit' }
   | { kind: 'arena'; index: number };
 
 /** Saved player arenas from this browser. */
@@ -146,7 +149,7 @@ export function tag(text: string, width: number, size = 40) {
 
 const STEEL = makeMatcap('metal', 0xc8ccd6);
 const BRASS = makeMatcap('metal', 0xe2b866);
-const THEME_COLOR: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff };
+const THEME_COLOR: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff, lava: 0xff2a0a, void: 0xb86cff };
 
 /** A neutral layout used only to draw floor miniatures. */
 const MINI: ArenaLayout = {
@@ -189,6 +192,17 @@ function pieceModel(p: Piece): Group {
     case 'pillar':
       m(new CylinderGeometry(0.005, 0.006, 0.022, 16), steel).position.y = 0.011;
       break;
+    case 'pad':
+      // A flat plate with a glowing chevron.
+      m(new CylinderGeometry(0.011, 0.011, 0.003, 24), steel).position.y = 0.0015;
+      m(new ConeGeometry(0.007, 0.012, 3).rotateX(Math.PI / 2).scale(1, 0.25, 1), glow(0x4ad8ff)).position.y = 0.004;
+      break;
+    case 'wild': {
+      // A crater in miniature: the stepping piece for the wild floors.
+      m(new TorusGeometry(0.009, 0.0035, 8, 24).rotateX(Math.PI / 2), clay(0xd8c9b0)).position.y = 0.004;
+      m(new CircleGeometry(0.012, 24).rotateX(-Math.PI / 2), clay(0x8a7a62)).position.y = 0.0005;
+      break;
+    }
     case 'bumper':
       m(new CylinderGeometry(0.006, 0.007, 0.018, 16), steel).position.y = 0.009;
       m(new TorusGeometry(0.0065, 0.0018, 6, 20).rotateX(Math.PI / 2), glow(0xff3b5c)).position.y = 0.016;
@@ -223,15 +237,18 @@ function pieceModel(p: Piece): Group {
     }
     case 'theme':
       // One gem per theme in a cluster: tap or drop it to step to the next theme.
-      (['forge', 'stone', 'clockwork', 'ice'] as Theme[]).forEach((t, i) => {
-        const a = (i / 4) * Math.PI * 2;
+      THEMES.forEach((t, i) => {
+        const a = (i / THEMES.length) * Math.PI * 2;
         m(new OctahedronGeometry(0.0055), new MeshMatcapMaterial({ matcap: makeMatcap('metal', THEME_COLOR[t]) })).position.set(Math.cos(a) * 0.006, 0.007, Math.sin(a) * 0.006);
       });
       break;
     case 'extra': {
-      const c = { vortex: 0x8fe8ff, spinner: 0xe2b866, tilt: 0xc8ccd6, shrink: 0xff4a12 }[p.value];
+      const c = { vortex: 0x8fe8ff, spinner: 0xe2b866, tilt: 0xc8ccd6, shrink: 0xff4a12, orbit: 0xc8ccd6 }[p.value];
       if (p.value === 'tilt') m(new SphereGeometry(0.012, 20, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), steel).position.y = 0.012;
-      else if (p.value === 'shrink') m(new TorusGeometry(0.01, 0.0025, 8, 24).rotateX(Math.PI / 2), glow(c)).position.y = 0.003;
+      else if (p.value === 'orbit') {
+        m(new TorusGeometry(0.011, 0.0012, 6, 28).rotateX(Math.PI / 2), brass).position.y = 0.002;
+        for (let i = 0; i < 3; i++) m(new CylinderGeometry(0.0028, 0.0028, 0.012, 10), steel).position.set(Math.cos((i * 2 * Math.PI) / 3) * 0.011, 0.006, Math.sin((i * 2 * Math.PI) / 3) * 0.011);
+      } else if (p.value === 'shrink') m(new TorusGeometry(0.01, 0.0025, 8, 24).rotateX(Math.PI / 2), glow(c)).position.y = 0.003;
       else m(new CylinderGeometry(0.011, 0.011, 0.003, 24), new MeshMatcapMaterial({ matcap: makeMatcap('metal', c) })).position.y = 0.0015;
       break;
     }
@@ -246,23 +263,25 @@ function pieceName(p: Piece, draft?: ArenaLayout): string {
   // The stepping pieces say what the draft has now.
   if (p.kind === 'wall') return draft ? `Wall: ${draft.wall}` : 'Wall';
   if (p.kind === 'theme') return draft ? `Theme: ${draft.theme}` : 'Theme';
+  if (p.kind === 'wild') return draft && WILD.includes(draft.floor) ? `Wild floor: ${draft.floor}` : 'Wild floor';
+  if (p.kind === 'pad') return 'Boost pad';
   if (!('value' in p)) return cap(p.kind);
-  if (p.kind === 'extra') return { vortex: 'Vortex', spinner: 'Turntable', tilt: 'Rocking', shrink: 'Embers' }[p.value];
+  if (p.kind === 'extra') return { vortex: 'Vortex', spinner: 'Turntable', tilt: 'Rocking', shrink: 'Embers', orbit: 'Circling pillars' }[p.value];
   return cap(p.value);
 }
 
 /** The tray: rows of pieces by category. */
 /** The drawers: at most five pieces each. Wall and Theme are one piece each that steps on a tap. */
 const TRAY: [string, Piece[]][] = [
-  ['Pieces', [{ kind: 'pocket' }, { kind: 'rail' }, { kind: 'pillar' }, { kind: 'bumper' }]],
-  ['Floor', (['bowl', 'flat', 'hill', 'ridge', 'tiers'] as Floor[]).map((value) => ({ kind: 'floor', value }))],
+  ['Pieces', [{ kind: 'pocket' }, { kind: 'rail' }, { kind: 'pillar' }, { kind: 'bumper' }, { kind: 'pad' }]],
+  ['Floor', [...(['bowl', 'flat', 'hill', 'ridge'] as Floor[]).map((value) => ({ kind: 'floor' as const, value })), { kind: 'wild' }]],
   ['Form', [...(['circle', 'oval', 'square'] as Shape[]).map((value) => ({ kind: 'shape' as const, value })), { kind: 'wall' }, { kind: 'theme' }]],
-  ['Extras', (['vortex', 'spinner', 'tilt', 'shrink'] as const).map((value) => ({ kind: 'extra', value }))],
+  ['Extras', (['vortex', 'spinner', 'tilt', 'shrink', 'orbit'] as const).map((value) => ({ kind: 'extra', value }))],
 ];
 const WALLS: Wall[] = ['low', 'standard', 'high', 'none'];
-const THEMES: Theme[] = ['forge', 'stone', 'clockwork', 'ice'];
+const THEMES: Theme[] = ['forge', 'stone', 'clockwork', 'ice', 'lava', 'void'];
 /** Pieces that land somewhere on the arena; the others change the whole arena, so a tap on the rail applies them. */
-const PLACED = new Set(['pocket', 'rail', 'pillar', 'bumper']);
+const PLACED = new Set(['pocket', 'rail', 'pillar', 'bumper', 'pad']);
 /** Arena-local layout of the drafting table (the arena center is the origin, +Z toward the player). */
 /** The drawer tabs in a row on the near rim (as in the forge), and the actions on the side rims. */
 const PLATES = [...TRAY.map(([label]) => label.toUpperCase()), 'ARENAS', 'BACK', 'TRY', 'SAVE'];
@@ -336,6 +355,8 @@ export interface BuilderHooks {
 export class Builder {
   /** Lives in arena-local space (a child of the arena root). */
   readonly root = new Group();
+  /** The arena shows shrunk by this much (a big arena at home size); arena-point hooks give true units. */
+  viewScale = 1;
   draft!: ArenaLayout;
   /** 0 folded .. 1 open. */
   opened = 0;
@@ -536,7 +557,8 @@ export class Builder {
     this.items.visible = this.opened > 0.3;
     this.dial.mesh.position.y = PLATE_AT.y - 0.08 * (1 - k);
     this.dial.mesh.visible = k > 0.01;
-    this.guides.scale.set(Math.max(0.001, k), 1, Math.max(0.001, k));
+    const v = this.viewScale;
+    this.guides.scale.set(Math.max(0.001, k) * v, v, Math.max(0.001, k) * v);
     this.guides.visible = k > 0.01;
   }
 
@@ -562,7 +584,7 @@ export class Builder {
         const radius = Math.round(Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, this.draft.radius * n)) * 100) / 100;
         if (radius !== this.draft.radius) {
           this.draft.radius = radius;
-          this.say(`${Math.round(radius * 200)} cm across`);
+          this.say(`${Math.round(radius * 200 * ARENA_SCALE)} cm across`);
           this.hooks.preview(this.draft);
         }
       }
@@ -586,7 +608,8 @@ export class Builder {
         z = Math.sin(a) * r;
         model.rotation.y = -a + Math.PI / 2;
       }
-      model.position.set(x, this.hooks.floorHeight(Math.min(1, normRadius(this.draft, x, z))) + 0.012 + 0.003 * Math.sin(this.time * 10), z);
+      const k = this.viewScale;
+      model.position.set(x * k, this.hooks.floorHeight(Math.min(1, normRadius(this.draft, x, z))) * k + 0.012 + 0.003 * Math.sin(this.time * 10), z * k);
     } else if (h.pinch.y > -50) {
       // Off the arena: it follows the pinch.
       this.hooks.toLocal(h.pinch, model.position);
@@ -636,6 +659,17 @@ export class Builder {
         if (n > 0.85) return this.reject('Drop it on the floor, away from the rim');
         L.pillars.push({ x: x / L.radius, z: z / L.radius, r: 0.009, bumper: piece.kind === 'bumper' });
         break;
+      case 'pad':
+        if (n > 0.85) return this.reject('Drop it on the floor, away from the rim');
+        // It points along the rim, so a top running round is flung faster on its way.
+        (L.pads ??= []).push({ x: x / L.radius, z: z / L.radius, angle: a + Math.PI / 2 });
+        break;
+      case 'wild': {
+        const i = WILD.indexOf(L.floor);
+        L.floor = WILD[(i + 1) % WILD.length];
+        L.depth = FLOOR_DEPTH[L.floor];
+        break;
+      }
       case 'shape':
         L.shape = piece.value;
         break;
@@ -656,6 +690,7 @@ export class Builder {
         if (piece.value === 'spinner') L.spinner = L.spinner > 0 ? 0 : 6;
         if (piece.value === 'tilt') L.tilt = L.tilt > 0 ? 0 : 0.06;
         if (piece.value === 'shrink') L.shrink = !L.shrink;
+        if (piece.value === 'orbit') L.orbit = L.orbit ? 0 : 0.7;
         break;
     }
     playPlace();
@@ -671,6 +706,14 @@ export class Builder {
         L.pillars.splice(L.pillars.indexOf(p), 1);
         this.hooks.preview(L);
         this.grab({ kind: p.bumper ? 'bumper' : 'pillar' }, h, 'arena', 2);
+        return true;
+      }
+    }
+    for (const p of L.pads ?? []) {
+      if (Math.hypot(p.x * L.radius - x, p.z * L.radius - z) < 0.02) {
+        L.pads!.splice(L.pads!.indexOf(p), 1);
+        this.hooks.preview(L);
+        this.grab({ kind: 'pad' }, h, 'arena', 2);
         return true;
       }
     }
