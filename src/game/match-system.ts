@@ -210,7 +210,8 @@ export class MatchSystem extends createSystem({
   /** The forge: build your own top from parts. */
   private forge = new Forge({
     done: (build) => this.leaveForge(build),
-    fitted: () => this.progress.advance('rematch'),
+    // The first session's part counts once the top is quenched (saved), not just fitted.
+    fitted: () => undefined,
   }, this.progress);
   /** A demo round from the workshop's Try it: AI launches, no score, then back to the workshop. */
   private demo = false;
@@ -305,6 +306,8 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** When Menu was pinched once during a match (a second pinch within 3 s leaves). */
+  private menuArmed = -10;
   /** The rival's entrance at a match's start (s into it), and the VS words it lands with. */
   private entrance: { t: number; vs: string; sub: string } | null = null;
   private portal = Object.assign(new Mesh(new RingGeometry(0.7, 1, 48), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide })), { visible: false });
@@ -806,16 +809,29 @@ export class MatchSystem extends createSystem({
               this.toHub();
               // Home after a match: what happened in it, for a few seconds.
               this.label.set(report);
-              this.labelTimer = 5;
+              this.labelTimer = 9;
             }
             else this.toReady();
             break;
           }
           if (this.demo) break;
         }
+        // Leaving a match takes two pinches on Menu within 3 s (a stray pinch never ends it).
         if (this.pickButton([this.menuButton]) === 'menu') {
-          this.toHub();
-          break;
+          if (this.time - this.menuArmed < 3) {
+            this.menuArmed = -10;
+            this.menuButton.set('Menu');
+            this.toHub();
+            break;
+          }
+          this.menuArmed = this.time;
+          this.menuButton.set('Leave?');
+          this.label.set('Leave this match?\nPinch Menu again to go home');
+          this.labelTimer = 3;
+        }
+        if (this.menuArmed > -10 && this.time - this.menuArmed >= 3) {
+          this.menuArmed = -10;
+          this.menuButton.set('Menu');
         }
         this.updateReadyPinch();
         break;
@@ -1113,6 +1129,7 @@ export class MatchSystem extends createSystem({
     this.forge.close();
     this.stage.position.y = 0;
     if (build) this.myBuild = { ...build };
+    if (build) this.progress.advance('rematch');
     this.toHub();
     // A quenched top is a moment: steam off the rim, and its name.
     if (build) {
@@ -1359,7 +1376,8 @@ export class MatchSystem extends createSystem({
   /** The match in two lines: the result and score, then each round's finish, the best rip and the XP. */
   private matchReport() {
     const m = this.matchLog;
-    const rounds = m.rounds.map((r) => (r.startsWith('-') ? r.slice(1).toLowerCase() : r)).join(' · ');
+    // Each round: who took it and how ("you SLAG", "they OUTLAST").
+    const rounds = m.rounds.map((r) => (r.startsWith('-') ? `they ${r.slice(1)}` : `you ${r}`)).join(' · ');
     return `${m.won ? 'Won' : 'Lost'} ${m.score} vs ${this.rival.name}\n${rounds} · best rip ${Math.round(m.rip * 100)}% · +${m.xp} XP`;
   }
 
@@ -1954,7 +1972,7 @@ export class MatchSystem extends createSystem({
       const sub = c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title;
       if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
       else this.entrance = { t: 0, vs, sub };
-      this.label.set(`${this.rival.name}, ${this.rival.title}: "${this.rival.intro}"\n${this.rival.style}${this.taught('tells') ? ` · ${MOVE_WORD[this.rival.move]}` : ''} · ${this.arena.layout.rule ?? this.arena.layout.name}`);
+      this.label.set(`${this.rival.name}, ${this.rival.title}\n"${this.rival.intro}"`);
     }
     else {
       this.label.set('');
@@ -2145,6 +2163,7 @@ export class MatchSystem extends createSystem({
     this.replayCount = 0;
     this.replay = null;
     this.offDeskShown = false;
+    this.lastCause = '';
     // Personal bests are their own small moment (the first record is just kept).
     if (!this.demo && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
     const mh = this.mine.hand;
@@ -2613,6 +2632,9 @@ export class MatchSystem extends createSystem({
     this.slungOnce = true;
     this.lastShape = { t: this.elapsed, kind: 'sling' };
     playDash(t.x);
+    // The release has a payoff: a stamp and a trail of sparks off the cup.
+    this.stamp.show('SLUNG!', '', 'mine', 0.3);
+    this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.8);
     if (import.meta.env.DEV) console.log(`[SHAPE] sling ${t === this.mine ? 'mine' : 'rival'} angle ${a.toFixed(2)}${gap < SLING_SNAP ? ' to a pit' : ''}`);
   }
 
@@ -2855,15 +2877,15 @@ export class MatchSystem extends createSystem({
       const cause = recent && v === 1 ? `YOUR ${recent}` : theirs && v === -1 && loser.finish !== 'spin' ? `THEIR ${this.rivalShapeKind}`.toUpperCase() : '';
       this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause, v === 1 ? 'mine' : 'rival', 1.1);
       if (recent && v === 1) {
-        text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
+        // The stamp names the cause (SLAG! / YOUR RAMP); the card keeps to the score.
         // The decisive move plays out slowly for a moment, in a shower of sparks, then again as a replay.
         if (loser.finish !== 'spin' && !this.demo) this.startReplay();
         if (loser.finish !== 'spin') {
           this.slowMo = SLOW_MO_TIME;
           this.sparks.burst(loser.x, this.arena.height(loser.x, loser.z), loser.z, 1);
         }
-      } else if (recent && v === -1 && loser.finish !== 'spin' && !(theirs && this.rivalShapeAt > this.lastShape!.t)) text = `YOUR ${recent} BACKFIRED\n${text}`;
-      else if (theirs && v === -1 && loser.finish !== 'spin') text = `THEIR ${this.rivalShapeKind} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
+      } else if (recent && v === -1 && loser.finish !== 'spin' && !(theirs && this.rivalShapeAt > this.lastShape!.t)) text = `YOUR ${recent} BACKFIRED\n${text.split('\n').pop()}`;
+      else if (theirs && v === -1 && loser.finish !== 'spin') text = `THEIR ${this.rivalShapeKind} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text.split('\n').pop()}`;
     }
     this.label.set(text);
     this.barMessage = text.split('\n')[0].replace(/!.*$/, '!');
@@ -2897,6 +2919,12 @@ export class MatchSystem extends createSystem({
       });
       // The rival and arena intro shows first; the rip hint follows.
       if (this.time - this.readySince > INTRO_TIME) this.label.set('Pinch over the arena where you want to launch\npull back and let go');
+    }
+    // Outside the first launch: after the intro, the card says what this bout is about (the arena's
+    // rule and how the rival plays), and later rounds say to rip again; it is never blank while waiting.
+    if (!ready && this.phase === 'ready' && !this.demo && this.time - this.readySince > INTRO_TIME && !this.label.current) {
+      const first = this.myPoints === 0 && this.theirPoints === 0;
+      this.label.set(first ? `${this.arena.layout.name}: ${this.arena.layout.rule ?? ''}\n${this.rival.name} ${this.rival.style}` : `Rip again\n${this.rival.name} ${this.rival.style}`);
     }
     // As soon as ramps work (the opening grace), so even a short round shows it.
     const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > TUNING.grace && this.theirs.alive;
@@ -2993,7 +3021,8 @@ export class MatchSystem extends createSystem({
       this.resultTimer = Math.max(this.resultTimer, 1.4 + 2.8);
     }
     if (this.rewardHold > 0) this.rewardHold -= dt;
-    else if (!this.reveal && !this.revealedHere && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+    // Unlocks wait for the match's end (never between rounds), then show one after another.
+    else if (!this.reveal && this.matchOver && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
       this.revealedHere = true;
       const key = this.reveals.shift()!;
       const obj = unlockModel(key, this.arenas);
@@ -3008,6 +3037,8 @@ export class MatchSystem extends createSystem({
     const r = this.reveal;
     if (!r) return;
     r.t += dt;
+    // A pinch moves on to the next one.
+    if ((this.hands.left.justPinched || this.hands.right.justPinched) && r.t > 0.4 && r.t < 2) r.t = 2;
     const grow = Math.min(1, r.t / 0.3);
     const leave = Math.max(0, (r.t - 2) / 0.6);
     // Low over the arena's middle, clear of the card and the match bar behind it.
