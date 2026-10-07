@@ -763,4 +763,15 @@ TUNING.grace = 0;
   assert.equal(rival.tell, 0, 'the strike cuts the tell short');
 }
 
+// 23. A rival knocked out hands over its signature part; a spin-out win does not.
+{
+  const store = new Map<string, string>();
+  const mem = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) };
+  const p = new Progress(mem as unknown as Storage);
+  p.award({ won: true, finish: 'spin', pocketPoints: 2, perfect: false, matchOver: false, matchWon: false, rival: 'Rim Raider' });
+  assert.ok(!p.isUnlocked('ring:gale'), 'a spin-out does not give the signature');
+  const a = p.award({ won: true, finish: 'pocket', pocketPoints: 2, perfect: false, matchOver: false, matchWon: false, rival: 'Rim Raider' });
+  assert.ok(p.isUnlocked('ring:gale') && a.unlocked.includes('ring:gale'), 'a knockout gives the signature part');
+}
+
 console.log('sim-check: all passed');

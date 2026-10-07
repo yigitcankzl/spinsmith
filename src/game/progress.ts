@@ -82,6 +82,17 @@ export const ARENA_UNLOCKS: Record<number, string> = {
   20: 'arena:Grand Anvil',
 };
 
+/** Each rival's signature part: knock that rival out once and it is yours (if a level has not opened it already). */
+export const RIVAL_SIGNATURE: Record<string, string> = {
+  'Rim Raider': 'ring:gale',
+  'Iron Keep': 'ring:bulwark',
+  Drifter: 'core:7-70',
+  Leech: 'ring:cog',
+  Hookjaw: 'ring:hook',
+  Sawtooth: 'ring:saw',
+  Bastion: 'core:5-80',
+};
+
 /** Strike seals (docs/DUEL-DESIGN.md): the Anvil Strike is yours from the start. */
 export const SEAL_UNLOCKS: Record<number, string> = {
   4: 'seal:rush',
@@ -135,6 +146,7 @@ export function unlockHint(key: string): string | null {
   for (const [lv, k] of [...Object.entries(LEVEL_UNLOCKS), ...Object.entries(ARENA_UNLOCKS), ...Object.entries(SEAL_UNLOCKS)]) if (k === key) return `Lv ${lv}`;
   for (const [n, k] of Object.entries(STAMP_UNLOCKS)) if (k === key) return `${n} order stamps`;
   for (const q of Object.values(QUEST_UNLOCKS)) if (q.key === key) return q.text;
+  for (const [rival, k] of Object.entries(RIVAL_SIGNATURE)) if (k === key) return `Knock out ${rival}`;
   return null;
 }
 
@@ -156,6 +168,8 @@ export interface RoundResult {
   /** The match was decided by this round. */
   matchOver: boolean;
   matchWon: boolean;
+  /** The rival faced (for its signature part). */
+  rival?: string;
 }
 
 export interface Award {
@@ -265,6 +279,8 @@ export class Progress {
       this.quests.add(deed);
       this.unlock(QUEST_UNLOCKS[deed].key, out);
     }
+    // A rival knocked out hands over its signature part.
+    if (r.won && r.rival && (r.finish === 'pocket' || r.finish === 'over' || r.finish === 'burst') && RIVAL_SIGNATURE[r.rival]) this.unlock(RIVAL_SIGNATURE[r.rival], out);
     if (r.matchOver) this.matches++;
     // Levels.
     this.xp += gained;

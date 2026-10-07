@@ -143,6 +143,36 @@ export const RINGS: Ring[] = [
     blades: 12,
     blurb: 'Grind: steals spin from opposite spin',
   },
+  {
+    // Rim Raider's signature: knock it out once to take it.
+    id: 'gale',
+    name: 'Gale',
+    radius: 0.025,
+    punch: 0.82,
+    knockback: 0.92,
+    burstResist: 0.95,
+    contact: 'upper',
+    chip: 1,
+    drain: 0.95,
+    weight: 22,
+    blades: 4,
+    blurb: 'Light upper: quick, lifts tops, spins a little longer',
+  },
+  {
+    // Iron Keep's signature.
+    id: 'bulwark',
+    name: 'Bulwark',
+    radius: 0.029,
+    punch: 0.75,
+    knockback: 0.65,
+    burstResist: 1.2,
+    contact: 'absorb',
+    chip: 1,
+    drain: 0.95,
+    weight: 29,
+    blades: 8,
+    blurb: 'A wide wall of studs: hard to move',
+  },
 ];
 
 export const CORES: Core[] = [
@@ -150,6 +180,8 @@ export const CORES: Core[] = [
   { id: '4-60', name: 'Bolt', height: 0.006, lock: 1, punch: 1, teeth: 4, weight: 5, blurb: 'Standard height and lock' },
   { id: '9-60', name: 'Clamp', height: 0.006, lock: 1.35, punch: 0.93, teeth: 9, weight: 7, blurb: 'Locked tight: hard to shatter' },
   { id: '5-80', name: 'Stilt', height: 0.008, lock: 1, punch: 1, teeth: 5, weight: 6, blurb: 'Tall: rides over low hits' },
+  // Drifter's signature.
+  { id: '7-70', name: 'Spindle', height: 0.007, lock: 1.15, punch: 0.97, teeth: 7, weight: 6, blurb: 'Mid height, locks well' },
 ];
 
 export const TIPS: Tip[] = [

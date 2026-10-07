@@ -2216,7 +2216,7 @@ export class MatchSystem extends createSystem({
   /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */
   private earn(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
     const before = this.progress.level;
-    const award = this.progress.award({ won, finish: loser.finish, pocketPoints: loser.pocketPoints, perfect: this.lastPerfect && won, matchOver, matchWon });
+    const award = this.progress.award({ won, finish: loser.finish, pocketPoints: loser.pocketPoints, perfect: this.lastPerfect && won, matchOver, matchWon, rival: this.rival.name });
     this.xpGained = award.gained;
     playXp();
     console.log(`[XP] +${award.gained} -> Lv ${this.progress.level} (${(this.progress.fraction * 100).toFixed(0)}%)${award.unlocked.length ? ` unlocked ${award.unlocked.join(', ')}` : ''}`);
