@@ -49,66 +49,171 @@ export interface ShapingResult {
   shapesPerRound: number;
   /** Rounds the shaper lost by a knockout within 1.5 s of its own shape. */
   ownKo: number;
+  /** Against the same round played without shaping (the sim is deterministic): rounds the shaping won that the twin lost, and the reverse. */
+  flipsWon: number;
+  flipsLost: number;
+  /** Share of the shaper's shapes no top ever came near while they were strong. */
+  untouched: number;
 }
 
-/** Deterministic: same rules, same result. */
-/** `rivalPolicy` lets the rival shape too, under its own charges. */
-export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: Policy = POLICIES.none): ShapingResult {
-  let seed = 3;
-  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-  const types = [ATTACK, DEFENSE, STAMINA];
+/**
+ * A human-feasible shaper (see docs/FIGHT-INTERACTION.md): it sees the rival in the outer band,
+ * and the ramp exists only `delay` later (reaction, gesture and tracking), aimed where the rival
+ * will be with some error. `delay` 0.62 s is a ramp set on release, 0.35 s one set at the pinch.
+ */
+export const HUMAN = { reaction: 0.25, gesture: 0.3, tracking: 0.07, posErr: 0.005, dirErr: 0.26, minGap: 1.0 };
+export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking): Policy {
+  let pending: { at: number; x: number; z: number; a: number }[] = [];
+  let lastT = Infinity;
+  let busy = 0;
+  let last = -9;
+  return (arena, me, rival, t, charges, rnd, owner = 'me') => {
+    // A new round starts the clock again.
+    if (t < lastT) {
+      pending = [];
+      busy = 0;
+      last = -9;
+    }
+    lastT = t;
+    for (const p of pending) {
+      if (p.at > t) continue;
+      const f = charges.spend(t, TUNING.grace);
+      if (f) arena.addShape('ramp', p.x, p.z, SHAPE_SIZE.ramp * f, owner, Math.cos(p.a), Math.sin(p.a));
+    }
+    pending = pending.filter((p) => p.at > t);
+    if (t < TUNING.grace || busy > t || t - last < HUMAN.minGap || charges.charges < 1) return;
+    const r = Math.hypot(rival.x, rival.z);
+    if (!rival.alive || r < arena.radius * 0.55) return;
+    busy = t + delay;
+    last = t;
+    const p = predictOrbit(rival, delay, 1 + 0.25 * gauss(rnd));
+    const pr = Math.hypot(p.x, p.z) || 1;
+    pending.push({
+      at: t + delay,
+      x: p.x - (p.x / pr) * 0.012 + HUMAN.posErr * gauss(rnd),
+      z: p.z - (p.z / pr) * 0.012 + HUMAN.posErr * gauss(rnd),
+      a: Math.atan2(p.z, p.x) + HUMAN.dirErr * gauss(rnd),
+    });
+  };
+}
+
+function gauss(rnd: () => number) {
+  return Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd());
+}
+
+/** Where a top will be `dt` from now, carrying its angular motion around the center. */
+function predictOrbit(t: Top, dt: number, lead: number): { x: number; z: number } {
+  const r = Math.hypot(t.x, t.z) || 1e-6;
+  const vr = (t.vx * t.x + t.vz * t.z) / r;
+  const vt = (-t.vx * t.z + t.vz * t.x) / r;
+  const a = Math.atan2(t.z, t.x) + (vt / r) * dt * lead;
+  const r2 = Math.max(0, r + vr * dt * lead * 0.5);
+  return { x: Math.cos(a) * r2, z: Math.sin(a) * r2 };
+}
+
+interface Setup {
+  layout: (typeof ARENAS)[number];
+  a: Top['spec'];
+  b: Top['spec'];
+  launchA: [number, number, number, number, number, number];
+  launchB: [number, number, number, number, number, number];
+}
+
+/** One round from a setup: the verdict, its length, and what the shaper's shapes did. */
+function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => number) {
+  const arena = new Arena(s.layout);
   const charges = new ShapingCharges();
   const rivalCharges = new ShapingCharges();
-  let wins = 0, n = 0, points = 0, ko = 0, shapes = 0, ownKo = 0;
+  const a = new Top(s.a);
+  const b = new Top(s.b);
+  a.launch(...s.launchA);
+  b.launch(...s.launchB);
+  let t = 0;
+  let lastShape = -99;
+  let shapes = 0;
+  const mine: { s: (typeof arena.shapes)[number]; touched: boolean }[] = [];
+  while (verdict(a, b, t) === 0) {
+    const before = new Set(arena.shapes);
+    policy(arena, a, b, t, charges, rnd);
+    rivalPolicy(arena, b, a, t, rivalCharges, rnd, 'rival');
+    for (const sh of arena.shapes) {
+      if (before.has(sh) || sh.owner !== 'me') continue;
+      shapes++;
+      lastShape = t;
+      mine.push({ s: sh, touched: false });
+    }
+    // A shape counts as noticed once a top comes within reach of it while it is strong.
+    for (const m of mine) {
+      if (m.touched || Arena.strength(m.s) < 0.3 || !arena.shapes.includes(m.s)) continue;
+      for (const top of [a, b]) if (top.alive && Math.hypot(top.x - m.s.x, top.z - m.s.z) < 0.05) m.touched = true;
+    }
+    charges.update(STEP);
+    rivalCharges.update(STEP);
+    const clash = step(arena, a, b);
+    if (clash) {
+      charges.clash(clash.strength, t);
+      rivalCharges.clash(clash.strength, t);
+    }
+    t += STEP;
+  }
+  return { v: verdict(a, b, t), t, a, b, shapes, lastShape, untouched: mine.filter((m) => !m.touched).length };
+}
+
+/**
+ * Deterministic: same rules, same result. Every round is also played without shaping from the
+ * same launch (its twin), so the report can say what the shaping changed.
+ * `rivalPolicy` lets the rival shape too, under its own charges.
+ */
+export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: Policy = POLICIES.none): ShapingResult {
+  let seed = 3;
+  const launchRnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  let pseed = 7;
+  const rnd = () => ((pseed = (pseed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const types = [ATTACK, DEFENSE, STAMINA];
+  let wins = 0, n = 0, points = 0, ko = 0, shapes = 0, ownKo = 0, flipsWon = 0, flipsLost = 0, untouched = 0;
   const lengths: number[] = [];
   for (const layout of ARENAS) {
-    const arena = new Arena(layout);
     const spawn = layout.shape === 'oval' ? layout.radius * 0.78 * 0.72 : layout.radius * 0.72;
     for (const x of types)
       for (const y of types)
         for (let i = 0; i < roundsPerPair; i++) {
-          arena.reset(layout);
-          charges.reset();
-          rivalCharges.reset();
-          const a = new Top(x);
-          const b = new Top(y);
-          const pa = 0.5 + rnd() * 0.5, pb = 0.5 + rnd() * 0.5;
-          const da = LAUNCH_TILT + (rnd() - 0.5) * 0.6, db = LAUNCH_TILT + (rnd() - 0.5) * 0.6;
+          const pa = 0.5 + launchRnd() * 0.5, pb = 0.5 + launchRnd() * 0.5;
+          const da = LAUNCH_TILT + (launchRnd() - 0.5) * 0.6, db = LAUNCH_TILT + (launchRnd() - 0.5) * 0.6;
           const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa), sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
           // Half the rounds from the other side and spin, so the shaper has no side advantage.
           const side = i % 2 === 0 ? 1 : -1;
-          a.launch(0, side * spawn, side * Math.sin(da) * sa, -side * Math.cos(da) * sa, 0.55 + 0.45 * pa, side);
-          b.launch(0, -side * spawn, -side * Math.sin(db) * sb, side * Math.cos(db) * sb, 0.55 + 0.45 * pb, -side);
-          let t = 0;
-          let lastShape = -99;
-          while (verdict(a, b, t) === 0) {
-            const before = arena.shapes.length ? arena.shapes[arena.shapes.length - 1] : null;
-            policy(arena, a, b, t, charges, rnd);
-            rivalPolicy(arena, b, a, t, rivalCharges, rnd, 'rival');
-            const after = arena.shapes.length ? arena.shapes[arena.shapes.length - 1] : null;
-            if (after && after !== before) {
-              shapes++;
-              lastShape = t;
-            }
-            charges.update(STEP);
-            rivalCharges.update(STEP);
-            const clash = step(arena, a, b);
-            if (clash) {
-              charges.clash(clash.strength, t);
-              rivalCharges.clash(clash.strength, t);
-            }
-            t += STEP;
-          }
-          const v = verdict(a, b, t);
+          const setup: Setup = {
+            layout,
+            a: x,
+            b: y,
+            launchA: [0, side * spawn, side * Math.sin(da) * sa, -side * Math.cos(da) * sa, 0.55 + 0.45 * pa, side],
+            launchB: [0, -side * spawn, -side * Math.sin(db) * sb, side * Math.cos(db) * sb, 0.55 + 0.45 * pb, -side],
+          };
+          const r = playRound(setup, policy, rivalPolicy, rnd);
+          const twin = policy === POLICIES.none ? r : playRound(setup, POLICIES.none, rivalPolicy, rnd);
           n++;
-          lengths.push(t);
-          if (v === 1) {
+          lengths.push(r.t);
+          shapes += r.shapes;
+          untouched += r.untouched;
+          if (r.v === 1) {
             wins++;
-            points += finishPoints(b);
-            if (b.finish !== 'spin') ko++;
-          } else if (v === -1 && a.finish !== 'spin' && t - lastShape < 1.5) ownKo++;
+            points += finishPoints(r.b);
+            if (r.b.finish !== 'spin') ko++;
+          } else if (r.v === -1 && r.a.finish !== 'spin' && r.t - r.lastShape < 1.5) ownKo++;
+          if (r.v === 1 && twin.v !== 1) flipsWon++;
+          if (r.v !== 1 && twin.v === 1) flipsLost++;
         }
   }
   lengths.sort((p, q) => p - q);
-  return { win: wins / n, pointsPerRound: points / n, koWins: ko / n, medianRound: lengths[n >> 1], shapesPerRound: shapes / n, ownKo: ownKo / n };
+  return {
+    win: wins / n,
+    pointsPerRound: points / n,
+    koWins: ko / n,
+    medianRound: lengths[n >> 1],
+    shapesPerRound: shapes / n,
+    ownKo: ownKo / n,
+    flipsWon: flipsWon / n,
+    flipsLost: flipsLost / n,
+    untouched: shapes ? untouched / shapes : 0,
+  };
 }

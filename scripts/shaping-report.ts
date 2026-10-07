@@ -1,17 +1,20 @@
 /** How much arena shaping decides a fight, by shaping habit. Run: npm run report:shaping */
-import { POLICIES, reportShaping } from '../src/game/shaping-report.ts';
+import { humanRamp, POLICIES, reportShaping } from '../src/game/shaping-report.ts';
+import type { ShapingResult } from '../src/game/shaping-report.ts';
 
-// Acceptance ranges from docs/QUESTLESS-PLAN.md.
-const goal: Record<string, string> = { none: '', random: 'win 48-52%', pushOut: 'win 58-63%, median 14-20 s, 2-4 shapes, own KO < 10%', centerWell: 'beats none, own KO < 10%' };
-for (const [name, policy] of Object.entries(POLICIES)) {
-  // 24 rounds per type pair and arena: fewer and the policies' gaps drown in noise.
-  const r = reportShaping(policy, 24);
+const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
+const line = (name: string, r: ShapingResult, goal = '') =>
   console.log(
-    `${name.padEnd(11)} win ${(r.win * 100).toFixed(0)}%, points/round ${r.pointsPerRound.toFixed(2)}, KO wins ${(r.koWins * 100).toFixed(0)}%, median round ${r.medianRound.toFixed(1)} s, shapes/round ${r.shapesPerRound.toFixed(1)}, own KO after a shape ${(r.ownKo * 100).toFixed(0)}%${goal[name] ? `   (target: ${goal[name]})` : ''}`,
+    `${name.padEnd(30)} win ${pct(r.win)}, KO wins ${pct(r.koWins)}, median ${r.medianRound.toFixed(1)} s, shapes ${r.shapesPerRound.toFixed(1)}, flips +${pct(r.flipsWon)} / -${pct(r.flipsLost)}, untouched ${pct(r.untouched)}, own KO ${pct(r.ownKo)}${goal ? `   (target: ${goal})` : ''}`,
   );
-}
+
+// 24 rounds per type pair and arena: fewer and the policies' gaps drown in noise.
+line('none', reportShaping(POLICIES.none, 24));
+line('masher (random)', reportShaping(POLICIES.random, 24), 'win at most +3 over none');
+line('human ramp (lag 0.35 s, pinch)', reportShaping(humanRamp(0.35), 24), 'win 55-59%, untouched <= 35%, flips lost <= 6%, median >= 13 s');
+line('human ramp (lag 0.62 s, release)', reportShaping(humanRamp(0.62), 24));
+line('superhuman push-out (no lag)', reportShaping(POLICIES.pushOut, 24));
+line('center well', reportShaping(POLICIES.centerWell, 24));
 // Rivals from level 6 ramp you out too: how a player fares against them.
-for (const name of ['none', 'pushOut']) {
-  const r = reportShaping(POLICIES[name], 24, POLICIES.pushOut);
-  console.log(`${name.padEnd(11)} vs a ramping rival: win ${(r.win * 100).toFixed(0)}%, median round ${r.medianRound.toFixed(1)} s`);
-}
+line('none vs a ramping rival', reportShaping(POLICIES.none, 24, humanRamp(0.62)));
+line('human ramp vs a ramping rival', reportShaping(humanRamp(0.35), 24, humanRamp(0.62)));
