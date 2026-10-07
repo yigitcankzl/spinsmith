@@ -29,10 +29,20 @@ into a slag pit, and a careless one can throw your own top out. Two charges keep
 not a reflex: clashing refills them. When a shape decides a round, the result says so: "YOUR
 RAMP → SLAG".
 
-**Read the arena.** Six arenas change the fight: a balanced bowl with slag pits and kick rails, a
-ring of embers that closes in, a dish that tips under weight, a walled spire with no ring-outs,
-an ice oval with a vortex, and a wall-less sumo square. Each says at the start who it favours.
-Rivals have their own styles: rim raiders, center holders and long drifters.
+**Strike the table.** Solid clashes fill your forge bar, a glowing ring on the back of your hand,
+faster when you are losing. Full, press your palm on the real table beside the arena: a shockwave
+runs out through the floor and throws the tops near the rim, the hot ones furthest. Choose your
+strike in the forge: the Anvil Strike, a Rush straight at the rival, or a Magnet that drags it
+toward a slag pit. Rivals have a big move of their own, and you see it coming: a second of
+flashing and a rising whine. Strike first and you cut it short.
+
+**Read the arena.** Fifteen arenas change the fight: a balanced bowl with slag pits and kick
+rails, a ring of embers that closes in, a dish that tips under weight, a crater to duel in, twin
+basins split by a ridge, a speedway of boost pads, bumpers that circle the floor, and Colossus
+Bowl, an arena over a metre across that opens out on your table when the match starts. Each
+says at the start who it favours. Rivals have their own styles and their own moves: rim raiders
+charge, center holders quake the floor, drifters pull you toward the pits. Knock one out and its
+signature part is yours.
 
 **Come back.** Every day the Smith's board posts a new order: a rival, an arena and one way to win, such as ramping Iron Keep out of the ring. Doing it strikes a stamp into your ledger; missed days cost nothing. Rivals carry medallions with three marks to earn, and the tops that won stand as champions.
 
@@ -54,6 +64,10 @@ strategy is measured over thousands of rounds.
   second), so it meets a moving top; dragging turns it, and a small dead zone keeps tracking
   jitter from swinging it. Far ramps use the hand ray the same way.
 - **Press for a cup, pull to sling:** a fingertip pressed into the arena floor opens a cup; a pinch on the caught top, pulled back and released, slings it.
+- **Press the table to place, and to strike:** a palm pressed on the real table raises the arena
+  at the table's true height, and during a fight, with the forge bar full, the same press beside
+  the arena is your strike. It is the same detector (down, then still), so a hand resting on the
+  table is never a press.
 - **Seated:** everything touched sits within a seated arm's reach (about 0.35-0.55 m); only the
   score and the stats, which are read, sit on the far rim.
 - **Forgiving by design:** tracking loss shorter than a tenth of a second is ignored, and a lost

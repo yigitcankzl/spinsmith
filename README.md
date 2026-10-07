@@ -56,18 +56,24 @@ an arena. First to 3 heat wins a match.
   white-hot pull with extra spin. In the emulator's play mode, click and flick the mouse: the
   hands move with the view.
 - An AI top launches from its spot on the far half at the same time.
-- **Arenas are data** (`src/game/layout.ts`): size (12–18 cm), shape (circle, oval, square),
-  floor (bowl, flat, hill, tornado ridge, two tiers), wall (low, standard, high and climbable,
-  none with a sumo berm), slag pits, kick rails, pillars and pinball bumpers,
-  a center vortex, a turntable, a rocking dish that tips under the tops' weight, a ring of
-  embers that closes in after 16 s, and a theme (forge, stone, clockwork, ice; ice is
-  slippery).
-- **Six built-in arenas** (`src/game/arenas.ts`) that together use every knob: Forge Bowl,
-  Ember Ring, Zero-G Dish, Clockwork Spire, Frost Oval and Sumo Square. Pick the arena on the home
-  screen. `npm run report:arenas` simulates every
+- **Arenas are data** (`src/game/layout.ts`): size (radius 0.12–0.26 arena units, up to
+  1.25 m across in the room), shape (circle, oval, square), floor (bowl, flat, hill, tornado
+  ridge, two tiers, crater, ripples, twin basins), wall (low, standard, high and climbable, none
+  with a sumo berm), slag pits, kick rails, pillars and pinball bumpers, pillars that circle the
+  middle, boost pads, a center vortex, a turntable, a rocking dish that tips under the tops'
+  weight, a ring of embers that closes in, and a theme (forge, stone, clockwork, ice, lava, void;
+  ice is slippery).
+- **Big arenas open out for a match:** at home, in the forge and in the workshop an arena past
+  0.19 shows shrunk to home size; when a match starts it opens out to full size and slides back,
+  so its near rim stays where a small arena's is. On a real table it is shrunk (to 70% at most)
+  until it stays on the wood.
+- **Fifteen built-in arenas** (`src/game/arenas.ts`) that together use every knob: the six
+  classics (Forge Bowl, Ember Ring, Zero-G Dish, Clockwork Spire, Frost Oval, Sumo Square) and
+  Titan Crater, Twin Basins, Ripple Pool, Colossus Bowl, Neon Speedway, Orbit Foundry, Glacier
+  Steps, Meteor Pit and Grand Anvil, opened by level. The rotation picks the arena. `npm run report:arenas` simulates every
   type matchup on every arena and reports round length, knockouts and type balance.
 - **Build your top from parts** (`src/game/parts.ts`, design in `docs/TOP-CUSTOMIZATION.md`):
-  a Ring (contact style and mass: Striker, Hook, Anvil, Halo, Saw, Cog), a Core (height and
+  a Ring (contact style and mass: Striker, Hook, Anvil, Halo, Saw, Cog, Gale, Bulwark), a Core (height and
   shatter lock: Stub, Bolt, Clamp, Stilt), a Tip (movement and rail gear: Chisel, Spur, Awl,
   Dome, Pin, Bead), spin direction and color, under a 40 g weight limit (136 legal builds).
   The parts change the fight: a lower top hits under a taller one, low tops scrape on steep
@@ -163,6 +169,18 @@ an arena. First to 3 heat wins a match.
   raise a ramp there; its place locks when the pinch starts. A small blue dot marks where the ray meets the arena floor. In the
   emulator's play mode a left click is a pinch, so the game is playable by looking
   around with the mouse and click-holding.
+- **The duel layer** (`docs/DUEL-DESIGN.md`): a forge bar (the ring on the back of each hand)
+  fills from solid clashes, three times as fast while your top is behind on spin. Full, press
+  your palm on the table beside the arena: your strike. The seal you engrave in the forge's
+  Style drawer picks it: the Anvil Strike (a shockwave from the middle that throws tops near the
+  rim, hot ones further; your own top is braced), the Rush (Lv 4: your top charges the rival) or
+  the Magnet (Lv 7: the rival is dragged toward a slag pit). A top that has taken a beating
+  glows red: it flies further.
+- **Rival tells:** after your first match each rival has one big move (a charge, a quake or a
+  pull). Its own bar fills like yours; when full it flashes and whines for a second, then the
+  move lands, unless your strike cuts it short ("INTERRUPTED!").
+- **Rival signature parts:** knock a rival out once and its part is yours (Rim Raider's Gale
+  ring, Iron Keep's Bulwark ring, Drifter's Spindle core, ...).
 - Result card with the finish and score, then pinch again for the next round.
 
 ## Run
@@ -196,6 +214,9 @@ own rays rarely line up with what you are looking at.
 | `B` | Hold to grow a ramp where you are looking, aimed outward; release to set it (during a fight) |
 | `N` | Open a cup where you are looking (during a fight) |
 | `C` | Open a cup right under the rival, to try the sling (during a fight) |
+| `J` | Fill the forge bar (then press a palm on the table beside the arena); `Shift+J` also strikes (during a fight) |
+| `T` | Fill the rival's bar: its tell starts (during a fight, after the first match) |
+| `A` | Show the next arena, locked or not (home) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Shatter the opponent now (during a fight) |
 | `O` | Throw the opponent over the wall now (during a fight) |

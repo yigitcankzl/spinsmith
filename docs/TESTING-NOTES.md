@@ -35,12 +35,16 @@ Draft (Oct 7, 2026); final text before the deadline. For judges and anyone tryin
    Press a fingertip into the floor ahead of a top and a cup opens: it catches the first top to
    roll in. Pinch the caught top, pull back and let go: it flies the other way (aimed near a slag
    pit, it goes straight in). An empty or unused cup lets go after 2 seconds.
-4. First to 3 heat wins: outlasting the rival scores 1, a knockout (into a slag pit, over the
+4. A glowing ring on the back of your hand is the forge bar: it fills as the tops clash. When it
+   is full, press your palm on the table beside the arena: the Anvil Strike throws the tops near
+   the rim (red-hot ones furthest). From the second match on, a rival flashes and whines for a
+   second before its big move: strike first to cut it short.
+5. First to 3 heat wins: outlasting the rival scores 1, a knockout (into a slag pit, over the
    wall, or shattering it) scores 2. A finish your ramp or sling caused says so: YOUR RAMP → SLAG.
-5. After the match the small anvil calls: pinch it and the arena turns into the forge. The Tip
+6. After the match the small anvil calls: pinch it and the arena turns into the forge. The Tip
    drawer is open with your new part pulsing; pinch it, bring it to your top, let go. Drop your top
    in the glowing slot on the right to save it.
-6. Back home, the Smith's board shows today's order, the rivals' medallions and your ledger.
+7. Back home, the Smith's board shows today's order, the rivals' medallions and your ledger.
 
 ## Known limits
 

@@ -1,6 +1,6 @@
 # SpinSmith: the duel layer
 
-Draft, Oct 7, 2026. What fighting games teach a spinning-top fight played with bare hands at a
+Oct 7, 2026; built the same night (status at the end). What fighting games teach a spinning-top fight played with bare hands at a
 real table, cut to what fits before the Nov 6 freeze.
 
 ## The problem
@@ -70,3 +70,22 @@ boxes, currencies, streak punishment.
 20 strikes during a fight, at least 19 detected; 0 strikes from a hand resting on the table
 between moves (the press needs the bar full and a come-down first); the shockwave reads from the
 seat; hitstop never makes a head turn feel stuck.
+
+## Status (Oct 7-8)
+
+Built and in the repo, measured with `npm run report:shaping` (rows "masher + strike" onward):
+
+- The forge bar is **separate from the shaping charges** (they stay two): sharing one bar made the
+  strike cost three ramps and it never paid. It fills from solid clashes (0.07 each) and in 30 s
+  on its own, three times as fast while your top is below 70% of the rival's spin.
+- **Hot metal scales only the strike**, not clashes: scaling clashes too tipped the type loop
+  (stamina beat defense only 49%).
+- The strike is felt by `n²` (n = distance to the rim, 0..1): a top in the middle barely moves,
+  so when you strike matters; your own top takes 60%.
+- **Seals:** Anvil, Rush (Lv 4), Magnet (Lv 7), within about a point of each other. A Quench
+  (spin refill) was cut: even a 0.05 refill decided spin finishes (65% win).
+- **Rival tells:** charge (Rim Raider, Hookjaw, Sawtooth), quake (Iron Keep, Bastion), pull
+  (Drifter, Leech), after the first match. A rival quench was cut for the same reason.
+- **Signature parts:** a rival knocked out once gives its part; new Gale and Bulwark rings and
+  the Spindle core (`report:tops`, no warnings).
+- Not built: combo counter, rival memory, the weekly rare-part order, the slap detector.
