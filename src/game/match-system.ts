@@ -2462,6 +2462,8 @@ export class MatchSystem extends createSystem({
         }
       }
       for (const t of this.tops) {
+        // Hot metal sheds embers: the more damage, the more often (a cracked top is a target).
+        if (t.alive && t.damage > 0.45 && Math.random() < (t.damage - 0.35) * 3 * STEP) this.sparks.burst(t.x, this.arena.height(t.x, t.z) + 0.01, t.z, 0.05);
         if (t.sinceWall === 0) {
           // A near miss: the top slams the wall and sparks scrape off it.
           this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, Math.min(1, t.wallHit * 1.5));
