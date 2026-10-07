@@ -33,4 +33,6 @@ loadFonts()
     world.visibilityState.subscribe((v) => landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive));
     // Emulator helper: move one hand at a time with the mouse (dev builds only).
     if (import.meta.env.DEV) void import('./dev-hands.js').then((m) => m.installDevHands());
+    // A hand driver for agents and demo shots: window.drive (dev builds only, see src/dev-drive.ts).
+    if (import.meta.env.DEV) void import('./dev-drive.js').then((m) => m.installDriver());
   });

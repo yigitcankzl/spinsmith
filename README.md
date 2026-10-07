@@ -244,6 +244,13 @@ own rays rarely line up with what you are looking at.
 
 ### Testing in the emulator (IWSDK CLI)
 
+**Hand driver** (`src/dev-drive.ts`, dev builds only): `window.drive` plays real hand motions on
+the emulated hands (tap, drag, rip, ramp, cup, sling, palm slap), so the game's own gesture
+detection reads them, unlike the dev keys. From a shell (dev server started with
+`--allow-browser-automation`): `scripts/emu.sh enter`, then for example
+`scripts/drive.sh '["tap","play"]' '["wait",2.5]' '["rip",{"power":0.9}]' '["wait",3]' '["ramp"]'`.
+The agent skill `.claude/skills/spinsmith-drive` describes every step and a playtest loop.
+
 ```sh
 npx @iwsdk/cli xr enter
 npx @iwsdk/cli xr set-input-mode --input-json '{"mode":"hand"}'

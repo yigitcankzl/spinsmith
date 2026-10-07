@@ -246,6 +246,8 @@ export class MatchSystem extends createSystem({
   private menuButton = new Button('menu', 0.07, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
+  /** Dev: the hand driver holds the hands, so the gaze is not a pointer. */
+  gazeOff = false;
   private gazePointer: HandState = {
     tracked: false,
     pinching: false,
@@ -452,6 +454,8 @@ export class MatchSystem extends createSystem({
     this.buildHandle();
     this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
+    // The hand driver (src/dev-drive.ts) reads the game through this.
+    if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
     this.menuButton.mesh.rotation.y = 0.4;
     this.menuButton.set('Menu');
@@ -1063,7 +1067,8 @@ export class MatchSystem extends createSystem({
     head.getWorldDirection(g.rayDir).negate();
     head.getWorldQuaternion(g.rayQuat);
     g.hasRay = true;
-    g.tracked = true;
+    // Off while the hand driver (src/dev-drive.ts) steers the hands: it pinches where it means to.
+    g.tracked = !this.gazeOff;
     g.pinch.set(0, -100, 0);
     const was = g.pinching;
     g.pinching = this.hands.left.pinching || this.hands.right.pinching;
