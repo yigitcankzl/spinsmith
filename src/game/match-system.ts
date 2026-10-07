@@ -304,6 +304,9 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** Molten handprints left on the desk by strikes (a small pool). */
+  private palmPrints = [0, 1, 2].map(() => Object.assign(new Mesh(new PlaneGeometry(0.075, 0.075), new MeshBasicMaterial({ map: PALM, transparent: true, depthWrite: false, blending: AdditiveBlending })), { visible: false }));
+  private nextPrint = 0;
   /** This round's off-the-desk moment has been shown. */
   private offDeskShown = false;
   /** The last REPLAY_STEPS sim steps of both tops (x, z, angle, wobble, damage each), a ring buffer. */
@@ -458,6 +461,7 @@ export class MatchSystem extends createSystem({
     this.chargeRing.visible = false;
     this.stage.add(
       this.chargeRing,
+      ...this.palmPrints,
       this.lane,
       this.sealPop,
       this.reticle,
@@ -672,6 +676,7 @@ export class MatchSystem extends createSystem({
     }
     this.label.update(Math.min(delta, 0.1));
     this.stamp.update(Math.min(delta, 0.1));
+    this.updatePrints(Math.min(delta, 0.1));
     if (this.sealPop.visible) {
       const t = (this.sealPop.userData.t += Math.min(delta, 0.1));
       const me = this.mine;
@@ -1192,6 +1197,32 @@ export class MatchSystem extends createSystem({
     });
   }
 
+  /**
+   * A molten handprint where the palm hit the desk: white-hot, cooling through orange to a dark
+   * scorch that stays until the match ends (three at most).
+   */
+  private printPalm(x: number, z: number, angle: number) {
+    const m = this.palmPrints[this.nextPrint];
+    this.nextPrint = (this.nextPrint + 1) % this.palmPrints.length;
+    m.position.set(x, -PEDESTAL / ARENA_SCALE + 0.0015, z);
+    // Fingers pointing away from the player's side of the arena, roughly as a palm lands.
+    m.rotation.set(-Math.PI / 2, 0, angle + Math.PI / 2);
+    m.userData.t = 0;
+    m.visible = true;
+  }
+
+  private updatePrints(dt: number) {
+    for (const m of this.palmPrints) {
+      if (!m.visible) continue;
+      const t = (m.userData.t += dt);
+      const mat = m.material as MeshBasicMaterial;
+      // White-hot (0 s), orange (1 s), dull red (3 s), then a faint scorch.
+      const k = Math.min(1, t / 3);
+      mat.color.setRGB(1, Math.max(0.12, 0.95 - k * 0.85), Math.max(0.02, 0.8 - k * 1.6));
+      mat.opacity = t < 3 ? 1 : Math.max(0.25, 1 - (t - 3) / 3);
+    }
+  }
+
   /** The match in two lines: the result and score, then each round's finish, the best rip and the XP. */
   private matchReport() {
     const m = this.matchLog;
@@ -1335,6 +1366,7 @@ export class MatchSystem extends createSystem({
     this.theirPoints = 0;
     this.wasDown = false;
     this.matchLog = { rounds: [], rip: 0, xp: 0, won: false, score: '' };
+    for (const m of this.palmPrints) m.visible = false;
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
     this.typesPicked = false;
     this.phase = 'ready';
@@ -2157,10 +2189,11 @@ export class MatchSystem extends createSystem({
         if (import.meta.env.DEV) console.log(`[STRIKE] pressed with the bar at ${Math.round(this.forgeBar.value * 100)}%`);
         continue;
       }
-      // The shockwave starts on the rim beside the palm.
+      // The shockwave starts on the rim beside the palm; the palm leaves a molten print on the desk.
       const a = Math.atan2(l!.z, l!.x);
       const r = rimRadius(this.arena.layout, a);
       this.doStrike(Math.cos(a) * r, Math.sin(a) * r);
+      this.printPalm(l!.x, l!.z, a);
       break;
     }
     // The arena's rails warm as the bar fills, and glow when it is full: the tops are what the eyes follow.
