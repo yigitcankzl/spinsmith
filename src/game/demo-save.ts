@@ -32,6 +32,8 @@ export function demoSave(storage: WritableStorage, today = new Date()): Progress
   p.mark('Rim Raider', MARK.beaten | MARK.knockout | MARK.shape);
   p.mark('Iron Keep', MARK.beaten | MARK.knockout);
   p.mark('Drifter', MARK.beaten);
+  p.claimSignature('Rim Raider');
+  p.claimSignature('Iron Keep');
   const halo: TopBuild = { ...PRESETS[2].build };
   const striker: TopBuild = { ...PRESETS[0].build, tip: 'rush' };
   p.recordChampion(halo);

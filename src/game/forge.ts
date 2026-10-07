@@ -263,10 +263,21 @@ export class Forge {
     return out;
   }
 
+  /** The seal's coin on the tray shows the strike engraved now. */
+  private showSeal() {
+    const slot = this.slots.find((s) => s.item.kind === 'seal');
+    if (!slot) return;
+    slot.model.clear();
+    const coin = sealModel(this.build.seal ?? 'anvil');
+    coin.rotation.x = 0.8;
+    slot.model.add(coin);
+  }
+
   /** Opens the forge; with a focus key (the first session's new part) its drawer opens and it pulses. */
   open(focus: string | null = null) {
     this.build = this.allowed(loadBuild());
     this.rebuildDisplay();
+    this.showSeal();
     this.root.visible = true;
     this.dropAll();
     this.opened = 0;
@@ -558,7 +569,8 @@ export class Forge {
       case 'emblem':
         return (b.emblem ?? 0) > 0;
       case 'seal':
-        return (b.seal ?? 'anvil') !== 'anvil';
+        // A top always carries a seal: the coin shows which.
+        return true;
       default:
         return b.ring === item.build.ring && b.core === item.build.core && b.tip === item.build.tip;
     }
@@ -581,6 +593,7 @@ export class Forge {
       const seal = owned[(owned.indexOf(this.build.seal ?? 'anvil') + 1) % owned.length];
       this.build = { ...this.build, seal };
       this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : 'Earn more strikes: Rush at Lv 4, Magnet at Lv 7');
+      this.showSeal();
     } else if (item.kind === 'emblem') {
       // The next glow you have earned (the forge's orange is always yours).
       const owned = EMBLEM_COLORS.map((_, i) => i).filter((i) => i === 0 || this.progress.isUnlocked(`emblem:${i}`));

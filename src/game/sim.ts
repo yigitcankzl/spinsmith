@@ -161,6 +161,8 @@ export class Arena {
   private tiltVZ = 0;
   /** Fight clock, for the shrinking ring. */
   elapsed = 0;
+  /** The circling pillars' clock (s): runs through rounds, and the view turns it between fights, so they never jump. */
+  orbitT = 0;
   /** Fight time of the last Anvil Strike (-99: none this round). */
   lastStrike = -99;
   /** Live player-made shapes (ramps and wells); each fades as it relaxes. */
@@ -389,6 +391,7 @@ export class Arena {
   /** Per-step arena update: shapes relax, the dish rocks under the tops' weight. */
   update(dt: number, a: Top, b: Top) {
     this.elapsed += dt;
+    this.orbitT += dt;
     const k = Math.exp(-dt / RELAX_TAU);
     for (let i = 0; i < this.shape.length; i++) this.shape[i] *= k;
     if (this.shapes.length) {
@@ -798,8 +801,9 @@ const PULL_SPEED = 0.6;
  * shockwave (as the Anvil Strike, with the rival braced). Pull:
  * your top is dragged toward the nearest slag pit (or the rim) and lifted.
  */
-export function rivalMove(arena: Arena, rival: Top, you: Top, kind: RivalMove, pull = PULL_SPEED) {
-  if (!rival.alive) return;
+export function rivalMove(arena: Arena, rival: Top, you: Top, kind: RivalMove, pull = PULL_SPEED): boolean {
+  // A rival held in your cup cannot move.
+  if (!rival.alive || arena.shapes.some((s) => s.caught === rival)) return false;
   const braced = arena.shapes.some((s) => s.caught === you);
   if (kind === 'charge') {
     const dx = you.x - rival.x;
@@ -812,8 +816,11 @@ export function rivalMove(arena: Arena, rival: Top, you: Top, kind: RivalMove, p
   } else if (!braced && you.alive) {
     if (kind === 'quake') {
       const tell = you.tell;
+      const last = arena.lastStrike;
       strike(arena, rival, you);
       you.tell = tell;
+      // A rival's quake is not your strike.
+      arena.lastStrike = last;
     } else {
       // Toward the nearest pit mouth, else straight out.
       const a0 = Math.atan2(you.z, you.x);
@@ -834,13 +841,14 @@ export function rivalMove(arena: Arena, rival: Top, you: Top, kind: RivalMove, p
       you.lifted = LIFT_TIME;
     }
   }
+  return true;
 }
 
 /** Pillars deflect a top; bumpers kick it away hard. Orbiting pillars also shove it along. */
 function pillars(arena: Arena, t: Top) {
   const L = arena.layout;
   for (const p of L.pillars) {
-    pillarAt(L, p, arena.elapsed, pillarTmp);
+    pillarAt(L, p, arena.orbitT, pillarTmp);
     const px = pillarTmp.x;
     const pz = pillarTmp.z;
     let nx = t.x - px;

@@ -998,6 +998,8 @@ export class ArenaView {
   /** Pillars that circle the center turn together in this group; boost pads pulse. */
   private orbit = new Group();
   private padMats: MeshBasicMaterial[] = [];
+  /** Between fights the circling pillars keep circling (not in the workshop, where they are picked up). */
+  idleOrbit = true;
   /** The forge bar's warmth on the rails and the rim line (0..1). */
   charge = 0;
   private padFlash: number[] = [];
@@ -1272,7 +1274,8 @@ export class ArenaView {
     }
     // three.js turns +y counter to atan2(z, x), so the group turns by minus the sim's angle. Outside
     // a fight (the clock stands at 0) they circle on the view's own clock, so they read before a match.
-    this.orbit.rotation.y = -(this.layout.orbit ?? 0) * (arena.elapsed > 0 ? arena.elapsed : this.time);
+    if (arena.elapsed === 0 && this.idleOrbit) arena.orbitT += dt;
+    this.orbit.rotation.y = -(this.layout.orbit ?? 0) * arena.orbitT;
     this.padMats.forEach((m, i) => {
       this.padFlash[i] = Math.max(0, this.padFlash[i] - dt * 4);
       m.opacity = Math.min(1, 0.55 + 0.35 * (0.5 + 0.5 * Math.sin(this.time * 5)) + this.padFlash[i]);

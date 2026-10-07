@@ -280,7 +280,8 @@ export class Progress {
       this.unlock(QUEST_UNLOCKS[deed].key, out);
     }
     // A rival knocked out hands over its signature part.
-    if (r.won && r.rival && (r.finish === 'pocket' || r.finish === 'over' || r.finish === 'burst') && RIVAL_SIGNATURE[r.rival]) this.unlock(RIVAL_SIGNATURE[r.rival], out);
+    // (Not in the first session, which already gives plenty.)
+    if (this.guide === 'done' && r.won && r.rival && (r.finish === 'pocket' || r.finish === 'over' || r.finish === 'burst') && RIVAL_SIGNATURE[r.rival]) this.unlock(RIVAL_SIGNATURE[r.rival], out);
     if (r.matchOver) this.matches++;
     // Levels.
     this.xp += gained;
@@ -306,6 +307,13 @@ export class Progress {
     if (this.unlocked.has(key)) return;
     this.unlocked.add(key);
     out.unlocked.push(key);
+  }
+
+  /** Gives a rival's signature part outright (the demo save's knocked-out rivals). */
+  claimSignature(rival: string) {
+    const key = RIVAL_SIGNATURE[rival];
+    if (key) this.unlocked.add(key);
+    this.save();
   }
 
   /** Stamps in the ledger. */

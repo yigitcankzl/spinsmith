@@ -768,6 +768,7 @@ TUNING.grace = 0;
   const store = new Map<string, string>();
   const mem = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) };
   const p = new Progress(mem as unknown as Storage);
+  p.advance('done');
   p.award({ won: true, finish: 'spin', pocketPoints: 2, perfect: false, matchOver: false, matchWon: false, rival: 'Rim Raider' });
   assert.ok(!p.isUnlocked('ring:gale'), 'a spin-out does not give the signature');
   const a = p.award({ won: true, finish: 'pocket', pocketPoints: 2, perfect: false, matchOver: false, matchWon: false, rival: 'Rim Raider' });
