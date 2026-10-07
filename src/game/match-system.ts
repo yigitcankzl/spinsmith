@@ -22,7 +22,7 @@ import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
-import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
@@ -2734,7 +2734,20 @@ function revealText(key: string): string {
   const [kind, id] = key.split(':');
   if (kind === 'rival') return `NEW RIVAL!\n${id} · ${RIVALS.find((r) => r.name === id)?.style ?? ''}`;
   if (kind === 'stamp') return `ORDER DONE!\nStamp ${id} in your ledger`;
-  return `NEW!\n${unlockName(key)}`;
+  return `NEW: ${unlockName(key)}\n${unlockBlurb(key)}`;
+}
+
+/** What a new thing does, in one line (so the card says why it matters and where to try it). */
+function unlockBlurb(key: string): string {
+  const [kind, id] = key.split(':');
+  if (kind === 'ring') return RINGS.find((r) => r.id === id)?.blurb ?? '';
+  if (kind === 'core') return CORES.find((c) => c.id === id)?.blurb ?? '';
+  if (kind === 'tip') return TIPS.find((t) => t.id === id)?.blurb ?? '';
+  if (kind === 'seal') return `${SEAL_BLURBS[id as Seal]} · set it in the forge's Style drawer`;
+  if (kind === 'arena') return ARENAS.find((a) => a.name === id)?.rule ?? 'A new arena in the rotation';
+  if (kind === 'paint') return 'Try it in the forge';
+  if (kind === 'emblem') return 'Pick it in the forge, Style drawer';
+  return '';
 }
 
 function unlockName(key: string): string {

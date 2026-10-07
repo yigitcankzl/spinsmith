@@ -43,7 +43,7 @@ import { SmithBoard } from './board.js';
 import { popIn } from './rim.js';
 import { COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
-import { MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
+import { MAX_LEVEL, STAMP_UNLOCKS, xpToNext } from './progress.js';
 import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
 
 export type HubAction =
@@ -368,7 +368,7 @@ export class Hub {
     const cradle = new Mesh(new BoxGeometry(0.04, 0.012, 0.016).translate(0, 0.006, 0), new MeshMatcapMaterial({ matcap: GRAPHITE }));
     cradle.position.set(BLUEPRINT_AT.x, TABLE_Y, BLUEPRINT_AT.z);
     cradle.rotation.y = -0.5;
-    const build = tag('BUILD', 0.07, 46);
+    const build = tag('WORKSHOP', 0.08, 46);
     build.position.set(home.x, home.y + 0.035, home.z);
     this.labels.push(build);
     this.blueprint.add(cradle, holder, build);
@@ -414,7 +414,7 @@ export class Hub {
   /** Your smith level beside the stand: level, rank and the bar toward the next level. */
   private drawRank(progress: Progress, nextMatch: string | null) {
     const next = progress.next;
-    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}|${nextMatch}|${progress.guide}`;
+    const key = `${progress.level}|${progress.rank}|${progress.xp}|${progress.fraction.toFixed(3)}|${next?.key}|${nextMatch}|${progress.guide}`;
     if (key === this.rankKey) return;
     this.rankKey = key;
     const g = this.rankCanvas.getContext('2d')!;
@@ -430,6 +430,14 @@ export class Hub {
     g.fillRect(28, 100, 456, 20);
     g.fillStyle = UI_STEEL;
     g.fillRect(28, 100, 456 * progress.fraction, 20);
+    // XP as numbers too, so a level's progress reads at a glance.
+    if (progress.level < MAX_LEVEL) {
+      g.fillStyle = TEXT;
+      g.font = `600 22px ${FONT}`;
+      g.textAlign = 'right';
+      g.fillText(`${progress.xp} / ${xpToNext(progress.level)} XP`, 484, 82);
+      g.textAlign = 'left';
+    }
     // Where progress leads next.
     g.fillStyle = TEXT;
     g.font = `600 28px ${FONT}`;
