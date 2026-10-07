@@ -137,7 +137,9 @@ export class MatchSystem extends createSystem({
   private lowered = 0;
   private matchScale = 1;
   private matchPush = 0;
-  private fitKey = '';
+  private fitLayout: ArenaLayout | null = null;
+  private fitRadius = 0;
+  private fitPlaced = 0;
   /** The arena is not opening, sliding or shrinking: a pull may start. */
   private sizeSettled = true;
   /** Press to place: a glowing print on the table where the arena will rise, and each hand's press detector. */
@@ -1182,13 +1184,15 @@ export class MatchSystem extends createSystem({
     const p = this.phase;
     const match = p === 'ready' || p === 'pulling' || p === 'fight' || p === 'result';
     const rim = maxRim(L);
+    // Worked out once per arena, size and placement (no per-frame allocation).
     if (match) {
-      const key = `${L.name}:${L.radius}:${this.placedAt}`;
-      if (key !== this.fitKey) {
-        this.fitKey = key;
+      if (L !== this.fitLayout || L.radius !== this.fitRadius || this.placedAt !== this.fitPlaced) {
+        this.fitLayout = L;
+        this.fitRadius = L.radius;
+        this.fitPlaced = this.placedAt;
         this.fitMatch(L, rim);
       }
-    } else this.fitKey = '';
+    } else this.fitLayout = null;
     // While the workshop resizes, the shown size holds still so the rim follows the hand.
     const k = match ? 1 : this.builder.resizing ? this.viewK : Math.min(1, DISPLAY_RIM / rim);
     const scale = match ? this.matchScale : 1;
