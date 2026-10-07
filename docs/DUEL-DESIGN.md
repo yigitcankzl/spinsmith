@@ -54,7 +54,15 @@ boxes, currencies, streak punishment.
    prompt, `[STRIKE]` dev logs and a dev key.
 3. **Rival tells (1.5 days).** One telegraphed big move per rival style (dash, pull, ramp), its
    glow and sound; a rival row in the report.
-4. **After the freeze.** Combo counter, part-specific strikes, rival memory (Nemesis-style),
+4. **Choose your strike, and more parts (3-4 days, after step 2 works).**
+   - A new forge drawer, the **seal**: the strike engraved on your top, unlocked by level.
+     Anvil Strike (shockwave, the first), Quench (refills your own spin), Rush (your top dashes
+     at the rival), Magnet (pulls the rival toward a slag pit). Three before the freeze, all with
+     the same palm press; each balanced in the report so none is always best.
+   - No market and no currency. Variety comes from play: the first knockout of a rival gives
+     its signature part (beat Hookjaw, take the Hook ring); 4-6 new parts tied to strikes and
+     rivals (`report:tops` balance); a weekly order that gives a rare part.
+5. **After the freeze.** Combo counter, part-specific strikes, rival memory (Nemesis-style),
    multiplayer.
 
 ## Device checks (when the headset arrives)
