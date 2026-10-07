@@ -338,6 +338,8 @@ export class MatchSystem extends createSystem({
   /** The shockwave ring running out from the middle (arena-local), and how far it has gone (0..1, 1 = done). */
   private shock = new Mesh(new RingGeometry(0.93, 1, 64).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }));
   private shockT = 1;
+  /** Where to slap: a glowing print on the table beside the near rim, while the strike is armed. */
+  private slapMark = new Group();
   /** The shockwave is clipped to the arena: its world center and rim radius. */
   private shockClip = { uC: { value: new Vector3() }, uR: { value: 1 } };
   /** The strike's hint shows once a session, the first time the bar is full. */
@@ -422,6 +424,12 @@ export class MatchSystem extends createSystem({
       this.shock,
     );
     this.shock.visible = false;
+    {
+      const glow = (o: number) => new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: o, depthWrite: false, blending: AdditiveBlending });
+      this.slapMark.add(new Mesh(new RingGeometry(0.028, 0.033, 40).rotateX(-Math.PI / 2), glow(0.9)), new Mesh(new CircleGeometry(0.022, 32).rotateX(-Math.PI / 2), glow(0.3)));
+      this.slapMark.visible = false;
+      this.root.add(this.slapMark);
+    }
     // Only the part over the arena floor draws (the ring starts on the rim, half of it would hang in the air).
     (this.shock.material as MeshBasicMaterial).onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.shockClip);
@@ -639,7 +647,7 @@ export class MatchSystem extends createSystem({
     }
     this.launchZone.visible = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
     if (this.phase !== 'fight') {
-      this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = false;
+      this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = false;
       this.arenaView.charge = 0;
     }
     switch (this.phase) {
@@ -1805,6 +1813,14 @@ export class MatchSystem extends createSystem({
       this.label.set(`Forge bar full: ${SEAL_NAMES[this.myBuild.seal ?? 'anvil']}!\nSlap your palm down beside the arena`);
     }
     const armed = full && this.elapsed - this.fullSince > 0.5;
+    // The print sits on the table off the near-right rim (any spot beside the arena works).
+    this.slapMark.visible = armed;
+    if (armed) {
+      const a = Math.PI / 3;
+      const r = rimRadius(this.arena.layout, a) + 0.05;
+      this.slapMark.position.set(Math.cos(a) * r, -PEDESTAL / ARENA_SCALE + 0.001, Math.sin(a) * r);
+      this.slapMark.scale.setScalar(1 + 0.12 * Math.sin(this.time * 8));
+    }
     // The table under the pedestal: a press counts within 5 cm of it.
     const tableY = this.root.position.y - PEDESTAL * this.rootK;
     for (const side of ['left', 'right'] as const) {
