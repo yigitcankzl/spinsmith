@@ -49,6 +49,21 @@ Draft (Oct 7, 2026); final text before the deadline. For judges and anyone tryin
    in the glowing slot on the right to save it.
 8. Back home, the Smith's board shows today's order, the rivals' medallions and your ledger.
 
+## Moments worth seeing (about ten minutes)
+
+- **Your room joins in.** Sit near the table's edge and ramp the rival over the wall: it keeps
+  spinning across your real desk and can drop off its real edge (OFF THE DESK!). With a wall
+  detected behind the arena, the rival's portal opens on it at the start of a match.
+- **Strike the desk.** With the forge bar full, slap your palm beside the arena: the shockwave,
+  and a molten print of your hand on the desk that cools to a scorch.
+- **Replay.** When your own move decides a round, the arena replays it slowly and turns to show
+  it from the rival's side (a pinch skips it).
+- **Quench.** Save a top in the forge's quench slot: the room turns cold blue for a breath.
+- **Win a match.** A wave of warm light rolls across your room.
+- **Challenge a friend.** The board shows your top's code; on another headset, add `?vs=CODE` to
+  the address and the next match is against your top.
+- `?demo` opens all of this at once (level 8, every move taught).
+
 ## Known limits
 
 - Without a table labelled in the Quest's Space Setup, the arena floats in front of you after
