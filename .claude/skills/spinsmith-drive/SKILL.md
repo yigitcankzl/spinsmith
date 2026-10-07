@@ -1,6 +1,6 @@
 ---
 name: spinsmith-drive
-description: Plays SpinSmith in the IWER emulator with real hand motions (rip, ramp, cup, sling, palm slap, taps on hub/forge items) through the dev hand driver, reading the game state between moves. Use to playtest a flow end to end (the first session, a match, the forge), to check that a gesture change still works, or to stage repeatable demo shots. Triggers: "oyna", "emülatörde dene", "elle oyna", "playtest", "demo çekimi", "drive the hands", "test the first session".
+description: Plays SpinSmith in the IWER emulator with real hand motions (rip, ramp, cup, sling, palm slap, taps on hub/forge items) through the dev hand driver, reading the game state between moves. Use to playtest a flow end to end (the first session, a match, the forge), to check that a gesture change still works, or to stage and record repeatable demo shots (DRIVE_VIDEO). Triggers: "oyna", "emülatörde dene", "elle oyna", "playtest", "demo çekimi", "drive the hands", "test the first session".
 ---
 
 # Driving SpinSmith's hands in the emulator
@@ -65,10 +65,17 @@ rival near the rim for a slap; `cups.holding` true before a sling.
 
 ## Demo shots
 
-Same steps, with the camera placed first (`scripts/emu.sh look X Y Z`, or
-`npx @iwsdk/cli xr set-transform` for the headset) and the screen recorded outside (OBS). For
-1080p screenshots, restart the server with `--screenshot-width 1920 --screenshot-height 1080`.
-Label emulator footage as captured in the emulator.
+Place the camera first (`scripts/emu.sh look X Y Z`, or `npx @iwsdk/cli xr set-transform` for the
+headset), then record the steps:
+
+```bash
+DRIVE_VIDEO=~/Desktop/spinsmith-videos/ramp-throw.mp4 scripts/drive.sh '["rip",{"power":0.9}]' '["wait",3]' '["ramp"]' '["wait",3]'
+```
+
+The clip is what the player sees (the emulator's room with the game over it, 1920 wide, 60 fps,
+H.264), without the emulator's gizmos and panels. One call is at most about 100 s; record long
+takes in several clips. Check a frame with `ffmpeg -ss 5 -i clip.mp4 -frames:v 1 /tmp/f.jpg` and
+Read it. Label emulator footage as captured in the emulator.
 
 ## Limits
 
