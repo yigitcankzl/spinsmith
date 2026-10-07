@@ -62,7 +62,7 @@ export interface ShapingResult {
  * will be with some error. `delay` 0.62 s is a ramp set on release, 0.35 s one set at the pinch.
  */
 export const HUMAN = { reaction: 0.25, gesture: 0.3, tracking: 0.07, posErr: 0.005, dirErr: 0.26, minGap: 1.0 };
-export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking): Policy {
+export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking, sigma?: number): Policy {
   let pending: { at: number; x: number; z: number; a: number }[] = [];
   let lastT = Infinity;
   let busy = 0;
@@ -78,7 +78,7 @@ export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.trackin
     for (const p of pending) {
       if (p.at > t) continue;
       const f = charges.spend(t, TUNING.grace);
-      if (f) arena.addShape('ramp', p.x, p.z, SHAPE_SIZE.ramp * f, owner, Math.cos(p.a), Math.sin(p.a));
+      if (f) arena.addShape('ramp', p.x, p.z, SHAPE_SIZE.ramp * f, owner, Math.cos(p.a), Math.sin(p.a), sigma);
     }
     pending = pending.filter((p) => p.at > t);
     if (t < TUNING.grace || busy > t || t - last < HUMAN.minGap || charges.charges < 1) return;

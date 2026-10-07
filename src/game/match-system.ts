@@ -5,7 +5,7 @@ import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { Arena, ATTACK, DEFENSE, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import { Arena, ATTACK, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
 import { GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -86,6 +86,10 @@ const PERFECT = TUNE.perfect;
 const PERFECT_SPIN = 1.1;
 /** Far ramps (and the dev key's) grow at this rate (m/s) while the pinch is held. */
 const RAY_BUMP_RATE = 0.05;
+/** A near ramp is set after the pinch is held this long (s); a brush of the fingers sets nothing. */
+const RAMP_NEAR_HOLD = 0.12;
+/** A drag shorter than this (arena-local, about 1.2 cm in the world) does not turn the ramp. */
+const RAMP_AIM_DEADZONE = 0.005;
 
 
 type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build' | 'forge';
@@ -251,7 +255,8 @@ export class MatchSystem extends createSystem({
    * A ramp being made by each hand: locked start point, pinch height and position at the start,
    * time held, near or far (ray), and its current height and push direction (the ghost).
    */
-  private shaping: Record<Side, { x: number; z: number; y0: number; sx: number; sz: number; t: number; far: boolean; amp: number; dx: number; dz: number } | null> = { left: null, right: null };
+  /** Each hand's ramp in the making: where, since when, and the live shape once it is set. */
+  private shaping: Record<Side, { x: number; z: number; sx: number; sz: number; t: number; far: boolean; amp: number; dx: number; dz: number; shape: FloorShape | null } | null> = { left: null, right: null };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
   private pressing: Record<Side, boolean> = { left: false, right: false };
   /** Each hand's fingertip height last frame (arena-local), and when it last set a ramp. */
@@ -1294,40 +1299,36 @@ export class MatchSystem extends createSystem({
       if (h.pinching) {
         let d = this.shaping[side];
         if (!d && h.justPinched && open) {
+          // Pointing out from the middle until the hand drags it round.
           if (this.arena.inside(l.x, l.z) && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
-            d = this.shaping[side] = { x: l.x, z: l.z, y0: l.y, sx: l.x, sz: l.z, t: 0, far: false, amp: SHAPE_SIZE.rampMin, dx: 0, dz: 0 };
+            d = this.shaping[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z, t: 0, far: false, amp: SHAPE_SIZE.ramp, dx: l.x, dz: l.z, shape: null };
           } else if (this.rayFloor(h)) {
-            d = this.shaping[side] = { x: this.rayHit.x, z: this.rayHit.z, y0: l.y, sx: l.x, sz: l.z, t: 0, far: true, amp: SHAPE_SIZE.rampMin, dx: 0, dz: 0 };
+            d = this.shaping[side] = { x: this.rayHit.x, z: this.rayHit.z, sx: l.x, sz: l.z, t: 0, far: true, amp: SHAPE_SIZE.ramp, dx: this.rayHit.x, dz: this.rayHit.z, shape: null };
           }
         }
         if (d) {
           d.t += this.frameDt;
-          const lift = d.far ? d.t * RAY_BUMP_RATE : (l.y - d.y0) * 1.2;
-          d.amp = Math.min(SHAPE_SIZE.ramp, Math.max(SHAPE_SIZE.rampMin, SHAPE_SIZE.rampMin + lift));
-          // Aim: the sideways pull since the pinch began (the far hand's own motion counts double);
-          // too small a pull aims straight out from the middle.
+          // Aim: the drag since the pinch began (the far hand's own motion counts double), once it is
+          // past a small dead zone, so tracking jitter never swings it.
           const k = d.far ? 2 : 1;
-          let px = (l.x - d.sx) * k;
-          let pz = (l.z - d.sz) * k;
-          if (Math.hypot(px, pz) < 0.012) {
-            px = d.x;
-            pz = d.z;
+          const px = (l.x - d.sx) * k;
+          const pz = (l.z - d.sz) * k;
+          if (Math.hypot(px, pz) >= RAMP_AIM_DEADZONE) {
+            d.dx = px;
+            d.dz = pz;
+            if (d.shape) this.arena.aimShape(d.shape, px, pz);
           }
-          const n = Math.hypot(px, pz) || 1;
-          d.dx = px / n;
-          d.dz = pz / n;
+          // The ramp is set at the pinch, full size, after a short hold (a brush is not a pinch).
+          if (!d.shape && d.t >= (d.far ? TUNE.farHold : RAMP_NEAR_HOLD)) {
+            d.shape = this.makeShape('ramp', d.x, d.z, SHAPE_SIZE.ramp, side, d.dx, d.dz);
+            this.rampAt[side] = this.elapsed;
+            if (!d.shape) this.shaping[side] = null;
+          }
         }
         continue;
       }
-      const d = this.shaping[side];
-      if (d) {
-        // Released: the ramp is set, if a charge is left (a far pinch must be held a moment).
-        this.shaping[side] = null;
-        if (!d.far || d.t >= TUNE.farHold) {
-          this.makeShape('ramp', d.x, d.z, d.amp, side, d.dx, d.dz);
-          this.rampAt[side] = this.elapsed;
-        }
-      }
+      // Let go: the ramp, if set, keeps working on its own.
+      this.shaping[side] = null;
       // A fingertip pressed into the floor makes a well, once per press, if it came down with
       // intent (a hand resting or drifting down does not) and not just as a ramp was let go.
       const tip = this.toLocal(h.index);
@@ -1345,18 +1346,19 @@ export class MatchSystem extends createSystem({
   }
 
   /** Spends a charge and sets a shape (one live shape per hand); without a charge, a dull clunk. */
-  private makeShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0) {
+  private makeShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0): FloorShape | null {
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (import.meta.env.DEV) console.log(`[SHAPE] ${kind} at ${x.toFixed(3)},${z.toFixed(3)} amp ${amp.toFixed(3)} factor ${f} charges ${this.charges.charges} t ${this.elapsed.toFixed(1)}`);
     if (!f) {
       playLocked();
-      return;
+      return null;
     }
-    this.arena.addShape(kind, x, z, amp * f, owner, dx, dz);
+    const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz);
     this.lastShape = { t: this.elapsed, kind };
     if (kind === 'well') this.wellInRound = true;
     this.progress.advance('match');
     playThock();
+    return shape;
   }
 
   /**
@@ -1372,7 +1374,7 @@ export class MatchSystem extends createSystem({
     if (!me.alive || r < this.arena.radius * 0.6 || r < 1e-3 || this.elapsed - this.rivalShapeAt < RIVAL_SHAPE_GAP) return;
     const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
     if (!f) return;
-    this.arena.addShape('ramp', me.x - (me.x / r) * 0.012, me.z - (me.z / r) * 0.012, SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r);
+    this.arena.addShape('ramp', me.x - (me.x / r) * 0.012, me.z - (me.z / r) * 0.012, SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r, RIVAL_RAMP_SIGMA);
     this.rivalShapeAt = this.elapsed;
     playThock();
     if (import.meta.env.DEV) console.log(`[SHAPE] rival ramp at ${me.x.toFixed(3)},${me.z.toFixed(3)} t ${this.elapsed.toFixed(1)}`);
@@ -1380,12 +1382,12 @@ export class MatchSystem extends createSystem({
 
   /** Marks for live shapes and ghosts, the charge embers, and a crunch when a top runs into a shape. */
   private updateShapes() {
-    const mark = (s: FloorShape): ShapeMarkSpec => ({ kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false });
+    const mark = (s: FloorShape): ShapeMarkSpec => ({ kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false, sigma: s.sigma });
     const specs = this.arena.shapes.filter((s) => s.owner !== 'rival').map(mark);
     this.rivalMarks.show(this.phase === 'fight' ? this.arena.shapes.filter((s) => s.owner === 'rival').map(mark) : [], (x, z) => this.arena.height(x, z), this.time);
     for (const side of ['left', 'right'] as const) {
       const d = this.shaping[side];
-      if (d) specs.push({ kind: 'ramp', x: d.x, z: d.z, dx: d.dx, dz: d.dz, strength: d.amp / SHAPE_SIZE.ramp, ghost: true });
+      if (d && !d.shape) specs.push({ kind: 'ramp', x: d.x, z: d.z, dx: d.dx, dz: d.dz, strength: 1, ghost: true });
     }
     if (this.devRampSince >= 0 && this.gazeHit.ok) {
       const r = Math.hypot(this.gazeHit.x, this.gazeHit.z) || 1;
@@ -1561,7 +1563,7 @@ export class MatchSystem extends createSystem({
       const z = this.theirs.z - (this.theirs.z / r) * 0.035;
       this.bumpMark.position.set(x, this.arena.height(x, z) + 0.002, z);
       this.bumpMark.scale.setScalar(1 + 0.3 * Math.sin(this.time * 6));
-      this.label.set('Pinch the floor at the ring, lift and pull outward\nlet go: the ramp pushes the rival');
+      this.label.set('Pinch the floor at the ring: a ramp rises at once\ndrag to aim it at the rival');
       this.bumpHintShown = true;
     } else if (this.bumpHintShown && g !== 'bump') {
       // The first move is made: the hint goes.

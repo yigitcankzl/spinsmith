@@ -1,6 +1,7 @@
 /** How much arena shaping decides a fight, by shaping habit. Run: npm run report:shaping */
 import { humanRamp, POLICIES, reportShaping } from '../src/game/shaping-report.ts';
 import type { ShapingResult } from '../src/game/shaping-report.ts';
+import { RIVAL_RAMP_SIGMA } from '../src/game/sim.ts';
 
 const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
 const line = (name: string, r: ShapingResult, goal = '') =>
@@ -16,5 +17,5 @@ line('human ramp (lag 0.62 s, release)', reportShaping(humanRamp(0.62), 24));
 line('superhuman push-out (no lag)', reportShaping(POLICIES.pushOut, 24));
 line('center well', reportShaping(POLICIES.centerWell, 24));
 // Rivals from level 6 ramp you out too: how a player fares against them.
-line('none vs a ramping rival', reportShaping(POLICIES.none, 24, humanRamp(0.62)));
-line('human ramp vs a ramping rival', reportShaping(humanRamp(0.35), 24, humanRamp(0.62)));
+line('none vs a ramping rival', reportShaping(POLICIES.none, 24, humanRamp(0.62, RIVAL_RAMP_SIGMA)));
+line('human ramp vs a ramping rival', reportShaping(humanRamp(0.35), 24, humanRamp(0.62, RIVAL_RAMP_SIGMA)));

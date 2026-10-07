@@ -40,7 +40,7 @@ import {
 import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena-shell.scene-asset.js';
 import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
-import { Arena, Top } from './sim.js';
+import { Arena, RAMP_SIGMA, Top, WELL_SIGMA } from './sim.js';
 import { FONT, glass, ORANGE, TEXT } from './ui.js';
 import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
 import { TABLE_Y } from './reach.js';
@@ -1469,6 +1469,8 @@ export interface ShapeMarkSpec {
   /** 0..1: how strong it still is (rings shrink as it relaxes). */
   strength: number;
   ghost: boolean;
+  /** Its footprint, when not the kind's default. */
+  sigma?: number;
 }
 
 /**
@@ -1506,7 +1508,7 @@ export class ShapeMarks {
       const s = specs[i];
       m.group.visible = !!s;
       if (!s) return;
-      const sigma = s.kind === 'ramp' ? 0.03 : 0.022;
+      const sigma = s.sigma ?? (s.kind === 'ramp' ? RAMP_SIGMA : WELL_SIGMA);
       const shrink = 0.4 + 0.6 * s.strength;
       m.group.position.set(s.x, height(s.x, s.z) + 0.003, s.z);
       const radii = s.kind === 'ramp' ? [0.6, 1.1, 1.6] : [0.5, 1, 1.5];

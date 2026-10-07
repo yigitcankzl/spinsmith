@@ -23,8 +23,7 @@ Striker smashes, Anvil absorbs, Halo outlasts.
 harder and straighter the pull, the more spin it starts with. A white-hot pull earns extra spin.
 
 **Reshape.** This is what no other top game has. During the fight you shape the arena floor itself.
-Pinch the floor, lift and pull sideways to raise a ramp: lift sets how hard it throws, the pull
-which way. Press a fingertip in to sink a well that catches a top and holds it. Shapes affect both
+Pinch the floor and a ramp rises there at once; drag while you hold to aim which way it throws. Press a fingertip in to sink a well that catches a top and holds it. Shapes affect both
 tops and relax back to flat in two or three seconds, so a well-placed ramp can throw your rival
 into a slag pit, and a careless one can throw your own top out. Two charges keep it a decision,
 not a reflex: clashing refills them. When a shape decides a round, the result says so: "YOUR
@@ -51,9 +50,9 @@ strategy is measured over thousands of rounds.
   the score are one machine on the table, so the hands never switch between touching and pointing.
 - **Pinch and pull to launch:** the rip is the motion of pulling a cord, with arrows showing the
   direction the first time.
-- **Pinch, lift and pull to ramp:** the position locks when the pinch starts, a ghost shows the
-  ramp before you let go, and release commits it. Far shapes use the hand ray with the same lock,
-  so tracking jitter never moves them.
+- **Pinch to ramp, drag to aim:** the ramp rises the moment the pinch holds (about a tenth of a
+  second), so it meets a moving top; dragging turns it, and a small dead zone keeps tracking
+  jitter from swinging it. Far ramps use the hand ray the same way.
 - **Press to well:** a fingertip pressed into the arena floor.
 - **Seated:** everything touched sits within a seated arm's reach (about 0.35-0.55 m); only the
   score and the stats, which are read, sit on the far rim.
@@ -71,7 +70,7 @@ reshape the arena to win.*
 | 0:08-0:12 | Over the shoulder: the whole arena on the table | Title: SpinSmith |
 | 0:12-0:18 | The arena transforms into the forge; hands pinch a tip from the drawer and press it onto the top | "Forge it by hand" |
 | 0:18-0:28 | Pinch and pull back; the top rips into the arena | "Rip it into your real table" |
-| 0:28-0:40 | Pinch the floor, lift and pull: a ramp throws the rival into a slag pit | "Reshape the arena to win" · YOUR RAMP → SLAG |
+| 0:28-0:40 | Pinch the floor ahead of the rival, drag to aim: the ramp throws it into a slag pit | "Reshape the arena to win" · YOUR RAMP → SLAG |
 | 0:40-0:45 | XP fills, LEVEL 2, a new part spins over the arena | Rematch |
 | 0:45-0:55 | Home: the Smith's board with today's order; pinch it, ramp the rival out, ORDER DONE and a stamp strikes the ledger | A new order every day |
 | 0:55-1:15 | The well: holding a stamina top in the middle against an attacker | Two verbs: ramp and well |

@@ -53,10 +53,13 @@ const GRID = 44;
 const EXTENT = MAX_RADIUS + 0.01;
 const CELL = (2 * EXTENT) / (GRID - 1);
 /** Shapes the player makes flatten back with this time constant (~2-3 s to vanish). */
-const RELAX_TAU = 0.8;
+const RELAX_TAU = 1.0;
 /** Player shapes: a ramp's and a well's width (sigma, m), and how hard a fresh well slows a top (1/s). */
-const RAMP_SIGMA = 0.03;
-const WELL_SIGMA = 0.022;
+/** A ramp's footprint (arena-local): about 11 cm across in the world, wide enough to meet a moving top. */
+export const RAMP_SIGMA = 0.045;
+/** The smaller ramp of a rival, so it does not end rounds too fast. */
+export const RIVAL_RAMP_SIGMA = 0.03;
+export const WELL_SIGMA = 0.022;
 const WELL_DRAG = 3;
 /** How much less a top in the middle of a fresh well is knocked back (0..1). */
 const WELL_BRACE = 0.5;
@@ -83,7 +86,7 @@ export const TUNING = {
   /** Outward speed (m/s) a top needs to drop into a pocket. */
   pocket: 0.27,
   /** Seconds a player's ramp or well stays at full strength before it starts to relax. */
-  shapeHold: 0.5,
+  shapeHold: 1.0,
   /** Seconds after the launch during which pockets and walls hold every top (no instant finishes). */
   grace: 2.5,
 };
@@ -228,12 +231,21 @@ export class Arena {
    * Adds a ramp or well. An owner holds one live shape at a time: its previous one dissolves.
    * Returns the shape.
    */
-  addShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0): FloorShape {
+  addShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0, sigma?: number): FloorShape {
     this.shapes = this.shapes.filter((s) => s.owner !== owner);
     const len = Math.hypot(dx, dz);
     const shape: FloorShape = { kind, x, z, dx: len > 1e-6 ? dx / len : 0, dz: len > 1e-6 ? dz / len : 0, amp, age: 0, owner };
+    if (sigma !== undefined) shape.sigma = sigma;
     this.shapes.push(shape);
     return shape;
+  }
+
+  /** Turns a live ramp to push another way (the hand still holding it drags its face round). */
+  aimShape(shape: FloorShape, dx: number, dz: number) {
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-6) return;
+    shape.dx = dx / len;
+    shape.dz = dz / len;
   }
 
   /** How strong a shape is now: full for a moment after it is made, then fading as it relaxes. */
@@ -254,9 +266,10 @@ export class Arena {
       }
       // A ramp: a mound whose front half (along its push direction) falls away steeply, so a top
       // on it slides off toward the push.
-      const g = Math.exp(-(rx * rx + rz * rz) / (RAMP_SIGMA * RAMP_SIGMA));
+      const sg = s.sigma ?? RAMP_SIGMA;
+      const g = Math.exp(-(rx * rx + rz * rz) / (sg * sg));
       const u = rx * s.dx + rz * s.dz;
-      h += k * g * 0.5 * (1 - Math.tanh(u / (0.5 * RAMP_SIGMA)));
+      h += k * g * 0.5 * (1 - Math.tanh(u / (0.5 * sg)));
     }
     return h;
   }
@@ -349,6 +362,8 @@ export interface FloorShape {
   amp: number;
   age: number;
   owner: string;
+  /** Footprint, when not the kind's default. */
+  sigma?: number;
 }
 
 function smoothstep(e0: number, e1: number, x: number) {

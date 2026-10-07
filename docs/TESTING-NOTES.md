@@ -28,8 +28,8 @@ Draft (Oct 7, 2026); final text before the deadline. For judges and anyone tryin
 2. The rival is introduced. Pinch over the arena where you want to launch (inside the dashed
    ring), pull back and let go: the top rips
    in. A white-hot pull adds spin.
-3. After the opening seconds a ring marks a spot beside the rival: pinch the floor there, lift
-   and pull outward, let go. Your ramp throws the rival toward the rim.
+3. After the opening seconds a ring marks a spot beside the rival: pinch the floor there and a
+   ramp rises at once; drag to aim it. Your ramp throws the rival toward the rim.
 4. First to 3 heat wins: outlasting the rival scores 1, a knockout (into a slag pit, over the
    wall, or shattering it) scores 2. A finish your ramp caused says so: YOUR RAMP → SLAG.
 5. After the match the small anvil calls: pinch it and the arena turns into the forge. The Tip

@@ -149,10 +149,10 @@ an arena. First to 3 heat wins a match.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
   burst, topple and result jingles.
-- **Arena moves during the fight** (`docs/ARENA-SHAPING.md`): pinch the floor, lift and pull
-  sideways to raise a ramp (lift sets its strength, the pull which way it throws a top); press a
-  fingertip into the floor to make a well that catches and slows a top. A ghost shows the ramp
-  while pinching, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
+- **Arena moves during the fight** (`docs/ARENA-SHAPING.md`): pinch the floor and a ramp
+  rises there at once (after a 0.12 s hold, full size, about 11 cm across); keep holding and drag
+  to aim which way it throws a top. Press a fingertip into the floor to make a well that catches
+  and slows a top. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
   shape affects both tops. Two charges, shown as sparks on the near rim: a shape spends one, a
   strong clash or about 6 s refills one, a hand keeps one live shape, and nothing can be shaped
   in the first 2.5 s. A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
