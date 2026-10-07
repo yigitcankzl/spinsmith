@@ -17,14 +17,70 @@ let pausedAudio = false;
 let panNow = 0;
 
 /** Plays `fn`'s sounds from an arena-local x (the arena is about 0.15-0.18 across a half). */
-function at(x: number, fn: () => void) {
+function at(x: number, fn: () => void, z = 0) {
   panNow = Math.max(-1, Math.min(1, x / 0.18)) * 0.7;
+  atX = x;
+  atZ = z;
+  placed = true;
   fn();
   panNow = 0;
+  placed = false;
+}
+let atX = 0;
+let atZ = 0;
+let placed = false;
+
+/**
+ * The arena's place in the room (its local-to-world matrix) and the head: sounds placed with at()
+ * come from where they happen, through head-related (HRTF) panners, once the game has set it.
+ */
+let arenaFrame: ArrayLike<number> | null = null;
+export function setAudioFrame(m: ArrayLike<number>, head: { x: number; y: number; z: number }, fwd: { x: number; y: number; z: number }) {
+  arenaFrame = m;
+  const l = ctx?.listener;
+  if (!ctx || !l) return;
+  const t = ctx.currentTime;
+  if (l.positionX) {
+    l.positionX.setValueAtTime(head.x, t);
+    l.positionY.setValueAtTime(head.y, t);
+    l.positionZ.setValueAtTime(head.z, t);
+    l.forwardX.setValueAtTime(fwd.x, t);
+    l.forwardY.setValueAtTime(fwd.y, t);
+    l.forwardZ.setValueAtTime(fwd.z, t);
+    l.upX.setValueAtTime(0, t);
+    l.upY.setValueAtTime(1, t);
+    l.upZ.setValueAtTime(0, t);
+  }
 }
 
-/** Where a sound goes: the master bus, through a stereo panner when it sits to one side. */
+/** World position of an arena-local point on the floor. */
+function worldOf(x: number, z: number, out: { x: number; y: number; z: number }) {
+  const m = arenaFrame!;
+  out.x = m[0] * x + m[8] * z + m[12];
+  out.y = m[1] * x + m[9] * z + m[13];
+  out.z = m[2] * x + m[10] * z + m[14];
+  return out;
+}
+const spot = { x: 0, y: 0, z: 0 };
+
+/** A head-related panner at an arena-local point, into `dest`. */
+function panner(a: AudioContext, x: number, z: number, dest: AudioNode): PannerNode {
+  const p = a.createPanner();
+  p.panningModel = 'HRTF';
+  p.distanceModel = 'inverse';
+  p.refDistance = 0.5;
+  p.rolloffFactor = 0.6;
+  worldOf(x, z, spot);
+  p.positionX.value = spot.x;
+  p.positionY.value = spot.y;
+  p.positionZ.value = spot.z;
+  p.connect(dest);
+  return p;
+}
+
+/** Where a sound goes: the effects bus, from where it happens (HRTF) or panned to its side. */
 function out(a: AudioContext): AudioNode {
+  if (placed && arenaFrame) return panner(a, atX, atZ, sfx!);
   if (panNow === 0 || !a.createStereoPanner) return sfx!;
   const p = a.createStereoPanner();
   p.pan.value = panNow;
@@ -158,8 +214,8 @@ function hiss(gain: number, decay: number, f0: number, f1 = f0, q = 1, at = 0) {
 const RING_PITCH: Record<string, number> = { anvil: 900, bulwark: 950, halo: 1300, cog: 1200, hook: 1500, gale: 1600, striker: 1700, saw: 1800 };
 
 /** Metal-on-metal clash; with the rings' ids, each top rings its own pitch (a two-voice clang). */
-export function playClash(strength: number, x = 0, ringA?: string, ringB?: string) {
-  at(x, () => clash(strength, ringA, ringB));
+export function playClash(strength: number, x = 0, ringA?: string, ringB?: string, z = 0) {
+  at(x, () => clash(strength, ringA, ringB), z);
 }
 
 let clashVoices = 0;
@@ -301,6 +357,7 @@ export class SpinHum {
   private whirrBand: BiquadFilterNode | null = null;
   private blade: OscillatorNode | null = null;
   private pan: StereoPannerNode | null = null;
+  private place: PannerNode | null = null;
 
   constructor(private readonly base: number) {}
 
@@ -317,7 +374,13 @@ export class SpinHum {
     this.pan = a.createStereoPanner();
     this.osc.connect(this.filter);
     this.osc2.connect(this.filter);
-    this.filter.connect(this.gain).connect(this.pan).connect(master!);
+    // Panned left-right, then placed in the room where the top is (HRTF).
+    this.place = a.createPanner();
+    this.place.panningModel = 'HRTF';
+    this.place.distanceModel = 'inverse';
+    this.place.refDistance = 0.5;
+    this.place.rolloffFactor = 0.6;
+    this.filter.connect(this.gain).connect(this.pan).connect(this.place).connect(master!);
     // The whirr: noise through a band, its loudness swung by the blade-pass oscillator.
     if (noise) {
       const src = a.createBufferSource();
@@ -344,7 +407,7 @@ export class SpinHum {
   }
 
   /** spin 0..1 (0 = silent), speed in m/s, wobble 0..1; x is where the top is (arena-local, for panning). */
-  update(spin: number, speed: number, wobble: number, time: number, x = 0) {
+  update(spin: number, speed: number, wobble: number, time: number, x = 0, z = 0) {
     const a = audio();
     if (!a) return;
     if (!this.osc) this.start(a);
@@ -357,7 +420,14 @@ export class SpinHum {
     this.filter!.frequency.setTargetAtTime(400 + 2600 * spin, t, 0.05);
     const loud = spin > 0 ? 0.025 + 0.05 * spin + 0.04 * Math.min(1, speed) : 0;
     this.gain!.gain.setTargetAtTime(loud, t, 0.08);
-    this.pan!.pan.setTargetAtTime(Math.max(-1, Math.min(1, x / 0.18)) * 0.6, t, 0.05);
+    if (arenaFrame && this.place) {
+      // In the room: the HRTF panner carries direction, so the stereo pan stays centred.
+      worldOf(x, z, spot);
+      this.place.positionX.setTargetAtTime(spot.x, t, 0.03);
+      this.place.positionY.setTargetAtTime(spot.y, t, 0.03);
+      this.place.positionZ.setTargetAtTime(spot.z, t, 0.03);
+      this.pan!.pan.setTargetAtTime(0, t, 0.05);
+    } else this.pan!.pan.setTargetAtTime(Math.max(-1, Math.min(1, x / 0.18)) * 0.6, t, 0.05);
     if (this.whirr && this.blade && this.whirrBand) {
       this.blade.frequency.setTargetAtTime(8 + 40 * spin, t, 0.05);
       this.whirrBand.frequency.setTargetAtTime(1200 + 1800 * spin, t, 0.05);

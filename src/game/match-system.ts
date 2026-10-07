@@ -1,5 +1,5 @@
 import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, duck, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -866,7 +866,11 @@ export class MatchSystem extends createSystem({
     if (moving || this.arenaDirty) this.arenaView.sync(this.arena);
     this.arenaDirty = moving;
     const live = this.phase === 'fight';
-    this.tops.forEach((t, i) => this.hums[i].update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time, t.x));
+    // Sounds come from where they happen in the room: the arena's place and the head, every frame.
+    this.player.head.getWorldPosition(this.head);
+    this.player.head.getWorldDirection(this.fwd).negate();
+    setAudioFrame(this.root.matrixWorld.elements, this.head, this.fwd);
+    this.tops.forEach((t, i) => this.hums[i].update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time, t.x, t.z));
     this.sinceClashSound += dt;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
       const p = this.progress;
@@ -2775,7 +2779,7 @@ export class MatchSystem extends createSystem({
           duck(0.5, 0.15);
         }
         if (this.sinceClashSound > 0.06) {
-          playClash(clash.strength, clash.x, this.myBuild.ring, this.theirBuild.ring);
+          playClash(clash.strength, clash.x, this.myBuild.ring, this.theirBuild.ring, clash.z);
           this.sinceClashSound = 0;
         }
       }
