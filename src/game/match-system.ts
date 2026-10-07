@@ -2693,7 +2693,8 @@ export class MatchSystem extends createSystem({
       this.hitStop -= dt;
       return;
     }
-    this.accumulator += dt;
+    // Assist (the comfort dial) runs the fight at 80% speed.
+    this.accumulator += COMFORT.assist ? dt * 0.8 : dt;
     let steps = 0;
     while (this.accumulator >= STEP && steps < 8) {
       this.accumulator -= STEP;
