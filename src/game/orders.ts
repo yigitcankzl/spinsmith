@@ -37,7 +37,7 @@ export interface OrderEvent {
   wonRound: boolean;
   finish: 'pocket' | 'over' | 'burst' | 'spin' | null;
   /** The player's shape that caused the finish (within the cause window), if any. */
-  cause: 'ramp' | 'well' | 'sling' | null;
+  cause: 'ramp' | 'well' | 'sling' | 'strike' | null;
   /** The player set a well during this round (a spin finish comes too late for the cause window). */
   wellInRound: boolean;
   /** The match ended with this round, won by the player, and the rival scored nothing. */

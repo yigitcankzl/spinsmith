@@ -75,14 +75,20 @@ export class ShapingCharges {
 
 /**
  * The forge bar (docs/DUEL-DESIGN.md): fills from solid clashes and slowly on its own, twice as
- * fast while your top is behind on spin; when full, the Anvil Strike is ready. Separate from the
+ * fast while your top is behind on spin (three times); when full, the Anvil Strike is ready. Separate from the
  * shaping charges, so the strike adds a decision (when) without taking ramps away.
  */
+/** A top with less than this share of its rival's spin counts as behind: its bar fills STRIKE_BAR.behind times as fast (the comeback). */
+export const BEHIND_SHARE = 0.7;
+export const behindOn = (me: { alive: boolean; spin: number }, rival: { alive: boolean; spin: number }) => me.alive && rival.alive && me.spin < BEHIND_SHARE * rival.spin;
+
 export const STRIKE_BAR = {
   /** Seconds to fill on its own. */
   passive: 30,
   /** Filled per solid clash (strength at least SHAPING.clashMin), at most once per clashGap. */
   clash: 0.07,
+  /** Behind on spin, the bar fills this many times as fast. */
+  behind: 3,
 };
 
 export class StrikeBar {
@@ -99,13 +105,13 @@ export class StrikeBar {
   }
 
   update(dt: number, behind: boolean) {
-    this.value = Math.min(1, this.value + (dt / STRIKE_BAR.passive) * (behind ? 2 : 1));
+    this.value = Math.min(1, this.value + (dt / STRIKE_BAR.passive) * (behind ? STRIKE_BAR.behind : 1));
   }
 
   clash(strength: number, t: number, behind: boolean) {
     if (strength < SHAPING.clashMin || t - this.lastClash < SHAPING.clashGap) return;
     this.lastClash = t;
-    this.value = Math.min(1, this.value + STRIKE_BAR.clash * (behind ? 2 : 1));
+    this.value = Math.min(1, this.value + STRIKE_BAR.clash * (behind ? STRIKE_BAR.behind : 1));
   }
 
   /** Spends the full bar at fight time t; false when it is not full or still the opening grace. */

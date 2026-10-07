@@ -5,7 +5,7 @@
 import { ARENAS } from './arenas.ts';
 import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, strike, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
-import { SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.ts';
+import { SHAPE_SIZE, ShapingCharges, StrikeBar, behindOn } from './shaping.ts';
 
 
 type Policy = (arena: Arena, me: Top, rival: Top, t: number, charges: ShapingCharges, rnd: () => number, owner?: string, bar?: StrikeBar) => void;
@@ -172,9 +172,6 @@ export function humanBoth(rampDelay = 0.35): Policy {
   };
 }
 
-/** A top with less than this share of its rival's spin counts as behind: its bar fills twice as fast (the comeback). */
-export const BEHIND_SHARE = 0.7;
-export const behindOn = (me: Top, rival: Top) => me.alive && rival.alive && me.spin < BEHIND_SHARE * rival.spin;
 
 /**
  * The Anvil Strike on top of another policy, as a player would use it: when the bar is full and

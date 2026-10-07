@@ -1,11 +1,11 @@
 import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, ForgeLoop, playCrunch, playLocked, playMachine, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, ForgeLoop, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import { strike, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
 import { GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -25,7 +25,7 @@ import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
-import { SHAPE_SIZE, ShapingCharges } from './shaping.js';
+import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
 import { TUNE } from './tuning.js';
 import type { Point } from './placement.js';
@@ -317,7 +317,19 @@ export class MatchSystem extends createSystem({
   private marks = new ShapeMarks(0xff8a2a);
   private pips = new ChargePips();
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
-  private lastShape: { t: number; kind: ShapeKind | 'sling' } | null = null;
+  private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' } | null = null;
+  /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
+  private forgeBar = new StrikeBar();
+  private strikeTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.press), right: new TableTouch(TUNE.press) };
+  /** The bar on the back of each hand: ten segments around a ring that faces the eyes. */
+  private barRings: Record<Side, Group> = { left: new Group(), right: new Group() };
+  private barSegs: MeshBasicMaterial[] = [];
+  /** The shockwave ring running out from the middle (arena-local), and how far it has gone (0..1, 1 = done). */
+  private shock = new Mesh(new RingGeometry(0.93, 1, 64).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }));
+  private shockT = 1;
+  /** The strike's hint shows once a session, the first time the bar is full. */
+  private strikeTaught = false;
+  private barWasFull = false;
   /** Each hand's live cup (a held well that catches the first top to roll in), and when it was set. */
   private cups: Record<Side, { shape: FloorShape; at: number; caught: boolean } | null> = { left: null, right: null };
   /** A hand pulling a caught top back to sling it: the cup and where the pinch began (arena-local). */
@@ -388,7 +400,9 @@ export class MatchSystem extends createSystem({
       this.rivalMarks.root,
       this.launchZone,
       this.pips.root,
+      this.shock,
     );
+    this.shock.visible = false;
     this.myBuild = this.forge.allowed(this.myBuild);
     this.setBuilds(this.myBuild, this.theirBuild);
     this.buildHandle();
@@ -412,6 +426,16 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.handOccluder.joints);
     this.world.createTransformEntity(this.handOccluder.bones);
     this.world.createTransformEntity(this.roomLight.mesh);
+    for (const side of ['left', 'right'] as const) {
+      const g = this.barRings[side];
+      for (let i = 0; i < 10; i++) {
+        const mat = new MeshBasicMaterial({ color: 0x8a8f99, transparent: true, opacity: 0.18, depthWrite: false, side: DoubleSide });
+        this.barSegs.push(mat);
+        g.add(new Mesh(new RingGeometry(0.014, 0.019, 6, 1, Math.PI / 2 - (i + 1) * ((Math.PI * 2) / 10) + 0.04, (Math.PI * 2) / 10 - 0.08), mat));
+      }
+      g.visible = false;
+      this.world.createTransformEntity(g);
+    }
     {
       // ponytail: a glowing ring and disc stand in for a handprint decal.
       const glow = (o: number) => new MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: o, depthWrite: false, blending: AdditiveBlending });
@@ -437,6 +461,11 @@ export class MatchSystem extends createSystem({
         this.keys.add(e.code);
         // C: a cup right under the rival, to try the sling.
         if (e.code === 'KeyC' && this.phase === 'fight') this.makeCup('right', this.theirs.x, this.theirs.z);
+        // J: fill the forge bar (then a palm press, or Shift+J, strikes).
+        if (e.code === 'KeyJ' && this.phase === 'fight') {
+          this.forgeBar.value = 1;
+          if (e.shiftKey) this.doStrike();
+        }
         // A: the next arena, locked or not (to look at every arena).
         if (e.code === 'KeyA' && this.phase === 'hub') {
           this.arenaIndex = (this.arenaIndex + 1) % this.arenas.length;
@@ -571,6 +600,7 @@ export class MatchSystem extends createSystem({
       this.roomLight.update(this.head, this.root.position, this.root.position.y - PEDESTAL, dim, p === 'forge' || p === 'build', dt);
     }
     this.launchZone.visible = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
+    if (this.phase !== 'fight') this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = false;
     switch (this.phase) {
       case 'placing':
         // Wait for a table to be detected, but never long: without one the arena floats on a tray.
@@ -621,6 +651,7 @@ export class MatchSystem extends createSystem({
       case 'fight':
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
         this.updateShaping();
+        this.updateStrike(dt);
         this.updateFight(dt);
         break;
     }
@@ -1565,6 +1596,8 @@ export class MatchSystem extends createSystem({
     const perfect = power >= PERFECT;
     this.lastPerfect = perfect;
     this.charges.reset();
+    this.forgeBar.reset();
+    this.barWasFull = false;
     this.rivalCharges.reset();
     this.rivalShapeAt = -9;
     this.lastShape = null;
@@ -1696,6 +1729,84 @@ export class MatchSystem extends createSystem({
         else if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${down.toFixed(2)} m/s down`);
       } else if (depth < 0) this.pressing[side] = false;
     }
+  }
+
+  /**
+   * The Anvil Strike: with the forge bar full, a palm pressed on the table (or the tray's level)
+   * outside the arena's rim. Also keeps the bar on the back of each hand and the shockwave going.
+   */
+  private updateStrike(dt: number) {
+    const full = this.forgeBar.full && this.elapsed >= TUNING.grace;
+    if (full && !this.barWasFull) {
+      playBarFull();
+      if (!this.strikeTaught && !this.demo) {
+        this.strikeTaught = true;
+        this.label.set('Forge bar full!\nPress your palm on the table beside the arena');
+        this.labelTimer = 4;
+      }
+    }
+    this.barWasFull = full;
+    // The table under the pedestal: a press counts within 5 cm of it.
+    const tableY = this.root.position.y - PEDESTAL * this.rootK;
+    for (const side of ['left', 'right'] as const) {
+      const h = this.hands[side];
+      const l = h.tracked ? this.toLocal(h.index) : null;
+      const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > 1.05;
+      const hit = this.strikeTouch[side].update(outside ? h.low : null, dt, tableY - 0.05, tableY + 0.05);
+      if (hit === null) continue;
+      if (!full) {
+        playLocked();
+        if (import.meta.env.DEV) console.log(`[STRIKE] pressed with the bar at ${Math.round(this.forgeBar.value * 100)}%`);
+        continue;
+      }
+      this.doStrike();
+      break;
+    }
+    // The bar: on the back of each tracked hand, lit by how full it is, pulsing when ready.
+    const lit = Math.round(this.forgeBar.value * 10);
+    this.barSegs.forEach((m, i) => {
+      const on = i % 10 < lit;
+      m.opacity = on ? (full ? 0.75 + 0.25 * Math.sin(this.time * 10) : 0.85) : 0.18;
+      m.color.setHex(full ? 0xffe0a0 : on ? 0xff8a2a : 0x8a8f99);
+    });
+    this.player.head.getWorldPosition(this.head);
+    for (const side of ['left', 'right'] as const) {
+      const g = this.barRings[side];
+      const h = this.hands[side];
+      g.visible = h.tracked && !this.demo;
+      if (!g.visible) continue;
+      g.position.copy(h.wrist).y += 0.05;
+      g.lookAt(this.head);
+    }
+    // The shockwave runs out to the rim in 0.35 s, fading.
+    if (this.shockT < 1) {
+      this.shockT = Math.min(1, this.shockT + dt / 0.35);
+      const r = Math.max(0.01, this.shockT * maxRim(this.arena.layout) * 1.1);
+      this.shock.scale.setScalar(r);
+      this.shock.position.y = this.arena.floorHeight(Math.min(1, this.shockT)) + 0.003;
+      (this.shock.material as MeshBasicMaterial).opacity = 0.9 * (1 - this.shockT);
+    }
+    this.shock.visible = this.shockT < 1;
+  }
+
+  /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
+  private doStrike() {
+    if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
+    strike(this.arena, this.mine, this.theirs);
+    for (const s of ['left', 'right'] as const) {
+      this.cups[s] = null;
+      this.slings[s] = null;
+    }
+    this.lastShape = { t: this.elapsed, kind: 'strike' };
+    this.shockT = 0;
+    for (const t of [this.mine, this.theirs]) if (t.alive) this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
+    this.impacts.hit(0, this.arena.floorHeight(0), 0, 1);
+    this.roomLight.hit();
+    this.hitStop = HIT_STOP * 2;
+    this.accumulator = 0;
+    playStrike();
+    if (this.strikeTaught && this.label.mesh.visible) this.label.set('');
+    if (import.meta.env.DEV) console.log(`[STRIKE] at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
   }
 
   /** A fingertip press: a cup that holds the first top to roll in, until it is slung or TUNE.cupHold passes. */
@@ -1862,6 +1973,9 @@ export class MatchSystem extends createSystem({
       steps++;
       this.elapsed += STEP;
       const clash = step(this.arena, this.mine, this.theirs);
+      const behind = behindOn(this.mine, this.theirs);
+      this.forgeBar.update(STEP, behind);
+      if (clash) this.forgeBar.clash(clash.strength, this.elapsed, behind);
       for (const t of [this.mine, this.theirs]) {
         if (t.sincePad !== 0) continue;
         // A boost pad fired: it flashes, sparks fly along it, a whoosh.

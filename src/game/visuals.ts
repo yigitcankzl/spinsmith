@@ -659,8 +659,10 @@ export class TopView {
     // lift the ring off the core, so a coming burst shows before it happens.
     this.flashT = Math.max(0, this.flashT - dt);
     const risk = Math.max(0, (top.damage - 0.45) / 0.55);
-    blur.opacity = top.state === 'spinning' ? Math.max(0.28 * Math.min(1, Math.max(0, top.spin)), this.flashT * 9, 0.35 * risk) : 0;
-    blur.color.copy(this.blurColor).lerp(this.danger, Math.min(1, risk)).lerp(this.white, Math.min(1, this.flashT * 12));
+    // Hot metal (docs/DUEL-DESIGN.md): it glows red early, since a hot top flies further from the strike.
+    const heat = Math.max(0, (top.damage - 0.12) / 0.88);
+    blur.opacity = top.state === 'spinning' ? Math.max(0.28 * Math.min(1, Math.max(0, top.spin)), this.flashT * 9, 0.4 * heat) : 0;
+    blur.color.copy(this.blurColor).lerp(this.danger, Math.min(1, heat * 1.3)).lerp(this.white, Math.min(1, this.flashT * 12));
     this.explode(0.35 * risk * (0.85 + 0.15 * Math.sin(time * 30)), null, time);
   }
 

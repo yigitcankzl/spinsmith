@@ -294,6 +294,20 @@ export function playUnlock() {
   tone(1760, 0.07, 0.8, 'triangle', 0.12);
 }
 
+/** The forge bar is full: a rising ring, the motif's first two notes. */
+export function playBarFull() {
+  tone(587, 0.08, 0.5, 'triangle');
+  tone(880, 0.08, 0.7, 'triangle', 0.1);
+}
+
+/** The Anvil Strike: a hammer on an anvil, a deep boom under it, a long metal ring. */
+export function playStrike() {
+  tone(55, 0.6, 0.9, 'sine', 0, 30);
+  hiss(0.5, 0.25, 1800, 200, 0.4);
+  tone(1320, 0.12, 1.4, 'triangle', 0.02);
+  tone(1980, 0.06, 1.1, 'triangle', 0.03);
+}
+
 /** A locked thing pinched: a dull clunk. */
 export function playLocked() {
   tone(140, 0.15, 0.15, 'square', 0, 90);

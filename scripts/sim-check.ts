@@ -719,7 +719,7 @@ TUNING.grace = 0;
   const fast = new StrikeBar();
   slow.update(5, false);
   fast.update(5, true);
-  assert.ok(Math.abs(fast.value - 2 * slow.value) < 1e-9, 'behind, the bar fills twice as fast');
+  assert.ok(Math.abs(fast.value - STRIKE_BAR.behind * slow.value) < 1e-9, 'behind, the bar fills faster');
   const arena = new Arena(FORGE);
   const outer = new Top(ATTACK);
   const inner = new Top(ATTACK);
