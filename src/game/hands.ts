@@ -18,6 +18,8 @@ export interface HandState {
   justReleased: boolean;
   /** Midpoint between thumb and index tips, world space. */
   pinch: Vector3;
+  /** Thumb-to-index distance (m), for the pinch ring (Infinity for controllers). */
+  gap: number;
   /** Index fingertip, world space (grip position for controllers). */
   index: Vector3;
   /** The hand's lowest point (world y): the lowest of the index tip, middle tip and palm, minus its radius. */
@@ -38,6 +40,7 @@ const newHand = (): HandState => ({
   justPinched: false,
   justReleased: false,
   pinch: new Vector3(),
+  gap: Infinity,
   index: new Vector3(),
   low: 0,
   wrist: new Vector3(),
@@ -100,6 +103,7 @@ export class HandInput {
         const t = tp.transform.position;
         const i = ip.transform.position;
         const d = Math.hypot(t.x - i.x, t.y - i.y, t.z - i.z);
+        h.gap = d;
         player.localToWorld(h.pinch.set((t.x + i.x) / 2, (t.y + i.y) / 2, (t.z + i.z) / 2));
         player.localToWorld(h.index.set(i.x, i.y, i.z));
         const wristJoint = hand.get('wrist');

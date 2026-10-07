@@ -263,6 +263,7 @@ export class MatchSystem extends createSystem({
     pinching: false,
     justPinched: false,
     justReleased: false,
+    gap: Infinity,
     pinch: new Vector3(),
     index: new Vector3(),
     low: 0,
@@ -310,6 +311,13 @@ export class MatchSystem extends createSystem({
   private portalCore = Object.assign(new Mesh(new CircleGeometry(0.7, 48), new MeshBasicMaterial({ color: 0x0a1a24, transparent: true, opacity: 0.85, depthWrite: false, side: DoubleSide })), { visible: false });
   /** Each hand's mark on the arena floor under it: a soft shadow, or a warm glow when the strike is ready. */
   private handAt = new Vector3();
+  /** The pinch ring between each thumb and index: it closes as the fingers do, and lights when they meet. */
+  private pinchRings = (['left', 'right'] as const).map(() => {
+    const m = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, depthTest: false }));
+    m.renderOrder = 40;
+    m.visible = false;
+    return m;
+  });
   private handMarks = (['left', 'right'] as const).map(() =>
     Object.assign(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, depthWrite: false })), { visible: false }),
   );
@@ -536,6 +544,7 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
     this.world.createTransformEntity(this.cord.line);
+    for (const m of this.pinchRings) this.world.createTransformEntity(m);
     this.world.createTransformEntity(this.handOccluder.joints);
     this.world.createTransformEntity(this.handOccluder.bones);
     this.world.createTransformEntity(this.roomLight.mesh);
@@ -684,12 +693,14 @@ export class MatchSystem extends createSystem({
       // The system menu is up: nothing stays stuck to where the hands were.
       this.barRings.left.visible = this.barRings.right.visible = this.reticle.visible = this.slapMark.visible = false;
       this.cord.set(null);
+      for (const m of this.pinchRings) m.visible = false;
       return;
     }
     this.label.update(Math.min(delta, 0.1));
     this.stamp.update(Math.min(delta, 0.1));
     this.updatePrints(Math.min(delta, 0.1));
     this.updateHandMarks();
+    this.updatePinchRings();
     if (this.sealPop.visible) {
       const t = (this.sealPop.userData.t += Math.min(delta, 0.1));
       const me = this.mine;
@@ -1259,6 +1270,27 @@ export class MatchSystem extends createSystem({
       this.stamp.show(e.vs, e.sub, 'rival', 1.6);
     }
     if (e.t > 2.1) this.entrance = null;
+  }
+
+  /**
+   * A ring at each pinch point, facing you: it closes as thumb and index come together and turns
+   * orange the moment they count as a pinch, so the hands always show what the game sees.
+   */
+  private updatePinchRings() {
+    this.player.head.getWorldPosition(this.head);
+    (['left', 'right'] as const).forEach((side, i) => {
+      const m = this.pinchRings[i];
+      const h = this.hands[side];
+      m.visible = h.tracked && h.gap < 0.07 && this.phase !== 'placing';
+      if (!m.visible) return;
+      m.position.copy(h.pinch);
+      m.lookAt(this.head);
+      const r = h.pinching ? 0.007 : 0.007 + 0.25 * Math.max(0, h.gap - TUNE.pinchOn);
+      m.scale.setScalar(r);
+      const mat = m.material as MeshBasicMaterial;
+      mat.color.setHex(h.pinching ? 0xff8a2a : 0xffffff);
+      mat.opacity = h.pinching ? 0.95 : 0.35 + 0.5 * Math.max(0, 1 - (h.gap - TUNE.pinchOn) / 0.05);
+    });
   }
 
   /**
