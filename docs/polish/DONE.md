@@ -13,11 +13,12 @@ From the five reports in this folder (FIRST-TIME, FIGHT-FEEL, META, ART-AUDIO, P
 - **First match.** The rim holds tops for 6 s in the very first match and the ramp hint shows as ramps open, so the lesson is not lost to a fast round.
 - **Art.** A generated forge environment map (warm and cool highlights on metal) replacing the grey studio, fixed foveation 0.5, team colors (orange #e8661c body, cyan #2a9fc4 rival), a graphite pedestal, contact shadows with a dark core, part names over the forge tray and a QUENCH TO SAVE sign, the label's headline always biggest, cards fade in.
 - **Audio.** A generated room reverb, effects and music buses, ducking under big hits, a smooth mute, a quieter calm mode; clashes as modal steel rings tuned per ring; a 96 bpm D-minor music sequencer on the motif that follows the game (home, ready, fight, tension); spin hums with a blade-rate whirr, panned to the top; a slag sizzle; a soft tick for cards; a gong for rounds.
+- **Replay.** A knockout your own move caused plays again on the table at 0.4x after its slow-motion moment, stamped REPLAY; a pinch skips it.
 - **Tools.** The hand driver (`window.drive`, `scripts/drive.sh`), MP4 recording of what the player sees (`DRIVE_VIDEO`), dev keys inside sequences, `scripts/emu.sh`.
 
 ## Not built (and why)
 
-- Instant replay of knockouts, title defense, weekly commission, smithy dressing: larger features, after the freeze.
+- Title defense, weekly commission, smithy dressing: larger features, after the freeze.
 - Match bar redesign beyond the animated bars, card eyebrow/icons, board legibility, true top scale: need the headset to judge sizes.
 - Spatial (HRTF) audio and spoken calls: headset-only judgments.
 - Moving the workshop's BACK / TRY / SAVE off the rail's sight line: the rail was lowered; a full relayout waits for a headset check.

@@ -210,7 +210,8 @@ an arena. First to 3 heat wins a match.
   it), level-ups, the forged top and a cleared circuit. Hard hits freeze for 70-110 ms and shake
   both tops (never the view); every knockout plays in slow motion; sparks are streaks that cool
   from white-hot and skip off the floor; each top has a ring of light in its team color; a won
-  match runs sparks round the rim. The placed arena forges up out of the table under the title.
+  match runs sparks round the rim; a knockout your move caused replays on the table at 0.4x
+  (a pinch skips it). The placed arena forges up out of the table under the title.
 - **Feats, bests and the match report** (`src/game/progress.ts`): twelve feats, each stamped the
   first time (ramp a rival out, sling one into a pit, knock one out with your strike, cut a big
   move short, rip white hot, a flawless match, a comeback from match point, a Hammer shatter, each
