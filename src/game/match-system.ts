@@ -314,7 +314,7 @@ export class MatchSystem extends createSystem({
   /** When Menu was pinched once during a match (a second pinch within 3 s leaves). */
   private menuArmed = -10;
   /** The rival's entrance at a match's start (s into it), and the VS words it lands with. */
-  private entrance: { t: number; vs: string; sub: string; champion: boolean } | null = null;
+  private entrance: { t: number; vs: string; sub: string; champion: boolean; from?: Vector3 } | null = null;
   private portal = Object.assign(new Mesh(new RingGeometry(0.7, 1, 48), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide })), { visible: false });
   private portalCore = Object.assign(new Mesh(new CircleGeometry(0.7, 48), new MeshBasicMaterial({ color: 0x0a1a24, transparent: true, opacity: 0.85, depthWrite: false, side: DoubleSide })), { visible: false });
   /** Each hand's mark on the arena floor under it: a soft shadow, or a warm glow when the strike is ready. */
@@ -1284,15 +1284,22 @@ export class MatchSystem extends createSystem({
       return;
     }
     e.t += dt;
-    const far = -(maxRim(this.arena.layout) + 0.22);
+    // On a real wall behind the arena when there is one; else in the dark beyond the far rim.
+    if (e.t === 0 || !e.from) e.from = this.portalWall(new Vector3()) ?? new Vector3(0.24, 0.16, -(maxRim(this.arena.layout) + 0.22));
+    const far = e.from.z;
     const open = Math.min(1, e.t / 0.4) * (e.t > 1.6 ? Math.max(0, 1 - (e.t - 1.6) / 0.4) : 1);
     // Off to the far right, clear of the card and the match bar over the far rim.
-    const px = 0.24;
-    this.portal.position.set(px, 0.16, far);
-    this.portalCore.position.set(px, 0.16, far - 0.001);
-    this.portal.scale.setScalar(0.001 + 0.09 * open);
-    this.portalCore.scale.setScalar(0.001 + 0.09 * open);
-    this.portal.rotation.z += dt * 3;
+    const px = e.from.x;
+    const py = e.from.y;
+    this.portal.position.set(px, py, far);
+    this.portalCore.position.set(px, py, far - 0.001);
+    // Facing the arena (a wall portal stands on the wall).
+    this.portal.lookAt(this.handAt.set(0, py, 0));
+    this.portalCore.quaternion.copy(this.portal.quaternion);
+    // Bigger the farther it is, so a portal on the wall reads from the chair.
+    const size = 0.09 * Math.max(1, Math.hypot(px, far) / 0.4);
+    this.portal.scale.setScalar(0.001 + size * open);
+    this.portalCore.scale.setScalar(0.001 + size * open);
     (this.portal.material as MeshBasicMaterial).opacity = 0.6 + 0.4 * Math.sin(e.t * 20) * 0.5;
     const them = this.theirs;
     const u = (e.t - 0.4) / 0.9;
@@ -1302,7 +1309,7 @@ export class MatchSystem extends createSystem({
       // From the portal to its spot: a high arc.
       const y = this.arena.height(them.x, them.z);
       view.visible = true;
-      view.position.set(px + (them.x - px) * u, 0.16 + (y - 0.16) * u + 0.12 * Math.sin(u * Math.PI), far + (them.z - far) * u);
+      view.position.set(px + (them.x - px) * u, py + (y - py) * u + 0.12 * Math.sin(u * Math.PI), far + (them.z - far) * u);
       view.rotation.set(0.6 * (1 - u), 0, 0);
       // A circuit's champion comes through huge, and shrinks to fight size as it lands.
       view.scale.setScalar(e.champion ? 1 + 2.5 * (1 - u) * (1 - u) : 1);
@@ -1951,6 +1958,38 @@ export class MatchSystem extends createSystem({
       out.push({ x: p.x, y: p.y, z: p.z });
     }
     return out;
+  }
+
+  /**
+   * The wall the rival's portal should open on: a detected vertical plane labelled a wall, behind
+   * the arena as seen from the head and within 3.5 m, as a point in the stage's space (or null).
+   */
+  private portalWall(out: Vector3): Vector3 | null {
+    const center = this.root.position;
+    this.player.head.getWorldPosition(this.head);
+    const awayX = center.x - this.head.x;
+    const awayZ = center.z - this.head.z;
+    const len = Math.hypot(awayX, awayZ) || 1;
+    let best = Infinity;
+    let found = false;
+    for (const e of this.queries.planes.entities) {
+      const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
+      if (plane?.orientation !== 'vertical' || !/wall/.test(plane.semanticLabel ?? '')) continue;
+      const p = e.object3D!.getWorldPosition(this.handAt);
+      const dx = p.x - center.x;
+      const dz = p.z - center.z;
+      const ahead = (dx * awayX + dz * awayZ) / len;
+      const dist = Math.hypot(dx, dz);
+      // Behind the arena, not off to the side.
+      if (ahead < 0.3 || dist > 3.5 || ahead < dist * 0.6) continue;
+      if (dist < best) {
+        best = dist;
+        // On the wall, at the arena's height plus a little, along the line from the arena.
+        out.set(center.x + (awayX / len) * ahead, center.y + 0.3, center.z + (awayZ / len) * ahead);
+        found = true;
+      }
+    }
+    return found ? this.stage.worldToLocal(out) : null;
   }
 
   /** A table detected after the arena went on the tray: the arena eases down onto it. */
