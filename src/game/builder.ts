@@ -137,11 +137,18 @@ export function tag(text: string, width: number, size = 40) {
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   let s = size;
-  do g.font = `bold ${s--}px ${FONT}`;
-  while (g.measureText(text).width > 248 && s > 10);
-  g.shadowColor = 'rgba(0,0,0,0.9)';
-  g.shadowBlur = 6;
-  g.fillText(text, 128, 32);
+  do g.font = `700 ${s--}px ${FONT}`;
+  while (g.measureText(text).width > 220 && s > 10);
+  // A small dark plaque behind the name, with the forge's orange underline: one sign style.
+  const w = Math.min(252, g.measureText(text).width + 28);
+  g.fillStyle = 'rgba(12, 14, 19, 0.82)';
+  g.beginPath();
+  g.roundRect(128 - w / 2, 6, w, 52, 10);
+  g.fill();
+  g.fillStyle = ORANGE;
+  g.fillRect(128 - w / 2 + 10, 52, w - 20, 3);
+  g.fillStyle = TEXT;
+  g.fillText(text, 128, 31);
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
   return new Mesh(new PlaneGeometry(width, width / 4), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
