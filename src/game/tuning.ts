@@ -36,6 +36,8 @@ export const TUNE = {
   cupHold: knob('cupHold', 2),
   /** Press to place: thresholds of a palm pressed onto the table (see table-touch.ts PRESS). */
   press: { down: knob('pressDown', PRESS.down), window: knob('pressWindow', PRESS.window), still: knob('pressStill', PRESS.still), hold: knob('pressHold', PRESS.hold) },
+  /** The strike's slap: a hand that comes down hard (m/s) and stops on the table; a hand set down to rest is not one. */
+  strikePress: { down: knob('slapDown', 0.6), window: knob('slapWindow', 0.25), still: knob('slapStill', 0.08), hold: knob('slapHold', 0.05) },
   /** A far ramp is set only after a pinch held this long (s); a quick tap does nothing. */
   farHold: knob('farHold', 0.12),
   /** The real hands drawn over the game (0 turns it off), and how full the hand shape is. */

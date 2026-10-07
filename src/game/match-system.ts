@@ -130,6 +130,8 @@ export class MatchSystem extends createSystem({
   private pushed = 0;
   /** A match arena's own scale (shrunk to fit a small table) and its slide, worked out once per arena and placement. */
   private rootK = 1;
+  /** How far a shrunk match arena has been lowered so its smaller pedestal still stands on the table (m). */
+  private lowered = 0;
   private matchScale = 1;
   private matchPush = 0;
   private fitKey = '';
@@ -320,7 +322,13 @@ export class MatchSystem extends createSystem({
   private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
-  private strikeTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.press), right: new TableTouch(TUNE.press) };
+  private strikeTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.strikePress), right: new TableTouch(TUNE.strikePress) };
+  /** When the bar last became full: the strike arms half a second later (a hand already resting there is not a strike). */
+  private fullSince = -1;
+  /** A strike has landed this session: the hint stops. */
+  private struckOnce = false;
+  /** Where the shockwave starts (arena-local, on the rim beside the palm). */
+  private shockAt = { x: 0, z: 0 };
   /** The bar on the back of each hand: ten segments around a ring that faces the eyes. */
   private barRings: Record<Side, Group> = { left: new Group(), right: new Group() };
   private barSegs: MeshBasicMaterial[] = [];
@@ -472,7 +480,13 @@ export class MatchSystem extends createSystem({
         // J: fill the forge bar (then a palm press, or Shift+J, strikes).
         if (e.code === 'KeyJ' && this.phase === 'fight') {
           this.forgeBar.value = 1;
-          if (e.shiftKey) this.doStrike();
+          if (e.shiftKey) {
+            // As a player would: the palm on the near rim, across from the rival.
+            let a = Math.atan2(-this.theirs.z, -this.theirs.x);
+            if (a < 0) a = Math.abs(a) < Math.PI / 2 ? 0 : Math.PI;
+            const r = rimRadius(this.arena.layout, a);
+            this.doStrike(Math.cos(a) * r, Math.sin(a) * r);
+          }
         }
         // A: the next arena, locked or not (to look at every arena).
         if (e.code === 'KeyA' && this.phase === 'hub') {
@@ -608,7 +622,10 @@ export class MatchSystem extends createSystem({
       this.roomLight.update(this.head, this.root.position, this.root.position.y - PEDESTAL, dim, p === 'forge' || p === 'build', dt);
     }
     this.launchZone.visible = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
-    if (this.phase !== 'fight') this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = false;
+    if (this.phase !== 'fight') {
+      this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = false;
+      this.arenaView.charge = 0;
+    }
     switch (this.phase) {
       case 'placing':
         // Wait for a table to be detected, but never long: without one the arena floats on a tray.
@@ -1169,6 +1186,10 @@ export class MatchSystem extends createSystem({
     if (was && !this.sizeSettled) playMachine();
     else if (!was && this.sizeSettled && match) playPlace();
     this.root.scale.setScalar(ARENA_SCALE * this.rootK);
+    // A shrunk arena's pedestal is shorter: lower it so it still stands on the table.
+    const drop = PEDESTAL * (1 - this.rootK);
+    this.root.position.y -= drop - this.lowered;
+    this.lowered = drop;
     this.stage.scale.setScalar(this.viewK);
     this.builder.viewScale = this.viewK;
     const far = rimRadius(L, -Math.PI / 2) * this.viewK;
@@ -1225,6 +1246,7 @@ export class MatchSystem extends createSystem({
     }
     this.root.position.set(at.x, at.y, at.z);
     this.pushed = 0;
+    this.lowered = 0;
     this.root.scale.setScalar(ARENA_SCALE);
     // Local +Z points back at the player.
     this.root.rotation.set(0, at.yaw, 0);
@@ -1605,6 +1627,8 @@ export class MatchSystem extends createSystem({
     this.lastPerfect = perfect;
     this.charges.reset();
     this.forgeBar.reset();
+    // A first match's later rounds start nearly full, so the strike shows in the first few minutes.
+    if (this.progress.matches === 0 && this.myPoints + this.theirPoints > 0 && !this.demo) this.forgeBar.value = 0.8;
     this.barWasFull = false;
     this.rivalBar.reset();
     this.tellAt = -1;
@@ -1749,13 +1773,15 @@ export class MatchSystem extends createSystem({
     const full = this.forgeBar.full && this.elapsed >= TUNING.grace;
     if (full && !this.barWasFull) {
       playBarFull();
-      if (!this.strikeTaught && !this.demo) {
-        this.strikeTaught = true;
-        this.label.set('Forge bar full!\nPress your palm on the table beside the arena');
-        this.labelTimer = 4;
-      }
+      this.fullSince = this.elapsed;
     }
     this.barWasFull = full;
+    // The hint stays until the first strike lands (the first session's ramp hint goes first).
+    if (full && !this.struckOnce && !this.demo && this.progress.guide !== 'bump' && this.labelTimer <= 0) {
+      this.strikeTaught = true;
+      this.label.set('Forge bar full!\nSlap your palm down beside the arena');
+    }
+    const armed = full && this.elapsed - this.fullSince > 0.5;
     // The table under the pedestal: a press counts within 5 cm of it.
     const tableY = this.root.position.y - PEDESTAL * this.rootK;
     for (const side of ['left', 'right'] as const) {
@@ -1764,14 +1790,18 @@ export class MatchSystem extends createSystem({
       const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > 1.05;
       const hit = this.strikeTouch[side].update(outside ? h.low : null, dt, tableY - 0.05, tableY + 0.05);
       if (hit === null) continue;
-      if (!full) {
-        playLocked();
+      if (!armed) {
         if (import.meta.env.DEV) console.log(`[STRIKE] pressed with the bar at ${Math.round(this.forgeBar.value * 100)}%`);
         continue;
       }
-      this.doStrike();
+      // The shockwave starts on the rim beside the palm.
+      const a = Math.atan2(l!.z, l!.x);
+      const r = rimRadius(this.arena.layout, a);
+      this.doStrike(Math.cos(a) * r, Math.sin(a) * r);
       break;
     }
+    // The arena's rails warm as the bar fills, and glow when it is full: the tops are what the eyes follow.
+    this.arenaView.charge = full ? 0.7 + 0.3 * Math.sin(this.time * 8) : this.forgeBar.value * 0.5;
     // The bar: on the back of each tracked hand, lit by how full it is, pulsing when ready.
     const lit = Math.round(this.forgeBar.value * 10);
     this.barSegs.forEach((m, i) => {
@@ -1783,17 +1813,17 @@ export class MatchSystem extends createSystem({
     for (const side of ['left', 'right'] as const) {
       const g = this.barRings[side];
       const h = this.hands[side];
-      g.visible = h.tracked && !this.demo;
+      g.visible = h.tracked && !this.demo && this.forgeBar.value > 0.05;
       if (!g.visible) continue;
       g.position.copy(h.wrist).y += 0.05;
       g.lookAt(this.head);
     }
-    // The shockwave runs out to the rim in 0.35 s, fading.
+    // The shockwave runs across the arena from where it started in 0.18 s, fading.
     if (this.shockT < 1) {
-      this.shockT = Math.min(1, this.shockT + dt / 0.35);
-      const r = Math.max(0.01, this.shockT * maxRim(this.arena.layout) * 1.1);
+      this.shockT = Math.min(1, this.shockT + dt / 0.18);
+      const r = Math.max(0.01, this.shockT * maxRim(this.arena.layout) * 2);
       this.shock.scale.setScalar(r);
-      this.shock.position.y = this.arena.floorHeight(Math.min(1, this.shockT)) + 0.003;
+      this.shock.position.set(this.shockAt.x, this.arena.floorHeight(0.5) + 0.003, this.shockAt.z);
       (this.shock.material as MeshBasicMaterial).opacity = 0.9 * (1 - this.shockT);
     }
     this.shock.visible = this.shockT < 1;
@@ -1850,11 +1880,20 @@ export class MatchSystem extends createSystem({
   }
 
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
-  private doStrike() {
+  private doStrike(ox = 0, oz = 0) {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
     const cut = this.tellAt >= 0 && this.theirs.tell > 0;
     const seal = this.myBuild.seal ?? 'anvil';
-    sealStrike(this.arena, this.mine, this.theirs, seal);
+    // Cups and slings let go first, so none is left holding forever.
+    for (const s of ['left', 'right'] as const) {
+      this.endSling(s, false);
+      const c = this.cups[s];
+      if (c && this.arena.shapes.includes(c.shape)) this.arena.free(c.shape);
+    }
+    sealStrike(this.arena, this.mine, this.theirs, seal, ox, oz);
+    this.shockAt.x = ox;
+    this.shockAt.z = oz;
+    this.struckOnce = true;
     if (cut) {
       this.tellAt = -1;
       this.label.set('INTERRUPTED!');
@@ -1872,7 +1911,7 @@ export class MatchSystem extends createSystem({
     const them = this.theirs;
     if (seal === 'anvil') {
       this.shockT = 0;
-      this.impacts.hit(0, this.arena.floorHeight(0), 0, 1);
+      this.impacts.hit(ox, this.arena.floorHeight(1), oz, 1);
       for (const t of [me, them]) if (t.alive) this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
       playStrike();
     } else if (seal === 'rush') {
@@ -1886,9 +1925,9 @@ export class MatchSystem extends createSystem({
       playTell();
     }
     this.roomLight.hit();
-    this.hitStop = HIT_STOP * 2;
+    this.hitStop = HIT_STOP;
     this.accumulator = 0;
-    if (!cut && this.strikeTaught && this.label.mesh.visible) this.label.set('');
+    if (!cut && this.label.current.startsWith('Forge bar full')) this.label.set('');
     if (import.meta.env.DEV) console.log(`[STRIKE] ${seal} at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
   }
 

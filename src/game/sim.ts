@@ -112,8 +112,10 @@ export const TUNING = {
    * scaled: that tipped the type loop toward attack. */
   hot: 0.6,
   /** Anvil Strike: outward speed (m/s) it gives a top at the rim, cold; the player's own top takes `strikeOwn` of it. */
-  strike: 1.2,
+  strike: 1.0,
   strikeOwn: 0.6,
+  /** Behind on spin (under 70% of the rival's), your strike lands this much harder: the comeback. */
+  strikeBehind: 1.6,
 };
 /** Height rule: a height gap this large (m) gives the lower top its full lift on the taller one. */
 const HEIGHT_GAP = 0.002;
@@ -721,22 +723,27 @@ function pads(arena: Arena, t: Top) {
 }
 
 /**
- * The Anvil Strike (docs/DUEL-DESIGN.md): the player's palm on the table sends a shockwave out from
- * the arena's middle. Every top is thrown outward, harder near the rim and the hotter it is, and
+ * The Anvil Strike (docs/DUEL-DESIGN.md): the player's palm on the table beside the arena sends a
+ * shockwave through the floor from the rim point at (ox, oz). Every top is thrown outward, harder near the rim and the hotter it is, and
  * lifted for a moment (walls and pits take less to clear); the player's own top, braced, takes only
  * TUNING.strikeOwn of it. A caught top is let go first.
  */
-export function strike(arena: Arena, mine: Top, rival: Top) {
+export function strike(arena: Arena, mine: Top, rival: Top, ox = 0, oz = 0) {
   for (const s of arena.shapes) if (s.caught) arena.free(s);
   for (const t of [mine, rival]) {
     if (!t.alive) continue;
-    const r = Math.hypot(t.x, t.z);
+    // Away from where the palm struck (the rim beside it): a top near your hand is thrown toward
+    // the middle, one across the arena out over the far rim. (0, 0): from the middle.
+    const dx = t.x - ox;
+    const dz = t.z - oz;
+    const r = Math.hypot(dx, dz);
     const n = Math.min(1, normRadius(arena.layout, t.x, t.z));
-    // A top in the very middle goes the way it was already moving.
-    const ux = r > 1e-4 ? t.x / r : t.vx / (Math.hypot(t.vx, t.vz) || 1);
-    const uz = r > 1e-4 ? t.z / r : t.vz / (Math.hypot(t.vx, t.vz) || 1);
+    // A top right at the origin goes the way it was already moving.
+    const ux = r > 1e-4 ? dx / r : t.vx / (Math.hypot(t.vx, t.vz) || 1);
+    const uz = r > 1e-4 ? dz / r : t.vz / (Math.hypot(t.vx, t.vz) || 1);
     // Felt mostly out near the rim: a top in the middle barely moves, so when you strike matters.
-    const k = TUNING.strike * n * n * (1 + TUNING.hot * t.damage) * (t === mine ? TUNING.strikeOwn : 1);
+    const rage = mine.spin < 0.7 * rival.spin ? TUNING.strikeBehind : 1;
+    const k = TUNING.strike * rage * n * n * (1 + TUNING.hot * t.damage) * (t === mine ? TUNING.strikeOwn : 1);
     t.vx += ux * k;
     t.vz += uz * k;
     t.kick = 1;
@@ -761,8 +768,8 @@ const MAGNET_SPEED = 0.45;
 /** Your Rush hits harder than a rival's charge: it is your one strike. */
 const RUSH_SPEED = 1.5;
 
-export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal) {
-  if (seal === 'anvil') return strike(arena, mine, rival);
+export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox = 0, oz = 0) {
+  if (seal === 'anvil') return strike(arena, mine, rival, ox, oz);
   if (seal === 'magnet') rivalMove(arena, mine, rival, 'pull', MAGNET_SPEED);
   else {
     rivalMove(arena, mine, rival, 'charge');

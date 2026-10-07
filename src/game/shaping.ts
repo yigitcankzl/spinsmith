@@ -84,7 +84,7 @@ export const behindOn = (me: { alive: boolean; spin: number }, rival: { alive: b
 
 export const STRIKE_BAR = {
   /** Seconds to fill on its own. */
-  passive: 30,
+  passive: 18,
   /** Filled per solid clash (strength at least SHAPING.clashMin), at most once per clashGap. */
   clash: 0.07,
   /** Behind on spin, the bar fills this many times as fast. */
@@ -92,11 +92,14 @@ export const STRIKE_BAR = {
 };
 
 export class StrikeBar {
-  value = 0;
+  value = StrikeBar.START;
   private lastClash = -99;
 
+  /** Each round starts with the bar this full, so the strike comes in time to matter. */
+  static readonly START = 0.3;
+
   reset() {
-    this.value = 0;
+    this.value = StrikeBar.START;
     this.lastClash = -99;
   }
 

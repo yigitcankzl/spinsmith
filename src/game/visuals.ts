@@ -998,6 +998,8 @@ export class ArenaView {
   /** Pillars that circle the center turn together in this group; boost pads pulse. */
   private orbit = new Group();
   private padMats: MeshBasicMaterial[] = [];
+  /** The forge bar's warmth on the rails and the rim line (0..1). */
+  charge = 0;
   private padFlash: number[] = [];
   private padMeshes: Mesh[] = [];
   private vortexDisc: Mesh | null = null;
@@ -1253,7 +1255,7 @@ export class ArenaView {
     this.time += dt;
     this.railMats.forEach((m, i) => {
       this.railFlash[i] = Math.max(0, this.railFlash[i] - dt * 3);
-      m.color.copy(this.railIdle).lerp(this.railHot, this.railFlash[i]);
+      m.color.copy(this.railIdle).lerp(this.railHot, Math.max(this.railFlash[i], this.charge));
     });
     this.bumperMats.forEach((m, i) => {
       this.bumperFlash[i] = Math.max(0, this.bumperFlash[i] - dt * 4);
@@ -1458,6 +1460,11 @@ export class Label {
       new PlaneGeometry(width, (width * 160) / 512),
       new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }),
     );
+  }
+
+  /** The text shown now. */
+  get current() {
+    return this.text;
   }
 
   set(text: string) {

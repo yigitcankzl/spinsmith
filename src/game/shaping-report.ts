@@ -2,6 +2,7 @@
  * Measures arena shaping in simulation: simulated players with different shaping habits fight an
  * equal rival on every arena and type matchup, under the real shaping economy.
  */
+import { rimRadius } from './layout.ts';
 import { ARENAS } from './arenas.ts';
 import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
@@ -188,7 +189,11 @@ export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture
     lastT = t;
     if (at >= 0 && t >= at) {
       at = -1;
-      if (bar.spend(t, TUNING.grace)) sealStrike(arena, me, rival, seal);
+      if (bar.spend(t, TUNING.grace)) {
+        // The palm goes down on the near half of the rim, across from the rival.
+        const o = strikeOrigin(arena, Math.atan2(-rival.z, -rival.x));
+        sealStrike(arena, me, rival, seal, o.x, o.z);
+      }
       return;
     }
     if (at >= 0) return;
@@ -206,7 +211,10 @@ export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture
 
 /** A masher with the strike: random shapes, and the strike at a random moment once the bar is full. */
 export const masherStrike: Policy = (arena, me, rival, t, charges, rnd, owner = 'me', bar) => {
-  if (bar?.full && rnd() < 0.01 && bar.spend(t, TUNING.grace)) strike(arena, me, rival);
+  if (bar?.full && rnd() < 0.01 && bar.spend(t, TUNING.grace)) {
+    const o = strikeOrigin(arena, rnd() * Math.PI);
+    strike(arena, me, rival, o.x, o.z);
+  }
   POLICIES.random(arena, me, rival, t, charges, rnd, owner);
 };
 
@@ -233,6 +241,14 @@ export function rivalWithMove(kind: import('./sim.ts').RivalMove, base: Policy =
       at = t + TELL_TIME;
     }
   };
+}
+
+/** The rim point a palm can reach nearest to angle `a`: the near half of the rim (z > 0, the player's side). */
+export function strikeOrigin(arena: Arena, a: number): { x: number; z: number } {
+  let b = Math.atan2(Math.sin(a), Math.cos(a));
+  if (b < 0) b = Math.abs(b) < Math.PI / 2 ? 0 : Math.PI;
+  const r = rimRadius(arena.layout, b);
+  return { x: Math.cos(b) * r, z: Math.sin(b) * r };
 }
 
 /** Where a top caught at (x, z) should go: the nearest slag-pit mouth, else straight out over the wall. */

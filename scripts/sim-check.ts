@@ -717,9 +717,9 @@ TUNING.grace = 0;
   assert.ok(bar.spend(20, 2.5) && bar.value === 0, 'a strike spends the whole bar');
   const slow = new StrikeBar();
   const fast = new StrikeBar();
-  slow.update(5, false);
-  fast.update(5, true);
-  assert.ok(Math.abs(fast.value - STRIKE_BAR.behind * slow.value) < 1e-9, 'behind, the bar fills faster');
+  slow.update(2, false);
+  fast.update(2, true);
+  assert.ok(Math.abs(fast.value - StrikeBar.START - STRIKE_BAR.behind * (slow.value - StrikeBar.START)) < 1e-9, 'behind, the bar fills faster');
   const arena = new Arena(FORGE);
   const outer = new Top(ATTACK);
   const inner = new Top(ATTACK);
@@ -772,6 +772,22 @@ TUNING.grace = 0;
   assert.ok(!p.isUnlocked('ring:gale'), 'a spin-out does not give the signature');
   const a = p.award({ won: true, finish: 'pocket', pocketPoints: 2, perfect: false, matchOver: false, matchWon: false, rival: 'Rim Raider' });
   assert.ok(p.isUnlocked('ring:gale') && a.unlocked.includes('ring:gale'), 'a knockout gives the signature part');
+}
+
+// 24. The strike's slap: a hand that comes down hard and stops is a slap; a hand set down gently
+// beside the arena to rest is not (the same detector as press-to-place, with harder thresholds).
+{
+  const slap = { down: 0.6, window: 0.25, still: 0.08, hold: 0.05 };
+  const dt = 1 / 72;
+  const run = (ys: number[]) => {
+    const t = new TableTouch(slap);
+    for (const y of ys) if (t.update(y, dt, 0.72, 0.78) !== null) return true;
+    return false;
+  };
+  const hold = (y: number, s: number) => Array.from({ length: Math.round(s / dt) }, () => y);
+  const move = (a: number, b: number, s: number) => Array.from({ length: Math.round(s / dt) }, (_, i) => a + ((b - a) * (i + 1)) / Math.round(s / dt));
+  assert.ok(run([...hold(0.95, 0.2), ...move(0.95, 0.75, 0.12), ...hold(0.75, 0.2)]), 'a hard slap is a strike');
+  assert.ok(!run([...hold(0.95, 0.2), ...move(0.95, 0.75, 0.8), ...hold(0.75, 1)]), 'a hand set down to rest is not');
 }
 
 console.log('sim-check: all passed');
