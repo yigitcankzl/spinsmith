@@ -153,10 +153,33 @@ export function playTopple() {
 }
 
 /** Round result jingle. */
+/**
+ * SpinSmith's motif: four notes, a hammer's rise (D, A, F, high D) rung like struck steel. The win
+ * stinger, a level-up and an order stamp all play it, so the game has one sound of its own.
+ */
+const MOTIF = [587, 880, 698, 1175];
+
+function motif(at: number, step: number, gain: number, notes = MOTIF.length) {
+  MOTIF.slice(0, notes).forEach((f, i) => {
+    tone(f, gain, 0.45, 'triangle', at + i * step);
+    tone(f * 2.76, gain * 0.25, 0.25, 'sine', at + i * step);
+  });
+}
+
 export function playResult(won: boolean) {
-  const notes = won ? [523, 659, 784, 1047] : [392, 330, 262];
   // Starts after the finish sound has landed.
-  notes.forEach((f, i) => tone(f, 0.12, 0.3, 'triangle', 0.45 + i * 0.12));
+  if (won) {
+    // The motif over an anvil strike.
+    hiss(0.2, 0.2, 3000, 1500, 2, 0.4);
+    tone(110, 0.3, 0.5, 'sine', 0.4, 70);
+    motif(0.45, 0.13, 0.12);
+  } else [392, 330, 262].forEach((f, i) => tone(f, 0.1, 0.3, 'triangle', 0.45 + i * 0.12));
+}
+
+/** An order stamp: the motif's first two notes, struck. */
+export function playStamp() {
+  tone(140, 0.3, 0.25, 'square', 0, 90);
+  motif(0.12, 0.12, 0.1, 2);
 }
 
 /**
@@ -258,9 +281,10 @@ export function playXp() {
 /** Level up: an anvil strike and a rising bell chord. */
 export function playLevelUp() {
   hiss(0.25, 0.25, 3000, 1500, 2);
-  [523, 659, 784, 1047, 1319].forEach((f, i) => {
-    tone(f, 0.1, 0.9, 'triangle', 0.15 + i * 0.08);
-    tone(f * 2.76, 0.03, 0.5, 'sine', 0.15 + i * 0.08);
+  // The motif, slower and an octave up.
+  MOTIF.forEach((f, i) => {
+    tone(f * 2, 0.1, 0.9, 'triangle', 0.15 + i * 0.16);
+    tone(f * 2 * 2.76, 0.03, 0.5, 'sine', 0.15 + i * 0.16);
   });
 }
 

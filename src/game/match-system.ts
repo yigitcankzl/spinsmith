@@ -1,5 +1,5 @@
 import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, ForgeLoop, playCrunch, playLocked, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
+import { CordTone, ForgeLoop, playCrunch, playLocked, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -1768,7 +1768,8 @@ export class MatchSystem extends createSystem({
       const obj = unlockModel(key, this.arenas);
       this.stage.add(obj);
       this.reveal = { obj, t: 0 };
-      playUnlock();
+      if (key.startsWith('stamp:')) playStamp();
+      else playUnlock();
       this.label.set(revealText(key));
       // Keep the result up while it shows.
       this.resultTimer = Math.max(this.resultTimer, 2.8);
