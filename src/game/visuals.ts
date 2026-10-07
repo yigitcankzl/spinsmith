@@ -1574,13 +1574,16 @@ export class Label {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const lines = text.split('\n');
+    // The headline always reads bigger than the line under it.
+    let head = 56;
     lines.forEach((line, i) => {
       // Shrink each line until it fits the card.
-      let size = i === 0 ? 56 : 34;
+      let size = i === 0 ? 56 : Math.min(34, head - 8);
       // The two loaded weights (ui.ts loadFonts): bold for the headline, semibold below.
       const weight = i === 0 ? '700 ' : '600 ';
       do g.font = `${weight}${size--}px ${FONT}`;
       while (g.measureText(line).width > 470 && size > 12);
+      if (i === 0) head = size + 1;
       g.fillText(line, 256, 80 + (i - (lines.length - 1) / 2) * 58);
     });
     this.tex.needsUpdate = true;
@@ -1718,9 +1721,13 @@ export class ShapeMarks {
       });
       m.chevron.visible = s.kind === 'ramp';
       if (s.kind === 'ramp') {
-        m.chevron.position.set(s.dx * sigma * 1.1, 0, s.dz * sigma * 1.1);
+        // The arrow runs out along the push, again and again: this is which way it throws.
+        const run = (time * 1.6) % 1;
+        const d = sigma * (0.4 + 1.1 * run);
+        m.chevron.position.set(s.dx * d, 0.002, s.dz * d);
         m.chevron.rotation.y = Math.atan2(s.dx, s.dz);
-        m.mats[3].opacity = s.ghost ? 0.6 : 0.9 * s.strength;
+        m.chevron.scale.set(1.6, 0.35, 1.6);
+        m.mats[3].opacity = (s.ghost ? 0.6 : 0.95 * s.strength) * Math.sin(run * Math.PI);
       }
     });
   }
