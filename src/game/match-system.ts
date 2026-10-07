@@ -91,6 +91,8 @@ const RIVAL_SHAPE_GAP = 3;
 const SLOW_MO_TIME = 0.9;
 /** Seconds the placed arena takes to forge up out of the table. */
 const RISE_TIME = 1.1;
+/** The first match's opening grace (s): no knockout before the ramp hint has shown. */
+const FIRST_GRACE = 6;
 const SLOW_MO = 0.3;
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
@@ -1013,6 +1015,12 @@ export class MatchSystem extends createSystem({
     this.stage.position.y = 0;
     if (build) this.myBuild = { ...build };
     this.toHub();
+    // A quenched top is a moment: steam off the rim, and its name.
+    if (build) {
+      this.stamp.show('FORGED!', buildName(build).toUpperCase(), 'mine', 1.1);
+      for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.08, 0.02, 0.1, 0.8);
+      playStamp();
+    }
   }
 
   /** Builds both sides' fight stats and views (views only rebuild when a build changed). */
@@ -1814,6 +1822,8 @@ export class MatchSystem extends createSystem({
     const aiMin = 0.5 + 0.25 * skill;
     // The very first match is steadier, so its lesson (the ramp) is not lost to a wild rip.
     const first = this.progress.matches === 0 && !this.demo;
+    // The very first match holds both tops in a little longer, so its one lesson (the ramp) has time.
+    this.arena.grace = first ? FIRST_GRACE : TUNING.grace;
     const aiPower = first ? 0.7 + Math.random() * 0.1 : aiMin + Math.random() * (0.98 - aiMin);
     const aiAim = first ? (Math.random() - 0.5) * 0.3 : (Math.random() - 0.5) * (1.0 - 0.6 * skill);
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
@@ -2462,7 +2472,8 @@ export class MatchSystem extends createSystem({
       // The rival and arena intro shows first; the rip hint follows.
       if (this.time - this.readySince > INTRO_TIME) this.label.set('Pinch over the arena where you want to launch\npull back and let go');
     }
-    const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > 3 && this.theirs.alive;
+    // As soon as ramps work (the opening grace), so even a short round shows it.
+    const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > TUNING.grace && this.theirs.alive;
     this.bumpMark.visible = bump;
     if (bump) {
       const r = Math.hypot(this.theirs.x, this.theirs.z) || 1;
@@ -2492,6 +2503,7 @@ export class MatchSystem extends createSystem({
       playLevelUp();
       for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
+      this.stamp.later(`LEVEL ${this.progress.level}!`, this.progress.rank.toUpperCase(), 'mine', 1.2);
     }
     this.reveals.push(...award.unlocked);
     // The first session's own part goes first: the forge calls for it next.

@@ -160,6 +160,8 @@ export class Arena {
   /** Rocking dish: current tilt (radians around the x and z axes) and its rate. */
   tiltX = 0;
   tiltZ = 0;
+  /** Seconds the rim holds every top after the launch (TUNING.grace; longer in a first match). */
+  grace = TUNING.grace;
   /** A Tilt strike: the direction the arena dips toward (unit, arena-local) and seconds left. */
   shove: { x: number; z: number; t: number } | null = null;
   private tiltVX = 0;
@@ -934,7 +936,7 @@ function wall(arena: Arena, t: Top) {
   const rim = rimRadius(L, angle);
   const r = Math.hypot(t.x, t.z);
   // A Ward holds the top in as the opening grace does.
-  const open = arena.elapsed >= TUNING.grace && t.guard <= 0;
+  const open = arena.elapsed >= arena.grace && t.guard <= 0;
   // No wall: crossing the edge is a ring-out (sumo).
   if (L.wall === 'none') {
     // Out once its center has crossed the edge (riding the berm is still in); during the opening
