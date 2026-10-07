@@ -341,6 +341,8 @@ export class MatchSystem extends createSystem({
   /** A knockout replay playing (in recorded steps, at REPLAY_SPEED), with stand-in tops to draw. */
   private replay: { t: number; frames: Float32Array; n: number; out: [Top, Top] } | null = null;
   private ghosts: [Top, Top] = [new Top(ATTACK), new Top(DEFENSE)];
+  /** The turntable's turn during a replay (radians). */
+  private turn = 0;
   /** This match so far, for the report at home: each round's finish (- = the rival's), best rip, XP. */
   private matchLog = { rounds: [] as string[], rip: 0, xp: 0, won: false, score: '' };
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
@@ -910,7 +912,16 @@ export class MatchSystem extends createSystem({
     // In the workshop the pillars stand where they are picked up.
     if (this.phase === 'build') this.arena.orbitT = 0;
     this.arenaView.update(dt, this.arena);
-    this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
+    // During a replay the arena turns slowly (a turntable, at most 25°/s) to show the knockout from
+    // the rival's side, then turns back; the view never moves.
+    const r = this.replay;
+    const total = r ? r.n / 120 / REPLAY_SPEED : 0;
+    const want = r && r.t > 0 ? Math.sin(Math.min(1, r.t / total) * Math.PI) * (2 * Math.PI) / 3 : 0;
+    const rate = r ? 0.45 : 1.6;
+    this.turn += Math.max(-rate * dt, Math.min(rate * dt, want - this.turn));
+    // Play never starts on a turned arena.
+    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'pulling') this.turn = 0;
+    this.stage.rotation.set(this.arena.tiltX, this.turn, this.arena.tiltZ);
     const me = this.mine;
     const armed = this.phase === 'fight' && me.alive && (me.hammer > 0 || me.guard > 0);
     this.aura.visible = armed;
