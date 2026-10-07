@@ -47,7 +47,7 @@ import { SmithBoard } from './board.js';
 import { popIn } from './rim.js';
 import { COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
-import { MAX_LEVEL, STAMP_UNLOCKS, xpToNext } from './progress.js';
+import { FEATS, MAX_LEVEL, STAMP_UNLOCKS, xpToNext } from './progress.js';
 import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
 
 export type HubAction =
@@ -199,6 +199,8 @@ export class Hub {
         nextGlow: next,
         rivals: RIVALS.map((r) => ({ name: r.name, level: r.level, met: r.level <= progress.level, marks: progress.marksOf(r.name) })),
         gilded: progress.isUnlocked('ledger:gold') || progress.level >= MAX_LEVEL,
+        feats: progress.feats.size,
+        featsOf: Object.keys(FEATS).length,
       });
       this.fillChampions(progress);
     }
