@@ -3,7 +3,8 @@
  * equal rival on every arena and type matchup, under the real shaping economy.
  */
 import { ARENAS } from './arenas.ts';
-import { Arena, ATTACK, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import type { FloorShape } from './sim.ts';
 import { SHAPE_SIZE, ShapingCharges } from './shaping.ts';
 
 
@@ -97,6 +98,97 @@ export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.trackin
   };
 }
 
+/** A cup laid ahead of the rival lets go after this long if nothing rolled in (s). */
+export const CUP_HOLD = 2;
+
+/**
+ * A human-feasible cup player: lays a cup ahead of the rival's path (with the same lag and aim
+ * error as the ramp), and once it holds a top: the rival is slung toward the nearest slag pit
+ * (or out over the wall), its own top is let go. Cups have their own owner, so a ramp and a cup
+ * can live at once (one per hand).
+ */
+export function humanCup(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking): Policy {
+  let cup: FloorShape | null = null;
+  let madeAt = 0;
+  let releaseAt = -1;
+  let pending: { at: number; x: number; z: number } | null = null;
+  let lastT = Infinity;
+  let busy = 0;
+  let last = -9;
+  return (arena, me, rival, t, charges, rnd, owner = 'me') => {
+    if (t < lastT) {
+      cup = null;
+      pending = null;
+      releaseAt = -1;
+      busy = 0;
+      last = -9;
+    }
+    lastT = t;
+    const cupOwner = `${owner}-cup`;
+    if (pending && pending.at <= t) {
+      const f = charges.spend(t, TUNING.grace);
+      if (f) {
+        cup = arena.addShape('well', pending.x, pending.z, CUP_DEPTH * f, cupOwner, 0, 0, CUP_SIGMA);
+        cup.trap = true;
+        cup.held = true;
+        madeAt = t;
+      }
+      pending = null;
+    }
+    if (cup) {
+      if (!arena.shapes.includes(cup)) {
+        cup = null;
+        return;
+      }
+      if (cup.caught && releaseAt < 0) releaseAt = t + HUMAN.reaction + HUMAN.tracking + 0.15;
+      if (releaseAt >= 0 && t >= releaseAt) {
+        if (cup.caught === rival) {
+          const exit = nearestExit(rival, arena);
+          const a = Math.atan2(exit.z - rival.z, exit.x - rival.x) + HUMAN.dirErr * gauss(rnd);
+          arena.sling(cup, Math.cos(a), Math.sin(a));
+        } else arena.free(cup);
+        cup = null;
+        releaseAt = -1;
+      } else if (!cup.caught && t - madeAt > CUP_HOLD) {
+        arena.free(cup);
+        cup = null;
+      }
+      return;
+    }
+    if (pending || t < TUNING.grace || busy > t || t - last < HUMAN.minGap || charges.charges < 1 || !rival.alive) return;
+    busy = t + delay;
+    last = t;
+    const p = predictOrbit(rival, delay + 0.3, 1 + 0.25 * gauss(rnd));
+    pending = { at: t + delay, x: p.x + HUMAN.posErr * gauss(rnd), z: p.z + HUMAN.posErr * gauss(rnd) };
+  };
+}
+
+/** Ramps when the rival is out in the outer band, cups it otherwise: both verbs, as a player would. */
+export function humanBoth(rampDelay = 0.35): Policy {
+  const ramp = humanRamp(rampDelay);
+  const cup = humanCup();
+  return (arena, me, rival, t, charges, rnd, owner = 'me') => {
+    ramp(arena, me, rival, t, charges, rnd, owner);
+    if (Math.hypot(rival.x, rival.z) < arena.radius * 0.55) cup(arena, me, rival, t, charges, rnd, owner);
+  };
+}
+
+/** Where a top caught at (x, z) should go: the nearest slag-pit mouth, else straight out over the wall. */
+function nearestExit(t: Top, arena: Arena): { x: number; z: number } {
+  const L = arena.layout;
+  const a0 = Math.atan2(t.z, t.x);
+  let best = a0;
+  let gap = Infinity;
+  for (const p of L.pockets) {
+    const d = Math.abs(Math.atan2(Math.sin(p.angle - a0), Math.cos(p.angle - a0)));
+    if (d < gap) {
+      gap = d;
+      best = p.angle;
+    }
+  }
+  return { x: Math.cos(best) * arena.radius, z: Math.sin(best) * arena.radius };
+}
+
 function gauss(rnd: () => number) {
   return Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd());
 }
@@ -137,7 +229,7 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
     policy(arena, a, b, t, charges, rnd);
     rivalPolicy(arena, b, a, t, rivalCharges, rnd, 'rival');
     for (const sh of arena.shapes) {
-      if (before.has(sh) || sh.owner !== 'me') continue;
+      if (before.has(sh) || !sh.owner.startsWith('me')) continue;
       shapes++;
       lastShape = t;
       mine.push({ s: sh, touched: false });

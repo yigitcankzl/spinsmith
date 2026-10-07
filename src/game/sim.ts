@@ -60,6 +60,18 @@ export const RAMP_SIGMA = 0.045;
 /** The smaller ramp of a rival, so it does not end rounds too fast. */
 export const RIVAL_RAMP_SIGMA = 0.03;
 export const WELL_SIGMA = 0.022;
+/**
+ * The cup: a shallow, held hollow (about 8 cm across in the world) that catches the first top to
+ * roll into it and holds only that one (drag and a pull to its middle), until the hand slings it
+ * or lets it go. The other top rolls over it.
+ */
+export const CUP_SIGMA = 0.035;
+export const CUP_DEPTH = 0.006;
+const CUP_CATCH = 0.8;
+const CUP_DRAG = 5;
+const CUP_PULL = 250;
+/** How fast a sling throws the caught top (sim m/s). */
+export const SLING_SPEED = 0.45;
 const WELL_DRAG = 3;
 /** How much less a top in the middle of a fresh well is knocked back (0..1). */
 const WELL_BRACE = 0.5;
@@ -250,6 +262,7 @@ export class Arena {
 
   /** How strong a shape is now: full for a moment after it is made, then fading as it relaxes. */
   static strength(s: FloorShape) {
+    if (s.held) return 1;
     return s.age < TUNING.shapeHold ? 1 : Math.exp(-(s.age - TUNING.shapeHold) / RELAX_TAU);
   }
 
@@ -261,7 +274,8 @@ export class Arena {
       const rx = x - s.x;
       const rz = z - s.z;
       if (s.kind === 'well') {
-        h -= k * Math.exp(-(rx * rx + rz * rz) / (WELL_SIGMA * WELL_SIGMA));
+        const ws = s.sigma ?? WELL_SIGMA;
+        h -= k * Math.exp(-(rx * rx + rz * rz) / (ws * ws));
         continue;
       }
       // A ramp: a mound whose front half (along its push direction) falls away steeply, so a top
@@ -286,16 +300,59 @@ export class Arena {
     return Math.min(1, w);
   }
 
-  /** Extra drag (1/s) where wells catch a top. */
-  drag(x: number, z: number): number {
+  /** Extra drag (1/s) where wells catch a top; a cup catches the first top in it and holds only that one. */
+  drag(t: Top): number {
     let d = 0;
     for (const s of this.shapes) {
       if (s.kind !== 'well') continue;
-      const rx = x - s.x;
-      const rz = z - s.z;
-      d += WELL_DRAG * Arena.strength(s) * Math.exp(-(rx * rx + rz * rz) / (WELL_SIGMA * WELL_SIGMA));
+      const rx = t.x - s.x;
+      const rz = t.z - s.z;
+      const ws = s.sigma ?? WELL_SIGMA;
+      if (s.trap) {
+        if (s.caught && s.caught !== t) continue;
+        if (!s.caught) {
+          if (!t.alive || Math.hypot(rx, rz) > CUP_CATCH * ws) continue;
+          s.caught = t;
+        }
+        d += CUP_DRAG;
+        continue;
+      }
+      d += WELL_DRAG * Arena.strength(s) * Math.exp(-(rx * rx + rz * rz) / (ws * ws));
     }
     return d;
+  }
+
+  /** The pull of a cup on the top it caught, toward the cup's middle (applied to velocity). */
+  cupPull(t: Top, dt: number) {
+    for (const s of this.shapes) {
+      if (!s.trap || s.caught !== t) continue;
+      const ws = s.sigma ?? WELL_SIGMA;
+      const rx = t.x - s.x;
+      const rz = t.z - s.z;
+      const g = Math.exp(-(rx * rx + rz * rz) / (4 * ws * ws));
+      t.vx -= rx * CUP_PULL * g * dt;
+      t.vz -= rz * CUP_PULL * g * dt;
+    }
+  }
+
+  /** Throws a cup's caught top along (dx, dz) and removes the cup. Returns the top thrown, if any. */
+  sling(cup: FloorShape, dx: number, dz: number, speed = SLING_SPEED): Top | null {
+    const t = cup.caught ?? null;
+    this.shapes = this.shapes.filter((s) => s !== cup);
+    const len = Math.hypot(dx, dz);
+    if (!t || !t.alive || len < 1e-6) return null;
+    t.vx = (dx / len) * speed;
+    t.vz = (dz / len) * speed;
+    t.kick = 0.9;
+    return t;
+  }
+
+  /** Lets a cup go without a throw: its top rolls on, the hollow relaxes away. */
+  free(cup: FloorShape) {
+    cup.held = false;
+    cup.trap = false;
+    cup.caught = null;
+    cup.age = Math.max(cup.age, TUNING.shapeHold);
   }
 
   /** Per-step arena update: shapes relax, the dish rocks under the tops' weight. */
@@ -364,6 +421,10 @@ export interface FloorShape {
   owner: string;
   /** Footprint, when not the kind's default. */
   sigma?: number;
+  /** A cup: held at full strength while the hand keeps it, catching one top. */
+  trap?: boolean;
+  held?: boolean;
+  caught?: Top | null;
 }
 
 function smoothstep(e0: number, e1: number, x: number) {
@@ -570,12 +631,13 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.spin -= (DRAIN_MID + (s.spinDrain - DRAIN_MID) * TUNING.drainSpread + v * 0.02) * TUNING.drain * dt;
   // A well catches the top: it slows down inside it.
   if (arena.shapes.length) {
-    const drag = arena.drag(t.x, t.z);
+    const drag = arena.drag(t);
     if (drag > 0) {
       const f = Math.exp(-drag * dt);
       t.vx *= f;
       t.vz *= f;
     }
+    arena.cupPull(t, dt);
   }
   // A low ring scrapes the floor on steep slopes (the bumps the player raises, steep bowls).
   if (s.height < LOW_HEIGHT) {

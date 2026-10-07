@@ -18,7 +18,7 @@ import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { Arena, ATTACK, DEFENSE, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -210,7 +210,8 @@ TUNING.grace = 0;
   assert.ok(t.vx > 0.02, `a ramp should push a top toward its direction, vx ${t.vx.toFixed(3)}`);
   flat.reset();
   flat.addShape('well', 0, 0, 0.02, 'me');
-  assert.ok(flat.drag(0, 0) > 0 && flat.well(0, 0) > 0.9 && flat.shapesHeight(0, 0) < 0, 'a well is a hollow that drags');
+  t.launch(0, 0, 0, 0, 1, 1);
+  assert.ok(flat.drag(t) > 0 && flat.well(0, 0) > 0.9 && flat.shapesHeight(0, 0) < 0, 'a well is a hollow that drags');
   flat.addShape('ramp', 0.05, 0, 0.06, 'me', 1, 0);
   assert.equal(flat.shapes.length, 1, 'an owner keeps one live shape');
   flat.addShape('well', -0.05, 0, 0.02, 'rival');
@@ -647,6 +648,33 @@ TUNING.grace = 0;
   const small = [{ x: -0.2, z: -0.8 }, { x: 0.2, z: -0.8 }, { x: 0.2, z: -0.6 }, { x: -0.2, z: -0.6 }];
   const far = fitToTable({ x: 0, z: -0.3 }, small, rim);
   assert.ok(Math.hypot(far.x, far.z + 0.3) <= MAX_FIT_MOVE + 1e-9, 'a table too small never pulls the arena further than MAX_FIT_MOVE');
+}
+
+// 19. The cup catches the first top that rolls in and holds only that one; the other rolls over it.
+// A sling throws the caught top and removes the cup; letting go frees it.
+{
+  const layout = { ...ARENAS[0], pockets: [], rails: [], pillars: [], floor: 'flat' as const, depth: 0.0, vortex: 0, spinner: 0, tilt: 0, shrink: false };
+  const arena = new Arena(layout);
+  arena.elapsed = 10;
+  const a = new Top(STAMINA);
+  const b = new Top(STAMINA);
+  a.launch(-0.03, 0, 0.12, 0, 1, 1);
+  b.launch(0.05, 0.06, 0, 0, 1, -1);
+  const cup = arena.addShape('well', 0, 0, CUP_DEPTH, 'me', 0, 0, CUP_SIGMA);
+  cup.trap = true;
+  cup.held = true;
+  for (let i = 0; i < 240; i++) step(arena, a, b);
+  assert.equal(cup.caught, a, 'the first top into the cup is caught');
+  assert.ok(Math.hypot(a.x, a.z) < CUP_SIGMA, `the caught top stays in the cup (${Math.hypot(a.x, a.z).toFixed(3)})`);
+  assert.equal(Arena.strength(cup), 1, 'a held cup stays at full strength');
+  const thrown = arena.sling(cup, 1, 0);
+  assert.equal(thrown, a);
+  assert.ok(a.vx > 0.5 && !arena.shapes.includes(cup), 'a sling throws the caught top and the cup is gone');
+  const cup2 = arena.addShape('well', 0.06, 0.06, CUP_DEPTH, 'me', 0, 0, CUP_SIGMA);
+  cup2.trap = true;
+  cup2.held = true;
+  arena.free(cup2);
+  assert.ok(!cup2.held && !cup2.trap && Arena.strength(cup2) <= 1, 'letting go frees the cup');
 }
 
 console.log('sim-check: all passed');
