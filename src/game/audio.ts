@@ -40,7 +40,7 @@ function audio(): AudioContext | null {
       return null;
     }
     master = ctx.createGain();
-    master.gain.value = COMFORT.sound ? 0.7 : 0;
+    master.gain.value = level();
     // A limiter at the end: stacked bursts, clashes and hums never clip.
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -6;
@@ -100,9 +100,14 @@ export function duck(depth = 0.35, hold = 0.25) {
   music.gain.setTargetAtTime(1, t + hold, 0.35);
 }
 
+/** The master level by the comfort dial: off when quiet, softer when calm. */
+function level() {
+  return COMFORT.sound ? (COMFORT.flashes ? 0.7 : 0.5) : 0;
+}
+
 /** Applies the comfort dial's sound setting at once (hums keep running). */
 export function applySound() {
-  if (ctx && master) master.gain.setTargetAtTime(COMFORT.sound ? 0.7 : 0, ctx.currentTime, 0.05);
+  if (ctx && master) master.gain.setTargetAtTime(level(), ctx.currentTime, 0.05);
 }
 
 /** Pauses (suspends) or resumes every sound at once, for the headset menu. */
@@ -188,11 +193,13 @@ export function playLaunch(power: number, perfect: boolean) {
   if (perfect) tone(1760, 0.15, 0.4, 'sine');
 }
 
-/** Dropping into a pocket: a hollow thunk and a falling tone. */
+/** Dropping into a slag pit: a hollow thunk, a falling tone, then the sizzle of hot slag. */
 export function playPocket(x = 0) {
   at(x, () => {
     tone(140, 0.4, 0.3, 'sine', 0, 55);
     hiss(0.2, 0.15, 900, 300, 2);
+    hiss(0.12, 0.6, 3000, 800, 2, 0.12);
+    tone(90, 0.15, 0.3, 'sine', 0.3, 45);
   });
 }
 

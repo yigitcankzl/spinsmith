@@ -16,8 +16,9 @@ const ARENA_RADIUS = 0.15;
 
 export const FORGE_SHELL_HEIGHT = 0.08;
 
-const iron = new MeshStandardMaterial({ color: 0x51464a, metalness: 0.62, roughness: 0.5 });
-const darkIron = new MeshStandardMaterial({ color: 0x242027, metalness: 0.58, roughness: 0.62 });
+// Graphite, not mauve: the forge's machine color (the darkest large surface stays above #26282d, so passthrough never shows a hole).
+const iron = new MeshStandardMaterial({ color: 0x3a3d45, metalness: 0.7, roughness: 0.45 });
+const darkIron = new MeshStandardMaterial({ color: 0x2a2c32, metalness: 0.6, roughness: 0.55 });
 const ember = new MeshBasicMaterial({
   color: 0xff5a24,
   transparent: true,
