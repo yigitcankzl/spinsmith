@@ -211,6 +211,12 @@ an arena. First to 3 heat wins a match.
   both tops (never the view); every knockout plays in slow motion; sparks are streaks that cool
   from white-hot and skip off the floor; each top has a ring of light in its team color; a won
   match runs sparks round the rim. The placed arena forges up out of the table under the title.
+- **Feats, bests and the match report** (`src/game/progress.ts`): twelve feats, each stamped the
+  first time (ramp a rival out, sling one into a pit, knock one out with your strike, cut a big
+  move short, rip white hot, a flawless match, a comeback from match point, a Hammer shatter, each
+  circuit, ten arenas won), counted on the board; personal bests (hardest rip, fastest knockout)
+  stamped when beaten; after a match, home shows its report (result, each round's finish, best
+  rip, XP). After a loss the rival's card gives a tip against it.
 - **Sound** (`src/game/audio.ts`): one generated room reverb, music that follows the game at 96
   bpm in D minor on the game's four-note motif (home: drone and anvil; getting ready: bass;
   fight: toms; tension: hats and the motif), ducked under big hits; clashes ring at each ring's
