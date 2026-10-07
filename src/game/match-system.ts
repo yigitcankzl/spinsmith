@@ -301,6 +301,8 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** This match so far, for the report at home: each round's finish (- = the rival's), best rip, XP. */
+  private matchLog = { rounds: [] as string[], rip: 0, xp: 0, won: false, score: '' };
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
   private titleShown = false;
   private titleT = 0;
@@ -753,7 +755,13 @@ export class MatchSystem extends createSystem({
           this.resultTimer -= dt;
           if (this.resultTimer <= 0) {
             if (this.demo) this.endDemo();
-            else if (this.matchOver) this.toHub();
+            else if (this.matchOver) {
+              const report = this.matchReport();
+              this.toHub();
+              // Home after a match: what happened in it, for a few seconds.
+              this.label.set(report);
+              this.labelTimer = 5;
+            }
             else this.toReady();
             break;
           }
@@ -1085,6 +1093,13 @@ export class MatchSystem extends createSystem({
 
   /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
   /** A rival for a new match, from the archetypes your level has reached; the same all match. */
+  /** The match in two lines: the result and score, then each round's finish, the best rip and the XP. */
+  private matchReport() {
+    const m = this.matchLog;
+    const rounds = m.rounds.map((r) => (r.startsWith('-') ? r.slice(1).toLowerCase() : r)).join(' · ');
+    return `${m.won ? 'Won' : 'Lost'} ${m.score} vs ${this.rival.name}\n${rounds} · best rip ${Math.round(m.rip * 100)}% · +${m.xp} XP`;
+  }
+
   /** A feat earned for the first time: stamped after what shows now. */
   private featDone(id: string) {
     if (this.demo || !this.progress.feat(id)) return;
@@ -1220,6 +1235,7 @@ export class MatchSystem extends createSystem({
     this.myPoints = 0;
     this.theirPoints = 0;
     this.wasDown = false;
+    this.matchLog = { rounds: [], rip: 0, xp: 0, won: false, score: '' };
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
     this.typesPicked = false;
     this.phase = 'ready';
@@ -1857,6 +1873,7 @@ export class MatchSystem extends createSystem({
     playLaunch(power, perfect);
     this.stamp.show(perfect ? 'WHITE HOT!' : 'RIP!', '', 'mine', 0.35);
     if (perfect) this.featDone('whiteHot');
+    this.matchLog.rip = Math.max(this.matchLog.rip, power);
     // Personal bests are their own small moment (the first record is just kept).
     if (!this.demo && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
     const mh = this.mine.hand;
@@ -2530,6 +2547,8 @@ export class MatchSystem extends createSystem({
       this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
       if (decided) {
         const youWon = this.myPoints > this.theirPoints;
+        this.matchLog.won = youWon;
+        this.matchLog.score = `${this.myPoints} - ${this.theirPoints}`;
         if (youWon && this.theirPoints === 0) this.featDone('flawless');
         if (youWon && this.wasDown) this.featDone('comeback');
         if (youWon && !this.demo && this.progress.wonMatchIn(this.arena.layout.name)) this.featDone('everyArena');
@@ -2625,6 +2644,8 @@ export class MatchSystem extends createSystem({
     const before = this.progress.level;
     const award = this.progress.award({ won, finish: loser.finish, pocketPoints: loser.pocketPoints, perfect: this.lastPerfect && won, matchOver, matchWon, rival: this.rival.name });
     this.xpGained = award.gained;
+    this.matchLog.xp += award.gained;
+    this.matchLog.rounds.push(`${won ? '' : '-'}${FINISH_WORD[loser.finish ?? 'spin']}`);
     playXp();
     console.log(`[XP] +${award.gained} -> Lv ${this.progress.level} (${(this.progress.fraction * 100).toFixed(0)}%)${award.unlocked.length ? ` unlocked ${award.unlocked.join(', ')}` : ''}`);
     if (award.levels.length) {
