@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferGeometry, CircleGeometry, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, ForgeLoop, playCrunch, playLocked, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -17,10 +17,12 @@ import { anvilModel, Hub, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
 import { RoomLight } from './room-light.js';
+import { fitToTable } from './room.js';
+import type { XZ } from './room.js';
 import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ShapeMarks, Sparks, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { SHAPE_SIZE, ShapingCharges } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena } from './placement.js';
@@ -96,7 +98,10 @@ const RAMP_AIM_DEADZONE = 0.005;
 
 type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build' | 'forge';
 
-type RawPlane = { orientation?: string; semanticLabel?: string };
+/** Depth only, drawn first: the real table hides what is behind or below it. */
+const TABLE_MASK = new MeshBasicMaterial({ colorWrite: false, side: DoubleSide });
+
+type RawPlane = { orientation?: string; semanticLabel?: string; polygon?: DOMPointReadOnly[] };
 
 /**
  * One match loop on the table: place the arena, rip-cord launch against an AI top,
@@ -273,6 +278,8 @@ export class MatchSystem extends createSystem({
   private handOccluder = new HandOccluder();
   /** The real room dims around the arena, more in a fight; the desk around the arena stays lit. */
   private roomLight = new RoomLight();
+  /** The real table as a depth-only shape: hides what falls behind or below the desk. */
+  private tableMask = new Group();
   /** The quiet forge loop: up at home and in the workshops, ducked under a fight. */
   private loop = new ForgeLoop();
   private rivalShapeAt = -9;
@@ -370,6 +377,7 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.handOccluder.joints);
     this.world.createTransformEntity(this.handOccluder.bones);
     this.world.createTransformEntity(this.roomLight.mesh);
+    this.world.createTransformEntity(this.tableMask);
     // The match bar: a metal strip set into the far rim, tipped back toward the player, under the
     // round messages, so score and fight share one view.
     this.bar.mesh.position.set(0, 0.03, -0.205);
@@ -964,6 +972,16 @@ export class MatchSystem extends createSystem({
     // getWorldDirection returns +Z of the object; the camera looks down -Z.
     this.fwd.negate();
     const at = placeArena(this.head, this.fwd.x, this.fwd.z, this.tables(), TUNE.reach);
+    // On a table, its rim stays on the wood: moved in from the edge if it would hang over.
+    if (at.onTable) {
+      const table = this.tableShape();
+      if (table) {
+        const fit = fitToTable(at, table.poly, this.arena.radius * ARENA_SCALE + 0.03);
+        at.x = fit.x;
+        at.z = fit.z;
+        at.yaw = Math.atan2(this.head.x - at.x, this.head.z - at.z);
+      }
+    }
     this.root.position.set(at.x, at.y, at.z);
     this.root.scale.setScalar(ARENA_SCALE);
     // Local +Z points back at the player.
@@ -972,6 +990,7 @@ export class MatchSystem extends createSystem({
     this.onTable = at.onTable;
     this.tableY = null;
     this.placedAt = this.time;
+    this.setRoom();
     console.log(`[MATCH] arena on ${at.onTable ? 'table' : 'tray'} at ${[at.x, at.y, at.z].map((v) => v.toFixed(2)).join(',')}`);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
@@ -985,6 +1004,95 @@ export class MatchSystem extends createSystem({
     this.handle.add(post, grip);
     this.handle.position.set(0, -0.026, 0.215);
     this.handle.visible = false;
+  }
+
+  /** The usable table's outline nearest the head (world x/z) and its height, or null. */
+  private tableShape(): { y: number; poly: XZ[] } | null {
+    this.player.head.getWorldPosition(this.head);
+    const y = pickTable(this.head, this.tables());
+    if (y === null) return null;
+    let best: { y: number; poly: XZ[] } | null = null;
+    let bestD = Infinity;
+    for (const e of this.queries.planes.entities) {
+      const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
+      if (plane?.orientation !== 'horizontal' || !/table|desk/.test(plane.semanticLabel ?? '') || !plane.polygon?.length) continue;
+      const o = e.object3D!;
+      o.updateWorldMatrix(true, false);
+      const c = o.getWorldPosition(this.local);
+      if (Math.abs(c.y - y) > 1e-3) continue;
+      const d = Math.hypot(c.x - this.head.x, c.z - this.head.z);
+      if (d >= bestD) continue;
+      bestD = d;
+      // The polygon is in the plane's own space; its world outline is what the arena sits inside.
+      const poly = plane.polygon.map((p) => {
+        const w = this.p.set(p.x, p.y, p.z).applyMatrix4(o.matrixWorld);
+        return { x: w.x, z: w.z };
+      });
+      best = { y, poly };
+    }
+    return best;
+  }
+
+  /** The lowest horizontal plane labelled floor, else the floor of the local-floor space (0). */
+  private floorY(): number {
+    let y = 0;
+    let found = false;
+    for (const e of this.queries.planes.entities) {
+      const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
+      if (plane?.orientation !== 'horizontal' || !/floor/.test(plane.semanticLabel ?? '')) continue;
+      const py = e.object3D!.getWorldPosition(this.local).y;
+      if (!found || py < y) y = py;
+      found = true;
+    }
+    return y;
+  }
+
+  /**
+   * Tells the views where the real table and floor are (arena-local), and fits the depth-only
+   * table that hides anything falling behind or below the real desk.
+   */
+  private setRoom() {
+    const table = this.onTable ? this.tableShape() : null;
+    if (!table) {
+      ROOM.poly = null;
+      ROOM.floor = null;
+      this.tableMask.visible = false;
+      return;
+    }
+    this.root.updateWorldMatrix(true, false);
+    ROOM.poly = table.poly.map((p) => {
+      const l = this.root.worldToLocal(this.p.set(p.x, table.y, p.z));
+      return { x: l.x, z: l.z };
+    });
+    ROOM.floor = this.root.worldToLocal(this.p.set(this.root.position.x, this.floorY(), this.root.position.z)).y;
+    // The mask: the table top 2 mm below the surface plus a 5 cm skirt down its edges.
+    const top = new Shape(table.poly.map((p) => new Vector2(p.x, p.z)));
+    const pos: number[] = [];
+    const n = table.poly.length;
+    for (let i = 0; i < n; i++) {
+      const a = table.poly[i];
+      const b = table.poly[(i + 1) % n];
+      const y0 = table.y - 0.002;
+      const y1 = table.y - 0.05;
+      pos.push(a.x, y0, a.z, b.x, y0, b.z, b.x, y1, b.z, a.x, y0, a.z, b.x, y1, b.z, a.x, y1, a.z);
+    }
+    const skirt = new BufferGeometry();
+    skirt.setAttribute('position', new Float32BufferAttribute(pos, 3));
+    skirt.computeVertexNormals();
+    const plate = new ShapeGeometry(top).rotateX(Math.PI / 2).translate(0, table.y - 0.002, 0);
+    const old = this.tableMask.children as Mesh[];
+    for (const m of [...old]) {
+      m.geometry.dispose();
+      m.removeFromParent();
+    }
+    for (const g of [plate, skirt]) {
+      const m = new Mesh(g, TABLE_MASK);
+      m.renderOrder = -10;
+      m.frustumCulled = false;
+      this.tableMask.add(m);
+    }
+    this.tableMask.visible = true;
+    console.log(`[MATCH] table polygon n=${n} at ${table.y.toFixed(2)}, floor ${this.floorY().toFixed(2)}`);
   }
 
   /** Centers of the detected horizontal table and desk planes (world). */
@@ -1008,6 +1116,7 @@ export class MatchSystem extends createSystem({
       if (table !== null) {
         this.onTable = true;
         this.tableY = table + PEDESTAL;
+        this.setRoom();
         console.log(`[MATCH] snapped to table at ${this.tableY.toFixed(2)}`);
       }
     }
@@ -1047,6 +1156,7 @@ export class MatchSystem extends createSystem({
     this.root.rotation.set(0, Math.atan2(this.head.x - p.x, this.head.z - p.z), 0);
     this.onTable = this.tables().some((t) => Math.abs(p.y - (t.y + PEDESTAL)) < 1e-3);
     this.placedAt = this.time;
+    this.setRoom();
     playPlace();
     console.log(`[MATCH] arena moved to ${[p.x, p.y, p.z].map((v) => v.toFixed(2)).join(',')}`);
     if (import.meta.env.DEV) this.hubLogPending = true;

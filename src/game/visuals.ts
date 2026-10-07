@@ -44,6 +44,8 @@ import { Arena, RAMP_SIGMA, Top, WELL_SIGMA } from './sim.js';
 import { FONT, glass, ORANGE, TEXT } from './ui.js';
 import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
 import { TABLE_Y } from './reach.js';
+import { insidePoly } from './room.js';
+import type { XZ } from './room.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
 /**
@@ -477,6 +479,18 @@ const GRAVITY = 9.81;
 const DEBRIS_LIFE = 4;
 /** The real table under the arena (arena-local): thrown tops and shattered parts land here. */
 const TABLE_LEVEL = TABLE_Y;
+
+/**
+ * The real room under the arena, arena-local: the table's outline (null on the tray or when it is
+ * unknown) and the floor's height. Set by the match system after every placement.
+ */
+export const ROOM: { poly: XZ[] | null; floor: number | null } = { poly: null, floor: null };
+
+/** The surface under (x, z) outside the arena: the table where it is, else the floor beside it. */
+function roomSurface(x: number, z: number): number {
+  if (!ROOM.poly || insidePoly(ROOM.poly, x, z)) return TABLE_LEVEL;
+  return ROOM.floor ?? TABLE_LEVEL;
+}
 /** A thrown top travels at most this far past the rim before it lands and stops (arena-local). */
 const THROW_REACH = 0.12;
 
@@ -675,24 +689,39 @@ export class TopView {
     if (!this.landed) {
       v.y -= GRAVITY * dt;
       p.addScaledVector(v, dt);
-      // Never farther than a short throw past the rim.
+      // Without a known table edge, never farther than a short throw past the rim.
       const r = Math.hypot(p.x, p.z);
       const max = arena.radius + THROW_REACH;
-      if (r > max) {
+      if (!ROOM.poly && r > max) {
         p.x *= max / r;
         p.z *= max / r;
         v.x = 0;
         v.z = 0;
       }
-      if (p.y <= TABLE_LEVEL) {
-        p.y = TABLE_LEVEL;
-        this.landed = true;
+      // It lands on the table, or past its edge, on the real floor.
+      const ground = roomSurface(p.x, p.z);
+      if (p.y <= ground) {
+        p.y = ground;
+        // Never inside the pedestal: a top dropping right by the rim lands just outside it.
+        const rr = Math.hypot(p.x, p.z);
+        const out = arena.radius + 0.035;
+        if (rr < out && rr > 1e-6) {
+          p.x *= out / rr;
+          p.z *= out / rr;
+        }
+        v.y = ground < TABLE_LEVEL ? -v.y * 0.3 : 0;
+        this.landed = ground >= TABLE_LEVEL || Math.abs(v.y) < 0.05;
+        if (import.meta.env.DEV && this.landed) console.log(`[OUT] landed on the ${ground < TABLE_LEVEL ? 'floor' : 'table'} at ${p.x.toFixed(2)},${p.z.toFixed(2)}`);
       }
     } else {
-      // Skids to a stop, then falls over.
+      // Skids to a stop, then falls over; skidding off the table's edge, it drops again.
       v.multiplyScalar(Math.exp(-dt * 6));
       p.x += v.x * dt;
       p.z += v.z * dt;
+      if (roomSurface(p.x, p.z) < p.y - 0.001) {
+        this.landed = false;
+        v.y = 0;
+      }
       this.fall = Math.min(1, this.fall + dt * 2.2);
     }
     this.root.position.copy(p);
@@ -700,7 +729,7 @@ export class TopView {
     const f = this.fall * this.fall;
     this.root.rotation.set(1.25 * f * this.fallZ, 0, -1.25 * f * this.fallX);
     this.shadow.visible = this.landed;
-    this.shadow.position.set(p.x, TABLE_LEVEL + 0.0008, p.z);
+    this.shadow.position.set(p.x, p.y + 0.0008, p.z);
   }
 
   /** Burst: the parts fly apart, tumble, bounce on the floor and fade out. */
@@ -736,7 +765,7 @@ export class TopView {
       // Bounce on the arena floor while over it, else on the real table beside it.
       const p = d.mesh.position;
       {
-        const floor = arena.inside(p.x, p.z) ? arena.height(p.x, p.z) + 0.003 : TABLE_LEVEL + 0.003;
+        const floor = arena.inside(p.x, p.z) ? arena.height(p.x, p.z) + 0.003 : roomSurface(p.x, p.z) + 0.003;
         if (p.y < floor) {
           p.y = floor;
           d.vel.y = Math.abs(d.vel.y) * 0.35;

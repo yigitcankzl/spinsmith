@@ -12,6 +12,7 @@ import { CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STA
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
+import { edgeDistance, fitToTable, insidePoly, MAX_FIT_MOVE, RIM_MARGIN } from '../src/game/room.ts';
 import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
@@ -629,6 +630,23 @@ TUNING.grace = 0;
     recent = [a, ...recent.filter((x) => x !== a)];
   }
   assert.equal(nextArena(['Forge Bowl'], ['Forge Bowl'], ['Forge Bowl'], 'Drifter'), 'Forge Bowl', 'one arena: that one');
+}
+
+// 18. The real table: inside tests, and the arena moved in from the edge so its rim stays on the wood,
+// never by more than MAX_FIT_MOVE.
+{
+  const desk = [{ x: -0.6, z: -0.9 }, { x: 0.6, z: -0.9 }, { x: 0.6, z: -0.3 }, { x: -0.6, z: -0.3 }];
+  assert.ok(insidePoly(desk, 0, -0.6) && !insidePoly(desk, 0, -0.2) && !insidePoly(desk, 0.7, -0.6));
+  assert.ok(Math.abs(edgeDistance(desk, 0, -0.6) - 0.3) < 1e-9);
+  const rim = 0.2;
+  const fits = (p: { x: number; z: number }) => insidePoly(desk, p.x, p.z) && edgeDistance(desk, p.x, p.z) >= rim + RIM_MARGIN - 1e-9;
+  const ok = fitToTable({ x: 0, z: -0.6 }, desk, rim);
+  assert.deepEqual(ok, { x: 0, z: -0.6 }, 'an arena that fits stays where it is');
+  const near = fitToTable({ x: 0, z: -0.45 }, desk, rim);
+  assert.ok(fits(near) && Math.hypot(near.x, near.z + 0.45) <= MAX_FIT_MOVE + 1e-9, 'an arena over the near edge moves in just enough');
+  const small = [{ x: -0.2, z: -0.8 }, { x: 0.2, z: -0.8 }, { x: 0.2, z: -0.6 }, { x: -0.2, z: -0.6 }];
+  const far = fitToTable({ x: 0, z: -0.3 }, small, rim);
+  assert.ok(Math.hypot(far.x, far.z + 0.3) <= MAX_FIT_MOVE + 1e-9, 'a table too small never pulls the arena further than MAX_FIT_MOVE');
 }
 
 console.log('sim-check: all passed');
