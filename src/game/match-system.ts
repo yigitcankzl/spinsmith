@@ -468,7 +468,8 @@ export class MatchSystem extends createSystem({
     this.title.visible = false;
     this.title.renderOrder = 5;
     this.root.add(this.title);
-    this.stamp.mesh.position.set(0, 0.075, -0.05);
+    // Low over the arena's middle, in front of the far card and the match bar.
+    this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.root.add(this.stamp.mesh);
     this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
