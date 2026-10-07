@@ -88,4 +88,16 @@ Built and in the repo, measured with `npm run report:shaping` (rows "masher + st
   (Drifter, Leech), after the first match. A rival quench was cut for the same reason.
 - **Signature parts:** a rival knocked out once gives its part; new Gale and Bulwark rings and
   the Spindle core (`report:tops`, no warnings).
-- Not built: combo counter, rival memory, the weekly rare-part order, the slap detector.
+- After the duel review: the bar starts each round a third full and fills on its own in 24 s
+  (it filled in only a third of rounds before, too late to matter); the strike starts from the
+  palm's spot on the rim (a top near your hand goes to the middle, one across the arena out); it
+  lands 1.6x harder while you are behind; a hard slap, armed half a second after the bar fills,
+  so a resting hand never strikes; the Rush is braced.
+- Final `npm run report:shaping` (12 rounds per pair, 15 arenas): masher + strike 49%; human +
+  Anvil 64% (+15, gate met), median 12.8 s (just under 13), comeback 8% (gate missed: the
+  measure is noisy, 0-22% across nearby settings, and rounds that fall far behind rarely turn);
+  Rush 60%, Magnet 63%; against a charging rival 62% with the strike, 43% without.
+- `npm run report:arenas`: no warnings on any of the fifteen arenas (KO 16-53%, medians 15-22 s).
+- Not built: combo counter, rival memory, the weekly rare-part order. Needs the headset: the slap
+  thresholds (`?slapDown=` etc.) and whether a tracking jump can look like a slap.
+
