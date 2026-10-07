@@ -25,7 +25,8 @@ Draft (Oct 7, 2026); final text before the deadline. For judges and anyone tryin
 ## The first five minutes
 
 1. Your top waits in its dock on the left of the arena. Pinch it and drop it in the arena.
-2. The rival is introduced. Pinch near your top, pull back toward you and let go: the top rips
+2. The rival is introduced. Pinch over the arena where you want to launch (inside the dashed
+   ring), pull back and let go: the top rips
    in. A white-hot pull adds spin.
 3. After the opening seconds a ring marks a spot beside the rival: pinch the floor there, lift
    and pull outward, let go. Your ramp throws the rival toward the rim.

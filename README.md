@@ -41,16 +41,18 @@ an arena. First to 3 heat wins a match.
   (`src/game/match-bar.ts`: each top's spin draining as a health bar, points as pips, the
   round's result in the middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
   the match ends back home when a side reaches 3 heat.
-- **Rip-cord launch, no target to hit:** pinch anywhere and a cord runs from your top to
-  your hand. Rip it back and let go: power comes only from the motion, how far the hand
+- **Rip-cord launch, from where you choose:** pinch over the arena (inside the dashed ring)
+  and your top goes to that spot; pinch anywhere else and it launches from its usual spot near
+  you. A cord runs from your top to your hand. The pull aims like a slingshot (the top goes the
+  other way), and its angle matters: a flat pull dashes off fast, a pull straight up launches
+  slower with more spin. The rival starts from a different spot on its half every round. Rip it back and let go: power comes only from the motion, how far the hand
   travelled and how fast it was still moving at release, so a rip that stops before letting
   go loses power and a hold without a pull does nothing. While ripping, the top spins up,
   the molten cord heats from white to orange to yellow, straightens, trembles and pulses
   toward the top, and a glow ring grows under the top. 92% or more is a
-  white-hot pull with extra spin. A sideways rip aims like a slingshot; otherwise the top goes
-  where your hand points on the floor. In the emulator's play mode, click and flick the
-  mouse: the hands move with the view.
-- An AI top launches from the far side at the same time.
+  white-hot pull with extra spin. In the emulator's play mode, click and flick the mouse: the
+  hands move with the view.
+- An AI top launches from its spot on the far half at the same time.
 - **Arenas are data** (`src/game/layout.ts`): size (12–18 cm), shape (circle, oval, square),
   floor (bowl, flat, hill, tornado ridge, two tiers), wall (low, standard, high and climbable,
   none with a sumo berm), slag pits, kick rails, pillars and pinball bumpers,

@@ -4,6 +4,7 @@
  * always use the defaults.
  */
 import { REACH } from './placement.ts';
+import { ARENA_SCALE } from './reach.ts';
 
 const query = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
 
@@ -17,7 +18,7 @@ export const TUNE = {
   /** How far ahead the arena goes (m). */
   reach: knob('reach', REACH),
   /** How much larger than its simulation the arena is drawn. */
-  scale: knob('scale', 2),
+  scale: knob('scale', ARENA_SCALE),
   /** Thumb-to-index distance that starts and ends a pinch (m). */
   pinchOn: knob('pinchOn', 0.02),
   pinchOff: knob('pinchOff', 0.035),

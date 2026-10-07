@@ -1,9 +1,9 @@
-import { AdditiveBlending, CircleGeometry, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, BufferGeometry, CircleGeometry, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, ForgeLoop, playCrunch, playLocked, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
-import { normRadius, spawnDistance } from './layout.js';
+import { normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { Arena, ATTACK, DEFENSE, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
@@ -47,6 +47,14 @@ const LAUNCH_REACH = 1.0;
 const MAX_PULL = 0.32;
 /** Launch direction is clamped to this many radians off straight-at-center. */
 const MAX_AIM = 0.6;
+/** A launch spot is kept this far inside the rim (fraction of the radius) and this far from the rival (arena-local). */
+const LAUNCH_MAX_N = 0.8;
+const LAUNCH_GAP = 0.05;
+/** A pinch this high above the floor still picks the launch spot under it (arena-local). */
+const LAUNCH_HOVER = 0.12;
+/** A straight-up pull launches this much slower and with this much more spin than a flat one. */
+const STEEP_SLOW = 0.6;
+const STEEP_SPIN = 0.12;
 /** Pinches this close to the floor (vertically) grab it to start a ramp. */
 const SHAPE_GRAB = 0.05;
 const RESULT_TIME = 4;
@@ -261,6 +269,12 @@ export class MatchSystem extends createSystem({
   private local = new Vector3();
   private pullStart = new Vector3();
   private cordStart = new Vector3();
+  /** Where your top launches from this round (arena-local), chosen by where you pinch over the arena. */
+  private launchFrom: { x: number; z: number } | null = null;
+  /** The rival's spot this round: an angle around the arena's far half. */
+  private rivalAngle = -Math.PI / 2;
+  /** While ready: a faint line on the floor around where you can launch from. */
+  private launchZone = new Mesh(new BufferGeometry(), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0.5, depthWrite: false, side: 2 }));
   /** Seconds left before a transient fight message clears. */
   private labelTimer = 0;
   private pullEnd = new Vector3();
@@ -302,6 +316,7 @@ export class MatchSystem extends createSystem({
       this.bumpMark,
       this.marks.root,
       this.rivalMarks.root,
+      this.launchZone,
       this.pips.root,
     );
     this.myBuild = this.forge.allowed(this.myBuild);
@@ -445,6 +460,7 @@ export class MatchSystem extends createSystem({
     this.easeToTable(dt);
     this.loop.update(this.phase === 'hub' || this.phase === 'forge' || this.phase === 'build' ? 0.6 : this.phase === 'ready' ? 0.3 : 0.1);
     this.handle.visible = this.phase === 'hub';
+    this.launchZone.visible = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
     switch (this.phase) {
       case 'placing':
         // Wait for a table to be detected, but never long: without one the arena floats on a tray.
@@ -531,6 +547,11 @@ export class MatchSystem extends createSystem({
     this.updateShapes();
     this.arenaView.update(dt, this.arena);
     this.stage.rotation.set(this.arena.tiltX, 0, this.arena.tiltZ);
+  }
+
+  /** The rival's launch spot this round (arena-local), at the spawn distance on its far half. */
+  private rivalSpot(): [number, number] {
+    return [Math.cos(this.rivalAngle) * this.SPAWN, Math.sin(this.rivalAngle) * this.SPAWN];
   }
 
   /** Player's top this round (alternates so both shapes get played). */
@@ -982,8 +1003,25 @@ export class MatchSystem extends createSystem({
     // Both tops wait upright at their spawn points.
     if (!this.typesPicked) this.pickBuilds();
     this.typesPicked = true;
+    // The launch zone follows this arena's rim.
+    // A thin ribbon (2 mm in arena units), dashed, just above the floor.
+    const zone: number[] = [];
+    const y = this.arena.floorHeight(LAUNCH_MAX_N) + 0.004;
+    for (let i = 0; i < 72; i += 2) {
+      for (const [k, j] of [[0, i], [1, i], [0, i + 1], [1, i], [1, i + 1], [0, i + 1]]) {
+        const a = (j / 72) * Math.PI * 2;
+        const r = rimRadius(this.arena.layout, a) * LAUNCH_MAX_N + (k ? 0.002 : -0.002);
+        zone.push(Math.cos(a) * r, y, Math.sin(a) * r);
+      }
+    }
+    this.launchZone.geometry.dispose();
+    this.launchZone.geometry = new BufferGeometry();
+    this.launchZone.geometry.setAttribute('position', new Float32BufferAttribute(zone, 3));
+    // The rival takes a new spot on the far half each round.
+    this.rivalAngle = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
+    const [rx, rz] = this.rivalSpot();
     this.mine.launch(0, this.SPAWN, 0, 0, 1, this.mine.hand);
-    this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirs.hand);
+    this.theirs.launch(rx, rz, 0, 0, 1, this.theirs.hand);
     this.puller = null;
     this.cord.set(null);
     this.label.mesh.position.copy(LABEL_AT);
@@ -1022,6 +1060,28 @@ export class MatchSystem extends createSystem({
     if (!pick) return;
     const h = this.hands[pick];
     if (this.phase === 'result') this.toReady();
+    // Pinched over the arena: your top goes to that spot and launches from there; elsewhere it
+    // launches from its usual spot near you.
+    const l = this.toLocal(h.pinch);
+    const L = this.arena.layout;
+    const n = normRadius(L, l.x, l.z);
+    this.launchFrom = null;
+    if (n <= 1.05 && l.y - this.arena.floorHeight(Math.min(1, n)) < LAUNCH_HOVER) {
+      const k = n > LAUNCH_MAX_N ? LAUNCH_MAX_N / n : 1;
+      let x = l.x * k;
+      let z = l.z * k;
+      // Never right on top of the rival.
+      const dx = x - this.theirs.x;
+      const dz = z - this.theirs.z;
+      const d = Math.hypot(dx, dz);
+      if (d < LAUNCH_GAP) {
+        x = this.theirs.x + ((d > 1e-6 ? dx / d : 0) * LAUNCH_GAP);
+        z = this.theirs.z + ((d > 1e-6 ? dz / d : 1) * LAUNCH_GAP);
+      }
+      this.launchFrom = { x, z };
+      this.mine.x = x;
+      this.mine.z = z;
+    }
     this.phase = 'pulling';
     this.puller = pick;
     this.pullStart.copy(h.pinch);
@@ -1080,10 +1140,21 @@ export class MatchSystem extends createSystem({
     }
     const end = this.p.copy(this.toLocal(this.pullEnd));
     const pull = end.sub(this.toLocal(this.pullStart));
+    const flat = Math.hypot(pull.x, pull.z);
+    // How steeply up you pulled: a flat pull dashes, a pull straight up spins in place.
+    const steep = Math.max(0, Math.min(1, pull.y / Math.max(1e-6, Math.hypot(flat, pull.y))));
+    if (this.launchFrom) {
+      // From your chosen spot: away from the pull, like a slingshot (a pull straight up goes toward the middle).
+      const from = this.launchFrom;
+      const r = Math.hypot(from.x, from.z) || 1;
+      const dir = flat >= 0.015 ? { x: -pull.x / flat, z: -pull.z / flat } : { x: -from.x / r, z: -from.z / r };
+      this.launch(power, 0, from, dir, steep);
+      return;
+    }
     let aim = 0;
-    if (Math.hypot(pull.x, pull.z) >= 0.03) aim = Math.atan2(-pull.x, pull.z);
+    if (flat >= 0.03) aim = Math.atan2(-pull.x, pull.z);
     else if (this.rayFloor(h)) aim = Math.atan2(this.rayHit.x, this.SPAWN - this.rayHit.z);
-    this.launch(power, Math.max(-MAX_AIM, Math.min(MAX_AIM, aim)));
+    this.launch(power, Math.max(-MAX_AIM, Math.min(MAX_AIM, aim)), null, null, steep);
   }
 
   /** Rip power from the motion alone: distance travelled and speed at the moment of release. */
@@ -1106,7 +1177,11 @@ export class MatchSystem extends createSystem({
   }
 
   /** Launches both tops. aim: radians off straight-at-center for the player's top. */
-  private launch(power: number, aim: number) {
+  /**
+   * Launches both tops. Yours from `from` (or its usual spot) along `dir` (or `aim` off straight
+   * ahead, angled into its orbit); `steep` 0..1 trades launch speed for spin.
+   */
+  private launch(power: number, aim: number, from: { x: number; z: number } | null = null, dir: { x: number; z: number } | null = null, steep = 0) {
     if (this.phase === 'result') this.toReady();
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
@@ -1123,9 +1198,16 @@ export class MatchSystem extends createSystem({
     const mh = this.mine.hand;
     const th = this.theirs.hand;
     // The launch angles into each top's own orbit direction (mirrored for left spin); aim stays as pulled.
-    const dir = aim + LAUNCH_TILT * mh;
-    this.mine.launch(0, this.SPAWN, Math.sin(dir) * speed, -Math.cos(dir) * speed, perfect ? PERFECT_SPIN : 0.55 + 0.45 * power, mh);
-    this.sparks.burst(0, this.arena.height(0, this.SPAWN), this.SPAWN, perfect ? 1 : power * 0.6);
+    const mySpeed = speed * (1 - STEEP_SLOW * steep);
+    const mySpin = (perfect ? PERFECT_SPIN : 0.55 + 0.45 * power) * (1 + STEEP_SPIN * steep);
+    const sx = from ? from.x : 0;
+    const sz = from ? from.z : this.SPAWN;
+    if (dir) this.mine.launch(sx, sz, dir.x * mySpeed, dir.z * mySpeed, mySpin, mh);
+    else {
+      const a = aim + LAUNCH_TILT * mh;
+      this.mine.launch(sx, sz, Math.sin(a) * mySpeed, -Math.cos(a) * mySpeed, mySpin, mh);
+    }
+    this.sparks.burst(sx, this.arena.height(sx, sz), sz, perfect ? 1 : power * 0.6);
     // The rival rips harder as you level up.
     // Difficulty is launch quality: the rival rips harder and aims steadier as you level up.
     const skill = Math.min(1, (this.progress.level - 1) / 15);
@@ -1135,16 +1217,22 @@ export class MatchSystem extends createSystem({
     const aiPower = first ? 0.7 + Math.random() * 0.1 : aiMin + Math.random() * (0.98 - aiMin);
     const aiAim = first ? (Math.random() - 0.5) * 0.3 : (Math.random() - 0.5) * (1.0 - 0.6 * skill);
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
-    const aiDir = aiAim + LAUNCH_TILT;
-    this.theirs.launch(0, -this.SPAWN, Math.sin(aiDir) * aiSpeed * th, Math.cos(aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, th);
+    // From its spot this round, toward the middle, angled into its orbit.
+    const aiDir = aiAim + LAUNCH_TILT * th;
+    const [rx, rz] = this.rivalSpot();
+    const inward = Math.atan2(-rx, -rz);
+    this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, th);
     this.phase = 'fight';
     this.elapsed = 0;
     this.lastHardHit = -1;
     this.accumulator = 0;
     this.clashes = 0;
-    this.label.set(perfect ? 'White hot!\nExtra spin' : '');
-    this.labelTimer = perfect ? 1.5 : 0;
-    console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)}`);
+    // Say how it launched: white hot, or the kind of launch the pull's angle gave.
+    const kind = steep > 0.6 ? 'Spin launch: slow, long spin' : steep < 0.25 && power > 0.5 && (from || dir) ? 'Dash launch' : '';
+    this.label.set(perfect ? 'White hot!\nExtra spin' : kind);
+    this.labelTimer = perfect || kind ? 1.5 : 0;
+    this.launchFrom = null;
+    console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''} from ${sx.toFixed(3)},${sz.toFixed(3)} steep ${steep.toFixed(2)} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)} from ${rx.toFixed(3)},${rz.toFixed(3)}`);
   }
 
   /** Pinch near the floor and lift to raise a bump; press a fingertip into the floor to dent it. */
@@ -1424,7 +1512,7 @@ export class MatchSystem extends createSystem({
         ((c as Mesh).material as MeshBasicMaterial).opacity = Math.sin(k * Math.PI);
       });
       // The rival and arena intro shows first; the rip hint follows.
-      if (this.time - this.readySince > INTRO_TIME) this.label.set('Pinch near your top and pull back toward you\nthen let go');
+      if (this.time - this.readySince > INTRO_TIME) this.label.set('Pinch over the arena where you want to launch\npull back and let go');
     }
     const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > 3 && this.theirs.alive;
     this.bumpMark.visible = bump;

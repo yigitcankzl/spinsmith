@@ -43,6 +43,7 @@ import { rimRadius } from './layout.js';
 import { Arena, Top } from './sim.js';
 import { FONT, glass, ORANGE, TEXT } from './ui.js';
 import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
+import { TABLE_Y } from './reach.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
 /**
@@ -475,7 +476,7 @@ export const OPPONENT_COLOR = 0x4f9fb0;
 const GRAVITY = 9.81;
 const DEBRIS_LIFE = 4;
 /** The real table under the arena (arena-local): thrown tops and shattered parts land here. */
-const TABLE_LEVEL = -0.04;
+const TABLE_LEVEL = TABLE_Y;
 /** A thrown top travels at most this far past the rim before it lands and stops (arena-local). */
 const THROW_REACH = 0.12;
 

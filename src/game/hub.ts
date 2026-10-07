@@ -41,7 +41,7 @@ import type { ArenaLayout, Theme } from './layout.js';
 import type { TopBuild } from './parts.js';
 import { RIVALS } from './parts.js';
 import { SmithBoard } from './board.js';
-import { BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE } from './reach.js';
+import { BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
 import { MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
@@ -96,7 +96,7 @@ const IRON = makeMatcap('metal', 0x9aa1ad);
 const GRAPHITE = makeMatcap('metal', 0x4a4e57);
 const STEEL = makeMatcap('chrome', 0xd6dce6);
 /** The table is this far below the arena floor (arena-local): props stand on the table itself. */
-const TABLE_Y = -0.04;
+const TABLE_Y = REACH_TABLE_Y;
 const BRASS = makeMatcap('metal', 0xe2b866);
 
 interface Pickable {

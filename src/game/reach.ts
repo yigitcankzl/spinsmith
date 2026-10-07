@@ -1,11 +1,11 @@
 /**
  * Where the things you touch sit, and how far they are from a seated player's eyes. One place for
  * the touch layout (arena-local: the arena center is the origin, +Z toward the player, drawn
- * twice life size), so the headless check can keep every direct-touch target in comfortable reach.
+ * ARENA_SCALE times life size), so the headless check can keep every direct-touch target in comfortable reach.
  * Meta's hands guidance puts direct touch at about 0.42-0.46 m and warns against 0.5-0.8 m.
  * No three.js here.
  */
-import { REACH } from './placement.ts';
+import { PEDESTAL, REACH } from './placement.ts';
 
 export interface Spot {
   x: number;
@@ -13,10 +13,10 @@ export interface Spot {
   z: number;
 }
 
-/** The arena-local to world scale (the arena is drawn twice its simulation size). */
-export const ARENA_SCALE = 2;
-/** The real table under the arena, arena-local (the props stand on it). */
-export const TABLE_Y = -0.04;
+/** The arena-local to world scale: the arena is drawn 2.4 times its simulation size (about 72 cm across). */
+export const ARENA_SCALE = 2.4;
+/** The real table under the arena, arena-local (the props stand on it): the pedestal below the floor. */
+export const TABLE_Y = -PEDESTAL / ARENA_SCALE;
 
 /** The drawer tabs of the forge and the workshop share one line along the near rim. */
 export const TAB_LINE = { z: 0.18, y: 0.006, gap: 0.066 };

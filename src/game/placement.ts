@@ -7,7 +7,7 @@
 /** The arena floor sits this far above the real table, leaving room to press wells. */
 export const PEDESTAL = 0.08;
 /** How far in front of the seated player's head the arena goes (m, horizontal). */
-export const REACH = 0.6;
+export const REACH = 0.68;
 /** Without a table the arena floats on a tray this far below the head. */
 export const TRAY_DROP = 0.35;
 export const TABLE_MIN_H = 0.45;
