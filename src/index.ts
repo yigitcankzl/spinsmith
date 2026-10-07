@@ -17,6 +17,9 @@ if (params.has('fresh') || params.has('demo')) {
   history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
 }
 
+// Installed builds keep working offline (public/sw.js); not in dev, where it would cache stale code.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
+
 // Panels are drawn into canvases as the game starts, so the display font must be loaded first.
 loadFonts()
   .then(() => World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions))
