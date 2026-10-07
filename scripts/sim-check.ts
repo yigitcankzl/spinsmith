@@ -851,6 +851,17 @@ TUNING.grace = 0;
   assert.equal(p.records.fastestKo, 4.2);
 }
 
+// 28. Feats are earned once; unknown ones are not; ten arenas won is a feat's condition.
+{
+  const p = new Progress();
+  assert.equal(p.feat('ramp'), true, 'a first ramp-out is a feat');
+  assert.equal(p.feat('ramp'), false, 'only once');
+  assert.equal(p.feat('nonsense'), false, 'no unknown feats');
+  let ten = false;
+  for (let i = 0; i < 10; i++) ten = p.wonMatchIn(`Arena ${i % 10}`);
+  assert.ok(ten && !new Progress().wonMatchIn('x'), 'ten different arenas');
+}
+
 // 25. The comfort dial steps through every mode and wraps round.
 {
   const { COMFORT, COMFORT_MODES, nextComfort } = await import('../src/game/comfort.ts');

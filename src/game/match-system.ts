@@ -10,7 +10,7 @@ import type { ArenaLayout } from './layout.js';
 import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
-import { GUIDE_ORDER, MARK, Progress } from './progress.js';
+import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
 import { nextArena } from './rotation.js';
 import { SAVE_KEYS } from './demo-save.js';
@@ -299,6 +299,8 @@ export class MatchSystem extends createSystem({
   private lane = new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }));
   /** Seconds left of a won match's celebration (sparks round the rim). */
   private celebrate = 0;
+  /** This match you were match point down at some time (a win is a comeback). */
+  private wasDown = false;
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
   private titleShown = false;
   private titleT = 0;
@@ -1083,6 +1085,14 @@ export class MatchSystem extends createSystem({
 
   /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
   /** A rival for a new match, from the archetypes your level has reached; the same all match. */
+  /** A feat earned for the first time: stamped after what shows now. */
+  private featDone(id: string) {
+    if (this.demo || !this.progress.feat(id)) return;
+    this.stamp.later('FEAT!', FEATS[id], 'mine', 1.3);
+    playStamp();
+    if (import.meta.env.DEV) console.log(`[FEAT] ${id}`);
+  }
+
   /** ' · Cinder Circuit champion' or ' · Cinder Circuit 2/3' for a rival not beaten yet; '' otherwise. */
   private boutText(name: string) {
     const c = circuitOf(name);
@@ -1209,6 +1219,7 @@ export class MatchSystem extends createSystem({
     this.perfectInMatch = false;
     this.myPoints = 0;
     this.theirPoints = 0;
+    this.wasDown = false;
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
     this.typesPicked = false;
     this.phase = 'ready';
@@ -1845,6 +1856,7 @@ export class MatchSystem extends createSystem({
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
     this.stamp.show(perfect ? 'WHITE HOT!' : 'RIP!', '', 'mine', 0.35);
+    if (perfect) this.featDone('whiteHot');
     // Personal bests are their own small moment (the first record is just kept).
     if (!this.demo && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
     const mh = this.mine.hand;
@@ -2181,6 +2193,7 @@ export class MatchSystem extends createSystem({
       this.tellAt = -1;
       this.label.set('INTERRUPTED!');
       this.stamp.show('INTERRUPTED!', '', 'mine', 0.6);
+      this.featDone('interrupt');
       this.labelTimer = 1.2;
       if (import.meta.env.DEV) console.log('[TELL] interrupted');
     }
@@ -2507,12 +2520,17 @@ export class MatchSystem extends createSystem({
       const points = finishPoints(loser);
       if (v === 1) this.myPoints += points;
       else this.theirPoints += points;
+      // Match point down: a win from here is a comeback.
+      if (this.theirPoints >= MATCH_HEAT - 1 && this.myPoints < this.theirPoints) this.wasDown = true;
       this.barPoints = [this.myPoints, this.theirPoints];
       const score = `Heat ${this.myPoints} - ${this.theirPoints}`;
       const decided = this.myPoints >= MATCH_HEAT || this.theirPoints >= MATCH_HEAT;
       this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
       if (decided) {
         const youWon = this.myPoints > this.theirPoints;
+        if (youWon && this.theirPoints === 0) this.featDone('flawless');
+        if (youWon && this.wasDown) this.featDone('comeback');
+        if (youWon && !this.demo && this.progress.wonMatchIn(this.arena.layout.name)) this.featDone('everyArena');
         // A won match: sparks run round the rim for a moment.
         if (youWon) this.celebrate = 1.6;
         // A loss leaves something to try next time.
@@ -2527,6 +2545,11 @@ export class MatchSystem extends createSystem({
       const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind).toUpperCase() : null;
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
       if (!this.demo && v === 1 && loser.finish !== 'spin' && this.progress.best('fastestKo', Math.round(this.elapsed * 10) / 10)) this.stamp.later('NEW BEST!', `Fastest knockout: ${this.elapsed.toFixed(1)} s`, 'mine', 1);
+      if (v === 1 && loser.finish !== 'spin' && recent && this.lastShape) {
+        const k = this.lastShape.kind;
+        this.featDone(k === 'ramp' ? 'ramp' : k === 'sling' ? 'sling' : k === 'strike' ? 'strike' : '');
+        if (k === 'strike' && loser.finish === 'burst' && this.myBuild.seal === 'hammer') this.featDone('hammer');
+      }
       // Every knockout, yours or theirs, slows for a moment.
       if (loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME * 0.5;
       const won = this.myPoints > this.theirPoints || (decided && v === 1);
@@ -2629,6 +2652,7 @@ export class MatchSystem extends createSystem({
     if (fresh & MARK.beaten && c?.champion) {
       this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name} is beaten`, 'mine', 2.2);
       playLevelUp();
+      this.featDone(c.circuit.startsWith('Cinder') ? 'cinder' : c.circuit.startsWith('Iron') ? 'iron' : 'crown');
     }
     if (matchWon) this.progress.recordChampion(this.myBuild);
     const o = this.order;

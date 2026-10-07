@@ -132,6 +132,22 @@ export const QUEST_UNLOCKS: Record<string, { key: string; text: string }> = {
   knockout: { key: 'tip:orb', text: 'Win a round by slag pit or throw' },
 };
 
+/** Feats: ways of winning, each earned once, mostly with your hands. */
+export const FEATS: Record<string, string> = {
+  ramp: 'Ramp a rival out',
+  sling: 'Sling a rival into a pit',
+  strike: 'Knock a rival out with your strike',
+  interrupt: "Cut a rival's big move short",
+  whiteHot: 'Rip white hot',
+  flawless: 'Win a match without giving up heat',
+  comeback: 'Win a match from match point down',
+  hammer: 'Shatter a rival with the Hammer',
+  cinder: 'Clear the Cinder Circuit',
+  iron: 'Clear the Iron Circuit',
+  crown: 'Take the Crown',
+  everyArena: 'Win in ten different arenas',
+};
+
 /** XP per round and match. */
 export const XP = {
   roundWin: 60,
@@ -214,6 +230,10 @@ export class Progress {
   arenaPin: string | null = null;
   recentArenas: string[] = [];
   playedArenas: string[] = [];
+  /** Feats earned (FEATS keys). */
+  feats = new Set<string>();
+  /** Arenas a match has been won in. */
+  wonIn = new Set<string>();
   /** Personal bests: the hardest rip (power 0..1) and the fastest knockout win (s). */
   records: { rip?: number; fastestKo?: number } = {};
   private readonly storage: Storage | null;
@@ -223,7 +243,7 @@ export class Progress {
     try {
       const raw = storage?.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; champions?: Champion[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number } };
+        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; champions?: Champion[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[] };
         this.matches = s.matches ?? 0;
         // Saves from before the guide existed skip it.
         this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
@@ -241,6 +261,8 @@ export class Progress {
         this.recentArenas = s.recentArenas ?? [];
         this.playedArenas = s.playedArenas ?? [];
         this.records = { ...(s.records ?? {}) };
+        this.feats = new Set(s.feats ?? []);
+        this.wonIn = new Set(s.wonIn ?? []);
       }
     } catch {
       // A broken save starts over.
@@ -383,6 +405,21 @@ export class Progress {
     this.save();
   }
 
+  /** Earns a feat; true only the first time. */
+  feat(id: string): boolean {
+    if (!(id in FEATS) || this.feats.has(id)) return false;
+    this.feats.add(id);
+    this.save();
+    return true;
+  }
+
+  /** A match won in an arena; true when that makes ten different ones. */
+  wonMatchIn(arena: string): boolean {
+    this.wonIn.add(arena);
+    this.save();
+    return this.wonIn.size >= 10;
+  }
+
   /** A new personal best? Higher is better for 'rip', lower for 'fastestKo'. Saves it when it is. */
   best(kind: 'rip' | 'fastestKo', value: number): boolean {
     const old = this.records[kind];
@@ -415,6 +452,8 @@ export class Progress {
     this.recentArenas = [];
     this.playedArenas = [];
     this.records = {};
+    this.feats = new Set();
+    this.wonIn = new Set();
     this.save();
   }
 
@@ -428,7 +467,7 @@ export class Progress {
   private save() {
     this.storage?.setItem(
       KEY,
-      JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records }),
+      JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn] }),
     );
   }
 }
