@@ -18,7 +18,7 @@ import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -669,7 +669,7 @@ TUNING.grace = 0;
   assert.equal(Arena.strength(cup), 1, 'a held cup stays at full strength');
   const thrown = arena.sling(cup, 1, 0);
   assert.equal(thrown, a);
-  assert.ok(a.vx > 0.5 && !arena.shapes.includes(cup), 'a sling throws the caught top and the cup is gone');
+  assert.ok(a.vx > SLING_SPEED * 0.9 && !arena.shapes.includes(cup), 'a sling throws the caught top and the cup is gone');
   const cup2 = arena.addShape('well', 0.06, 0.06, CUP_DEPTH, 'me', 0, 0, CUP_SIGMA);
   cup2.trap = true;
   cup2.held = true;

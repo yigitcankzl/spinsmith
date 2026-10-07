@@ -30,8 +30,11 @@ Draft (Oct 7, 2026); final text before the deadline. For judges and anyone tryin
    in. A white-hot pull adds spin.
 3. After the opening seconds a ring marks a spot beside the rival: pinch the floor there and a
    ramp rises at once; drag to aim it. Your ramp throws the rival toward the rim.
+   Press a fingertip into the floor ahead of a top and a cup opens: it catches the first top to
+   roll in. Pinch the caught top, pull back and let go: it flies the other way (aimed near a slag
+   pit, it goes straight in). An empty or unused cup lets go after 2 seconds.
 4. First to 3 heat wins: outlasting the rival scores 1, a knockout (into a slag pit, over the
-   wall, or shattering it) scores 2. A finish your ramp caused says so: YOUR RAMP → SLAG.
+   wall, or shattering it) scores 2. A finish your ramp or sling caused says so: YOUR RAMP → SLAG.
 5. After the match the small anvil calls: pinch it and the arena turns into the forge. The Tip
    drawer is open with your new part pulsing; pinch it, bring it to your top, let go. Drop your top
    in the glowing slot on the right to save it.

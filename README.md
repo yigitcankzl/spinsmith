@@ -2,7 +2,7 @@
 
 A hands-first mixed reality spinning-top battler for Meta Quest, built with the
 Immersive Web SDK (IWSDK). Rip your top into an arena on your real table, then
-steer the fight by pulling ramps up out of the arena floor and pressing wells into it.
+steer the fight by pulling ramps up out of the arena floor and pressing cups into it that catch a top for you to sling.
 
 Entry for the Meta VR Start Developer Competition 2026 (Gaming – New Experience).
 Current direction: [docs/GAMEPLAY-DIRECTION.md](docs/GAMEPLAY-DIRECTION.md); the remaining work:
@@ -13,7 +13,7 @@ Current direction: [docs/GAMEPLAY-DIRECTION.md](docs/GAMEPLAY-DIRECTION.md); the
 Sit at a table, enable hand tracking, and allow spatial data so the arena can stand on your
 table. Everything is done with a pinch: carry your top from its dock into the arena, pinch near
 it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (or
-press a fingertip in for a well). Pinch the small anvil to forge your top, the blueprint to build
+press a fingertip in for a cup, then pinch, pull and let go to sling what it caught). Pinch the small anvil to forge your top, the blueprint to build
 an arena. First to 3 heat wins a match.
 
 - **Shared headset:** add `?fresh` to the address to start as a new player, or `?demo` for a
@@ -113,11 +113,11 @@ an arena. First to 3 heat wins a match.
 - **A reason to come back** (`src/game/orders.ts`, `src/game/board.ts`, `docs/COME-BACK.md`):
   once the first session is over, the Smith's board over the far rim shows **today's Smith
   Order**, made from the local date and what you have unlocked (the same all day): a rival, an
-  arena and one way of winning (ramp them out, shatter them, outlast them from your well, win
+  arena and one way of winning (ramp them out, shatter them, outlast them from your cup, win
   with a given kind of top, with a white-hot pull, without giving up heat, on your own arena). Pinch the
   board to play it; doing it strikes a stamp into the ledger (stamps 5, 10 and 15 earn emblem
   glows). Missed days cost nothing. The board also shows the seven rivals as medallions with
-  three notches each: beaten, knocked out, beaten by your own ramp or well. The last three tops
+  three notches each: beaten, knocked out, beaten by your own ramp, cup or sling. The last three tops
   that won a match stand as champions on the left rim with their record; pinch one to make it
   your top again. The hosted build has a web app manifest, so it can be added to the Quest
   library.
@@ -151,8 +151,9 @@ an arena. First to 3 heat wins a match.
   burst, topple and result jingles.
 - **Arena moves during the fight** (`docs/ARENA-SHAPING.md`): pinch the floor and a ramp
   rises there at once (after a 0.12 s hold, full size, about 11 cm across); keep holding and drag
-  to aim which way it throws a top. Press a fingertip into the floor to make a well that catches
-  and slows a top. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
+  to aim which way it throws a top. Press a fingertip into the floor to open a cup that catches
+  the first top to roll in; pinch it, pull back and let go to sling it the other way (snapped
+  into a slag pit within 20°). A cup with nothing in it, or a catch not slung, lets go after 2 s. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
   shape affects both tops. Two charges, shown as sparks on the near rim: a shape spends one, a
   strong clash or about 6 s refills one, a hand keeps one live shape, and nothing can be shaped
   in the first 2.5 s. A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
@@ -193,7 +194,8 @@ own rays rarely line up with what you are looking at.
 |---|---|
 | `Space` | Hold to charge, release to launch toward where you are looking |
 | `B` | Hold to grow a ramp where you are looking, aimed outward; release to set it (during a fight) |
-| `N` | Make a well where you are looking (during a fight) |
+| `N` | Open a cup where you are looking (during a fight) |
+| `C` | Open a cup right under the rival, to try the sling (during a fight) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Shatter the opponent now (during a fight) |
 | `O` | Throw the opponent over the wall now (during a fight) |

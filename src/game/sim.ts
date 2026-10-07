@@ -72,6 +72,8 @@ const CUP_DRAG = 5;
 const CUP_PULL = 250;
 /** How fast a sling throws the caught top (sim m/s). */
 export const SLING_SPEED = 0.45;
+/** A cup lets go after this long if nothing rolled in (s). */
+export const CUP_HOLD = 2;
 const WELL_DRAG = 3;
 /** How much less a top in the middle of a fresh well is knocked back (0..1). */
 const WELL_BRACE = 0.5;

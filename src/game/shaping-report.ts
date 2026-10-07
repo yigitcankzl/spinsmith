@@ -3,7 +3,7 @@
  * equal rival on every arena and type matchup, under the real shaping economy.
  */
 import { ARENAS } from './arenas.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
 import { SHAPE_SIZE, ShapingCharges } from './shaping.ts';
 
@@ -97,9 +97,6 @@ export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.trackin
     });
   };
 }
-
-/** A cup laid ahead of the rival lets go after this long if nothing rolled in (s). */
-export const CUP_HOLD = 2;
 
 /**
  * A human-feasible cup player: lays a cup ahead of the rival's path (with the same lag and aim

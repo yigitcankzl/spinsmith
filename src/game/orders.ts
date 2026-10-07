@@ -37,7 +37,7 @@ export interface OrderEvent {
   wonRound: boolean;
   finish: 'pocket' | 'over' | 'burst' | 'spin' | null;
   /** The player's shape that caused the finish (within the cause window), if any. */
-  cause: 'ramp' | 'well' | null;
+  cause: 'ramp' | 'well' | 'sling' | null;
   /** The player set a well during this round (a spin finish comes too late for the cause window). */
   wellInRound: boolean;
   /** The match ended with this round, won by the player, and the rival scored nothing. */
@@ -91,7 +91,7 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
   const text: Record<Goal, string> = {
     rampKO: `Ramp ${rival} out: into a slag pit or over the wall`,
     burst: `Shatter ${rival}`,
-    wellSpin: `Outlast ${rival} from your well`,
+    wellSpin: `Outlast ${rival} from your cup`,
     role: `Beat ${rival} with ${ROLE_WORD[role ?? 'attack']} top`,
     perfect: `Beat ${rival} with a white-hot pull in the match`,
     sweep: `Beat ${rival} without giving up heat`,

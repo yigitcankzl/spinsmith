@@ -31,6 +31,8 @@ export const TUNE = {
   wellSpeed: knob('wellSpeed', 0.15),
   /** No well from a hand this soon after it set a ramp (s): the release dips the fingers. */
   wellAfterRamp: knob('wellAfterRamp', 0.3),
+  /** How long a cup waits for a top, then holds it for a sling (s). */
+  cupHold: knob('cupHold', 2),
   /** A far ramp is set only after a pinch held this long (s); a quick tap does nothing. */
   farHold: knob('farHold', 0.12),
   /** The real hands drawn over the game (0 turns it off), and how full the hand shape is. */

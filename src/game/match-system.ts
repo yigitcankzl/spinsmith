@@ -5,7 +5,7 @@ import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { Arena, ATTACK, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import { Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
 import { GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -92,6 +92,12 @@ const PERFECT_SPIN = 1.1;
 const RAY_BUMP_RATE = 0.05;
 /** A near ramp is set after the pinch is held this long (s); a brush of the fingers sets nothing. */
 const RAMP_NEAR_HOLD = 0.12;
+/** Sling: grab within this of the caught top, fire past SLING_MIN of pull, full cord at SLING_FULL (arena-local). */
+const SLING_GRAB = 0.025;
+const SLING_MIN = 0.01;
+const SLING_FULL = 0.05;
+/** A sling aimed within this of a slag pit's mouth goes straight in (rad). */
+const SLING_SNAP = (20 * Math.PI) / 180;
 /** A drag shorter than this (arena-local, about 1.2 cm in the world) does not turn the ramp. */
 const RAMP_AIM_DEADZONE = 0.005;
 
@@ -289,7 +295,14 @@ export class MatchSystem extends createSystem({
   private marks = new ShapeMarks(0xff8a2a);
   private pips = new ChargePips();
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
-  private lastShape: { t: number; kind: ShapeKind } | null = null;
+  private lastShape: { t: number; kind: ShapeKind | 'sling' } | null = null;
+  /** Each hand's live cup (a held well that catches the first top to roll in), and when it was set. */
+  private cups: Record<Side, { shape: FloorShape; at: number; caught: boolean } | null> = { left: null, right: null };
+  /** A hand pulling a caught top back to sling it: the cup and where the pinch began (arena-local). */
+  private slings: Record<Side, { cup: FloorShape; sx: number; sz: number; px: number; pz: number } | null> = { left: null, right: null };
+  private readonly slingFrom = new Vector3();
+  /** The sling has been used this session (its hint stops). */
+  private slungOnce = false;
   /** Which tops already ran into which shape (one crunch each). */
   private crunched = new WeakMap<FloorShape, Set<Top>>();
   /** Dev: the time B was pressed (a ramp at the gaze grows while it is held). */
@@ -389,6 +402,8 @@ export class MatchSystem extends createSystem({
       const onKey = (e: KeyboardEvent) => {
         if (e.repeat) return;
         this.keys.add(e.code);
+        // C: a cup right under the rival, to try the sling.
+        if (e.code === 'KeyC' && this.phase === 'fight') this.makeCup('right', this.theirs.x, this.theirs.z);
         if (e.code === 'KeyR') {
           if (this.phase === 'hub' || this.phase === 'forge' || this.phase === 'build') this.startMatch();
           else this.toReady();
@@ -1363,6 +1378,8 @@ export class MatchSystem extends createSystem({
     this.lastShape = null;
     this.wellInRound = false;
     this.rampAt.left = this.rampAt.right = -9;
+    this.cups.left = this.cups.right = null;
+    this.slings.left = this.slings.right = null;
     if (perfect && !this.demo) this.perfectInMatch = true;
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
@@ -1417,14 +1434,30 @@ export class MatchSystem extends createSystem({
     const open = this.elapsed >= TUNING.grace;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
+      this.updateCup(side);
       if (!h.tracked) {
         this.shaping[side] = null;
         this.pressing[side] = false;
+        this.endSling(side, false);
         continue;
       }
       const l = this.toLocal(h.pinch);
       if (h.pinching) {
         let d = this.shaping[side];
+        // Pinching a cup that holds a top grabs it to sling, before any ramp.
+        if (!d && h.justPinched && open && this.startSling(side, l.x, l.z)) continue;
+        const sl = this.slings[side];
+        if (sl) {
+          sl.px = l.x - sl.sx;
+          sl.pz = l.z - sl.sz;
+          const t = sl.cup.caught;
+          if (t) {
+            // The cord runs from the top back to the hand: let go and it flies the other way.
+            this.root.localToWorld(this.slingFrom.set(t.x, this.arena.height(t.x, t.z) + 0.03, t.z));
+            this.cord.set(this.slingFrom, h.pinch, Math.min(1, Math.hypot(sl.px, sl.pz) / SLING_FULL), this.frameDt);
+          }
+          continue;
+        }
         if (!d && h.justPinched && open) {
           // Pointing out from the middle until the hand drags it round.
           if (this.arena.inside(l.x, l.z) && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
@@ -1454,8 +1487,9 @@ export class MatchSystem extends createSystem({
         }
         continue;
       }
-      // Let go: the ramp, if set, keeps working on its own.
+      // Let go: the ramp, if set, keeps working on its own; a pulled sling fires.
       this.shaping[side] = null;
+      this.endSling(side, true);
       // A fingertip pressed into the floor makes a well, once per press, if it came down with
       // intent (a hand resting or drifting down does not) and not just as a ramp was let go.
       const tip = this.toLocal(h.index);
@@ -1466,21 +1500,102 @@ export class MatchSystem extends createSystem({
       const down = (this.tipDown[side] += (raw - this.tipDown[side]) * (1 - Math.exp(-this.frameDt / 0.08)));
       if (depth > 0.004 && !this.pressing[side] && open) {
         this.pressing[side] = true;
-        if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp) this.makeShape('well', tip.x, tip.z, SHAPE_SIZE.well, side);
+        if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp) this.makeCup(side, tip.x, tip.z);
         else if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${down.toFixed(2)} m/s down`);
       } else if (depth < 0) this.pressing[side] = false;
     }
   }
 
+  /** A fingertip press: a cup that holds the first top to roll in, until it is slung or TUNE.cupHold passes. */
+  private makeCup(side: Side, x: number, z: number) {
+    const shape = this.makeShape('well', x, z, CUP_DEPTH, `${side}-cup`, 0, 0, CUP_SIGMA);
+    if (!shape) return;
+    shape.trap = shape.held = true;
+    this.cups[side] = { shape, at: this.elapsed, caught: false };
+  }
+
+  /** Drops a cup that is gone (round over); one that caught nothing, or held a top unslung, lets go after TUNE.cupHold. */
+  private updateCup(side: Side) {
+    const c = this.cups[side];
+    if (!c) return;
+    if (!this.arena.shapes.includes(c.shape)) {
+      this.cups[side] = null;
+      return;
+    }
+    if (c.shape.caught && !c.caught) {
+      // The hold clock restarts at the catch: sling it soon or it rolls on.
+      c.caught = true;
+      c.at = this.elapsed;
+      playThock();
+      if (!this.slungOnce) this.label.set('Caught! Pinch it, pull back, let go:\nit flies the other way. Aim at a slag pit');
+      if (import.meta.env.DEV) {
+        const t = c.shape.caught;
+        const w = this.root.localToWorld(this.slingFrom.set(t.x, this.arena.height(t.x, t.z), t.z));
+        console.log(`[SHAPE] cup caught ${t === this.mine ? 'mine' : 'rival'} at ${w.x.toFixed(3)},${w.y.toFixed(3)},${w.z.toFixed(3)}`);
+      }
+    }
+    const slung = this.slings.left?.cup === c.shape || this.slings.right?.cup === c.shape;
+    if (!slung && this.elapsed - c.at > TUNE.cupHold) {
+      this.arena.free(c.shape);
+      this.cups[side] = null;
+    }
+  }
+
+  /** A pinch near a cup holding a top takes hold of it (either hand, either cup). */
+  private startSling(side: Side, x: number, z: number): boolean {
+    for (const s of ['left', 'right'] as const) {
+      const cup = this.cups[s]?.shape;
+      const t = cup?.caught;
+      if (!cup || !t || Math.hypot(t.x - x, t.z - z) > SLING_GRAB) continue;
+      this.slings[side] = { cup, sx: x, sz: z, px: 0, pz: 0 };
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Lets go of a sling: pulled far enough (and `fire`), the top flies opposite the pull, snapped to
+   * a slag-pit mouth within SLING_SNAP; otherwise the cup just lets it roll on.
+   */
+  private endSling(side: Side, fire: boolean) {
+    const sl = this.slings[side];
+    if (!sl) return;
+    this.slings[side] = null;
+    this.cord.set(null);
+    const t = sl.cup.caught;
+    if (!t || !this.arena.shapes.includes(sl.cup)) return;
+    for (const s of ['left', 'right'] as const) if (this.cups[s]?.shape === sl.cup) this.cups[s] = null;
+    if (!fire || Math.hypot(sl.px, sl.pz) < SLING_MIN) {
+      this.arena.free(sl.cup);
+      return;
+    }
+    let a = Math.atan2(-sl.pz, -sl.px);
+    let gap = SLING_SNAP;
+    for (const p of this.arena.layout.pockets) {
+      const b = Math.atan2(Math.sin(p.angle) * this.arena.radius - t.z, Math.cos(p.angle) * this.arena.radius - t.x);
+      const d = Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)));
+      if (d < gap) {
+        gap = d;
+        a = b;
+      }
+    }
+    this.arena.sling(sl.cup, Math.cos(a), Math.sin(a));
+    if (!this.slungOnce) this.label.set('');
+    this.slungOnce = true;
+    this.lastShape = { t: this.elapsed, kind: 'sling' };
+    playDash(t.x);
+    if (import.meta.env.DEV) console.log(`[SHAPE] sling ${t === this.mine ? 'mine' : 'rival'} angle ${a.toFixed(2)}${gap < SLING_SNAP ? ' to a pit' : ''}`);
+  }
+
   /** Spends a charge and sets a shape (one live shape per hand); without a charge, a dull clunk. */
-  private makeShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0): FloorShape | null {
+  private makeShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0, sigma?: number): FloorShape | null {
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (import.meta.env.DEV) console.log(`[SHAPE] ${kind} at ${x.toFixed(3)},${z.toFixed(3)} amp ${amp.toFixed(3)} factor ${f} charges ${this.charges.charges} t ${this.elapsed.toFixed(1)}`);
     if (!f) {
       playLocked();
       return null;
     }
-    const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz);
+    const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz, sigma);
     this.lastShape = { t: this.elapsed, kind };
     if (kind === 'well') this.wellInRound = true;
     this.progress.advance('match');
@@ -1824,7 +1939,7 @@ export class MatchSystem extends createSystem({
       this.makeShape('ramp', x, z, this.devRampAmp(), 'dev', x / r, z / r);
       this.devRampSince = -1;
     }
-    if (this.keys.has('KeyN') && !this.devWellHeld) this.makeShape('well', x, z, SHAPE_SIZE.well, 'dev-well');
+    if (this.keys.has('KeyN') && !this.devWellHeld) this.makeCup('left', x, z);
     this.devWellHeld = this.keys.has('KeyN');
   }
 
