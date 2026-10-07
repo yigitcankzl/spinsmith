@@ -269,6 +269,11 @@ export class SpinHum {
   private osc2: OscillatorNode | null = null;
   private gain: GainNode | null = null;
   private filter: BiquadFilterNode | null = null;
+  /** The whirr: band-passed noise pulsed at the blade-pass rate. */
+  private whirr: GainNode | null = null;
+  private whirrBand: BiquadFilterNode | null = null;
+  private blade: OscillatorNode | null = null;
+  private pan: StereoPannerNode | null = null;
 
   constructor(private readonly base: number) {}
 
@@ -282,26 +287,55 @@ export class SpinHum {
     this.filter.Q.value = 4;
     this.gain = a.createGain();
     this.gain.gain.value = 0;
+    this.pan = a.createStereoPanner();
     this.osc.connect(this.filter);
     this.osc2.connect(this.filter);
-    this.filter.connect(this.gain).connect(master!);
+    this.filter.connect(this.gain).connect(this.pan).connect(master!);
+    // The whirr: noise through a band, its loudness swung by the blade-pass oscillator.
+    if (noise) {
+      const src = a.createBufferSource();
+      src.buffer = noise;
+      src.loop = true;
+      this.whirrBand = a.createBiquadFilter();
+      this.whirrBand.type = 'bandpass';
+      this.whirrBand.Q.value = 2;
+      this.whirr = a.createGain();
+      this.whirr.gain.value = 0;
+      this.blade = a.createOscillator();
+      this.blade.type = 'sine';
+      const depth = a.createGain();
+      depth.gain.value = 0.5;
+      const am = a.createGain();
+      am.gain.value = 0.5;
+      this.blade.connect(depth).connect(am.gain);
+      src.connect(this.whirrBand).connect(am).connect(this.whirr).connect(this.pan);
+      src.start();
+      this.blade.start();
+    }
     this.osc.start();
     this.osc2.start();
   }
 
-  /** spin 0..1 (0 = silent), speed in m/s, wobble 0..1. */
-  update(spin: number, speed: number, wobble: number, time: number) {
+  /** spin 0..1 (0 = silent), speed in m/s, wobble 0..1; x is where the top is (arena-local, for panning). */
+  update(spin: number, speed: number, wobble: number, time: number, x = 0) {
     const a = audio();
     if (!a) return;
     if (!this.osc) this.start(a);
     const t = a.currentTime;
-    const waver = 1 + wobble * 0.08 * Math.sin(time * 18);
+    // The waver follows the drawn wobble (visuals: time * 9).
+    const waver = 1 + wobble * 0.08 * Math.sin(time * 9);
     const f = (this.base * (0.45 + 0.75 * spin)) * waver;
     this.osc!.frequency.setTargetAtTime(f, t, 0.05);
     this.osc2!.frequency.setTargetAtTime(f * 2.01, t, 0.05);
     this.filter!.frequency.setTargetAtTime(400 + 2600 * spin, t, 0.05);
     const loud = spin > 0 ? 0.025 + 0.05 * spin + 0.04 * Math.min(1, speed) : 0;
     this.gain!.gain.setTargetAtTime(loud, t, 0.08);
+    this.pan!.pan.setTargetAtTime(Math.max(-1, Math.min(1, x / 0.18)) * 0.6, t, 0.05);
+    if (this.whirr && this.blade && this.whirrBand) {
+      this.blade.frequency.setTargetAtTime(8 + 40 * spin, t, 0.05);
+      this.whirrBand.frequency.setTargetAtTime(1200 + 1800 * spin, t, 0.05);
+      this.whirr.gain.setTargetAtTime(spin > 0 ? 0.02 + 0.03 * spin + 0.05 * Math.min(1, speed) : 0, t, 0.08);
+    }
   }
 }
 
