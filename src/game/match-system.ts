@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, duck, ForgeLoop, playGong, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
@@ -291,6 +291,8 @@ export class MatchSystem extends createSystem({
   private stamp = new Stamp(0.2);
   /** The arena forging up out of the table after placing (0..1), and the title over it. */
   private rise = 1;
+  /** A rival's tell drawn on the floor: the lane of a charge, the line of a pull toward its pit. */
+  private lane = new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }));
   /** Seconds left of a won match's celebration (sparks round the rim). */
   private celebrate = 0;
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
@@ -436,6 +438,7 @@ export class MatchSystem extends createSystem({
     this.chargeRing.visible = false;
     this.stage.add(
       this.chargeRing,
+      this.lane,
       this.reticle,
       this.aura,
       this.arenaView.root,
@@ -698,7 +701,7 @@ export class MatchSystem extends createSystem({
     }
     this.launchZone.visible = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
     if (this.phase !== 'fight') {
-      this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = false;
+      this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
       this.arenaView.charge = 0;
     }
     switch (this.phase) {
@@ -2054,6 +2057,7 @@ export class MatchSystem extends createSystem({
       this.tellAt = this.elapsed + TELL_TIME;
       them.tell = TELL_TIME;
       playTell();
+      this.stamp.show(`${this.rival.move.toUpperCase()}!`, `${this.rival.name} winds up`, 'rival', 0.7);
       const what = { charge: 'a charge', quake: 'a quake', pull: 'a pull' }[this.rival.move];
       if (!this.tellTaught) {
         this.tellTaught = true;
@@ -2066,9 +2070,11 @@ export class MatchSystem extends createSystem({
     if (them.tell <= 0) {
       // Cut short by the strike (doStrike says so).
       this.tellAt = -1;
+      this.lane.visible = false;
       return;
     }
     them.tell = this.tellAt - this.elapsed;
+    this.drawLane(1 - them.tell / TELL_TIME);
     // The tell: the rival flashes and rings spread under it.
     // Three flashes a second at most (WCAG 2.3.1), none with flashes off.
     if (Math.floor(this.elapsed * 3) !== Math.floor((this.elapsed - STEP) * 3)) this.theirView.flash();
@@ -2076,6 +2082,7 @@ export class MatchSystem extends createSystem({
     if (them.tell > 0) return;
     them.tell = 0;
     this.tellAt = -1;
+    this.lane.visible = false;
     if (!them.alive) return;
     if (!rivalMove(this.arena, them, this.mine, this.rival.move)) {
       // Held in your cup: the move fizzles.
@@ -2094,6 +2101,44 @@ export class MatchSystem extends createSystem({
     this.label.set(`${this.rival.name.toUpperCase()}: ${this.rival.move.toUpperCase()}!`);
     this.labelTimer = 1.2;
     if (import.meta.env.DEV) console.log(`[TELL] ${this.rival.move} landed`);
+  }
+
+  /**
+   * The tell on the floor, filling as it winds up (k 0..1): a charge's lane from the rival to your
+   * top, a pull's line from your top to the pit it drags you toward. A quake has its rings.
+   */
+  private drawLane(k: number) {
+    const them = this.theirs;
+    const me = this.mine;
+    const move = this.rival.move;
+    this.lane.visible = move !== 'quake' && me.alive;
+    if (!this.lane.visible) return;
+    let fx = them.x;
+    let fz = them.z;
+    let tx = me.x;
+    let tz = me.z;
+    if (move === 'pull') {
+      // From your top toward the nearest pit mouth (as rivalMove pulls).
+      const a0 = Math.atan2(me.z, me.x);
+      let a = a0;
+      let gap = Infinity;
+      for (const p of this.arena.layout.pockets) {
+        const g = Math.abs(Math.atan2(Math.sin(p.angle - a0), Math.cos(p.angle - a0)));
+        if (g < gap) {
+          gap = g;
+          a = p.angle;
+        }
+      }
+      fx = me.x;
+      fz = me.z;
+      tx = Math.cos(a) * this.arena.radius;
+      tz = Math.sin(a) * this.arena.radius;
+    }
+    const len = Math.hypot(tx - fx, tz - fz) * Math.max(0.15, k);
+    this.lane.position.set(fx, this.arena.height(fx, fz) + 0.002, fz);
+    this.lane.rotation.y = Math.atan2(-(tx - fx), -(tz - fz));
+    this.lane.scale.set(0.012, 1, Math.max(0.001, len));
+    (this.lane.material as MeshBasicMaterial).opacity = 0.35 + 0.35 * k;
   }
 
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
