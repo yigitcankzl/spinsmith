@@ -580,7 +580,7 @@ export class MatchSystem extends createSystem({
     // round messages, so score and fight share one view.
     this.bar.mesh.position.set(0, 0.03, -0.205);
     this.bar.mesh.rotation.x = -0.55;
-    this.bar.mesh.scale.setScalar(0.17);
+    this.bar.mesh.scale.setScalar(0.21);
     this.root.add(this.bar.mesh);
 
     if (import.meta.env.DEV) {
@@ -1671,7 +1671,7 @@ export class MatchSystem extends createSystem({
     const reach = TUNE.reach / ARENA_SCALE;
     const grow = Math.max(1, (reach + this.pushed / ARENA_SCALE + far) / (reach + 0.17));
     this.label.mesh.scale.setScalar(1.25 * grow);
-    this.bar.mesh.scale.setScalar(0.17 * grow);
+    this.bar.mesh.scale.setScalar(0.21 * grow);
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
