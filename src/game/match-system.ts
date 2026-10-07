@@ -335,6 +335,8 @@ export class MatchSystem extends createSystem({
   /** The shockwave ring running out from the middle (arena-local), and how far it has gone (0..1, 1 = done). */
   private shock = new Mesh(new RingGeometry(0.93, 1, 64).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }));
   private shockT = 1;
+  /** The shockwave is clipped to the arena: its world center and rim radius. */
+  private shockClip = { uC: { value: new Vector3() }, uR: { value: 1 } };
   /** The strike's hint shows once a session, the first time the bar is full. */
   private strikeTaught = false;
   private barWasFull = false;
@@ -417,6 +419,16 @@ export class MatchSystem extends createSystem({
       this.shock,
     );
     this.shock.visible = false;
+    // Only the part over the arena floor draws (the ring starts on the rim, half of it would hang in the air).
+    (this.shock.material as MeshBasicMaterial).onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, this.shockClip);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vShockWorld;')
+        .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvShockWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vShockWorld;\nuniform vec3 uC;\nuniform float uR;')
+        .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (distance(vShockWorld.xz, uC.xz) > uR) discard;');
+    };
     this.myBuild = this.forge.allowed(this.myBuild);
     this.setBuilds(this.myBuild, this.theirBuild);
     this.buildHandle();
@@ -1824,6 +1836,8 @@ export class MatchSystem extends createSystem({
       const r = Math.max(0.01, this.shockT * maxRim(this.arena.layout) * 2);
       this.shock.scale.setScalar(r);
       this.shock.position.set(this.shockAt.x, this.arena.floorHeight(0.5) + 0.003, this.shockAt.z);
+      this.shockClip.uC.value.copy(this.root.position);
+      this.shockClip.uR.value = maxRim(this.arena.layout) * ARENA_SCALE * this.rootK * this.viewK;
       (this.shock.material as MeshBasicMaterial).opacity = 0.9 * (1 - this.shockT);
     }
     this.shock.visible = this.shockT < 1;
