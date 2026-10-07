@@ -848,6 +848,7 @@ export class MatchSystem extends createSystem({
       this.featDone('offDesk');
       if (import.meta.env.DEV) console.log('[OUT] off the desk');
     }
+    this.sparks.rim = maxRim(this.arena.layout) + 0.01;
     this.sparks.update(vdt);
     this.impacts.update(vdt);
     this.updateGuide();

@@ -1426,6 +1426,8 @@ export class Sparks {
   private verts: Float32Array;
   private cols: Float32Array;
   private next = 0;
+  /** The arena's rim radius (arena-local): sparks past it fall to the desk. */
+  rim = 0.17;
 
   constructor(private count = 160) {
     this.pos = new Float32Array(count * 3);
@@ -1470,9 +1472,10 @@ export class Sparks {
       let px = (this.pos[i * 3] += this.vel[i * 3] * dt);
       let py = (this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt);
       const pz = (this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt);
-      // Sparks skip off the floor once, losing most of their speed.
-      if (py < this.floor[i] && this.vel[i * 3 + 1] < 0) {
-        this.pos[i * 3 + 1] = py = this.floor[i];
+      // Sparks skip off the floor once, losing most of their speed; past the rim, off the real desk.
+      const floor = px * px + pz * pz > this.rim * this.rim ? TABLE_Y : this.floor[i];
+      if (py < floor && this.vel[i * 3 + 1] < 0) {
+        this.pos[i * 3 + 1] = py = floor;
         this.vel[i * 3 + 1] *= -0.35;
         this.vel[i * 3] *= 0.5;
         this.vel[i * 3 + 2] *= 0.5;
