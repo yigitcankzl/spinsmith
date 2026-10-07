@@ -4,7 +4,7 @@
  * fight stats of a build are put together from its rows, like the stats on a toy's box.
  * No three.js here, so builds can be checked and balanced headlessly.
  */
-import type { Contact, TopSpec } from './sim.ts';
+import type { Contact, RivalMove, TopSpec } from './sim.ts';
 
 export interface Ring {
   id: string;
@@ -270,6 +270,8 @@ export function allBuilds(): TopBuild[] {
  */
 export interface Rival {
   name: string;
+  /** Its one big move, telegraphed a second ahead (docs/DUEL-DESIGN.md). */
+  move: RivalMove;
   /** How it plays, in a few words. */
   style: string;
   build: TopBuild;
@@ -278,11 +280,11 @@ export interface Rival {
 }
 
 export const RIVALS: Rival[] = [
-  { name: 'Rim Raider', style: 'aggressive rim attacker', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: -1, color: 0 }, level: 1 },
-  { name: 'Iron Keep', style: 'heavy center holder', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: -1, color: 0 }, level: 1 },
-  { name: 'Drifter', style: 'stamina drifter', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
-  { name: 'Leech', style: 'opposite-spin equalizer', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
-  { name: 'Hookjaw', style: 'upper attacker, deadly on low walls', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
-  { name: 'Sawtooth', style: 'chips toward a shatter', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
-  { name: 'Bastion', style: 'tall, locked and patient', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
+  { name: 'Rim Raider', move: 'charge', style: 'aggressive rim attacker', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: -1, color: 0 }, level: 1 },
+  { name: 'Iron Keep', move: 'quake', style: 'heavy center holder', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: -1, color: 0 }, level: 1 },
+  { name: 'Drifter', move: 'pull', style: 'stamina drifter', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
+  { name: 'Leech', move: 'pull', style: 'opposite-spin equalizer', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
+  { name: 'Hookjaw', move: 'charge', style: 'upper attacker, deadly on low walls', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
+  { name: 'Sawtooth', move: 'charge', style: 'chips toward a shatter', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
+  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
 ];

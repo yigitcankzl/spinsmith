@@ -1,11 +1,11 @@
 import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, ForgeLoop, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, ForgeLoop, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { strike, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import { rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild } from './forge.js';
 import { GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -330,6 +330,12 @@ export class MatchSystem extends createSystem({
   /** The strike's hint shows once a session, the first time the bar is full. */
   private strikeTaught = false;
   private barWasFull = false;
+  /** The rival's own bar and its telegraphed move: when it lands, and whether its hint was shown this session. */
+  private rivalBar = new StrikeBar();
+  private tellAt = -1;
+  private tellTaught = false;
+  /** What the rival last did to the floor or to you (for THEIR … → SLAG). */
+  private rivalShapeKind = 'RAMP';
   /** Each hand's live cup (a held well that catches the first top to roll in), and when it was set. */
   private cups: Record<Side, { shape: FloorShape; at: number; caught: boolean } | null> = { left: null, right: null };
   /** A hand pulling a caught top back to sling it: the cup and where the pinch began (arena-local). */
@@ -461,6 +467,8 @@ export class MatchSystem extends createSystem({
         this.keys.add(e.code);
         // C: a cup right under the rival, to try the sling.
         if (e.code === 'KeyC' && this.phase === 'fight') this.makeCup('right', this.theirs.x, this.theirs.z);
+        // T: fill the rival's bar (its move's tell starts).
+        if (e.code === 'KeyT' && this.phase === 'fight') this.rivalBar.value = 1;
         // J: fill the forge bar (then a palm press, or Shift+J, strikes).
         if (e.code === 'KeyJ' && this.phase === 'fight') {
           this.forgeBar.value = 1;
@@ -1598,6 +1606,8 @@ export class MatchSystem extends createSystem({
     this.charges.reset();
     this.forgeBar.reset();
     this.barWasFull = false;
+    this.rivalBar.reset();
+    this.tellAt = -1;
     this.rivalCharges.reset();
     this.rivalShapeAt = -9;
     this.lastShape = null;
@@ -1789,10 +1799,67 @@ export class MatchSystem extends createSystem({
     this.shock.visible = this.shockT < 1;
   }
 
+  /**
+   * Rivals' big moves (after the first match): the rival's own bar fills like yours; when full it
+   * telegraphs its move for TELL_TIME (it flashes, rings spread under it, a rising whine), then the
+   * move lands, unless your Anvil Strike cut it short.
+   */
+  private rivalTell(clash: number) {
+    if (this.demo || this.progress.matches < 1) return;
+    this.rivalBar.update(STEP, false);
+    if (clash) this.rivalBar.clash(clash, this.elapsed, false);
+    const them = this.theirs;
+    if (this.tellAt < 0) {
+      if (!them.alive || !this.mine.alive || !this.rivalBar.spend(this.elapsed, TUNING.grace + 2)) return;
+      this.tellAt = this.elapsed + TELL_TIME;
+      them.tell = TELL_TIME;
+      playTell();
+      const what = { charge: 'a charge', quake: 'a quake', pull: 'a pull' }[this.rival.move];
+      if (!this.tellTaught) {
+        this.tellTaught = true;
+        this.label.set(`${this.rival.name} winds up ${what}!\nStrike first to stop it`);
+        this.labelTimer = 2.5;
+      }
+      if (import.meta.env.DEV) console.log(`[TELL] ${this.rival.name} ${this.rival.move} at t ${this.elapsed.toFixed(1)}`);
+      return;
+    }
+    if (them.tell <= 0) {
+      // Cut short by the strike (doStrike says so).
+      this.tellAt = -1;
+      return;
+    }
+    them.tell = this.tellAt - this.elapsed;
+    // The tell: the rival flashes and rings spread under it.
+    if (Math.floor(this.elapsed * 8) !== Math.floor((this.elapsed - STEP) * 8)) this.theirView.flash();
+    if (Math.floor(this.elapsed * 4) !== Math.floor((this.elapsed - STEP) * 4)) this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 0.5);
+    if (them.tell > 0) return;
+    them.tell = 0;
+    this.tellAt = -1;
+    if (!them.alive) return;
+    rivalMove(this.arena, them, this.mine, this.rival.move);
+    this.rivalShapeAt = this.elapsed;
+    this.rivalShapeKind = this.rival.move.toUpperCase();
+    if (this.rival.move === 'quake') {
+      this.shockT = 0;
+      playStrike();
+      this.roomLight.hit();
+    } else playDash(them.x);
+    this.label.set(`${this.rival.name.toUpperCase()}: ${this.rival.move.toUpperCase()}!`);
+    this.labelTimer = 1.2;
+    if (import.meta.env.DEV) console.log(`[TELL] ${this.rival.move} landed`);
+  }
+
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
   private doStrike() {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
+    const cut = this.tellAt >= 0 && this.theirs.tell > 0;
     strike(this.arena, this.mine, this.theirs);
+    if (cut) {
+      this.tellAt = -1;
+      this.label.set('INTERRUPTED!');
+      this.labelTimer = 1.2;
+      if (import.meta.env.DEV) console.log('[TELL] interrupted');
+    }
     for (const s of ['left', 'right'] as const) {
       this.cups[s] = null;
       this.slings[s] = null;
@@ -1805,7 +1872,7 @@ export class MatchSystem extends createSystem({
     this.hitStop = HIT_STOP * 2;
     this.accumulator = 0;
     playStrike();
-    if (this.strikeTaught && this.label.mesh.visible) this.label.set('');
+    if (!cut && this.strikeTaught && this.label.mesh.visible) this.label.set('');
     if (import.meta.env.DEV) console.log(`[STRIKE] at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
   }
 
@@ -1919,6 +1986,7 @@ export class MatchSystem extends createSystem({
     if (!me.alive || normRadius(this.arena.layout, me.x, me.z) < 0.6 || r < 1e-3 || this.elapsed - this.rivalShapeAt < RIVAL_SHAPE_GAP) return;
     const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
     if (!f) return;
+    this.rivalShapeKind = 'RAMP';
     this.arena.addShape('ramp', me.x - (me.x / r) * 0.012 * (this.arena.radius / 0.17), me.z - (me.z / r) * 0.012 * (this.arena.radius / 0.17), SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r, RIVAL_RAMP_SIGMA);
     this.rivalShapeAt = this.elapsed;
     playThock();
@@ -1976,6 +2044,7 @@ export class MatchSystem extends createSystem({
       const behind = behindOn(this.mine, this.theirs);
       this.forgeBar.update(STEP, behind);
       if (clash) this.forgeBar.clash(clash.strength, this.elapsed, behind);
+      this.rivalTell(clash ? clash.strength : 0);
       for (const t of [this.mine, this.theirs]) {
         if (t.sincePad !== 0) continue;
         // A boost pad fired: it flashes, sparks fly along it, a whoosh.
@@ -2076,7 +2145,7 @@ export class MatchSystem extends createSystem({
         // The decisive move plays out slowly for a moment.
         if (loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME;
       } else if (recent && v === -1 && loser.finish !== 'spin') text = `YOUR ${recent} BACKFIRED\n${text}`;
-      else if (theirs && v === -1 && loser.finish !== 'spin') text = `THEIR RAMP → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
+      else if (theirs && v === -1 && loser.finish !== 'spin') text = `THEIR ${this.rivalShapeKind} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
     }
     this.label.set(text);
     this.barMessage = text.split('\n')[0].replace(/!.*$/, '!');

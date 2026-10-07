@@ -308,6 +308,12 @@ export function playStrike() {
   tone(1980, 0.06, 1.1, 'triangle', 0.03);
 }
 
+/** A rival's tell: a rising whine over a second, then a rival's move lands. */
+export function playTell() {
+  tone(300, 0.12, 1.0, 'sawtooth', 0, 900);
+  tone(150, 0.08, 1.0, 'square', 0, 450);
+}
+
 /** A locked thing pinched: a dull clunk. */
 export function playLocked() {
   tone(140, 0.15, 0.15, 'square', 0, 90);

@@ -19,7 +19,7 @@ import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { strike, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -734,6 +734,33 @@ TUNING.grace = 0;
   hot.damage = 0.8;
   strike(new Arena(FORGE), cold, hot);
   assert.ok(hot.vz < 0 && Math.abs(hot.vz) > Math.abs(cold.vz) * 1.5, 'a hot rival flies further than your own cold top');
+}
+
+// 22. Rivals' big moves: a charge rushes at you, a pull drags you toward a pit unless your top is
+// braced in a cup, and the Anvil Strike cuts a rival's tell short.
+{
+  const arena = new Arena(FORGE);
+  const rival = new Top(ATTACK);
+  const you = new Top(DEFENSE);
+  rival.launch(0, -0.1, 0, 0, 1, -1);
+  you.launch(0.05, 0.05, 0, 0, 1, 1);
+  rivalMove(arena, rival, you, 'charge');
+  const toward = (rival.vx * 0.05 + rival.vz * 0.15) / Math.hypot(0.05, 0.15);
+  assert.ok(toward > 1, 'a charge rushes straight at you');
+  const free = new Top(DEFENSE);
+  free.launch(0.03, 0.03, 0, 0, 1, 1);
+  rivalMove(arena, rival, free, 'pull');
+  assert.ok(Math.hypot(free.vx, free.vz) > 0.4, 'a pull drags your top');
+  const cupped = new Top(DEFENSE);
+  cupped.launch(0.03, 0.03, 0, 0, 1, 1);
+  const cup = arena.addShape('well', 0.03, 0.03, CUP_DEPTH, 'me-cup', 0, 0, CUP_SIGMA);
+  cup.trap = cup.held = true;
+  cup.caught = cupped;
+  rivalMove(arena, rival, cupped, 'pull');
+  assert.ok(Math.hypot(cupped.vx, cupped.vz) < 1e-9, 'a top braced in a cup is not pulled');
+  rival.tell = TELL_TIME;
+  strike(new Arena(FORGE), you, rival);
+  assert.equal(rival.tell, 0, 'the strike cuts the tell short');
 }
 
 console.log('sim-check: all passed');

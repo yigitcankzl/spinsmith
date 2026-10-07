@@ -3,7 +3,7 @@
  * equal rival on every arena and type matchup, under the real shaping economy.
  */
 import { ARENAS } from './arenas.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, strike, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, strike, TELL_TIME, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
 import { SHAPE_SIZE, ShapingCharges, StrikeBar, behindOn } from './shaping.ts';
 
@@ -194,7 +194,8 @@ export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture
     if (at >= 0) return;
     const nr = Math.hypot(rival.x, rival.z) / arena.radius;
     const nm = Math.hypot(me.x, me.z) / arena.radius;
-    const good = rival.alive && (nr > 0.55 || rival.damage > 0.35) && nr + rival.damage > nm + me.damage + 0.15;
+    // A rival's tell is a reason too: the strike cuts its move short.
+    const good = rival.alive && (rival.tell > 0 || ((nr > 0.55 || rival.damage > 0.35) && nr + rival.damage > nm + me.damage + 0.15));
     if (bar.full && t >= TUNING.grace && good) at = t + delay;
   };
 }
@@ -204,6 +205,31 @@ export const masherStrike: Policy = (arena, me, rival, t, charges, rnd, owner = 
   if (bar?.full && rnd() < 0.01 && bar.spend(t, TUNING.grace)) strike(arena, me, rival);
   POLICIES.random(arena, me, rival, t, charges, rnd, owner);
 };
+
+/** A rival with its big move: when its own bar is full, it tells for TELL_TIME, then moves (unless cut short). */
+export function rivalWithMove(kind: import('./sim.ts').RivalMove, base: Policy = POLICIES.none): Policy {
+  let at = -1;
+  let lastT = Infinity;
+  return (arena, me, rival, t, charges, rnd, owner = 'rival', bar) => {
+    if (t < lastT) at = -1;
+    lastT = t;
+    base(arena, me, rival, t, charges, rnd, owner);
+    if (!bar) return;
+    if (at >= 0) {
+      if (me.tell <= 0) at = -1;
+      else if (t >= at) {
+        me.tell = 0;
+        at = -1;
+        rivalMove(arena, me, rival, kind);
+      } else me.tell = at - t;
+      return;
+    }
+    if (me.alive && rival.alive && bar.spend(t, TUNING.grace + 2)) {
+      me.tell = TELL_TIME;
+      at = t + TELL_TIME;
+    }
+  };
+}
 
 /** Where a top caught at (x, z) should go: the nearest slag-pit mouth, else straight out over the wall. */
 function nearestExit(t: Top, arena: Arena): { x: number; z: number } {
@@ -249,6 +275,7 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
   const charges = new ShapingCharges();
   const rivalCharges = new ShapingCharges();
   const bar = new StrikeBar();
+  const rivalBar = new StrikeBar();
   const a = new Top(s.a);
   const b = new Top(s.b);
   a.launch(...s.launchA);
@@ -261,7 +288,7 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
   while (verdict(a, b, t) === 0) {
     const before = new Set(arena.shapes);
     policy(arena, a, b, t, charges, rnd, 'me', bar);
-    rivalPolicy(arena, b, a, t, rivalCharges, rnd, 'rival');
+    rivalPolicy(arena, b, a, t, rivalCharges, rnd, 'rival', rivalBar);
     for (const sh of arena.shapes) {
       if (before.has(sh) || !sh.owner.startsWith('me')) continue;
       shapes++;
@@ -276,12 +303,14 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
     charges.update(STEP);
     rivalCharges.update(STEP);
     bar.update(STEP, behindOn(a, b));
+    rivalBar.update(STEP, false);
     if (t > 5 && a.alive && b.alive && a.spin < 0.6 * b.spin) behind = true;
     const clash = step(arena, a, b);
     if (clash) {
       charges.clash(clash.strength, t);
       rivalCharges.clash(clash.strength, t);
       bar.clash(clash.strength, t, behindOn(a, b));
+      rivalBar.clash(clash.strength, t, false);
     }
     t += STEP;
   }

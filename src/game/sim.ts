@@ -537,6 +537,8 @@ export class Top {
   sinceDash = 99;
   /** Seconds since the last bumper kick (large = none recently). */
   sinceBump = 99;
+  /** Seconds left of a telegraphed big move (a rival's tell; 0 = none). An Anvil Strike cuts it short. */
+  tell = 0;
   /** Seconds since a boost pad flung it. */
   sincePad = 99;
   /** Accumulated hit damage; at 1 the top bursts apart. */
@@ -555,7 +557,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sincePad: 99, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sincePad: 99, tell: 0, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -743,6 +745,59 @@ export function strike(arena: Arena, mine: Top, rival: Top) {
     t.lifted = LIFT_TIME;
   }
   arena.lastStrike = arena.elapsed;
+  // The strike cuts a rival's telegraphed move short.
+  rival.tell = 0;
+}
+
+/** A rival's one big move, by its style (docs/DUEL-DESIGN.md); shown TELL_TIME ahead by a glow and a sound. */
+export type RivalMove = 'charge' | 'quake' | 'pull';
+export const TELL_TIME = 1;
+/** Charge speed (m/s) and the pull's speed toward a pit (m/s). (A spin-refill move was tried: any refill decided spin finishes.) */
+const CHARGE_SPEED = 1.1;
+const PULL_SPEED = 0.6;
+
+/**
+ * Does `rival`'s big move against `you`. A top held in a cup is braced: the quake and the pull pass
+ * it by, a charge only meets it in a clash. Charge: it rushes straight at you. Quake: its own
+ * shockwave (as the Anvil Strike, with the rival braced). Pull:
+ * your top is dragged toward the nearest slag pit (or the rim) and lifted.
+ */
+export function rivalMove(arena: Arena, rival: Top, you: Top, kind: RivalMove) {
+  if (!rival.alive) return;
+  const braced = arena.shapes.some((s) => s.caught === you);
+  if (kind === 'charge') {
+    const dx = you.x - rival.x;
+    const dz = you.z - rival.z;
+    const d = Math.hypot(dx, dz) || 1;
+    rival.vx = (dx / d) * CHARGE_SPEED;
+    rival.vz = (dz / d) * CHARGE_SPEED;
+    rival.kick = Math.min(1, rival.kick + 0.4);
+    rival.sinceDash = 0;
+  } else if (!braced && you.alive) {
+    if (kind === 'quake') {
+      const tell = you.tell;
+      strike(arena, rival, you);
+      you.tell = tell;
+    } else {
+      // Toward the nearest pit mouth, else straight out.
+      const a0 = Math.atan2(you.z, you.x);
+      let a = a0;
+      let gap = Infinity;
+      for (const p of arena.layout.pockets) {
+        const g = Math.abs(Math.atan2(Math.sin(p.angle - a0), Math.cos(p.angle - a0)));
+        if (g < gap) {
+          gap = g;
+          a = p.angle;
+        }
+      }
+      const tx = Math.cos(a) * arena.radius - you.x;
+      const tz = Math.sin(a) * arena.radius - you.z;
+      const d = Math.hypot(tx, tz) || 1;
+      you.vx += (tx / d) * PULL_SPEED;
+      you.vz += (tz / d) * PULL_SPEED;
+      you.lifted = LIFT_TIME;
+    }
+  }
 }
 
 /** Pillars deflect a top; bumpers kick it away hard. Orbiting pillars also shove it along. */
