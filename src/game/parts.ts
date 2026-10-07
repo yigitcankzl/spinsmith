@@ -324,19 +324,21 @@ export interface Rival {
   intro: string;
   win: string;
   lose: string;
+  /** What to try against it, shown after you lose to it. */
+  tip: string;
   build: TopBuild;
   /** Smith level from which it can appear. */
   level: number;
 }
 
 export const RIVALS: Rival[] = [
-  { name: 'Rim Raider', move: 'charge', style: 'hits hard from the rim', title: 'the Ember Runner', intro: 'Keep up if you can.', win: 'Too slow, smith.', lose: 'Next time I go faster.', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: -1, color: 0 }, level: 1 },
-  { name: 'Iron Keep', move: 'quake', style: 'holds the middle, hard to move', title: 'the Cinder Champion', intro: 'Move me. I dare you.', win: 'The middle is mine.', lose: 'You moved the mountain.', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: -1, color: 0 }, level: 1 },
-  { name: 'Drifter', move: 'pull', style: 'spins longest, waits you out', title: 'the Long Spin', intro: 'I can wait all day.', win: 'Still spinning.', lose: 'You outlasted the drift.', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
-  { name: 'Leech', move: 'pull', style: 'opposite spin: steals yours', title: 'the Spin Thief', intro: 'Your spin looks tasty.', win: 'Thanks for the spin.', lose: 'Nothing left to steal.', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
-  { name: 'Hookjaw', move: 'charge', style: 'lifts you over low walls', title: 'the Wall Breaker', intro: 'Walls are suggestions.', win: 'Over you go.', lose: 'You kept your feet.', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
-  { name: 'Sawtooth', move: 'charge', style: 'chips you toward a shatter', title: 'the Iron Champion', intro: 'Every hit takes a piece.', win: 'In pieces.', lose: 'Not a scratch? Fine.', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
-  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', title: 'the Crown', intro: 'The crown is earned here.', win: 'Not yet, smith.', lose: 'Wear it well.', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
+  { name: 'Rim Raider', move: 'charge', style: 'hits hard from the rim', title: 'the Ember Runner', intro: 'Keep up if you can.', win: 'Too slow, smith.', lose: 'Next time I go faster.', tip: 'It lives on the rim: ramp it as it comes round', build: { ring: 'striker', core: '4-60', tip: 'flat', spin: -1, color: 0 }, level: 1 },
+  { name: 'Iron Keep', move: 'quake', style: 'holds the middle, hard to move', title: 'the Cinder Champion', intro: 'Move me. I dare you.', win: 'The middle is mine.', lose: 'You moved the mountain.', tip: 'Heavy in the middle: wait for its quake, then strike it out', build: { ring: 'anvil', core: '4-60', tip: 'ball', spin: -1, color: 0 }, level: 1 },
+  { name: 'Drifter', move: 'pull', style: 'spins longest, waits you out', title: 'the Long Spin', intro: 'I can wait all day.', win: 'Still spinning.', lose: 'You outlasted the drift.', tip: 'It outlasts: knock it out early, before the spin runs down', build: { ring: 'halo', core: '4-60', tip: 'needle', spin: -1, color: 0 }, level: 1 },
+  { name: 'Leech', move: 'pull', style: 'opposite spin: steals yours', title: 'the Spin Thief', intro: 'Your spin looks tasty.', win: 'Thanks for the spin.', lose: 'Nothing left to steal.', tip: 'It steals spin: keep away and ramp it into a pit', build: { ring: 'cog', core: '9-60', tip: 'taper', spin: -1, color: 0 }, level: 4 },
+  { name: 'Hookjaw', move: 'charge', style: 'lifts you over low walls', title: 'the Wall Breaker', intro: 'Walls are suggestions.', win: 'Over you go.', lose: 'You kept your feet.', tip: 'It throws you over low walls: cup your own top when it charges', build: { ring: 'hook', core: '3-50', tip: 'rush', spin: -1, color: 0 }, level: 6 },
+  { name: 'Sawtooth', move: 'charge', style: 'chips you toward a shatter', title: 'the Iron Champion', intro: 'Every hit takes a piece.', win: 'In pieces.', lose: 'Not a scratch? Fine.', tip: 'Every hit chips you: a Ward or a cup keeps you whole', build: { ring: 'saw', core: '3-50', tip: 'orb', spin: -1, color: 0 }, level: 9 },
+  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', title: 'the Crown', intro: 'The crown is earned here.', win: 'Not yet, smith.', lose: 'Wear it well.', tip: 'Tall and locked: a Tilt or a ramp under it moves it', build: { ring: 'anvil', core: '5-80', tip: 'needle', spin: -1, color: 0 }, level: 12 },
 ];
 
 /**

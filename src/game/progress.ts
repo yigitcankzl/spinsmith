@@ -214,6 +214,8 @@ export class Progress {
   arenaPin: string | null = null;
   recentArenas: string[] = [];
   playedArenas: string[] = [];
+  /** Personal bests: the hardest rip (power 0..1) and the fastest knockout win (s). */
+  records: { rip?: number; fastestKo?: number } = {};
   private readonly storage: Storage | null;
 
   constructor(storage: Storage | null = null) {
@@ -221,7 +223,7 @@ export class Progress {
     try {
       const raw = storage?.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; champions?: Champion[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[] };
+        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; champions?: Champion[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number } };
         this.matches = s.matches ?? 0;
         // Saves from before the guide existed skip it.
         this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
@@ -238,6 +240,7 @@ export class Progress {
         this.arenaPin = s.arenaPin ?? null;
         this.recentArenas = s.recentArenas ?? [];
         this.playedArenas = s.playedArenas ?? [];
+        this.records = { ...(s.records ?? {}) };
       }
     } catch {
       // A broken save starts over.
@@ -380,6 +383,16 @@ export class Progress {
     this.save();
   }
 
+  /** A new personal best? Higher is better for 'rip', lower for 'fastestKo'. Saves it when it is. */
+  best(kind: 'rip' | 'fastestKo', value: number): boolean {
+    const old = this.records[kind];
+    const better = old === undefined ? true : kind === 'rip' ? value > old + 1e-9 : value < old - 1e-9;
+    if (!better) return false;
+    this.records[kind] = value;
+    this.save();
+    return old !== undefined;
+  }
+
   /** Pins an arena for every match (null: back to the rotation). */
   pinArena(name: string | null) {
     this.arenaPin = name;
@@ -401,6 +414,7 @@ export class Progress {
     this.arenaPin = null;
     this.recentArenas = [];
     this.playedArenas = [];
+    this.records = {};
     this.save();
   }
 
@@ -414,7 +428,7 @@ export class Progress {
   private save() {
     this.storage?.setItem(
       KEY,
-      JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas }),
+      JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records }),
     );
   }
 }

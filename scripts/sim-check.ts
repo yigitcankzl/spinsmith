@@ -840,6 +840,17 @@ TUNING.grace = 0;
   assert.notEqual(outward(true), 'out', 'a ward holds it in');
 }
 
+// 27. Personal bests: the first is just kept; a better one is news; a worse one is not.
+{
+  const p = new Progress();
+  assert.equal(p.best('rip', 0.8), false, 'the first rip only sets the record');
+  assert.equal(p.best('rip', 0.7), false, 'a weaker rip is no record');
+  assert.equal(p.best('rip', 0.9), true, 'a harder rip is a new best');
+  p.best('fastestKo', 6);
+  assert.equal(p.best('fastestKo', 4.2), true, 'a faster knockout is a new best');
+  assert.equal(p.records.fastestKo, 4.2);
+}
+
 // 25. The comfort dial steps through every mode and wraps round.
 {
   const { COMFORT, COMFORT_MODES, nextComfort } = await import('../src/game/comfort.ts');

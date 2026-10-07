@@ -1844,6 +1844,8 @@ export class MatchSystem extends createSystem({
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
     this.stamp.show(perfect ? 'WHITE HOT!' : 'RIP!', '', 'mine', 0.35);
+    // Personal bests are their own small moment (the first record is just kept).
+    if (!this.demo && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
     const mh = this.mine.hand;
     const th = this.theirs.hand;
     // The launch angles into each top's own orbit direction (mirrored for left spin); aim stays as pulled.
@@ -2505,7 +2507,8 @@ export class MatchSystem extends createSystem({
         const youWon = this.myPoints > this.theirPoints;
         // A won match: sparks run round the rim for a moment.
         if (youWon) this.celebrate = 1.6;
-        text = `${youWon ? 'You win the match!' : 'You lose the match'}\n${this.rival.name}: "${youWon ? this.rival.lose : this.rival.win}"`;
+        // A loss leaves something to try next time.
+        text = youWon ? `You win the match!\n${this.rival.name}: "${this.rival.lose}"` : `You lose the match\nTip: ${this.rival.tip}`;
         this.myPoints = 0;
         this.theirPoints = 0;
         this.matchOver = true;
@@ -2515,11 +2518,12 @@ export class MatchSystem extends createSystem({
       // A finish within 1.5 s of the player's shape names it as the cause.
       const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind).toUpperCase() : null;
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
+      if (!this.demo && v === 1 && loser.finish !== 'spin' && this.progress.best('fastestKo', Math.round(this.elapsed * 10) / 10)) this.stamp.later('NEW BEST!', `Fastest knockout: ${this.elapsed.toFixed(1)} s`, 'mine', 1);
       // Every knockout, yours or theirs, slows for a moment.
       if (loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME * 0.5;
       const won = this.myPoints > this.theirPoints || (decided && v === 1);
       const cause = recent && v === 1 ? `YOUR ${recent}` : theirs && v === -1 && loser.finish !== 'spin' ? `THEIR ${this.rivalShapeKind}`.toUpperCase() : '';
-      this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : 'MATCH LOST') : cause, v === 1 ? 'mine' : 'rival', 1.1);
+      this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause, v === 1 ? 'mine' : 'rival', 1.1);
       if (recent && v === 1) {
         text = `YOUR ${recent} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text}`;
         // The decisive move plays out slowly for a moment, in a shower of sparks.
