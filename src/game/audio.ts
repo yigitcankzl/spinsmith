@@ -260,6 +260,13 @@ export function playLand(on: 'table' | 'floor', x = 0, hard = 1) {
   });
 }
 
+/** The quench: hot steel into water, a long hiss and a bubbling settle. */
+export function playQuench() {
+  hiss(0.35, 1.2, 5000, 1200, 0.8);
+  hiss(0.12, 0.8, 800, 400, 2, 0.2);
+  for (let i = 0; i < 5; i++) tone(300 + Math.random() * 400, 0.03, 0.06, 'sine', 0.3 + i * 0.12 + Math.random() * 0.05);
+}
+
 /** A card appears: a soft, short tick. */
 export function playTick() {
   tone(2200, 0.025, 0.05, 'sine');

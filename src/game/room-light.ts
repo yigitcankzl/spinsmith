@@ -21,6 +21,14 @@ export class RoomLight {
     uR1: { value: 0.85 },
   };
   private readonly warm = new Color(0.16, 0.06, 0.0);
+  private readonly cold = new Color(0.02, 0.08, 0.18);
+  /** Seconds left of a quench's cold wash over the room. */
+  private coolT = 0;
+
+  /** The quench: the forge's orange room flips to a cold blue, then settles. */
+  quench() {
+    this.coolT = 1.4;
+  }
 
   constructor() {
     const material = new MeshBasicMaterial({ color: 0x000000, transparent: true, depthWrite: false, side: BackSide });
@@ -76,6 +84,10 @@ export class RoomLight {
     this.mesh.visible = this.dim > 0.01;
     this.uniforms.uDim.value = Math.max(0, this.dim - 0.15 * this.flash);
     this.uniforms.uTint.value.copy(this.warm).multiplyScalar(warm ? 1 : this.flash);
+    if (this.coolT > 0) {
+      this.coolT = Math.max(0, this.coolT - dt);
+      this.uniforms.uTint.value.copy(this.cold).multiplyScalar(Math.min(1, this.coolT / 0.7));
+    }
     this.uniforms.uCenter.value.copy(center);
     this.uniforms.uTableY.value = tableY;
   }
