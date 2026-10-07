@@ -554,6 +554,14 @@ export class TopView {
   private deskHand = 1;
   private travelled = 0;
   offDesk = false;
+  /** Called where a thrown top lands on the desk (for its scorch mark). */
+  onLand: ((x: number, y: number, z: number) => void) | null = null;
+  /** Picked off the desk by the player's hand: hidden until the next round. */
+  picked = false;
+  /** Where the thrown top rests now (arena-local), or null while not resting on the desk. */
+  get restingAt(): Vector3 | null {
+    return this.outT >= 0 && this.landed && this.deskSpin <= 0 ? this.throwPos : null;
+  }
   private fallX = 1;
   private fallZ = 0;
 
@@ -668,6 +676,7 @@ export class TopView {
       return;
     }
     this.outT = -1;
+    this.picked = false;
     const visible = top.state !== 'out';
     this.root.visible = visible;
     this.shadow.visible = visible && top.state === 'spinning';
@@ -720,6 +729,11 @@ export class TopView {
    * the arena, skids and falls over; into a slag pit, it sinks out of sight.
    */
   private updateOut(top: Top, arena: Arena, dt: number) {
+    if (this.picked) {
+      this.root.visible = false;
+      this.shadow.visible = false;
+      return;
+    }
     if (this.outT < 0) {
       this.outT = 0;
       this.landed = false;
@@ -772,6 +786,7 @@ export class TopView {
         if (floor && !this.offDesk) this.offDesk = true;
         if (floor) this.deskSpin = 0;
         playLand(floor ? 'floor' : 'table', p.x, Math.min(1, Math.abs(v.y) * 2));
+        if (!floor) this.onLand?.(p.x, p.y, p.z);
         v.y = floor ? -v.y * 0.3 : 0;
         this.landed = !floor || Math.abs(v.y) < 0.05;
         if (import.meta.env.DEV && this.landed) console.log(`[OUT] landed on the ${floor ? 'floor' : 'table'} at ${p.x.toFixed(2)},${p.z.toFixed(2)}`);

@@ -332,6 +332,9 @@ export class MatchSystem extends createSystem({
   /** Molten handprints left on the desk by strikes (a small pool). */
   private palmPrints = [0, 1, 2].map(() => Object.assign(new Mesh(new PlaneGeometry(0.075, 0.075), new MeshBasicMaterial({ map: PALM, transparent: true, depthWrite: false, blending: AdditiveBlending })), { visible: false }));
   private nextPrint = 0;
+  /** Scorches on the desk where thrown tops landed (a small pool). */
+  private scorches = [0, 1, 2, 3].map(() => Object.assign(new Mesh(new PlaneGeometry(0.045, 0.045), new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0xff6a1a, transparent: true, depthWrite: false, blending: AdditiveBlending })), { visible: false }));
+  private nextScorch = 0;
   /** This round's off-the-desk moment has been shown. */
   private offDeskShown = false;
   /** The last REPLAY_STEPS sim steps of both tops (x, z, angle, wobble, damage each), a ring buffer. */
@@ -492,6 +495,7 @@ export class MatchSystem extends createSystem({
       this.portal,
       this.portalCore,
       ...this.palmPrints,
+      ...this.scorches,
       ...this.handMarks,
       this.lane,
       this.sealPop,
@@ -1181,6 +1185,8 @@ export class MatchSystem extends createSystem({
       old?.dispose();
       const view = new TopView(build, color);
       view.team(i === 0 ? TEAM_MINE : TEAM_RIVAL, ringOf(build).radius);
+      // A top that lands on the desk scorches it.
+      view.onLand = (x, y, z) => this.scorch(x, y, z);
       view.root.name = i === 0 ? 'my-top' : 'their-top';
       this.stage.add(view.root, view.shadowMesh, view.debris);
       if (i === 0) this.myView = view;
@@ -1375,6 +1381,34 @@ export class MatchSystem extends createSystem({
     });
   }
 
+  /** A scorch where a thrown top hit the desk: ember-bright, cooling to a faint mark for the match. */
+  private scorch(x: number, y: number, z: number) {
+    const m = this.scorches[this.nextScorch];
+    this.nextScorch = (this.nextScorch + 1) % this.scorches.length;
+    m.position.set(x, y + 0.0012, z);
+    m.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI);
+    m.userData.t = 0;
+    m.visible = true;
+  }
+
+  /**
+   * Your top, thrown out and resting on the desk, can be picked up: a pinch on it takes it back
+   * (it goes from the desk; the next round starts it in the arena as always).
+   */
+  private pickOffDesk() {
+    const at = this.myView.restingAt;
+    if (!at || this.myView.picked) return;
+    this.stage.localToWorld(this.handAt.copy(at));
+    for (const side of ['left', 'right'] as const) {
+      const h = this.hands[side];
+      if (!h.justPinched || h.pinch.distanceTo(this.handAt) > 0.07) continue;
+      this.myView.picked = true;
+      playPick();
+      this.stamp.show('BACK IN HAND', '', 'mine', 0.4);
+      return;
+    }
+  }
+
   /**
    * A molten handprint where the palm hit the desk: white-hot, cooling through orange to a dark
    * scorch that stays until the match ends (three at most).
@@ -1390,6 +1424,14 @@ export class MatchSystem extends createSystem({
   }
 
   private updatePrints(dt: number) {
+    if (this.phase === 'result') this.pickOffDesk();
+    for (const m of this.scorches) {
+      if (!m.visible) continue;
+      const t = (m.userData.t += dt);
+      const mat = m.material as MeshBasicMaterial;
+      mat.opacity = t < 1.5 ? 1 - t * 0.4 : 0.35;
+      mat.color.setRGB(1, Math.max(0.15, 0.5 - t * 0.2), 0.05);
+    }
     for (const m of this.palmPrints) {
       if (!m.visible) continue;
       const t = (m.userData.t += dt);
@@ -1561,7 +1603,7 @@ export class MatchSystem extends createSystem({
     this.theirPoints = 0;
     this.wasDown = false;
     this.matchLog = { rounds: [], rip: 0, xp: 0, won: false, score: '' };
-    for (const m of this.palmPrints) m.visible = false;
+    for (const m of [...this.palmPrints, ...this.scorches]) m.visible = false;
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
     this.typesPicked = false;
     this.phase = 'ready';
