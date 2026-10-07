@@ -314,7 +314,7 @@ export class MatchSystem extends createSystem({
   /** When Menu was pinched once during a match (a second pinch within 3 s leaves). */
   private menuArmed = -10;
   /** The rival's entrance at a match's start (s into it), and the VS words it lands with. */
-  private entrance: { t: number; vs: string; sub: string } | null = null;
+  private entrance: { t: number; vs: string; sub: string; champion: boolean } | null = null;
   private portal = Object.assign(new Mesh(new RingGeometry(0.7, 1, 48), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide })), { visible: false });
   private portalCore = Object.assign(new Mesh(new CircleGeometry(0.7, 48), new MeshBasicMaterial({ color: 0x0a1a24, transparent: true, opacity: 0.85, depthWrite: false, side: DoubleSide })), { visible: false });
   /** Each hand's mark on the arena floor under it: a soft shadow, or a warm glow when the strike is ready. */
@@ -1273,6 +1273,7 @@ export class MatchSystem extends createSystem({
     const show = !!e && (this.phase === 'ready' || this.phase === 'pulling');
     this.portal.visible = this.portalCore.visible = show;
     if (!e || !show) {
+      if (e) this.theirView.root.scale.setScalar(1);
       this.entrance = null;
       return;
     }
@@ -1297,17 +1298,23 @@ export class MatchSystem extends createSystem({
       view.visible = true;
       view.position.set(px + (them.x - px) * u, 0.16 + (y - 0.16) * u + 0.12 * Math.sin(u * Math.PI), far + (them.z - far) * u);
       view.rotation.set(0.6 * (1 - u), 0, 0);
+      // A circuit's champion comes through huge, and shrinks to fight size as it lands.
+      view.scale.setScalar(e.champion ? 1 + 2.5 * (1 - u) * (1 - u) : 1);
       this.theirView.shadowMesh.visible = false;
       if (Math.floor(e.t * 30) !== Math.floor((e.t - dt) * 30)) this.sparks.burst(view.position.x, view.position.y - 0.01, view.position.z, 0.1);
     } else if (u - dt / 0.9 < 1) {
       // Touchdown.
+      view.scale.setScalar(1);
       this.sparks.burst(them.x, this.arena.height(them.x, them.z), them.z, 1);
       this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 1);
       playLand('table', them.x, 1);
       duck(0.4, 0.3);
       this.stamp.show(e.vs, e.sub, 'rival', 1.6);
     }
-    if (e.t > 2.1) this.entrance = null;
+    if (e.t > 2.1) {
+      this.theirView.root.scale.setScalar(1);
+      this.entrance = null;
+    }
   }
 
   /**
@@ -2008,7 +2015,7 @@ export class MatchSystem extends createSystem({
       const vs = `VS ${this.rival.name.toUpperCase()}`;
       const sub = c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title;
       if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
-      else this.entrance = { t: 0, vs, sub };
+      else this.entrance = { t: 0, vs, sub, champion: !!c?.champion };
       this.label.set(`${this.rival.name}, ${this.rival.title}\n"${this.rival.intro}"`);
     }
     else {
