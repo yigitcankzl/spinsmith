@@ -309,6 +309,10 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** The frame-rate guard: average frame time, how long it has been slow, and whether it lightened. */
+  private fpsAvg = 1 / 72;
+  private slowFor = 0;
+  private lite = false;
   /** The last finish's cause, for the log ("YOUR RAMP → SLAG"). */
   private lastCause = '';
   /** When Menu was pinched once during a match (a second pinch within 3 s leaves). */
@@ -712,6 +716,7 @@ export class MatchSystem extends createSystem({
       return;
     }
     this.label.update(Math.min(delta, 0.1));
+    this.guardFrameRate(delta);
     this.stamp.update(Math.min(delta, 0.1));
     this.updatePrints(Math.min(delta, 0.1));
     this.updateHandMarks();
@@ -775,7 +780,7 @@ export class MatchSystem extends createSystem({
     {
       // Home is bright, a fight dark around the lit arena, the forge and workshop warm.
       const p = this.phase;
-      const dim = p === 'fight' || p === 'pulling' ? 0.45 : p === 'ready' || p === 'result' ? 0.25 : p === 'forge' || p === 'build' ? 0.35 : p === 'hub' ? 0.1 : 0;
+      const dim = this.lite ? 0 : p === 'fight' || p === 'pulling' ? 0.45 : p === 'ready' || p === 'result' ? 0.25 : p === 'forge' || p === 'build' ? 0.35 : p === 'hub' ? 0.1 : 0;
       this.player.head.getWorldPosition(this.head);
       this.roomLight.update(this.head, this.root.position, this.root.position.y - PEDESTAL, dim, p === 'forge' || p === 'build', dt);
     }
@@ -1448,6 +1453,22 @@ export class MatchSystem extends createSystem({
       mat.color.setRGB(1, Math.max(0.12, 0.95 - k * 0.85), Math.max(0.02, 0.8 - k * 1.6));
       mat.opacity = t < 3 ? 1 : Math.max(0.25, 1 - (t - 3) / 3);
     }
+  }
+
+  /**
+   * A frame-rate guard: if the headset averages under 62 fps for 3 s, the game lightens itself
+   * once (stronger foveation, no room dimming shell, which covers the whole view), and says so in
+   * the log. Hands, the fight and the visuals that matter stay.
+   */
+  private guardFrameRate(dt: number) {
+    // Not in the emulator (a desktop browser's frame rate says nothing about the headset).
+    if (this.lite || dt <= 0 || dt > 0.25 || 'IWER_DEVICE' in window) return;
+    this.fpsAvg += (dt - this.fpsAvg) * 0.02;
+    this.slowFor = this.fpsAvg > 1 / 62 ? this.slowFor + dt : 0;
+    if (this.slowFor < 3) return;
+    this.lite = true;
+    this.world.renderer.xr.setFoveation?.(1);
+    console.warn(`[PERF] averaging ${(1 / this.fpsAvg).toFixed(0)} fps: lighter rendering (foveation 1, no room dimming)`);
   }
 
   /** The match in two lines: the result and score, then each round's finish, the best rip and the XP. */
