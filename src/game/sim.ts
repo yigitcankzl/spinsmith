@@ -539,6 +539,8 @@ export class Top {
   sinceDash = 99;
   /** Seconds since the last bumper kick (large = none recently). */
   sinceBump = 99;
+  /** Seconds left of a Rush: the charging top is braced and takes half the knockback. */
+  rushing = 0;
   /** Seconds left of a telegraphed big move (a rival's tell; 0 = none). An Anvil Strike cuts it short. */
   tell = 0;
   /** Seconds since a boost pad flung it. */
@@ -559,7 +561,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sincePad: 99, tell: 0, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sincePad: 99, tell: 0, rushing: 0, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -689,6 +691,7 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.sinceDash += dt;
   t.sinceBump += dt;
   t.sincePad += dt;
+  t.rushing = Math.max(0, t.rushing - dt);
   pillars(arena, t);
   pads(arena, t);
   wall(arena, t);
@@ -766,7 +769,7 @@ export const SEALS: Seal[] = ['anvil', 'rush', 'magnet'];
 /** Your Magnet pulls a little softer than a rival's pull: it lands more often. */
 const MAGNET_SPEED = 0.45;
 /** Your Rush hits harder than a rival's charge: it is your one strike. */
-const RUSH_SPEED = 1.5;
+const RUSH_SPEED = 1.2;
 
 export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox = 0, oz = 0) {
   if (seal === 'anvil') return strike(arena, mine, rival, ox, oz);
@@ -776,6 +779,7 @@ export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox =
     const v = Math.hypot(mine.vx, mine.vz) || 1;
     mine.vx *= RUSH_SPEED / v;
     mine.vz *= RUSH_SPEED / v;
+    mine.rushing = 0.6;
   }
   arena.lastStrike = arena.elapsed;
   rival.tell = 0;
@@ -970,8 +974,8 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   const liftA = gap > 0 ? gap * HEIGHT_LIFT : 0;
   const liftB = gap < 0 ? -gap * HEIGHT_LIFT : 0;
   // A top braced in a well is knocked back less.
-  const braceA = arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(a.x, a.z) : 1;
-  const braceB = arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(b.x, b.z) : 1;
+  const braceA = (arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(a.x, a.z) : 1) * (a.rushing > 0 ? 0.5 : 1);
+  const braceB = (arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(b.x, b.z) : 1) * (b.rushing > 0 ? 0.5 : 1);
   const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA) * braceA;
   const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB) * braceB;
   a.vx -= nx * ja;

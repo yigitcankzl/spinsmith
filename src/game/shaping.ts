@@ -84,7 +84,7 @@ export const behindOn = (me: { alive: boolean; spin: number }, rival: { alive: b
 
 export const STRIKE_BAR = {
   /** Seconds to fill on its own. */
-  passive: 18,
+  passive: 24,
   /** Filled per solid clash (strength at least SHAPING.clashMin), at most once per clashGap. */
   clash: 0.07,
   /** Behind on spin, the bar fills this many times as fast. */

@@ -203,7 +203,7 @@ export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture
     // When each seal pays: the anvil and the magnet with the rival out and hotter than you, the rush
     // with the rival near the rim.
     const out = (nr > 0.55 || rival.damage > 0.35) && nr + rival.damage > nm + me.damage + 0.15;
-    const when = seal === 'rush' ? nr > 0.6 : out;
+    const when = seal === 'rush' ? nr > 0.6 && nm < 0.5 : out;
     const good = rival.alive && (rival.tell > 0 || when);
     if (bar.full && t >= TUNING.grace && good) at = t + delay;
   };
