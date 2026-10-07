@@ -107,4 +107,7 @@ Built and in the repo, measured with `npm run report:shaping` (rows "masher + st
   warnings (Gale 50%, Cog 48%).
 - Not built: combo counter, rival memory, the weekly rare-part order. Needs the headset: the slap
   thresholds (`?slapDown=` etc.) and whether a tracking jump can look like a slap.
-
+- Six seals after the polish pass (Oct 8, `report:shaping`, 12 rounds per pair): Anvil 64%, Rush
+  62%, Magnet 65%, Tilt 63% (the arena dips toward the palm for 1.6 s; your own top holds), Hammer
+  63% (the next solid clash cracks three times as hard, at least 0.22), Ward 61% (3 s: no knockout,
+  half the knockback, braced against quakes and pulls); masher + strike 49%.
