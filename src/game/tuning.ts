@@ -5,6 +5,7 @@
  */
 import { REACH } from './placement.ts';
 import { ARENA_SCALE } from './reach.ts';
+import { PRESS } from './table-touch.ts';
 
 const query = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
 
@@ -33,6 +34,8 @@ export const TUNE = {
   wellAfterRamp: knob('wellAfterRamp', 0.3),
   /** How long a cup waits for a top, then holds it for a sling (s). */
   cupHold: knob('cupHold', 2),
+  /** Press to place: thresholds of a palm pressed onto the table (see table-touch.ts PRESS). */
+  press: { down: knob('pressDown', PRESS.down), window: knob('pressWindow', PRESS.window), still: knob('pressStill', PRESS.still), hold: knob('pressHold', PRESS.hold) },
   /** A far ramp is set only after a pinch held this long (s); a quick tap does nothing. */
   farHold: knob('farHold', 0.12),
   /** The real hands drawn over the game (0 turns it off), and how full the hand shape is. */

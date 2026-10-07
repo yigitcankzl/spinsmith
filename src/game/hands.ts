@@ -7,6 +7,9 @@ const PINCH_OFF = TUNE.pinchOff;
 
 export type Side = 'left' | 'right';
 
+/** The joints a palm pressed on a table touches with. */
+const LOW_JOINTS: XRHandJoint[] = ['index-finger-tip', 'middle-finger-tip', 'middle-finger-metacarpal'];
+
 export interface HandState {
   /** Hand (or controller) is tracked this frame. */
   tracked: boolean;
@@ -17,6 +20,8 @@ export interface HandState {
   pinch: Vector3;
   /** Index fingertip, world space (grip position for controllers). */
   index: Vector3;
+  /** The hand's lowest point (world y): the lowest of the index tip, middle tip and palm, minus its radius. */
+  low: number;
   /** Wrist, world space (grip position for controllers): where hand-held menus attach. */
   wrist: Vector3;
   /** Pointing ray (the system target ray), world space. */
@@ -34,6 +39,7 @@ const newHand = (): HandState => ({
   justReleased: false,
   pinch: new Vector3(),
   index: new Vector3(),
+  low: 0,
   wrist: new Vector3(),
   rayOrigin: new Vector3(),
   rayDir: new Vector3(),
@@ -51,6 +57,7 @@ export class HandInput {
   private seen = { left: false, right: false };
   private mat = new Matrix4();
   private quat = new Quaternion();
+  private v = new Vector3();
 
   update(frame: XRFrame, ref: XRReferenceSpace, session: XRSession, player: Object3D) {
     this.seen.left = false;
@@ -99,6 +106,14 @@ export class HandInput {
         const wp = wristJoint && frame.getJointPose(wristJoint, ref);
         if (wp) player.localToWorld(h.wrist.set(wp.transform.position.x, wp.transform.position.y, wp.transform.position.z));
         else h.wrist.copy(h.index);
+        h.low = Infinity;
+        for (const j of LOW_JOINTS) {
+          const space = hand.get(j);
+          const pose = space && frame.getJointPose(space, ref);
+          if (!pose) continue;
+          const p = pose.transform.position;
+          h.low = Math.min(h.low, player.localToWorld(this.v.set(p.x, p.y, p.z)).y - (pose.radius ?? 0.008));
+        }
         return pressed || (h.pinching ? d < PINCH_OFF : d < PINCH_ON);
       }
     }
@@ -109,6 +124,7 @@ export class HandInput {
     player.localToWorld(h.pinch.set(p.x, p.y, p.z));
     h.index.copy(h.pinch);
     h.wrist.copy(h.pinch);
+    h.low = h.pinch.y;
     return pressed;
   }
 

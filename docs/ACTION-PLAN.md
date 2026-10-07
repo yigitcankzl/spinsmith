@@ -391,7 +391,9 @@ See WP14. Capture after the feature freeze.
 
 ## 5. Do-not-do list
 
-- **XRAnchors**, a table-slam gesture, mesh-based physics or new gestures. Re-place on reset and the handle cover a seated table game; anchors only matter if drift is seen on the device.
+- **XRAnchors**, a table-slam gesture, mesh-based physics or new gestures. (Amended Oct 7: the
+  palm press that places the arena, PASSTHROUGH-PLAN step C, and the cup's sling are in; the slam
+  stays out.) Re-place on reset and the handle cover a seated table game; anchors only matter if drift is seen on the device.
 - **More content:** arenas, parts, rivals, ranks, a daily run or a second economy. Judges will not see what exists already.
 - **Multiplayer, leaderboards, accounts, cloud saves, LLM or agentic rivals, voice.** Skip the Social and Agentic awards.
 - **Bloom, post-processing, shadow maps, an environment system**, or a full art rework of the tops.

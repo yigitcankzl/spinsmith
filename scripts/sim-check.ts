@@ -14,6 +14,7 @@ import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
 import { edgeDistance, fitToTable, insidePoly, MAX_FIT_MOVE, RIM_MARGIN } from '../src/game/room.ts';
 import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
+import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
@@ -675,6 +676,33 @@ TUNING.grace = 0;
   cup2.held = true;
   arena.free(cup2);
   assert.ok(!cup2.held && !cup2.trap && Arena.strength(cup2) <= 1, 'letting go frees the cup');
+}
+
+// 20. Press to place: a palm brought down onto the table and held is a press, at the table's
+// height; a hand resting from the start, a slow drift down or a hold in mid-air is not.
+{
+  const dt = 1 / 72;
+  const TABLE = 0.74;
+  /** Runs a trace of hand heights; returns the first contact height found, or null. */
+  const run = (ys: (number | null)[], lo = TABLE - 0.04, hi = TABLE + 0.04) => {
+    const touch = new TableTouch();
+    for (const y of ys) {
+      const hit = touch.update(y, dt, lo, hi);
+      if (hit !== null) return hit;
+    }
+    return null;
+  };
+  const hold = (y: number, s: number) => Array.from({ length: Math.round(s / dt) }, () => y);
+  const move = (a: number, b: number, s: number) => Array.from({ length: Math.round(s / dt) }, (_, i) => a + ((b - a) * (i + 1)) / Math.round(s / dt));
+  const press = [...hold(0.9, 0.3), ...move(0.9, TABLE + 0.005, 0.4), ...hold(TABLE + 0.005, 0.5)];
+  const hit = run(press);
+  assert.ok(hit !== null && Math.abs(hit - (TABLE + 0.005)) < 1e-6, 'a palm brought down and held is a press, at its height');
+  assert.equal(run(hold(TABLE + 0.005, 3)), null, 'a hand resting on the table from the start is not a press');
+  assert.ok(run([...hold(TABLE + 0.005, 1), ...move(TABLE + 0.005, 0.85, 0.3), ...move(0.85, TABLE + 0.005, 0.3), ...hold(TABLE + 0.005, 0.5)]) !== null, 'it is, once it lifts and presses');
+  assert.equal(run([...hold(0.9, 0.3), ...move(0.9, TABLE + 0.005, 5), ...hold(TABLE + 0.005, 1)]), null, 'a slow drift down is not a press');
+  assert.equal(run([...hold(1.0, 0.3), ...move(1.0, TABLE + 0.15, 0.3), ...hold(TABLE + 0.15, 1)]), null, 'a hold 15 cm above the table is not a press');
+  assert.ok(run([...hold(0.9, 0.3), null, null, ...hold(TABLE + 0.005, 0.1), ...hold(TABLE + 0.005, 0.5)]) === null, 'a hand reappearing still on the table is not a press');
+  assert.equal(run([...hold(0.9, 0.3), ...move(0.9, TABLE + 0.005, 0.4), ...hold(TABLE + 0.005, 0.15), 0.9]), null, 'a touch let go before the hold is not a press');
 }
 
 console.log('sim-check: all passed');

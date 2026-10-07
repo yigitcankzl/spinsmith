@@ -18,6 +18,7 @@ import { MatchBar } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
 import { RoomLight } from './room-light.js';
 import { fitToTable } from './room.js';
+import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
 import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
@@ -25,7 +26,7 @@ import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { SHAPE_SIZE, ShapingCharges } from './shaping.js';
-import { PEDESTAL, pickTable, placeArena } from './placement.js';
+import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
 import { TUNE } from './tuning.js';
 import type { Point } from './placement.js';
 
@@ -34,6 +35,10 @@ const ARENA_SCALE = TUNE.scale;
 /** Placing waits at least this long for planes, and places on the tray after SETTLE_MAX without a table (s). */
 const SETTLE_MIN = 0.5;
 const SETTLE_MAX = 5;
+/** With hands in view, placing waits this long for a palm pressed on the table, then places anyway (s). */
+const PRESS_WAIT = 8;
+/** A press moves the arena at most this far from its comfortable spot toward the hand (m). */
+const PRESS_PULL = 0.15;
 /** A table found within this long after placing on the tray still gets the arena (s). */
 const LATE_TABLE = 30;
 /** The move handle: grabbed within this distance (world m); the arena moves at most this far up or down. */
@@ -118,6 +123,10 @@ export class MatchSystem extends createSystem({
 }) {
   private phase: Phase = 'placing';
   private settle = 0;
+  /** Press to place: a glowing print on the table where the arena will rise, and each hand's press detector. */
+  private print = new Group();
+  private printLabel = new Label(0.2);
+  private touches: Record<Side, TableTouch> = { left: new TableTouch(TUNE.press), right: new TableTouch(TUNE.press) };
   /** The floor mesh needs one more sync (the arena was reset or a shape just ended). */
   private arenaDirty = true;
   /** The XR session the arena was placed in; a new one (or a recenter) places it again. */
@@ -222,6 +231,7 @@ export class MatchSystem extends createSystem({
     justReleased: false,
     pinch: new Vector3(),
     index: new Vector3(),
+    low: 0,
     wrist: new Vector3(),
     rayOrigin: new Vector3(),
     rayDir: new Vector3(),
@@ -390,6 +400,17 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.handOccluder.joints);
     this.world.createTransformEntity(this.handOccluder.bones);
     this.world.createTransformEntity(this.roomLight.mesh);
+    {
+      // ponytail: a glowing ring and disc stand in for a handprint decal.
+      const glow = (o: number) => new MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: o, depthWrite: false, blending: AdditiveBlending });
+      this.print.add(new Mesh(new RingGeometry(0.075, 0.085, 48).rotateX(-Math.PI / 2), glow(0.9)), new Mesh(new CircleGeometry(0.055, 32).rotateX(-Math.PI / 2), glow(0.35)));
+      this.printLabel.mesh.position.set(0, 0.12, 0);
+      this.printLabel.mesh.scale.setScalar(1.25);
+      this.printLabel.set('Press your table\npalm down, here: the arena rises');
+      this.print.add(this.printLabel.mesh);
+      this.print.visible = false;
+      this.world.createTransformEntity(this.print);
+    }
     this.world.createTransformEntity(this.tableMask);
     // The match bar: a metal strip set into the far rim, tipped back toward the player, under the
     // round messages, so score and fight share one view.
@@ -434,7 +455,11 @@ export class MatchSystem extends createSystem({
           localStorage.removeItem('spinsmith.top.v1');
           location.reload();
         }
-        if (e.code === 'KeyP') this.phase = 'placing';
+        if (e.code === 'KeyP') {
+          this.phase = 'placing';
+          this.settle = 0;
+          this.root.visible = false;
+        }
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
         if (e.code === 'KeyK' && this.phase === 'fight') {
           // Burst the opponent now, to see the burst finish.
@@ -490,7 +515,12 @@ export class MatchSystem extends createSystem({
     if (paused) return;
     // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
     if (session !== this.xrSession) {
-      if (this.xrSession) this.needPlace = true;
+      // Back at home, the print asks for a press again; mid-match, the arena just comes along.
+      if (this.xrSession && this.phase === 'hub') {
+        this.phase = 'placing';
+        this.settle = 0;
+        this.root.visible = false;
+      } else if (this.xrSession) this.needPlace = true;
       this.xrSession = session;
       ref.addEventListener('reset', () => (this.needPlace = true));
     }
@@ -528,6 +558,14 @@ export class MatchSystem extends createSystem({
         // Wait for a table to be detected, but never long: without one the arena floats on a tray.
         this.settle += dt;
         this.player.head.getWorldPosition(this.head);
+        if (this.settle >= SETTLE_MIN && (this.hands.left.tracked || this.hands.right.tracked)) {
+          if (this.updatePress(dt) || this.settle >= PRESS_WAIT) {
+            this.print.visible = false;
+            if (this.phase === 'placing') this.place();
+          }
+          return;
+        }
+        this.print.visible = false;
         if ((this.settle >= SETTLE_MIN && pickTable(this.head, this.tables()) !== null) || this.settle >= SETTLE_MAX) this.place();
         return;
       case 'hub':
@@ -971,6 +1009,58 @@ export class MatchSystem extends createSystem({
 
   private describe(t: TopSpec) {
     return `${t.name} (${roleOf(t)})`;
+  }
+
+  /**
+   * Placing with hands in view: a print glows where the arena will stand (on the table, else at a
+   * guessed desk height); a palm pressed on the table there raises it at the hand's true height,
+   * a pinch on the print places it at once. True once placed.
+   */
+  private updatePress(dt: number): boolean {
+    this.player.head.getWorldDirection(this.fwd).negate();
+    const table = pickTable(this.head, this.tables());
+    const at = placeArena(this.head, this.fwd.x, this.fwd.z, this.tables(), TUNE.reach);
+    const y = at.y - PEDESTAL;
+    this.print.visible = true;
+    this.print.position.set(at.x, y + 0.002, at.z);
+    this.print.rotation.y = at.yaw;
+    this.print.scale.setScalar(1 + 0.06 * Math.sin(this.time * 5));
+    // With a known table, a press counts within 4 cm of it; without, anywhere a desk could be.
+    const lo = table !== null ? table - 0.04 : TABLE_MIN_H;
+    const hi = table !== null ? table + 0.04 : Math.min(TABLE_MAX_H, this.head.y - 0.25);
+    if (import.meta.env.DEV && Math.floor(this.settle) !== Math.floor(this.settle - dt)) console.log(`[PRESS] band ${lo.toFixed(3)}..${hi.toFixed(3)} print ${at.x.toFixed(2)},${y.toFixed(3)},${at.z.toFixed(2)} low ${this.hands.right.low.toFixed(3)} at ${this.hands.right.index.x.toFixed(2)},${this.hands.right.index.z.toFixed(2)}`);
+    for (const side of ['left', 'right'] as const) {
+      const h = this.hands[side];
+      if (h.justPinched && Math.hypot(h.pinch.x - at.x, h.pinch.z - at.z) < 0.1) {
+        console.log('[MATCH] placed by a pinch on the print');
+        this.place();
+        return true;
+      }
+      const hit = this.touches[side].update(h.tracked ? h.low : null, dt, lo, hi);
+      if (hit === null) continue;
+      this.placeRoot();
+      // Toward the hand a little, standing on the height the palm found.
+      const p = this.root.position;
+      const dx = h.index.x - p.x;
+      const dz = h.index.z - p.z;
+      const k = Math.min(1, PRESS_PULL / (Math.hypot(dx, dz) || 1));
+      p.set(p.x + dx * k, hit + PEDESTAL, p.z + dz * k);
+      const table2 = this.tableShape();
+      if (table2) {
+        const fit = fitToTable(p, table2.poly, this.arena.radius * ARENA_SCALE + 0.03);
+        p.x = fit.x;
+        p.z = fit.z;
+      }
+      this.root.rotation.y = Math.atan2(this.head.x - p.x, this.head.z - p.z);
+      this.onTable = true;
+      this.setRoom();
+      playPlace();
+      for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
+      console.log(`[MATCH] forged by press at y=${hit.toFixed(3)}${table !== null ? ` (table plane ${table.toFixed(3)})` : ''}`);
+      this.toHub();
+      return true;
+    }
+    return false;
   }
 
   /** The first placement: the arena in front, then home. */

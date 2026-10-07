@@ -9,7 +9,9 @@ Draft (Oct 7, 2026); final text before the deadline. For judges and anyone tryin
    is a pinch, a pull or a fingertip press.
 3. **Allow spatial data** when the browser asks. The arena then stands on your real table;
    without it, or with no table nearby, it floats on a tray in front of you and plays the same.
-4. Open the link and press **Enter**.
+4. Open the link and press **Enter**. A ring glows on your table: lay your palm on the table
+   there and the arena rises where you pressed, at your table's real height. A pinch on the ring
+   also places it, and after 8 seconds it places itself.
 
 ## If something is off
 
@@ -42,8 +44,8 @@ Draft (Oct 7, 2026); final text before the deadline. For judges and anyone tryin
 
 ## Known limits
 
-- The arena uses the nearest table plane but not its edge yet; on a small table, pull it back with
-  the handle.
+- On a small table the arena moves in from the edge by at most 15 cm; if it still hangs over,
+  pull it back with the handle.
 - Rivals from level 6 use ramps too; you meet them only after some play, or at once with `?demo`
   (they are not in the first session).
 - All sound is synthesized; there are no music files.
