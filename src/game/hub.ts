@@ -11,6 +11,10 @@
  * Table things are arena-local (arena center at the origin, +Z toward the player).
  */
 import {
+  AdditiveBlending,
+  InstancedMesh,
+  Matrix4,
+  SphereGeometry,
   BoxGeometry,
   BufferGeometry,
   ExtrudeGeometry,
@@ -118,6 +122,9 @@ export class Hub {
   private items: Pickable[] = [];
   private labels: Mesh[] = [];
   /** A breathing ring of light that shows where to reach next during the first session. */
+  /** The first move shown, not written: ember dots running in an arc from the dock into the arena. */
+  private path = new InstancedMesh(new SphereGeometry(0.004, 8, 6), new MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }), 9);
+  private pathOn = false;
   private beacon = new Mesh(new RingGeometry(0.028, 0.034, 40), new MeshBasicMaterial({ color: ORANGE, transparent: true, depthWrite: false }));
   private rankCanvas = document.createElement('canvas');
   private rankTex!: CanvasTexture;
@@ -145,6 +152,7 @@ export class Hub {
   private readonly q = new Vector3();
   private readonly hit = new Vector3();
   private readonly at = new Vector3();
+  private readonly mat = new Matrix4();
   private readonly center = new Vector3();
 
   constructor() {
@@ -157,7 +165,9 @@ export class Hub {
     this.board.mesh.position.copy(BOARD_AT);
     this.board.mesh.rotation.x = -0.25;
     this.items.push({ action: { kind: 'order' }, carry: false, model: this.board.mesh, home: BOARD_AT.clone() });
-    this.root.add(this.anvil, this.stand, this.beacon, this.board.mesh, this.champions);
+    this.root.add(this.anvil, this.stand, this.beacon, this.board.mesh, this.champions, this.path);
+    this.path.visible = false;
+    this.path.frustumCulled = false;
     this.root.visible = false;
   }
 
@@ -174,6 +184,7 @@ export class Hub {
     this.blueprint.visible = !first;
     // Every unfinished guide step points somewhere: the dock to play, the anvil for the new part.
     this.beacon.visible = progress.guide !== 'done';
+    this.pathOn = progress.guide === 'launch' || progress.guide === 'bump' || progress.guide === 'match';
     this.teaching = progress.guide !== 'done';
     // The board and the champions come once the first session is over.
     this.board.mesh.visible = !this.teaching;
@@ -213,6 +224,21 @@ export class Hub {
   /** One frame: hover, pinch, carry, drop. Returns what the player chose, if anything. */
   update(pointers: HandState[], dt: number, head: Vector3): HubAction | null {
     this.time += dt;
+    // Before the first match, ember dots show the way from the dock into the arena.
+    this.path.visible = this.pathOn && !this.held;
+    if (this.path.visible) {
+      for (let i = 0; i < 9; i++) {
+        const u = (this.time * 0.6 + i / 9) % 1;
+        const x = DOCK_AT.x * (1 - u);
+        const z = DOCK_AT.z * (1 - u) + 0.04 * u;
+        // From the top in its dock, up and over the rim, down onto the arena floor.
+        const y = (TABLE_Y + DOCK_TOP + 0.01) * (1 - u) + 0.012 * u + 0.09 * Math.sin(u * Math.PI);
+        this.mat.makeScale(1, 1, 1).setPosition(x, y, z);
+        this.mat.elements[0] = this.mat.elements[5] = this.mat.elements[10] = Math.sin(u * Math.PI) * 1.2 + 0.2;
+        this.path.setMatrixAt(i, this.mat);
+      }
+      this.path.instanceMatrix.needsUpdate = true;
+    }
     // The beacon breathes.
     const k = 0.5 + 0.5 * Math.sin(this.time * 4);
     this.beacon.scale.setScalar(1 + 0.35 * k);
