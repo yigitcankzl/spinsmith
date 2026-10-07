@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, duck, ForgeLoop, playGong, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
@@ -25,7 +25,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, ShapeMarks, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -304,6 +304,11 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** Each hand's mark on the arena floor under it: a soft shadow, or a warm glow when the strike is ready. */
+  private handAt = new Vector3();
+  private handMarks = (['left', 'right'] as const).map(() =>
+    Object.assign(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, depthWrite: false })), { visible: false }),
+  );
   /** Molten handprints left on the desk by strikes (a small pool). */
   private palmPrints = [0, 1, 2].map(() => Object.assign(new Mesh(new PlaneGeometry(0.075, 0.075), new MeshBasicMaterial({ map: PALM, transparent: true, depthWrite: false, blending: AdditiveBlending })), { visible: false }));
   private nextPrint = 0;
@@ -462,6 +467,7 @@ export class MatchSystem extends createSystem({
     this.stage.add(
       this.chargeRing,
       ...this.palmPrints,
+      ...this.handMarks,
       this.lane,
       this.sealPop,
       this.reticle,
@@ -677,6 +683,7 @@ export class MatchSystem extends createSystem({
     this.label.update(Math.min(delta, 0.1));
     this.stamp.update(Math.min(delta, 0.1));
     this.updatePrints(Math.min(delta, 0.1));
+    this.updateHandMarks();
     if (this.sealPop.visible) {
       const t = (this.sealPop.userData.t += Math.min(delta, 0.1));
       const me = this.mine;
@@ -1197,6 +1204,43 @@ export class MatchSystem extends createSystem({
       g.wobble = f[o + 3];
       g.damage = f[o + 4];
       g.spin = 1;
+    });
+  }
+
+  /**
+   * Your hands in the arena's light: over the arena each casts a soft shadow on the floor (darker and
+   * tighter as it comes down); with the strike ready, the palm glows orange on the floor instead.
+   */
+  private updateHandMarks() {
+    const play = this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight';
+    const hot = this.phase === 'fight' && this.forgeBar.full && this.taught('strike');
+    (['left', 'right'] as const).forEach((side, i) => {
+      const m = this.handMarks[i];
+      const h = this.hands[side];
+      m.visible = false;
+      if (!play || !h.tracked) return;
+      // Between the wrist and the fingertip (toLocal reuses one vector, so copy first).
+      const w = this.handAt.copy(this.toLocal(h.wrist));
+      const l = w.lerp(this.toLocal(h.index), 0.5);
+      const n = normRadius(this.arena.layout, l.x, l.z);
+      if (n > 1.15) return;
+      const floor = this.arena.height(l.x, l.z);
+      const up = l.y - floor;
+      if (up < 0 || up > 0.12) return;
+      m.visible = true;
+      m.position.set(l.x, floor + 0.0015, l.z);
+      const k = 1 - up / 0.12;
+      m.scale.setScalar(0.03 + 0.03 * (1 - k));
+      const mat = m.material as MeshBasicMaterial;
+      if (hot) {
+        mat.color.setHex(0xff8a2a);
+        mat.blending = AdditiveBlending;
+        mat.opacity = 0.35 + 0.4 * k;
+      } else {
+        mat.color.setHex(0x000000);
+        mat.blending = NormalBlending;
+        mat.opacity = 0.25 * k;
+      }
     });
   }
 
