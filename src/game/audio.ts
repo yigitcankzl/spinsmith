@@ -246,6 +246,12 @@ export function playResult(won: boolean) {
   } else [392, 330, 262].forEach((f, i) => tone(f, 0.1, 0.3, 'triangle', 0.45 + i * 0.12));
 }
 
+/** A card appears: a soft, short tick. */
+export function playTick() {
+  tone(2200, 0.025, 0.05, 'sine');
+  tone(3300, 0.012, 0.03, 'sine', 0.01);
+}
+
 /** A round begins: a low gong (a struck plate's partials, decaying over a second and a half). */
 export function playGong() {
   tone(110, 0.25, 1.5, 'sine');

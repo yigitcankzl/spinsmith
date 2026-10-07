@@ -54,6 +54,7 @@ import { TABLE_Y } from './reach.js';
 import { insidePoly } from './room.js';
 import type { XZ } from './room.js';
 import { COMFORT } from './comfort.js';
+import { playTick } from './audio.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
 /**
@@ -1565,7 +1566,10 @@ export class Label {
     if (import.meta.env.DEV && text) console.log(`[LABEL] ${text.replace('\n', ' / ')}`);
     this.mesh.visible = text.length > 0;
     // A card appearing fades in (update()); a changing one (a pull's percent) just redraws.
-    if (appearing) (this.mesh.material as MeshBasicMaterial).opacity = 0;
+    if (appearing) {
+      (this.mesh.material as MeshBasicMaterial).opacity = 0;
+      if (text) playTick();
+    }
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, 512, 160);
     if (!text) return;
