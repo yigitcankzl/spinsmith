@@ -1867,3 +1867,35 @@ export class Stamp {
     }
   }
 }
+
+/** A glowing palm print (palm and five fingers), drawn once: where to press or slap the table. */
+export const PALM = palmTexture();
+function palmTexture(): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ffffff';
+  g.shadowColor = '#ffffff';
+  g.shadowBlur = 10;
+  // The palm, then the fingers fanned out above it and the thumb to the side.
+  g.beginPath();
+  g.ellipse(128, 160, 52, 58, 0, 0, Math.PI * 2);
+  g.fill();
+  const finger = (x: number, y: number, len: number, angle: number, w = 22) => {
+    g.save();
+    g.translate(x, y);
+    g.rotate(angle);
+    g.beginPath();
+    g.roundRect(-w / 2, -len, w, len, w / 2);
+    g.fill();
+    g.restore();
+  };
+  finger(92, 120, 62, -0.2);
+  finger(118, 108, 78, -0.06);
+  finger(144, 108, 74, 0.06);
+  finger(168, 120, 60, 0.2);
+  finger(78, 175, 60, -1.0, 24);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+}

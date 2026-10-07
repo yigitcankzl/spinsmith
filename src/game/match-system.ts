@@ -25,7 +25,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, ShapeMarks, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, ShapeMarks, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -150,6 +150,8 @@ export class MatchSystem extends createSystem({
   private sizeSettled = true;
   /** Press to place: a glowing print on the table where the arena will rise, and each hand's press detector. */
   private print = new Group();
+  /** The ring round the print that runs down over PRESS_WAIT (then the arena places itself). */
+  private printWait = new Mesh(new RingGeometry(0.08, 0.09, 64, 1, Math.PI / 2, Math.PI * 2).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.9, depthWrite: false, blending: AdditiveBlending }));
   private printLabel = new Label(0.2);
   private touches: Record<Side, TableTouch> = { left: new TableTouch(TUNE.press), right: new TableTouch(TUNE.press) };
   /** The floor mesh needs one more sync (the arena was reset or a shape just ended). */
@@ -455,7 +457,8 @@ export class MatchSystem extends createSystem({
     this.shock.visible = false;
     {
       const glow = (o: number) => new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: o, depthWrite: false, blending: AdditiveBlending });
-      this.slapMark.add(new Mesh(new RingGeometry(0.028, 0.033, 40).rotateX(-Math.PI / 2), glow(0.9)), new Mesh(new CircleGeometry(0.022, 32).rotateX(-Math.PI / 2), glow(0.3)));
+      const palm = new MeshBasicMaterial({ color: 0xffd23a, map: PALM, transparent: true, opacity: 0.9, depthWrite: false, blending: AdditiveBlending });
+      this.slapMark.add(new Mesh(new RingGeometry(0.028, 0.033, 40).rotateX(-Math.PI / 2), glow(0.6)), new Mesh(new PlaneGeometry(0.05, 0.05).rotateX(-Math.PI / 2), palm));
       this.slapMark.visible = false;
       this.root.add(this.slapMark);
     }
@@ -512,12 +515,13 @@ export class MatchSystem extends createSystem({
       this.world.createTransformEntity(g);
     }
     {
-      // ponytail: a glowing ring and disc stand in for a handprint decal.
+      // A glowing palm print inside a ring; the ring empties as the wait for a table runs out.
       const glow = (o: number) => new MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: o, depthWrite: false, blending: AdditiveBlending });
-      this.print.add(new Mesh(new RingGeometry(0.075, 0.085, 48).rotateX(-Math.PI / 2), glow(0.9)), new Mesh(new CircleGeometry(0.055, 32).rotateX(-Math.PI / 2), glow(0.35)));
+      const palm = new MeshBasicMaterial({ color: 0xff8a2a, map: PALM, transparent: true, opacity: 0.85, depthWrite: false, blending: AdditiveBlending });
+      this.print.add(new Mesh(new RingGeometry(0.075, 0.08, 48).rotateX(-Math.PI / 2), glow(0.4)), new Mesh(new PlaneGeometry(0.13, 0.13).rotateX(-Math.PI / 2), palm), this.printWait);
       this.printLabel.mesh.position.set(0, 0.12, 0);
       this.printLabel.mesh.scale.setScalar(1.25);
-      this.printLabel.set('Press your table\npalm down, here: the arena rises');
+      this.printLabel.set('Rest your palm here\npress it on the table: the arena rises');
       this.print.add(this.printLabel.mesh);
       this.print.visible = false;
       this.world.createTransformEntity(this.print);
@@ -1229,6 +1233,8 @@ export class MatchSystem extends createSystem({
     this.print.position.set(at.x, y + 0.002, at.z);
     this.print.rotation.y = at.yaw;
     this.print.scale.setScalar(1 + 0.06 * Math.sin(this.time * 5));
+    const left = Math.max(0, 1 - this.settle / PRESS_WAIT);
+    this.printWait.geometry.setDrawRange(0, Math.ceil(left * 64) * 6);
     // With a known table, a press counts within 4 cm of it; without, anywhere a desk could be.
     const lo = table !== null ? table - 0.04 : TABLE_MIN_H;
     const hi = table !== null ? table + 0.04 : Math.min(TABLE_MAX_H, this.head.y - 0.25);
@@ -1271,13 +1277,7 @@ export class MatchSystem extends createSystem({
   private place() {
     this.placeRoot();
     this.toHub();
-    // Once a session the name stands over the far rim as the arena rises.
-    if (!this.titleShown) {
-      this.titleShown = true;
-      this.titleT = 0;
-      this.title.visible = true;
-      playLevelUp();
-    }
+
     if (!this.onTable) {
       // No table found (or none labelled one): say so, then the first session's note returns.
       this.label.set('No table found: the arena floats here\nMove it by its brass handle');
@@ -1396,6 +1396,13 @@ export class MatchSystem extends createSystem({
     this.root.position.set(at.x, at.y, at.z);
     this.rise = 0;
     playMachine();
+    // Once a session the name stands over the far rim as the arena rises.
+    if (!this.titleShown) {
+      this.titleShown = true;
+      this.titleT = 0;
+      this.title.visible = true;
+      playLevelUp();
+    }
     this.pushed = 0;
     this.lowered = 0;
     this.root.scale.setScalar(ARENA_SCALE);
