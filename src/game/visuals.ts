@@ -1400,6 +1400,13 @@ export class ArenaView {
         const dip = -arena.pocketDip(x, z) / 0.003;
         if (shape > 0) this.tmp.copy(this.base).lerp(this.warm, Math.min(1, shape / 0.02));
         else this.tmp.copy(this.base).lerp(this.cold, Math.min(1, -shape / 0.02));
+        // A raised shape is lit from above and the player's side, so its faces read as a slope
+        // (a ramp's steep face is bright toward you, dark away), not as a flat glow.
+        if (shape > 0.001) {
+          arena.slope(x, z, SLOPE_TMP);
+          const lit = (1 - 0.3 * SLOPE_TMP.x - 0.8 * SLOPE_TMP.z) / Math.sqrt((1 + SLOPE_TMP.x * SLOPE_TMP.x + SLOPE_TMP.z * SLOPE_TMP.z) * 1.73);
+          this.tmp.multiplyScalar(Math.max(0.35, Math.min(1.5, 0.25 + lit * 1.1)));
+        }
         if (dip > 0) this.tmp.lerp(this.pit, Math.min(1, dip) * 0.8);
         // Embers: outside the shrinking safe zone the floor glows, pulsing.
         if (n > safe) this.tmp.lerp(this.ember, 0.45 + 0.15 * Math.sin(this.time * 6));
@@ -1938,6 +1945,8 @@ export class Stamp {
     }
   }
 }
+
+const SLOPE_TMP = { x: 0, z: 0 };
 
 /** A glowing palm print (palm and five fingers), drawn once: where to press or slap the table. */
 export const PALM = palmTexture();

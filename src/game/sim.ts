@@ -845,7 +845,7 @@ export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox =
 
 /** A rival's one big move, by its style (docs/DUEL-DESIGN.md); shown TELL_TIME ahead by a glow and a sound. */
 export type RivalMove = 'charge' | 'quake' | 'pull';
-export const TELL_TIME = 1;
+export const TELL_TIME = 1.3;
 /** Charge speed (m/s) and the pull's speed toward a pit (m/s). (A spin-refill move was tried: any refill decided spin finishes.) */
 const CHARGE_SPEED = 1.1;
 const PULL_SPEED = 0.6;

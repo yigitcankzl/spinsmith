@@ -306,6 +306,8 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** The last finish's cause, for the log ("YOUR RAMP → SLAG"). */
+  private lastCause = '';
   /** When Menu was pinched once during a match (a second pinch within 3 s leaves). */
   private menuArmed = -10;
   /** The rival's entrance at a match's start (s into it), and the VS words it lands with. */
@@ -2875,6 +2877,7 @@ export class MatchSystem extends createSystem({
       if (loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME * 0.5;
       const won = this.myPoints > this.theirPoints || (decided && v === 1);
       const cause = recent && v === 1 ? `YOUR ${recent}` : theirs && v === -1 && loser.finish !== 'spin' ? `THEIR ${this.rivalShapeKind}`.toUpperCase() : '';
+      this.lastCause = cause ? `${cause} → ${FINISH_WORD[loser.finish ?? 'spin']}` : '';
       this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause, v === 1 ? 'mine' : 'rival', 1.1);
       if (recent && v === 1) {
         // The stamp names the cause (SLAG! / YOUR RAMP); the card keeps to the score.
@@ -2889,7 +2892,7 @@ export class MatchSystem extends createSystem({
     }
     this.label.set(text);
     this.barMessage = text.split('\n')[0].replace(/!.*$/, '!');
-    console.log(`[MATCH] ${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
+    console.log(`[MATCH] ${this.lastCause ? `${this.lastCause} - ` : ''}${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
     if (v !== 2) {
       this.round++;
       this.typesPicked = false;
