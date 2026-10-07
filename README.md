@@ -124,9 +124,13 @@ an arena. First to 3 heat wins a match.
   the Clamp core comes from a first shatter win and the Bead tip from a first slag or throw win.
   A rival's signature part also opens by level, a few levels after that rival arrives: knocking
   the rival out is the early way to it. Locked parts and arenas show dark with how they are earned. A match is
-  against one rival archetype that keeps its build and spin for every round (Rim Raider, Iron
+  against one rival that keeps its build and spin for every round (Rim Raider, Iron
   Keep and Drifter at first; Leech, Hookjaw, Sawtooth and Bastion join with levels, announced as
-  NEW RIVAL); its name and style show at the start. Higher levels make rivals rip harder and aim steadier, never
+  NEW RIVAL). Rivals come as a ladder, **the circuits**: the Cinder Circuit (Drifter, Rim Raider,
+  then its champion Iron Keep), the Iron Circuit (Leech, Hookjaw, champion Sawtooth) and the
+  Crown (Bastion); the next bout is the first rival you have not beaten, and beating a champion
+  clears its circuit. Each rival has a title and lines: "VS DRIFTER · Cinder Circuit · bout 1 of 3"
+  is stamped as the match starts, with its intro line, and it has a word for you when the match ends. Higher levels make rivals rip harder and aim steadier, never
   stronger in stats.
   After a round the match bar shows the XP earned and the level bar; a level-up rings and
   throws sparks, and each unlock spins over the arena. Your level and rank sit on the near rim.
@@ -189,14 +193,28 @@ an arena. First to 3 heat wins a match.
   as fast while your top is behind on spin. Full, press
   your palm on the table beside the arena: your strike. The seal you engrave in the forge's
   Style drawer picks it: the Anvil Strike (a shockwave from the middle that throws tops near the
-  rim, hot ones further; your own top is braced), the Rush (Lv 4: your top charges the rival) or
-  the Magnet (Lv 7: the rival is dragged toward a slag pit). A top that has taken a beating
-  glows red: it flies further.
+  rim, hot ones further; your own top is braced), the Rush (Lv 4: your top charges the rival),
+  the Magnet (Lv 7: the rival is dragged toward a slag pit), the Tilt (Lv 10: the arena dips
+  toward your palm; the rival slides, your top holds), the Hammer (Lv 13: your next solid hit
+  cracks three times as hard) or the Ward (Lv 16: for 3 s your top cannot be knocked out). A top
+  that has taken a beating glows red: it flies further. The strike is staged: a short freeze, the
+  seal rising off your top, its name stamped over the arena.
 - **Rival tells:** from the fourth match (the third, once you have struck) each rival has one big move (a charge, a quake or a
   pull). Its own bar fills like yours; when full it flashes and whines for a second, then the
   move lands, unless your strike cuts it short ("INTERRUPTED!").
 - **Rival signature parts:** knock a rival out once and its part is yours (Rim Raider's Gale
   ring, Iron Keep's Bulwark ring, Drifter's Spindle core, ...).
+- **Framing and feel** (`Stamp` in `src/game/visuals.ts`): big stamped words over the arena for
+  the bout (VS), each later round (ROUND 2, MATCH POINT, FINAL ROUND, with a gong), the rip
+  (RIP!, WHITE HOT!), every finish (SLAG!, THROWN!, SHATTER!, OUTLAST!, with your move that caused
+  it), level-ups, the forged top and a cleared circuit. Hard hits freeze for 70-110 ms and shake
+  both tops (never the view); every knockout plays in slow motion; sparks are streaks that cool
+  from white-hot and skip off the floor; each top has a ring of light in its team color; a won
+  match runs sparks round the rim. The placed arena forges up out of the table under the title.
+- **Sound** (`src/game/audio.ts`): one generated room reverb, music that follows the game at 96
+  bpm in D minor on the game's four-note motif (home: drone and anvil; getting ready: bass;
+  fight: toms; tension: hats and the motif), ducked under big hits; clashes ring at each ring's
+  own pitch (an Anvil clangs lower than a Striker).
 - Result card with the finish and score, then pinch again for the next round.
 
 ## Run

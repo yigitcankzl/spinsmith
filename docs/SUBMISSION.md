@@ -32,17 +32,18 @@ RAMP → SLAG".
 **Strike the table.** Your forge bar, a glowing ring on the back of your hand, fills over each
 round and with every solid clash, faster while your top is behind on spin. Full, press your palm on the real table beside the arena: a shockwave
 runs out through the floor and throws the tops near the rim, the hot ones furthest. Choose your
-strike in the forge: the Anvil Strike, a Rush straight at the rival, or a Magnet that drags it
-toward a slag pit. A gentler press-and-hold strike is one turn of the comfort dial away. Rivals have a big move of their own, and you see it coming: a second of
+strike in the forge, six in all: the Anvil Strike, a Rush straight at the rival, a Magnet that
+drags it toward a slag pit, a Tilt that dips the arena toward your palm, a Hammer that makes your
+next hit crack, or a Ward that keeps your top in. A gentler press-and-hold strike is one turn of the comfort dial away. Rivals have a big move of their own, and you see it coming: a second of
 flashing and a rising whine. Strike first and you cut it short.
 
 **Read the arena.** Fifteen arenas change the fight: a balanced bowl with slag pits and kick
 rails, a ring of embers that closes in, a dish that tips under weight, a crater to duel in, twin
 basins split by a ridge, a speedway of boost pads, bumpers that circle the floor, and Colossus
 Bowl, an arena over a metre across that opens out on your table when the match starts. Each
-says at the start who it favours. Rivals have their own styles and their own moves: rim raiders
-charge, center holders quake the floor, drifters pull you toward the pits. Knock one out and its
-signature part is yours.
+says at the start who it favours. Rivals have their own styles, lines and moves: rim raiders
+charge, center holders quake the floor, drifters pull you toward the pits. You climb them as
+circuits, each with a champion to beat. Knock one out and its signature part is yours.
 
 **Come back.** Every day the Smith's board posts a new order: a rival, an arena and one way to win, such as ramping Iron Keep out of the ring. Doing it strikes a stamp into your ledger; missed days cost nothing. Rivals carry medallions with three marks to earn, and the tops that won stand as champions.
 
