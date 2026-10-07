@@ -15,6 +15,8 @@ import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
 import { anvilModel, Hub, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
+import { HandOccluder } from './hand-occluder.js';
+import { RoomLight } from './room-light.js';
 import { allBuilds, buildName, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
@@ -267,6 +269,10 @@ export class MatchSystem extends createSystem({
   private charges = new ShapingCharges();
   /** Rivals from level 6 shape too: their own charges, their last ramp, and its cyan marks. */
   private rivalCharges = new ShapingCharges();
+  /** Real hands drawn in front of the game (a depth-only copy of each tracked hand). */
+  private handOccluder = new HandOccluder();
+  /** The real room dims around the arena, more in a fight; the desk around the arena stays lit. */
+  private roomLight = new RoomLight();
   /** The quiet forge loop: up at home and in the workshops, ducked under a fight. */
   private loop = new ForgeLoop();
   private rivalShapeAt = -9;
@@ -361,6 +367,9 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.root);
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
     this.world.createTransformEntity(this.cord.line);
+    this.world.createTransformEntity(this.handOccluder.joints);
+    this.world.createTransformEntity(this.handOccluder.bones);
+    this.world.createTransformEntity(this.roomLight.mesh);
     // The match bar: a metal strip set into the far rim, tipped back toward the player, under the
     // round messages, so score and fight share one view.
     this.bar.mesh.position.set(0, 0.03, -0.205);
@@ -466,6 +475,7 @@ export class MatchSystem extends createSystem({
     this.frameDt = dt;
     this.time += dt;
     this.hands.update(frame, ref, session, this.player);
+    this.handOccluder.update(frame, ref, session, this.player);
     if (import.meta.env.DEV) {
       // In the emulator the gaze crosshair is the only far pointer: the hands' own rays would aim
       // somewhere else at the same time. Hands still work by touch. On a headset, hands do both.
@@ -482,6 +492,13 @@ export class MatchSystem extends createSystem({
     this.easeToTable(dt);
     this.loop.update(this.phase === 'hub' || this.phase === 'forge' || this.phase === 'build' ? 0.6 : this.phase === 'ready' ? 0.3 : 0.1);
     this.handle.visible = this.phase === 'hub';
+    {
+      // Home is bright, a fight dark around the lit arena, the forge and workshop warm.
+      const p = this.phase;
+      const dim = p === 'fight' || p === 'pulling' ? 0.45 : p === 'ready' || p === 'result' ? 0.25 : p === 'forge' || p === 'build' ? 0.35 : p === 'hub' ? 0.1 : 0;
+      this.player.head.getWorldPosition(this.head);
+      this.roomLight.update(this.head, this.root.position, this.root.position.y - PEDESTAL, dim, p === 'forge' || p === 'build', dt);
+    }
     this.launchZone.visible = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
     switch (this.phase) {
       case 'placing':
@@ -1444,6 +1461,7 @@ export class MatchSystem extends createSystem({
           this.myView.flash();
           this.theirView.flash();
           this.hitStop = HIT_STOP;
+          this.roomLight.hit();
           this.accumulator = 0;
         }
         if (this.sinceClashSound > 0.06) {

@@ -33,4 +33,9 @@ export const TUNE = {
   wellAfterRamp: knob('wellAfterRamp', 0.3),
   /** A far ramp is set only after a pinch held this long (s); a quick tap does nothing. */
   farHold: knob('farHold', 0.12),
+  /** The real hands drawn over the game (0 turns it off), and how full the hand shape is. */
+  occluder: knob('occluder', 1),
+  occluderScale: knob('occluderScale', 0.95),
+  /** How much the real room dims around the arena (0 turns it off). */
+  dim: knob('dim', 1),
 };
