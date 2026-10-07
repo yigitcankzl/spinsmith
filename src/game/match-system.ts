@@ -1,5 +1,5 @@
 import { AdditiveBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, ForgeLoop, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, duck, ForgeLoop, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -83,7 +83,7 @@ const LABEL_AT = new Vector3(0, 0.115, -0.21);
 const NEAR_RIM = 0.17;
 const MOVE_WORD = { charge: 'charges', quake: 'quakes the floor', pull: 'pulls you to the pits' } as const;
 /** The forge bar's color by seal, so the chosen strike shows on the wrist. */
-const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magnet: 0x5ab8ff, tilt: 0x7de07d, hammer: 0xffe066, bulwark: 0xd9d4ff };
+const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magnet: 0x5ab8ff, tilt: 0x7de07d, hammer: 0xffe066, ward: 0xd9d4ff };
 /** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
@@ -290,7 +290,7 @@ export class MatchSystem extends createSystem({
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
   private titleShown = false;
   private titleT = 0;
-  /** A ring around your top while a Hammer is armed (gold) or a Bulwark holds (pale violet). */
+  /** A ring around your top while a Hammer is armed (gold) or a Ward holds (pale violet). */
   private aura = new Mesh(new TorusGeometry(0.016, 0.0016, 8, 40).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffe066, transparent: true, depthWrite: false, blending: AdditiveBlending }));
   private label = new Label();
   private round = 0;
@@ -663,7 +663,10 @@ export class MatchSystem extends createSystem({
     }
     this.easeToTable(dt);
     this.updateSize(dt);
-    this.loop.update(this.phase === 'hub' || this.phase === 'forge' || this.phase === 'build' ? 0.6 : this.phase === 'ready' ? 0.3 : 0.1);
+    // The music follows the game; tension when a bar is full, a top is nearly out of spin, or a rival winds up.
+    const ph = this.phase;
+    const tense = ph === 'fight' && (this.forgeBar.full || this.tellAt >= 0 || (this.mine.alive && this.mine.spin < 0.3) || (this.theirs.alive && this.theirs.spin < 0.3));
+    this.loop.update(ph === 'hub' || ph === 'forge' || ph === 'build' ? 'home' : ph === 'ready' || ph === 'pulling' ? 'ready' : ph === 'fight' ? 'fight' : 'quiet', tense ? 1 : 0);
     this.handle.visible = this.phase === 'hub';
     {
       // Home is bright, a fight dark around the lit arena, the forge and workshop warm.
@@ -2010,7 +2013,8 @@ export class MatchSystem extends createSystem({
     }
     them.tell = this.tellAt - this.elapsed;
     // The tell: the rival flashes and rings spread under it.
-    if (Math.floor(this.elapsed * 8) !== Math.floor((this.elapsed - STEP) * 8)) this.theirView.flash();
+    // Three flashes a second at most (WCAG 2.3.1), none with flashes off.
+    if (Math.floor(this.elapsed * 3) !== Math.floor((this.elapsed - STEP) * 3)) this.theirView.flash();
     if (Math.floor(this.elapsed * 4) !== Math.floor((this.elapsed - STEP) * 4)) this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 0.5);
     if (them.tell > 0) return;
     them.tell = 0;
@@ -2080,7 +2084,7 @@ export class MatchSystem extends createSystem({
       this.impacts.hit(ox, this.arena.floorHeight(1), oz, 1);
       playStrike();
       playMachine();
-    } else if (seal === 'hammer' || seal === 'bulwark') {
+    } else if (seal === 'hammer' || seal === 'ward') {
       this.sparks.burst(me.x, this.arena.height(me.x, me.z), me.z, 0.7);
       this.myView.flash();
       playStrike();
@@ -2090,6 +2094,7 @@ export class MatchSystem extends createSystem({
       playTell();
     }
     this.roomLight.hit();
+    duck(0.3, 0.4);
     this.hitStop = HIT_STOP;
     this.accumulator = 0;
     if (!cut && this.label.current.startsWith('Forge bar full')) this.label.set('');
@@ -2262,9 +2267,8 @@ export class MatchSystem extends createSystem({
       this.accumulator -= STEP;
       steps++;
       this.elapsed += STEP;
-      const hammer = this.mine.hammer > 0;
       const clash = step(this.arena, this.mine, this.theirs);
-      if (hammer && clash && this.mine.hammer === 0) {
+      if (clash?.hammer) {
         // The Hammer lands: a heavy ring and a shower of sparks where the rims met.
         this.sparks.burst(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
         this.impacts.hit(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
@@ -2301,9 +2305,10 @@ export class MatchSystem extends createSystem({
           this.hitStop = HIT_STOP;
           this.roomLight.hit();
           this.accumulator = 0;
+          duck(0.5, 0.15);
         }
         if (this.sinceClashSound > 0.06) {
-          playClash(clash.strength, clash.x);
+          playClash(clash.strength, clash.x, this.myBuild.ring, this.theirBuild.ring);
           this.sinceClashSound = 0;
         }
       }
@@ -2349,7 +2354,10 @@ export class MatchSystem extends createSystem({
       else if (t.finish === 'burst') playBurst(t.x);
       else if (t.finish === 'spin') playTopple();
     }
-    if (v !== 2) playResult(v === 1);
+    if (v !== 2) {
+      duck(0.25, 1.2);
+      playResult(v === 1);
+    }
     let text: string;
     if (v === 2) {
       text = 'Draw\nReplay the round';

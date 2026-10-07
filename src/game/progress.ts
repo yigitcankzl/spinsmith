@@ -100,7 +100,7 @@ export const SEAL_UNLOCKS: Record<number, string> = {
   7: 'seal:magnet',
   10: 'seal:tilt',
   13: 'seal:hammer',
-  16: 'seal:bulwark',
+  16: 'seal:ward',
 };
 
 /** Emblem glows earned by Smith Order stamps: this many stamps, this glow. */

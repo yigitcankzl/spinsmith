@@ -7,6 +7,9 @@ import { COMFORT } from './comfort.js';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/** Effects go through `sfx` (with a reverb send); music has its own bus, ducked under big hits. */
+let sfx: GainNode | null = null;
+let music: GainNode | null = null;
 let noise: AudioBuffer | null = null;
 /** While paused, no sound may wake the context back up. */
 let pausedAudio = false;
@@ -22,10 +25,10 @@ function at(x: number, fn: () => void) {
 
 /** Where a sound goes: the master bus, through a stereo panner when it sits to one side. */
 function out(a: AudioContext): AudioNode {
-  if (panNow === 0 || !a.createStereoPanner) return master!;
+  if (panNow === 0 || !a.createStereoPanner) return sfx!;
   const p = a.createStereoPanner();
   p.pan.value = panNow;
-  p.connect(master!);
+  p.connect(sfx!);
   return p;
 }
 
@@ -37,7 +40,7 @@ function audio(): AudioContext | null {
       return null;
     }
     master = ctx.createGain();
-    master.gain.value = 0.7;
+    master.gain.value = COMFORT.sound ? 0.7 : 0;
     // A limiter at the end: stacked bursts, clashes and hums never clip.
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -6;
@@ -46,19 +49,60 @@ function audio(): AudioContext | null {
     limiter.attack.value = 0.003;
     limiter.release.value = 0.15;
     master.connect(limiter).connect(ctx.destination);
+    // One room for every effect: a short generated reverb (decaying noise, darker as it fades).
+    const verb = ctx.createConvolver();
+    verb.buffer = impulse(ctx, 1.1);
+    const send = ctx.createGain();
+    send.gain.value = 0.22;
+    send.connect(verb).connect(master);
+    sfx = ctx.createGain();
+    sfx.connect(master);
+    sfx.connect(send);
+    music = ctx.createGain();
+    music.gain.value = 1;
+    music.connect(master);
+    const musicSend = ctx.createGain();
+    musicSend.gain.value = 0.3;
+    music.connect(musicSend).connect(verb);
     // One second of white noise, reused by every noisy sound.
     noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
   if (ctx.state === 'suspended' && !pausedAudio) void ctx.resume();
-  master!.gain.value = COMFORT.sound ? 0.7 : 0;
   return ctx;
+}
+
+/** A stereo reverb impulse: independent noise per channel, decaying, low-passed as it goes. */
+function impulse(a: AudioContext, seconds: number): AudioBuffer {
+  const n = Math.floor(a.sampleRate * seconds);
+  const b = a.createBuffer(2, n, a.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = b.getChannelData(c);
+    let lp = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / a.sampleRate;
+      const k = 0.15 + 0.85 * Math.exp(-t / 0.25);
+      lp += (Math.random() * 2 - 1 - lp) * k;
+      d[i] = lp * Math.exp(-t / 0.28);
+    }
+  }
+  return b;
+}
+
+/** Music dips under a big moment (a hard hit, the strike, a knockout) and comes back. */
+export function duck(depth = 0.35, hold = 0.25) {
+  const a = ctx;
+  if (!a || !music) return;
+  const t = a.currentTime;
+  music.gain.cancelScheduledValues(t);
+  music.gain.setTargetAtTime(depth, t, 0.02);
+  music.gain.setTargetAtTime(1, t + hold, 0.35);
 }
 
 /** Applies the comfort dial's sound setting at once (hums keep running). */
 export function applySound() {
-  if (master) master.gain.value = COMFORT.sound ? 0.7 : 0;
+  if (ctx && master) master.gain.setTargetAtTime(COMFORT.sound ? 0.7 : 0, ctx.currentTime, 0.05);
 }
 
 /** Pauses (suspends) or resumes every sound at once, for the headset menu. */
@@ -105,18 +149,29 @@ function hiss(gain: number, decay: number, f0: number, f1 = f0, q = 1, at = 0) {
   src.stop(t + decay + 0.02);
 }
 
-/** Metal-on-metal clash: a noisy crack plus inharmonic ringing partials. */
-export function playClash(strength: number, x = 0) {
-  at(x, () => clash(strength));
+/** Each ring's ringing pitch (Hz): heavy rings clang low, light ones bright. */
+const RING_PITCH: Record<string, number> = { anvil: 900, bulwark: 950, halo: 1300, cog: 1200, hook: 1500, gale: 1600, striker: 1700, saw: 1800 };
+
+/** Metal-on-metal clash; with the rings' ids, each top rings its own pitch (a two-voice clang). */
+export function playClash(strength: number, x = 0, ringA?: string, ringB?: string) {
+  at(x, () => clash(strength, ringA, ringB));
 }
 
-function clash(strength: number) {
+let clashVoices = 0;
+function clash(strength: number, ringA?: string, ringB?: string) {
+  const a = ctx;
+  if (a && clashVoices >= 3) return;
+  clashVoices++;
+  setTimeout(() => clashVoices--, 250);
   const s = Math.min(1, Math.max(0.15, strength));
-  hiss(0.5 * s, 0.06, 4000, 2500, 0.8);
-  const base = 1500 + Math.random() * 400;
-  tone(base, 0.12 * s, 0.25, 'triangle');
-  tone(base * 1.47, 0.08 * s, 0.18, 'sine');
-  tone(base * 2.13, 0.05 * s, 0.12, 'sine');
+  // Transient: the tick the ear locks onto. Body: weight. Ring: struck steel. Grit: the scrape.
+  hiss(0.6 * s, 0.012, 9000, 7000, 0.7);
+  tone(180, 0.3 * s, 0.07, 'sine', 0, 80);
+  for (const id of [ringA, ringB]) {
+    const base = (id ? (RING_PITCH[id] ?? 1500) : 1500) * (0.96 + Math.random() * 0.08);
+    [1, 2.76, 5.4, 8.93].forEach((r, i) => tone(base * r, (0.1 / (i + 1)) * s * (0.7 + Math.random() * 0.6), [0.6, 0.35, 0.2, 0.12][i] * (0.5 + 0.5 * s), 'sine'));
+  }
+  hiss(0.18 * s, 0.1, 3200, 2200, 3);
 }
 
 /** Rail dash: a rising zip. */
@@ -352,57 +407,107 @@ export function playDrawer() {
 }
 
 /**
- * A quiet forge loop under home, the forge and the workshop: a low bellows drone and a hammer
- * on the anvil every other beat, ducked under a fight. Synthesized and scheduled a beat ahead.
+ * The music: one sequencer at 96 bpm in D minor, built on the motif, scheduled ahead of the clock.
+ * Layers come and go with the game: home has the bellows drone and the anvil; getting ready adds a
+ * bass pulse; the fight adds toms; tension (a full bar, a top nearly out of spin, a rival tell)
+ * adds hats and the motif up high. Big moments duck it (duck()).
  */
+export type MusicState = 'home' | 'ready' | 'fight' | 'quiet';
 export class ForgeLoop {
   private bus: GainNode | null = null;
   private drone: OscillatorNode | null = null;
   private next = 0;
-  private beat = 0;
+  private step = 0;
+  private state: MusicState = 'quiet';
+  private tension = 0;
 
-  /** level 0..1; call every frame. */
-  update(level: number) {
+  /** Call every frame with where the game is; tension 0..1. */
+  update(state: MusicState, tension = 0) {
     const a = audio();
-    if (!a || !master) return;
+    if (!a || !music) return;
+    this.state = state;
+    this.tension = tension;
     if (!this.bus) {
       this.bus = a.createGain();
       this.bus.gain.value = 0;
-      this.bus.connect(master);
+      // Leave room for the spin hums (about 190-230 Hz).
+      const eq = a.createBiquadFilter();
+      eq.type = 'peaking';
+      eq.frequency.value = 330;
+      eq.Q.value = 1;
+      eq.gain.value = -5;
+      this.bus.connect(eq).connect(music);
       const f = a.createBiquadFilter();
       f.type = 'lowpass';
-      f.frequency.value = 180;
+      f.frequency.value = 220;
       this.drone = a.createOscillator();
       this.drone.type = 'sawtooth';
-      this.drone.frequency.value = 55;
+      this.drone.frequency.value = 73.4;
       const g = a.createGain();
-      g.gain.value = 0.05;
+      g.gain.value = 0.035;
       this.drone.connect(f).connect(g).connect(this.bus);
       this.drone.start();
       this.next = a.currentTime + 0.1;
     }
-    this.bus.gain.setTargetAtTime(level, a.currentTime, 0.4);
-    // Schedule the coming beat (0.75 s): a hammer ring on even beats, a soft tap on odd ones.
+    const level = state === 'quiet' ? 0 : state === 'home' ? 0.55 : state === 'ready' ? 0.5 : 0.45;
+    this.bus.gain.setTargetAtTime(level, a.currentTime, 0.5);
+    // Sixteenth notes at 96 bpm, scheduled 0.2 s ahead.
+    const sixteenth = 60 / 96 / 4;
     while (this.next < a.currentTime + 0.2) {
-      const t = this.next;
-      const even = this.beat % 2 === 0;
-      const ring = (freq: number, gain: number, decay: number) => {
-        const o = a.createOscillator();
-        const g = a.createGain();
-        o.type = 'triangle';
-        o.frequency.value = freq;
-        g.gain.setValueAtTime(gain, t);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-        o.connect(g).connect(this.bus!);
-        o.start(t);
-        o.stop(t + decay + 0.02);
-      };
-      if (even) {
-        ring(1320, 0.05, 0.5);
-        ring(1320 * 2.76, 0.02, 0.3);
-      } else ring(880, 0.02, 0.15);
-      this.beat++;
-      this.next += 0.75;
+      this.play(a, this.next, this.step % 64);
+      this.step++;
+      this.next += sixteenth;
+    }
+  }
+
+  private voice(a: AudioContext, t: number, freq: number, gain: number, decay: number, type: OscillatorType = 'triangle', slideTo?: number) {
+    const o = a.createOscillator();
+    const g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + decay);
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    o.connect(g).connect(this.bus!);
+    o.start(t);
+    o.stop(t + decay + 0.02);
+  }
+
+  private hat(a: AudioContext, t: number, gain: number) {
+    if (!noise) return;
+    const src = a.createBufferSource();
+    src.buffer = noise;
+    const hp = a.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 7000;
+    const g = a.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+    src.connect(hp).connect(g).connect(this.bus!);
+    src.start(t, Math.random() * 0.5);
+    src.stop(t + 0.06);
+  }
+
+  /** One sixteenth of the 4-bar loop (64 steps). */
+  private play(a: AudioContext, t: number, i: number) {
+    const st = this.state;
+    if (st === 'quiet') return;
+    const bar = i % 16;
+    // The anvil: a ring on beats 1 and 3, a ghost tap before 4.
+    if (bar === 0 || bar === 8) {
+      this.voice(a, t, 1320, 0.045, 0.5);
+      this.voice(a, t, 1320 * 2.76, 0.016, 0.3, 'sine');
+    } else if (bar === 14) this.voice(a, t, 880, 0.018, 0.12);
+    // Every four bars at home, the motif rung softly an octave down.
+    if (st === 'home' && i === 48) MOTIF.forEach((f, k) => this.voice(a, t + k * 0.22, f / 2, 0.03, 0.6));
+    // Bass: eighths on D (B-flat in bar 3), from getting ready on.
+    if (st !== 'home' && i % 2 === 0) this.voice(a, t, i >= 32 && i < 48 ? 58.27 : 73.42, st === 'fight' ? 0.11 : 0.07, 0.18, 'sawtooth');
+    // Fight: toms on 1, the and of 2, and 4.
+    if (st === 'fight' && (bar === 0 || bar === 6 || bar === 12)) this.voice(a, t, bar === 6 ? 150 : 120, 0.22, 0.22, 'sine', 55);
+    // Tension: hats in sixteenths and the motif up high, a note a beat.
+    if (st === 'fight' && this.tension > 0.5) {
+      this.hat(a, t, i % 4 === 0 ? 0.05 : 0.025);
+      if (i % 4 === 0) this.voice(a, t, MOTIF[(i / 4) % 4] * 2, 0.025, 0.25);
     }
   }
 }

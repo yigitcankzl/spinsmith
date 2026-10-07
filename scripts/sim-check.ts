@@ -791,8 +791,8 @@ TUNING.grace = 0;
   assert.ok(!run([...hold(0.95, 0.2), ...move(0.95, 0.75, 0.8), ...hold(0.75, 1)]), 'a hand set down to rest is not');
 }
 
-// 26. The newer strikes: a Tilt slides tops toward the palm, a Hammer's next clash shatters three
-// times as hard, a Bulwark keeps a top in through a hit that would knock it out.
+// 26. The newer strikes: a Tilt slides the rival toward the palm (yours holds), a Hammer's next clash shatters three
+// times as hard, a Ward keeps a top in through a hit that would knock it out.
 {
   const flat = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
   flat.elapsed = 5;
@@ -800,9 +800,17 @@ TUNING.grace = 0;
   t.launch(0, 0, 0, 0, 1, 1);
   const parked = new Top(DEFENSE);
   parked.state = 'toppled';
-  sealStrike(flat, t, parked, 'tilt', 1, 0);
+  sealStrike(flat, parked, t, 'tilt', 1, 0);
   solo(flat, t, 0.8);
-  assert.ok(t.x > 0.01, `a tilt toward +x slides a top that way (x ${t.x.toFixed(3)})`);
+  assert.ok(t.x > 0.01, `a tilt toward +x slides the rival that way (x ${t.x.toFixed(3)})`);
+  // The striker's own top digs in.
+  const flat2 = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
+  flat2.elapsed = 5;
+  const own = new Top(DEFENSE);
+  own.launch(0, 0, 0, 0, 1, 1);
+  sealStrike(flat2, own, parked, 'tilt', 1, 0);
+  solo(flat2, own, 0.8);
+  assert.ok(Math.abs(own.x) < 0.005, `your own top holds through your tilt (x ${own.x.toFixed(3)})`);
 
   const clashDamage = (hammer: boolean) => {
     const arena = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
@@ -828,8 +836,8 @@ TUNING.grace = 0;
     solo(arena, top, 0.6);
     return top.state;
   };
-  assert.equal(outward(false), 'out', 'without a bulwark a hard-driven top goes over the edge');
-  assert.notEqual(outward(true), 'out', 'a bulwark holds it in');
+  assert.equal(outward(false), 'out', 'without a ward a hard-driven top goes over the edge');
+  assert.notEqual(outward(true), 'out', 'a ward holds it in');
 }
 
 // 25. The comfort dial steps through every mode and wraps round.

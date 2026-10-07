@@ -28,6 +28,6 @@ line('human + rush', reportShaping(humanStrike(humanBoth(), undefined, 'rush'), 
 line('human + magnet', reportShaping(humanStrike(humanBoth(), undefined, 'magnet'), 12), 'within 3 of the anvil');
 line('human + tilt', reportShaping(humanStrike(humanBoth(), undefined, 'tilt'), 12), 'within 3 of the anvil');
 line('human + hammer', reportShaping(humanStrike(humanBoth(), undefined, 'hammer'), 12), 'within 3 of the anvil');
-line('human + bulwark', reportShaping(humanStrike(humanBoth(), undefined, 'bulwark'), 12), 'within 3 of the anvil');
+line('human + ward', reportShaping(humanStrike(humanBoth(), undefined, 'ward'), 12), 'within 3 of the anvil');
 line('none vs a charging rival', reportShaping(POLICIES.none, 12, rivalWithMove('charge')));
 line('human + strike vs charging', reportShaping(humanStrike(humanBoth()), 12, rivalWithMove('charge')));

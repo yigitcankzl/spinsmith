@@ -594,7 +594,7 @@ export class Forge {
       const owned = SEALS.filter((s) => s === 'anvil' || this.progress.isUnlocked(`seal:${s}`));
       const seal = owned[(owned.indexOf(this.build.seal ?? 'anvil') + 1) % owned.length];
       this.build = { ...this.build, seal };
-      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : 'Earn more strikes: Rush at Lv 4, Magnet at Lv 7, Tilt at Lv 10, Hammer at Lv 13, Bulwark at Lv 16');
+      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : 'Earn more strikes: Rush at Lv 4, Magnet at Lv 7, Tilt at Lv 10, Hammer at Lv 13, Ward at Lv 16');
       this.showSeal();
     } else if (item.kind === 'emblem') {
       // The next glow you have earned (the forge's orange is always yours).
@@ -838,7 +838,7 @@ export function sealModel(seal: Seal): Object3D {
     head.position.set(0, 0.003, -0.006);
     handle.position.set(0, 0.003, 0.004);
     g.add(head, handle);
-  } else if (seal === 'bulwark') {
+  } else if (seal === 'ward') {
     // A ring wall.
     const wall = new Mesh(new TorusGeometry(0.008, 0.0025, 6, 24).rotateX(-Math.PI / 2), mat);
     wall.position.y = 0.003;
