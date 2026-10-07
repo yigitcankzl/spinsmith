@@ -25,6 +25,8 @@ import {
   Object3D,
   Path,
   PlaneGeometry,
+  LineBasicMaterial,
+  LineSegments,
   Points,
   PointsMaterial,
   Quaternion,
@@ -1356,51 +1358,90 @@ export class ArenaView {
 
 /** Pooled additive sparks for clashes. */
 export class Sparks {
-  readonly points: Points;
+  /** Short streaks (a line per spark, stretched along its motion), white-hot cooling to ember. */
+  readonly points: LineSegments;
   private pos: Float32Array;
   private vel: Float32Array;
   private life: Float32Array;
+  private max: Float32Array;
+  private floor: Float32Array;
+  private verts: Float32Array;
+  private cols: Float32Array;
   private next = 0;
 
-  constructor(private count = 96) {
+  constructor(private count = 160) {
     this.pos = new Float32Array(count * 3);
     this.vel = new Float32Array(count * 3);
     this.life = new Float32Array(count);
+    this.max = new Float32Array(count).fill(1);
+    this.floor = new Float32Array(count);
+    this.verts = new Float32Array(count * 6);
+    this.cols = new Float32Array(count * 6);
     const geo = new BufferGeometry();
-    geo.setAttribute('position', new BufferAttribute(this.pos, 3));
-    this.points = new Points(
-      geo,
-      new PointsMaterial({ color: 0xffb04a, size: 0.004, transparent: true, blending: AdditiveBlending, depthWrite: false }),
-    );
+    geo.setAttribute('position', new BufferAttribute(this.verts, 3));
+    geo.setAttribute('color', new BufferAttribute(this.cols, 3));
+    this.points = new LineSegments(geo, new LineBasicMaterial({ vertexColors: true, transparent: true, blending: AdditiveBlending, depthWrite: false }));
     this.points.frustumCulled = false;
   }
 
   burst(x: number, y: number, z: number, strength: number) {
-    const n = 4 + Math.round(strength * 14);
+    const n = 4 + Math.round(strength * 20);
     for (let k = 0; k < n; k++) {
       const i = this.next;
       this.next = (this.next + 1) % this.count;
       const a = Math.random() * Math.PI * 2;
-      const sp = 0.15 + Math.random() * 0.45 * (0.5 + strength);
+      const sp = 0.15 + Math.random() * 0.5 * (0.5 + strength);
       this.pos.set([x, y + 0.012, z], i * 3);
-      this.vel.set([Math.cos(a) * sp, 0.2 + Math.random() * 0.35, Math.sin(a) * sp], i * 3);
-      this.life[i] = 0.25 + Math.random() * 0.25;
+      this.vel.set([Math.cos(a) * sp, 0.2 + Math.random() * 0.4, Math.sin(a) * sp], i * 3);
+      this.life[i] = this.max[i] = 0.25 + Math.random() * 0.3;
+      this.floor[i] = y;
     }
   }
 
   update(dt: number) {
+    const v = this.verts;
+    const c = this.cols;
     for (let i = 0; i < this.count; i++) {
+      const o = i * 6;
       if (this.life[i] <= 0) {
-        this.pos[i * 3 + 1] = -10; // parked out of sight
+        v[o + 1] = v[o + 4] = -10; // parked out of sight
         continue;
       }
       this.life[i] -= dt;
       this.vel[i * 3 + 1] -= 1.6 * dt;
-      this.pos[i * 3] += this.vel[i * 3] * dt;
-      this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt;
-      this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt;
+      let px = (this.pos[i * 3] += this.vel[i * 3] * dt);
+      let py = (this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt);
+      const pz = (this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt);
+      // Sparks skip off the floor once, losing most of their speed.
+      if (py < this.floor[i] && this.vel[i * 3 + 1] < 0) {
+        this.pos[i * 3 + 1] = py = this.floor[i];
+        this.vel[i * 3 + 1] *= -0.35;
+        this.vel[i * 3] *= 0.5;
+        this.vel[i * 3 + 2] *= 0.5;
+      }
+      // Head where it is, tail where it was a moment ago.
+      const tail = 0.025;
+      v[o] = px;
+      v[o + 1] = py;
+      v[o + 2] = pz;
+      px -= this.vel[i * 3] * tail;
+      v[o + 3] = px;
+      v[o + 4] = py - this.vel[i * 3 + 1] * tail;
+      v[o + 5] = pz - this.vel[i * 3 + 2] * tail;
+      // White-hot to orange to a dull red as it cools; the tail is dimmer.
+      const k = Math.max(0, this.life[i] / this.max[i]);
+      const r = 1;
+      const g = 0.25 + 0.75 * k;
+      const b = 0.1 + 0.8 * k * k;
+      c[o] = r * k + 0.3;
+      c[o + 1] = g * k;
+      c[o + 2] = b * k;
+      c[o + 3] = 0.5 * k;
+      c[o + 4] = 0.15 * k;
+      c[o + 5] = 0;
     }
     (this.points.geometry.attributes.position as BufferAttribute).needsUpdate = true;
+    (this.points.geometry.attributes.color as BufferAttribute).needsUpdate = true;
   }
 }
 
