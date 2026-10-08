@@ -27,10 +27,9 @@ import {
   Object3D,
   Path,
   PlaneGeometry,
-  LineBasicMaterial,
-  LineSegments,
-  Points,
-  PointsMaterial,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  DynamicDrawUsage,
   Quaternion,
   RepeatWrapping,
   RingGeometry,
@@ -511,6 +510,82 @@ function topHeight(ring: Ring, base: number) {
   return base + (tops.get(ring.id) ?? 0.008);
 }
 
+/** Fighting tops are drawn this much larger than their simulated size (presentation only). */
+const HERO_SCALE = 1.25;
+/** The drawn spin turns this many times faster than the simulation's angle (which tops out near 4.5 rev/s). */
+const SPIN_DRAW = 5;
+
+/** A thin shell hugging the blade's outer edge (its bevel included), for the team-colored glow. */
+function edgeGeometry(d: RingDesign, ring: Ring): BufferGeometry {
+  const n = 240;
+  const outer: Vector2[] = [];
+  const inner: Vector2[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const r = d.outline(a);
+    outer.push(new Vector2(Math.cos(a) * (r + 0.0011), -Math.sin(a) * (r + 0.0011)));
+    inner.push(new Vector2(Math.cos(a) * (r + 0.0002), -Math.sin(a) * (r + 0.0002)));
+  }
+  const shape = new Shape(outer);
+  shape.holes.push(new Path(inner.reverse()));
+  const geo = new ExtrudeGeometry(shape, { depth: d.thick + 0.0008, bevelEnabled: false, curveSegments: 4 }).rotateX(-Math.PI / 2).translate(0, -0.0004, 0);
+  // The same up or down tilt as the blade's contact points.
+  if (d.slope !== 0) {
+    const pos = geo.getAttribute('position');
+    const R0 = ring.radius * 0.7;
+    for (let i = 0; i < pos.count; i++) {
+      const r = Math.hypot(pos.getX(i), pos.getZ(i));
+      if (r > R0) pos.setY(i, pos.getY(i) + d.slope * (r - R0));
+    }
+  }
+  return geo;
+}
+
+/**
+ * The blade as fast spin smears it: at each radius, how much of the circle the blade (steel) and
+ * the colored layer cover, as color and opacity. Clear in the middle, where the chip stands.
+ */
+function blurDiscTexture(d: RingDesign, reach: number, color: number): CanvasTexture {
+  const N = 64;
+  const steel = new Color(0xb4bcc8);
+  const layer = new Color(color);
+  const cols = new Float32Array(N * 4);
+  const c = new Color();
+  for (let j = 0; j < N; j++) {
+    const r = ((j + 0.5) / N) * reach;
+    let blade = 0;
+    let lay = 0;
+    for (let i = 0; i < 180; i++) {
+      const a = (i / 180) * Math.PI * 2;
+      if (d.outline(a) + 0.0005 >= r) blade++;
+      if (d.layer(a) >= r) lay++;
+    }
+    blade /= 180;
+    lay /= 180;
+    c.copy(steel).lerp(layer, blade > 0 ? lay / blade : 0);
+    cols.set([c.r, c.g, c.b, r < CHIP_R ? 0 : 0.92 * blade], j * 4);
+  }
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d')!;
+  const img = ctx.createImageData(128, 128);
+  for (let y = 0; y < 128; y++) {
+    for (let x = 0; x < 128; x++) {
+      const rr = Math.hypot(x - 63.5, y - 63.5) / 64;
+      const j = Math.min(N - 1, Math.floor(rr * N));
+      const o = (y * 128 + x) * 4;
+      img.data[o] = cols[j * 4] * 255;
+      img.data[o + 1] = cols[j * 4 + 1] * 255;
+      img.data[o + 2] = cols[j * 4 + 2] * 255;
+      img.data[o + 3] = rr < 1 ? cols[j * 4 + 3] * 255 : 0;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new CanvasTexture(cv);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+}
+
 export const PLAYER_COLOR = 0xe8661c;
 export const OPPONENT_COLOR = 0x2a9fc4;
 /** Team colors for what marks whose top it is (the floor ring): the UI's orange and the rival's cyan. */
@@ -591,6 +666,39 @@ export class TopView {
   }
   private fallX = 1;
   private fallZ = 0;
+  /** Everything drawn of the top (halo, blur disc, edge, parts), scaled up in a fight and punched by hits. */
+  private body = new Group();
+  private drawScale = 1;
+  private readonly ring: Ring;
+  private readonly base: number;
+  private readonly bodyColor: number;
+  /** The drawn spin: SPIN_DRAW times the simulation's angle, and its rate (sim rad/s, smoothed). */
+  private drawAngle = 0;
+  private lastAngle = 0;
+  private rate = 0;
+  /** Set by the match while the simulation is held (hit-stop): the drawn spin holds too. */
+  frozen = false;
+  /** Set by the match while the simulation is stopped (a round's end): a top still up keeps spinning. */
+  coast = false;
+  /** Fighting tops only: a radial motion-blur disc over the blade, and a team-colored edge on it. */
+  private disc: Mesh | null = null;
+  private discY = 0;
+  private edge: Mesh | null = null;
+  private readonly edgeColor = new Color();
+  /** A hit's punch: time since it (s), how long it holds, its size, and the recoil direction and lean. */
+  private popT = 9;
+  private popHold = 0;
+  private popAmp = 0;
+  private recX = 0;
+  private recZ = 0;
+  private recoil = 0;
+  private edgeFlash = 0;
+  private clock = 0;
+  private lastFlash = -9;
+  /** A toppled top's clatter after it hits the floor (s, -1 before), and where it fell. */
+  private clatterT = -1;
+  /** Called where a spun-out top lands on its side (for its sparks). */
+  onTopple: ((x: number, y: number, z: number) => void) | null = null;
 
   constructor(build: TopBuild, color: number) {
     const ring = ringOf(build);
@@ -599,6 +707,9 @@ export class TopView {
     const ratchet = coreMesh(core);
     ratchet.position.y += tipHeight(build.tip);
     const base = tipHeight(build.tip) + core.height;
+    this.ring = ring;
+    this.base = base;
+    this.bodyColor = color;
     // The emblem's glow at rest: the build's chosen glow (the forge's orange unless earned otherwise).
     this.cool = new Color(EMBLEM_COLORS[build.emblem ?? 0] ?? EMBLEM_COLORS[0]);
     this.core = new MeshBasicMaterial({ color: this.cool.clone() });
@@ -613,9 +724,10 @@ export class TopView {
     );
     this.blurColor = (this.blur.material as MeshBasicMaterial).color.clone();
     this.blur.position.y = topHeight(ring, base) - 0.002;
-    this.root.add(this.blur);
+    this.body.add(this.blur);
     this.spinner.add(...this.parts);
-    this.root.add(this.spinner);
+    this.body.add(this.spinner);
+    this.root.add(this.body);
     this.shadow = new Mesh(
       new PlaneGeometry(ring.radius * 3.2, ring.radius * 3.2).rotateX(-Math.PI / 2),
       new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, opacity: 0.5, depthWrite: false }),
@@ -641,6 +753,25 @@ export class TopView {
   }
 
   /**
+   * A hit lands (strength 0..1) from the direction (dx, dz) it came from: the top swells and
+   * squats, recoils and leans away, and its edge flares, holding the pose for `hold` seconds (the
+   * hit-stop) before it springs back. Presentation only. The edge goes white-hot only with flashes
+   * on, and at most about three times a second; in the Calm modes it brightens in its own color.
+   */
+  hit(strength: number, dx: number, dz: number, hold = 0) {
+    this.popT = 0;
+    this.popHold = hold;
+    this.popAmp = 0.04 + 0.08 * strength;
+    const l = Math.hypot(dx, dz) || 1;
+    this.recX = -dx / l;
+    this.recZ = -dz / l;
+    this.recoil = 0.0015 + 0.004 * strength;
+    const often = this.clock - this.lastFlash < 0.33;
+    this.lastFlash = this.clock;
+    this.edgeFlash = often ? 0.4 : 1;
+  }
+
+  /**
    * Exploded view (k 0..1): the ring lifts off and the bit drops away, so a part brought close
    * shows where it goes; the slot it would replace pulses.
    */
@@ -650,11 +781,16 @@ export class TopView {
       p.position.y = this.bases[i] + (kind === 'ring' ? 0.012 : kind === 'tip' ? -0.009 : 0) * k;
       p.scale.setScalar(kind === focus ? 1 + 0.08 * k * (0.5 + 0.5 * Math.sin(time * 10)) : 1);
     });
+    // The edge glow and the blur disc lift with the ring.
+    if (this.edge && this.disc) {
+      this.edge.position.y = this.base + 0.012 * k;
+      this.disc.position.y = this.discY + 0.012 * k;
+    }
   }
 
   /** Frees the GPU buffers when the top is rebuilt with other parts. */
   dispose() {
-    for (const p of [...this.parts, this.shadow, this.blur]) {
+    for (const p of [...this.parts, this.shadow, this.blur, ...(this.disc && this.edge ? [this.disc, this.edge] : [])]) {
       p.geometry.dispose();
       // Shared materials and textures (metals, the emblem, the soft shadow) stay.
       const m = p.material as MeshBasicMaterial;
@@ -667,7 +803,11 @@ export class TopView {
     this.debris.removeFromParent();
   }
 
-  /** A ring of light on the floor in the team's color (orange yours, cyan the rival's): whose top it is at a glance. */
+  /**
+   * Marks a fighting top: a ring of light on the floor in the team's color (orange yours, cyan the
+   * rival's), a glowing edge on the blade in that color that brightens with spin, a motion-blur
+   * disc for fast spin, and a larger drawing (HERO_SCALE; the simulation's radius is unchanged).
+   */
   team(color: number, radius: number) {
     const ring = new Mesh(
       new RingGeometry(radius * 1.25, radius * 1.55, 40).rotateX(-Math.PI / 2),
@@ -677,6 +817,27 @@ export class TopView {
     ring.renderOrder = 2;
     this.teamRing = ring;
     this.shadow.add(ring);
+    this.drawScale = HERO_SCALE;
+    this.body.scale.setScalar(HERO_SCALE);
+    this.shadow.geometry.scale(HERO_SCALE, 1, HERO_SCALE);
+    for (const f of this.flying) f.mesh.scale.setScalar(HERO_SCALE);
+    const d = ringDesign(this.ring);
+    this.edgeColor.set(color);
+    this.edge = new Mesh(edgeGeometry(d, this.ring), new MeshBasicMaterial({ color, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false }));
+    this.edge.position.y = this.base;
+    this.spinner.add(this.edge);
+    let reach = 0;
+    for (let i = 0; i < 90; i++) reach = Math.max(reach, d.outline((i / 90) * Math.PI * 2));
+    reach += 0.0008;
+    this.disc = new Mesh(
+      new CircleGeometry(reach, 48).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ map: blurDiscTexture(d, reach, this.bodyColor), transparent: true, opacity: 0, depthWrite: false }),
+    );
+    // Just over the colored layer; the chip's dome stands through its clear middle.
+    this.discY = this.base + d.thick + d.tierThick + 0.0027;
+    this.disc.position.y = this.discY;
+    this.disc.renderOrder = 1;
+    this.body.add(this.disc);
   }
 
   /** The shadow lives on the arena floor, not on the tilting top. */
@@ -720,25 +881,57 @@ export class TopView {
     this.shadow.position.set(top.x, y + 0.0008, top.z);
     // The team ring glows with the spin, and flashes with a hit.
     if (this.teamRing) (this.teamRing.material as MeshBasicMaterial).opacity = 0.3 + 0.4 * Math.min(1, Math.max(0, top.spin)) + this.flashT * 6;
-    this.spinner.rotation.y = top.angle;
+    // The drawn spin: the simulation's angle sped up SPIN_DRAW times (a jump, as at a new round or a
+    // replay's start, is not a turn). Held while the simulation is; coasting on once it has stopped.
+    let turn = top.angle - this.lastAngle;
+    this.lastAngle = top.angle;
+    if (Math.abs(turn) > 4) turn = 0;
+    if (turn === 0 && this.coast && !this.frozen && top.state === 'spinning') turn = (6 + 22 * Math.min(1, Math.max(0, top.spin))) * top.hand * dt;
+    this.drawAngle = (this.drawAngle + turn * SPIN_DRAW) % (Math.PI * 200);
+    if (!this.frozen && dt > 0) this.rate += (Math.abs(turn) / dt - this.rate) * Math.min(1, dt * 12);
+    this.spinner.rotation.y = this.drawAngle;
+    // A hit's punch: up to its size in 40 ms, held through the hit-stop, then back in 160 ms.
+    this.clock += dt;
+    this.popT += dt;
+    const after = this.popT - 0.04 - this.popHold;
+    const q = this.popT < 0.04 ? this.popT / 0.04 : after < 0 ? 1 : Math.max(0, 1 - after / 0.16) ** 2;
+    const s = this.drawScale * (1 + this.popAmp * q);
+    this.body.scale.set(s, s * (1 - 0.5 * this.popAmp * q), s);
+    this.body.position.set(this.recX * this.recoil * q, 0, this.recZ * this.recoil * q);
     if (top.state === 'toppled') {
-      // Falls over in about half a second instead of snapping flat.
+      // Falls over in about half a second instead of snapping flat, then clatters on its side.
       this.fall = Math.min(1, this.fall + dt * 2.2);
       const f = this.fall * this.fall;
-      this.root.rotation.set(1.25 * f * this.fallZ, 0, -1.25 * f * this.fallX);
+      let rattle = 0;
+      if (this.fall >= 1) {
+        if (this.clatterT < 0) {
+          this.clatterT = 0;
+          this.onTopple?.(top.x + this.fallX * this.ring.radius, y, top.z + this.fallZ * this.ring.radius);
+        }
+        this.clatterT += dt;
+        const k = Math.max(0, 1 - this.clatterT / 0.7);
+        rattle = 0.14 * k * k * Math.abs(Math.sin(this.clatterT * 38));
+      }
+      this.root.rotation.set((1.25 * f - rattle) * this.fallZ, 0, -(1.25 * f - rattle) * this.fallX);
     } else {
       this.fall = 0;
-      // Lean: into the direction of travel, away from the last hit, plus the precessing wobble.
+      this.clatterT = -1;
+      // Lean: into the direction of travel, away from the last hit (and from a fresh punch), plus the precessing wobble.
       const lean = 0.03 + 0.4 * top.wobble * top.wobble;
-      const ax = top.vz * 0.25 + top.kickZ * top.kick * 0.35 + Math.cos(time * 9) * lean;
-      const az = -(top.vx * 0.25 + top.kickX * top.kick * 0.35) + Math.sin(time * 9) * lean;
+      const punch = 2.5 * this.popAmp * q;
+      const ax = top.vz * 0.25 + top.kickZ * top.kick * 0.35 + this.recZ * punch + Math.cos(time * 9) * lean;
+      const az = -(top.vx * 0.25 + top.kickX * top.kick * 0.35 + this.recX * punch) + Math.sin(time * 9) * lean;
       this.root.rotation.set(ax, 0, az);
       // Remember which way it was leaning, to fall that way.
       const l = Math.hypot(ax, az) || 1;
       this.fallZ = ax / l;
       this.fallX = -az / l;
     }
+    // The edge's flare after a hit: white-hot with flashes on, its own color brightened without.
+    this.edgeFlash = Math.max(0, this.edgeFlash - dt * 4);
+    const flare = this.edgeFlash * this.edgeFlash;
     this.core.color.copy(this.cool).lerp(this.hot, top.wobble);
+    if (COMFORT.flashes) this.core.color.lerp(this.white, 0.7 * flare);
     const blur = this.blur.material as MeshBasicMaterial;
     // A hit flashes the halo white for a moment; accumulated damage heats it red and starts to
     // lift the ring off the core, so a coming burst shows before it happens.
@@ -746,10 +939,19 @@ export class TopView {
     const risk = Math.max(0, (top.damage - 0.45) / 0.55);
     // Hot metal (docs/DUEL-DESIGN.md): it glows red early, since a hot top flies further from the strike.
     const heat = Math.max(0, (top.damage - 0.12) / 0.88);
-    blur.opacity = top.state === 'spinning' ? Math.max(0.5 * Math.min(1, Math.max(0, top.spin)), this.flashT * 9, 0.6 * heat) : 0;
-    // The streaks sweep round a fraction as fast as the top, so the spin reads as motion.
-    this.blur.rotation.y = this.spinner.rotation.y * 0.12;
+    const spinning = top.state === 'spinning';
+    blur.opacity = spinning ? Math.max(0.5 * Math.min(1, Math.max(0, top.spin)), this.flashT * 9, 0.6 * heat) : 0;
+    // The streaks sweep round at half the simulation's rate, so the spin reads as motion.
+    this.blur.rotation.y = this.drawAngle * 0.1;
     blur.color.copy(this.blurColor).lerp(this.danger, Math.min(1, heat * 1.3)).lerp(this.white, Math.min(1, this.flashT * 12));
+    // Fast spin smears the blade into a disc; as the spin drops the disc fades and the parts show.
+    const fast = spinning ? Math.min(1, Math.max(0, (this.rate - 9) / 15)) : 0;
+    if (this.disc) (this.disc.material as MeshBasicMaterial).opacity = 0.85 * fast * fast * (3 - 2 * fast);
+    if (this.edge) {
+      const m = this.edge.material as MeshBasicMaterial;
+      m.color.copy(this.edgeColor).lerp(this.danger, Math.min(1, heat)).lerp(this.white, COMFORT.flashes ? 0.8 * flare : 0);
+      m.opacity = top.state === 'out' ? 0 : Math.min(1, 0.2 + 0.6 * fast + (COMFORT.flashes ? 0.8 : 0.4) * flare);
+    }
     this.explode(0.35 * risk * (0.85 + 0.15 * Math.sin(time * 30)), null, time);
   }
 
@@ -858,7 +1060,9 @@ export class TopView {
       }
     }
     this.root.position.copy(p);
-    this.spinner.rotation.y += dt * (8 + 50 * this.deskSpin) * (1 - this.fall);
+    this.spinner.rotation.y += dt * (8 + 50 * this.deskSpin) * (1 - this.fall) * SPIN_DRAW * 0.6;
+    // Its blur fades as it spins down on the desk, so it falls over crisp.
+    if (this.disc) (this.disc.material as MeshBasicMaterial).opacity = 0.85 * Math.min(1, Math.max(0, (this.deskSpin - 0.15) * 2)) * (1 - this.fall);
     // A slowing top wobbles before it falls.
     if (this.landed && this.deskSpin > 0 && this.deskSpin < 0.25) {
       const w = (0.25 - this.deskSpin) * 1.2;
@@ -881,7 +1085,7 @@ export class TopView {
       this.root.updateMatrixWorld(true);
       this.flying.forEach((d, i) => {
         const p = this.parts[i];
-        d.mesh.position.set(top.x, arena.height(top.x, top.z) + p.position.y, top.z);
+        d.mesh.position.set(top.x, arena.height(top.x, top.z) + p.position.y * this.drawScale, top.z);
         d.mesh.rotation.copy(this.root.rotation);
         const a = Math.random() * Math.PI * 2;
         const out = 0.25 + Math.random() * 0.35;
@@ -1485,95 +1689,212 @@ export class ArenaView {
   }
 }
 
-/** Pooled additive sparks for clashes. */
+/** A soft round glow, white on transparent: one spark or ember, stretched along its motion. */
+const SPARK_DOT = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.3, 'rgba(255,255,255,0.8)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+})();
+
+/** Sparks fly fast and die young; embers drift, settle on the floor and cool there. */
+const SPARK_POOL = 200;
+const EMBER_POOL = 80;
+
+/**
+ * Pooled additive sparks for clashes: camera-facing quads a few millimetres wide (WebGL lines are
+ * always 1 px on Quest), stretched along their motion, white-hot cooling to a dull red, plus slower
+ * embers that land on the floor and cool there. One instanced draw call, nothing allocated per frame.
+ */
 export class Sparks {
-  /** Short streaks (a line per spark, stretched along its motion), white-hot cooling to ember. */
-  readonly points: LineSegments;
-  private pos: Float32Array;
-  private vel: Float32Array;
-  private life: Float32Array;
-  private max: Float32Array;
-  private floor: Float32Array;
-  private verts: Float32Array;
-  private cols: Float32Array;
-  private next = 0;
+  /** Every spark and ember in one mesh (the name is the old one: the match system adds it). */
+  readonly points: Mesh;
+  private readonly count = SPARK_POOL + EMBER_POOL;
+  private pos = new Float32Array(this.count * 3);
+  private vel = new Float32Array(this.count * 3);
+  private life = new Float32Array(this.count);
+  private max = new Float32Array(this.count).fill(1);
+  private floor = new Float32Array(this.count);
+  /** Width (arena-local m) and color family (0 fire, 1 gold) per particle. */
+  private width = new Float32Array(this.count);
+  private gold = new Uint8Array(this.count);
+  private gpuPos: InstancedBufferAttribute;
+  private gpuVel: InstancedBufferAttribute;
+  private gpuCol: InstancedBufferAttribute;
+  private nextSpark = 0;
+  private nextEmber = SPARK_POOL;
   /** The arena's rim radius (arena-local): sparks past it fall to the desk. */
   rim = 0.17;
 
-  constructor(private count = 160) {
-    this.pos = new Float32Array(count * 3);
-    this.vel = new Float32Array(count * 3);
-    this.life = new Float32Array(count);
-    this.max = new Float32Array(count).fill(1);
-    this.floor = new Float32Array(count);
-    this.verts = new Float32Array(count * 6);
-    this.cols = new Float32Array(count * 6);
-    const geo = new BufferGeometry();
-    geo.setAttribute('position', new BufferAttribute(this.verts, 3));
-    geo.setAttribute('color', new BufferAttribute(this.cols, 3));
-    this.points = new LineSegments(geo, new LineBasicMaterial({ vertexColors: true, transparent: true, blending: AdditiveBlending, depthWrite: false }));
+  constructor() {
+    const n = this.count;
+    const geo = new InstancedBufferGeometry();
+    // A unit quad: x runs from the head (0) to the tail (1), y across the streak.
+    geo.setIndex([0, 1, 2, 0, 2, 3]);
+    geo.setAttribute('position', new Float32BufferAttribute([0, -1, 0, 1, -1, 0, 1, 1, 0, 0, 1, 0], 3));
+    geo.setAttribute('uv', new Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+    this.gpuPos = new InstancedBufferAttribute(new Float32Array(n * 3), 3).setUsage(DynamicDrawUsage);
+    this.gpuVel = new InstancedBufferAttribute(new Float32Array(n * 3), 3).setUsage(DynamicDrawUsage);
+    this.gpuCol = new InstancedBufferAttribute(new Float32Array(n * 4), 4).setUsage(DynamicDrawUsage);
+    geo.setAttribute('iPos', this.gpuPos);
+    geo.setAttribute('iVel', this.gpuVel);
+    geo.setAttribute('iCol', this.gpuCol);
+    geo.instanceCount = n;
+    const mat = new MeshBasicMaterial({ map: SPARK_DOT, transparent: true, blending: AdditiveBlending, depthWrite: false, toneMapped: false });
+    // Billboarded in view space: the quad lies along the spark's on-screen motion and is as wide
+    // as the spark (iCol.a, arena-local), so a slow one is a round dot and a fast one a streak.
+    mat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec3 iPos;\nattribute vec3 iVel;\nattribute vec4 iCol;\nvarying vec3 vSpark;')
+        .replace(
+          '#include <project_vertex>',
+          [
+            'vSpark = iCol.rgb;',
+            'vec4 head = modelViewMatrix * vec4(iPos, 1.0);',
+            'vec4 tail = modelViewMatrix * vec4(iPos - iVel * 0.03, 1.0);',
+            'vec2 sd = tail.xy - head.xy;',
+            'float sl = length(sd);',
+            'vec2 dir = sl > 1e-6 ? sd / sl : vec2(1.0, 0.0);',
+            'float w = iCol.a * length(modelViewMatrix[0].xyz);',
+            'vec4 mvPosition = head;',
+            'mvPosition.xy += dir * (position.x * (sl + w) - 0.5 * w) + vec2(-dir.y, dir.x) * (position.y * 0.5 * w);',
+            'mvPosition.z += (tail.z - head.z) * position.x;',
+            'gl_Position = projectionMatrix * mvPosition;',
+          ].join('\n'),
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vSpark;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= vSpark;');
+    };
+    this.points = new Mesh(geo, mat);
     this.points.frustumCulled = false;
+    this.points.visible = false;
   }
 
+  private spawn(i: number, x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number, width: number, floor: number) {
+    const o = i * 3;
+    this.pos[o] = x;
+    this.pos[o + 1] = y;
+    this.pos[o + 2] = z;
+    this.vel[o] = vx;
+    this.vel[o + 1] = vy;
+    this.vel[o + 2] = vz;
+    this.life[i] = this.max[i] = life;
+    this.width[i] = width;
+    this.floor[i] = floor;
+    this.gold[i] = 0;
+    this.points.visible = true;
+  }
+
+  /** A shower where something hit (strength 0..1): more, faster, fatter sparks, and embers on hard hits. */
   burst(x: number, y: number, z: number, strength: number) {
     const n = 4 + Math.round(strength * 20);
     for (let k = 0; k < n; k++) {
-      const i = this.next;
-      this.next = (this.next + 1) % this.count;
+      const i = this.nextSpark;
+      this.nextSpark = (this.nextSpark + 1) % SPARK_POOL;
       const a = Math.random() * Math.PI * 2;
       const sp = 0.15 + Math.random() * 0.5 * (0.5 + strength);
-      this.pos.set([x, y + 0.012, z], i * 3);
-      this.vel.set([Math.cos(a) * sp, 0.2 + Math.random() * 0.4, Math.sin(a) * sp], i * 3);
-      this.life[i] = this.max[i] = 0.25 + Math.random() * 0.3;
-      this.floor[i] = y;
+      const w = 0.0009 + 0.0007 * Math.random() * (0.5 + strength);
+      this.spawn(i, x, y + 0.012, z, Math.cos(a) * sp, 0.2 + Math.random() * 0.4, Math.sin(a) * sp, 0.25 + Math.random() * 0.3, w, y);
+    }
+    if (strength > 0.45) this.embers(x, y, z, Math.round(strength * 8), 0.18, 0.1 + 0.12 * strength);
+  }
+
+  /**
+   * Slow embers (gold for a win): they rise at about `up` (arena units/s), spread at `spread`,
+   * land on the floor and cool there over about a second.
+   */
+  embers(x: number, y: number, z: number, n: number, up = 0.18, spread = 0.12, gold: 0 | 1 = 0) {
+    for (let k = 0; k < n; k++) {
+      const i = this.nextEmber;
+      this.nextEmber = this.nextEmber + 1 >= this.count ? SPARK_POOL : this.nextEmber + 1;
+      const a = Math.random() * Math.PI * 2;
+      const sp = spread * (0.3 + 0.7 * Math.random());
+      const life = 0.7 + Math.random() * (gold ? 0.9 : 0.4);
+      this.spawn(i, x, y + 0.008, z, Math.cos(a) * sp, up * (0.6 + 0.8 * Math.random()), Math.sin(a) * sp, life, 0.0018 + 0.0012 * Math.random(), y);
+      this.gold[i] = gold;
     }
   }
 
   update(dt: number) {
-    const v = this.verts;
-    const c = this.cols;
+    if (!this.points.visible) return;
+    const P = this.gpuPos.array as Float32Array;
+    const V = this.gpuVel.array as Float32Array;
+    const C = this.gpuCol.array as Float32Array;
+    // Calm comfort modes: the same motion, dimmer and never white-hot.
+    const lum = COMFORT.flashes ? 1 : 0.6;
+    const hot = COMFORT.flashes ? 1 : 0.4;
+    let live = 0;
     for (let i = 0; i < this.count; i++) {
-      const o = i * 6;
+      const o = i * 3;
+      const c = i * 4;
       if (this.life[i] <= 0) {
-        v[o + 1] = v[o + 4] = -10; // parked out of sight
+        C[c + 3] = 0; // zero width: nothing drawn
         continue;
       }
+      live++;
+      const ember = i >= SPARK_POOL;
       this.life[i] -= dt;
-      this.vel[i * 3 + 1] -= 1.6 * dt;
-      let px = (this.pos[i * 3] += this.vel[i * 3] * dt);
-      let py = (this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt);
-      const pz = (this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt);
-      // Sparks skip off the floor once, losing most of their speed; past the rim, off the real desk.
-      const floor = px * px + pz * pz > this.rim * this.rim ? TABLE_Y : this.floor[i];
-      if (py < floor && this.vel[i * 3 + 1] < 0) {
-        this.pos[i * 3 + 1] = py = floor;
-        this.vel[i * 3 + 1] *= -0.35;
-        this.vel[i * 3] *= 0.5;
-        this.vel[i * 3 + 2] *= 0.5;
+      this.vel[o + 1] -= (ember ? 0.7 : 1.6) * dt;
+      if (ember) {
+        // Embers float: the air slows them.
+        const d = Math.exp(-dt * 2.5);
+        this.vel[o] *= d;
+        this.vel[o + 2] *= d;
       }
-      // Head where it is, tail where it was a moment ago.
-      const tail = 0.025;
-      v[o] = px;
-      v[o + 1] = py;
-      v[o + 2] = pz;
-      px -= this.vel[i * 3] * tail;
-      v[o + 3] = px;
-      v[o + 4] = py - this.vel[i * 3 + 1] * tail;
-      v[o + 5] = pz - this.vel[i * 3 + 2] * tail;
-      // White-hot to orange to a dull red as it cools; the tail is dimmer.
+      const px = (this.pos[o] += this.vel[o] * dt);
+      let py = (this.pos[o + 1] += this.vel[o + 1] * dt);
+      const pz = (this.pos[o + 2] += this.vel[o + 2] * dt);
+      // Sparks skip off the floor once, losing most of their speed; embers stay where they land.
+      // Past the rim, both fall to the real desk.
+      const floor = px * px + pz * pz > this.rim * this.rim ? TABLE_Y : this.floor[i];
+      if (py < floor && this.vel[o + 1] < 0) {
+        this.pos[o + 1] = py = floor + (ember ? 0.0015 : 0);
+        const keep = ember ? 0 : 0.5;
+        this.vel[o + 1] *= ember ? 0 : -0.35;
+        this.vel[o] *= keep;
+        this.vel[o + 2] *= keep;
+      }
+      P[o] = px;
+      P[o + 1] = py;
+      P[o + 2] = pz;
+      V[o] = this.vel[o];
+      V[o + 1] = this.vel[o + 1];
+      V[o + 2] = this.vel[o + 2];
+      // White-hot to orange to a dull red as it cools (gold for a win's embers).
       const k = Math.max(0, this.life[i] / this.max[i]);
-      const r = 1;
-      const g = 0.25 + 0.75 * k;
-      const b = 0.1 + 0.8 * k * k;
-      c[o] = r * k + 0.3;
-      c[o + 1] = g * k;
-      c[o + 2] = b * k;
-      c[o + 3] = 0.5 * k;
-      c[o + 4] = 0.15 * k;
-      c[o + 5] = 0;
+      const fade = Math.min(1, this.life[i] / 0.1);
+      if (this.gold[i]) {
+        const b = lum * fade * (0.4 + 0.6 * k);
+        C[c] = b;
+        C[c + 1] = b * (0.62 + 0.25 * k);
+        C[c + 2] = b * 0.28;
+      } else if (ember) {
+        const b = lum * fade * (0.25 + 0.75 * k);
+        C[c] = b;
+        C[c + 1] = b * (0.12 + 0.4 * k * hot);
+        C[c + 2] = b * 0.04;
+      } else {
+        const b = lum * fade * (0.35 + 0.65 * k);
+        C[c] = b;
+        C[c + 1] = b * (0.25 + 0.75 * k * hot);
+        C[c + 2] = b * (0.08 + 0.7 * k * k * hot);
+      }
+      C[c + 3] = this.width[i] * (ember ? 0.7 + 0.3 * k : 0.6 + 0.4 * k);
     }
-    (this.points.geometry.attributes.position as BufferAttribute).needsUpdate = true;
-    (this.points.geometry.attributes.color as BufferAttribute).needsUpdate = true;
+    // Nothing left: no draw call and no upload until the next burst.
+    this.points.visible = live > 0;
+    this.gpuPos.needsUpdate = true;
+    this.gpuVel.needsUpdate = true;
+    this.gpuCol.needsUpdate = true;
   }
 }
 
@@ -1758,6 +2079,23 @@ export class Label {
   }
 }
 
+/** A shockwave's band, white on transparent: soft inside, brightest near its leading edge. */
+const SHOCK_RING = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0.55, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.8, 'rgba(255,255,255,0.45)');
+  grad.addColorStop(0.93, 'rgba(255,255,255,1)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+})();
+
 /**
  * Impact effects in the arena: an expanding ring of light where a hard hit lands, and a fading
  * streak behind a top that dashes along a rail. Small pools, additive, no depth writes.
@@ -1773,9 +2111,51 @@ export class Impacts {
   private flareT = 1;
   private flareSize = 0;
 
+  /** Hard hits: a thick shockwave rolling over the floor, and a scorch that glows and fades where they met. */
+  private shocks: { mesh: Mesh; t: number; size: number; o: Vector3 }[] = [];
+  private scorches: { mesh: Mesh; t: number }[] = [];
+  private nextShock = 0;
+  private nextScorch = 0;
+  /** The arena's rim radius (arena-local): shockwaves stop at it rather than hang over the wall. */
+  private readonly rimClip = { value: 0.17 };
+  private readonly hotScorch = new Color(0xffa040);
+  private readonly coldScorch = new Color(0x24140c);
+
+  set rim(r: number) {
+    this.rimClip.value = r;
+  }
+
   constructor() {
     this.flare.visible = false;
     this.root.add(this.flare);
+    for (let i = 0; i < 3; i++) {
+      const o = new Vector3();
+      const mat = new MeshBasicMaterial({ map: SHOCK_RING, color: 0xffc890, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false });
+      // Only the part over the arena floor draws (uO: the ring's center and radius, arena-local).
+      mat.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, { uRim: this.rimClip, uO: { value: o } });
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nuniform vec3 uO;\nvarying vec2 vRimXZ;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRimXZ = uO.xy + position.xz * uO.z;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform float uRim;\nvarying vec2 vRimXZ;')
+          .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (length(vRimXZ) > uRim) discard;');
+      };
+      const mesh = new Mesh(new RingGeometry(0.55, 1, 48).rotateX(-Math.PI / 2), mat);
+      mesh.visible = false;
+      this.shocks.push({ mesh, t: 1, size: 0, o });
+      this.root.add(mesh);
+    }
+    for (let i = 0; i < 4; i++) {
+      const mesh = new Mesh(
+        new PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+        new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0xffa040, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }),
+      );
+      mesh.visible = false;
+      mesh.renderOrder = 1;
+      this.scorches.push({ mesh, t: 1 });
+      this.root.add(mesh);
+    }
     for (let i = 0; i < 4; i++) {
       const mesh = new Mesh(
         new RingGeometry(0.8, 1, 32).rotateX(-Math.PI / 2),
@@ -1812,6 +2192,37 @@ export class Impacts {
     }
   }
 
+  /**
+   * A hard hit on the floor (strength 0..1): a thick shockwave rolls out over 0.3 s, and a scorch
+   * glows hot where it landed and cools to a dark mark that fades in about 2 s. Floor effects only,
+   * so they stay in the Calm comfort modes (dimmer there).
+   */
+  shock(x: number, y: number, z: number, strength: number, color = 0xffc890) {
+    const s = this.shocks[this.nextShock];
+    this.nextShock = (this.nextShock + 1) % this.shocks.length;
+    s.t = 0;
+    s.size = 0.03 + 0.06 * strength;
+    s.mesh.position.set(x, y + 0.0025, z);
+    s.o.set(x, z, 0);
+    (s.mesh.material as MeshBasicMaterial).color.set(color);
+    s.mesh.visible = true;
+    const m = this.scorches[this.nextScorch];
+    this.nextScorch = (this.nextScorch + 1) % this.scorches.length;
+    m.t = 0;
+    m.mesh.position.set(x, y + 0.0012, z);
+    m.mesh.scale.setScalar(0.02 + 0.025 * strength);
+    m.mesh.rotation.y = Math.random() * Math.PI;
+    m.mesh.visible = true;
+  }
+
+  /** Clears the floor's marks (a new round). */
+  clear() {
+    for (const m of this.scorches) {
+      m.t = 1;
+      m.mesh.visible = false;
+    }
+  }
+
   /** A streak behind a top dashing in direction (dx, dz). */
   dash(x: number, y: number, z: number, dx: number, dz: number) {
     const s = this.streaks[this.nextStreak];
@@ -1831,6 +2242,29 @@ export class Impacts {
       m.opacity = (1 - k) ** 2;
       m.color.setRGB(1, 1 - 0.45 * k, 1 - 0.8 * k);
       if (k >= 1) this.flare.visible = false;
+    }
+    const lum = COMFORT.flashes ? 1 : 0.6;
+    for (const s of this.shocks) {
+      if (!s.mesh.visible) continue;
+      s.t += dt / 0.3;
+      const k = Math.min(1, s.t);
+      // Fast out, easing off as it spreads.
+      const r = s.size * (0.25 + 1.0 * (1 - (1 - k) ** 2));
+      s.mesh.scale.set(r, 1, r);
+      s.o.z = r;
+      (s.mesh.material as MeshBasicMaterial).opacity = lum * 0.95 * (1 - k) ** 1.5;
+      if (k >= 1) s.mesh.visible = false;
+    }
+    for (const m of this.scorches) {
+      if (!m.mesh.visible) continue;
+      m.t += dt / 2;
+      const k = Math.min(1, m.t);
+      // Ember-hot for a moment, then a dark mark fading away.
+      const mat = m.mesh.material as MeshBasicMaterial;
+      const cool = Math.min(1, k / 0.2);
+      mat.color.copy(this.hotScorch).lerp(this.coldScorch, cool);
+      mat.opacity = (0.75 - 0.35 * cool) * (1 - Math.max(0, (k - 0.3) / 0.7));
+      if (k >= 1) m.mesh.visible = false;
     }
     for (const r of this.rings) {
       if (!r.mesh.visible) continue;
@@ -1932,8 +2366,9 @@ const PILLAR_FADE = (() => {
 })();
 
 /**
- * A wall of light rising from the rim for a won match or a new level: it climbs over 0.4 s and
- * fades over 0.8 s (gold for a level, your orange for a win).
+ * A wall of light rising from the rim for a won match or a new level. A level's climbs over 0.4 s
+ * and fades over 0.8 s (gold); a won match's stands taller for about 2.5 s with a slow shimmer (your
+ * orange). In the Calm comfort modes it rises and fades slowly and never shimmers: no flash at all.
  */
 export class Pillar {
   readonly mesh = new Mesh(
@@ -1941,6 +2376,7 @@ export class Pillar {
     new MeshBasicMaterial({ map: PILLAR_FADE, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, toneMapped: false }),
   );
   private t = -1;
+  private mode: 'level' | 'win' | 'calm' = 'level';
 
   private sx = 1;
   private sz = 1;
@@ -1952,8 +2388,9 @@ export class Pillar {
   }
 
   /** Rises round an arena of this layout (its rim `rim` from the center, oval and square shapes followed). */
-  play(layout: ArenaLayout, rim: number, y: number, color: number) {
+  play(layout: ArenaLayout, rim: number, y: number, color: number, mode: 'level' | 'win' | 'calm' = 'level') {
     this.t = 0;
+    this.mode = mode;
     this.sx = rim * (layout.shape === 'square' ? 1.12 : 1);
     this.sz = rim * (layout.shape === 'oval' ? 0.78 : layout.shape === 'square' ? 1.12 : 1);
     this.mesh.scale.set(this.sx, 0.001, this.sz);
@@ -1965,10 +2402,15 @@ export class Pillar {
   update(dt: number) {
     if (this.t < 0) return;
     this.t += dt;
-    const up = Math.min(1, this.t / 0.4);
-    const fade = Math.max(0, (this.t - 0.4) / 0.8);
-    this.mesh.scale.y = 0.12 * (1 - (1 - up) ** 3);
-    (this.mesh.material as MeshBasicMaterial).opacity = 0.7 * Math.min(1, this.t / 0.1) * (1 - fade);
+    // Rise, hold, fade (s), the peak height (arena-local) and brightness, by mode.
+    const [rise, hold, out, height, peak] = this.mode === 'win' ? [0.4, 0.8, 1.3, 0.17, 0.7] : this.mode === 'calm' ? [0.9, 0.6, 1.5, 0.15, 0.4] : [0.4, 0, 0.8, 0.12, 0.7];
+    const up = Math.min(1, this.t / rise);
+    const fade = Math.max(0, (this.t - rise - hold) / out);
+    this.mesh.scale.y = height * (1 - (1 - up) ** 3);
+    // Calm ramps in as slowly as it rises; a win's shimmer is slow (about 1.3 Hz) and shallow.
+    const inK = this.mode === 'calm' ? up * up : Math.min(1, this.t / 0.1);
+    const shimmer = this.mode === 'win' ? 0.88 + 0.12 * Math.sin(this.t * 8) : 1;
+    (this.mesh.material as MeshBasicMaterial).opacity = peak * inK * shimmer * (1 - fade);
     if (fade >= 1) {
       this.t = -1;
       this.mesh.visible = false;

@@ -1,5 +1,5 @@
 import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
+import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -10,7 +10,7 @@ import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
 import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
-import type { FloorShape, Seal, ShapeKind } from './sim.js';
+import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
@@ -75,6 +75,9 @@ const RESULT_TIME = 4;
 /** A knockout replay: this many sim steps (2 s) recorded, played back at this speed. */
 const REPLAY_STEPS = 240;
 const REPLAY_SPEED = 0.4;
+/** A replay step: per top x, z, angle, wobble, damage, spin, vx, vz, kick, kickX, kickZ; then the step's clash (strength, x, z). */
+const REC_TOP = 11;
+const REC = 2 * REC_TOP + 3;
 /** A finish this soon (s) after the player's shape is credited to it. */
 const CAUSE_WINDOW = 1.5;
 const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', burst: 'SHATTER', spin: 'OUTLAST' };
@@ -98,7 +101,6 @@ const NEAR_RIM = 0.17;
 const MOVE_WORD = { charge: 'charges', quake: 'quakes the floor', pull: 'pulls you to the pits' } as const;
 /** The forge bar's color by seal, so the chosen strike shows on the wrist. */
 const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magnet: 0x5ab8ff, tilt: 0x7de07d, hammer: 0xffe066, ward: 0xd9d4ff };
-/** A clash this strong (0..1) is a hard hit: big feedback and a 45 ms simulation-only hit stop. */
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
 /** A finish your shape caused plays its visuals at SLOW_MO speed for this long (real s). */
@@ -108,10 +110,14 @@ const RISE_TIME = 1.1;
 /** The first match's opening grace (s): no knockout before the ramp hint has shown. */
 const FIRST_GRACE = 6;
 const SLOW_MO = 0.3;
+/** A clash this strong (0..1) is a hard hit: big feedback and a 70-110 ms simulation-only hit stop. */
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
 const HIT_STOP_GAP = 0.3;
-const HIT_STOP = 0.045;
+/** A knockout's frame holds still this long (real s) before its slow motion (visuals only). */
+const KO_FREEZE = 0.12;
+/** Seconds between the countdown's beats (3, 2, 1, RIP!). */
+const COUNT_BEAT = 0.6;
 /** A pointing ray this close to a button's center (m) presses it. */
 const BUTTON_REACH = 0.035;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
@@ -378,12 +384,17 @@ export class MatchSystem extends createSystem({
   private nextScorch = 0;
   /** This round's off-the-desk moment has been shown. */
   private offDeskShown = false;
-  /** The last REPLAY_STEPS sim steps of both tops (x, z, angle, wobble, damage each), a ring buffer. */
-  private replayBuf = new Float32Array(REPLAY_STEPS * 10);
+  /** The last REPLAY_STEPS sim steps of both tops and their clashes (REC floats a step), a ring buffer. */
+  private replayBuf = new Float32Array(REPLAY_STEPS * REC);
   private replayAt = 0;
   private replayCount = 0;
   /** A knockout replay playing (in recorded steps, at REPLAY_SPEED), with stand-in tops to draw. */
-  private replay: { t: number; frames: Float32Array; n: number; out: [Top, Top] } | null = null;
+  private replay: { t: number; frames: Float32Array; n: number; out: [Top, Top]; at: number } | null = null;
+  /** A knockout's still frame (s left), and the last light hit's punch on the tops (sim s). */
+  private koFreeze = 0;
+  private lastPop = -1;
+  /** The countdown before a round (3, 2, 1, RIP!): time and the next beat, or null. A cue only. */
+  private count: { t: number; beat: number } | null = null;
   private ghosts: [Top, Top] = [new Top(ATTACK), new Top(DEFENSE)];
   /** The turntable's turn during a replay (radians). */
   private turn = 0;
@@ -777,6 +788,7 @@ export class MatchSystem extends createSystem({
     }
     this.guardFrameRate(delta);
     this.stamp.update(Math.min(delta, 0.1));
+    this.updateCountdown(Math.min(delta, 0.1));
     this.updatePrints(Math.min(delta, 0.1));
     this.updateHandMarks();
     this.updatePinchRings();
@@ -796,8 +808,13 @@ export class MatchSystem extends createSystem({
         const a = this.celebrate * 9;
         const r = rimRadius(this.arena.layout, a);
         this.sparks.burst(Math.cos(a) * r, this.arena.floorHeight(1), Math.sin(a) * r, 0.7);
+        // A fountain of gold embers off your top (or the middle), steady: it suits the Calm modes too.
+        const me = this.mine;
+        const at = me.state === 'spinning' ? me : null;
+        this.sparks.embers(at ? at.x : 0, this.arena.height(at ? at.x : 0, at ? at.z : 0) + 0.01, at ? at.z : 0, 4, 0.45, 0.07, 1);
       }
-      this.arenaView.charge = 0.6 + 0.4 * Math.sin(this.time * 14);
+      // The arena pulses with the win; steady in the Calm modes.
+      this.arenaView.charge = COMFORT.flashes ? 0.6 + 0.4 * Math.sin(this.time * 14) : 0.8;
     }
     // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
     if (session !== this.xrSession) {
@@ -965,10 +982,15 @@ export class MatchSystem extends createSystem({
       this.bar.animate(this.mine.spin, this.theirs.spin, dt);
     }
     // Visuals only: after a finish your shape caused they slow down for a moment.
-    const vdt = this.slowMo > 0 ? dt * SLOW_MO : dt;
-    this.slowMo = Math.max(0, this.slowMo - dt);
+    // A knockout holds still for a beat first (visuals only: the simulation has already stopped).
+    const vdt = this.koFreeze > 0 ? 0 : this.slowMo > 0 ? dt * SLOW_MO : dt;
+    if (this.koFreeze > 0) this.koFreeze = Math.max(0, this.koFreeze - dt);
+    else this.slowMo = Math.max(0, this.slowMo - dt);
     if (this.replay) this.playReplay(dt);
     const [ga, gb] = this.replay ? this.ghosts : [this.mine, this.theirs];
+    // The drawn spin holds through a hit-stop, and a top still up spins on once a round has ended.
+    this.myView.frozen = this.theirView.frozen = this.phase === 'fight' && this.hitStop > 0;
+    this.myView.coast = this.theirView.coast = this.phase === 'result' && !this.replay;
     this.myView.sync(ga, this.arena, this.time, vdt);
     this.theirView.sync(gb, this.arena, this.time, vdt);
     this.updateEntrance(dt);
@@ -981,6 +1003,7 @@ export class MatchSystem extends createSystem({
     }
     this.sparks.rim = maxRim(this.arena.layout) + 0.01;
     this.sparks.update(vdt);
+    this.impacts.rim = this.sparks.rim;
     this.impacts.update(vdt);
     // Trails behind both tops while they fight.
     this.trailT += vdt;
@@ -1293,6 +1316,11 @@ export class MatchSystem extends createSystem({
       view.team(i === 0 ? TEAM_MINE : TEAM_RIVAL, ringOf(build).radius);
       // A top that lands on the desk scorches it.
       view.onLand = (x, y, z) => this.scorch(x, y, z);
+      // A spun-out top clatters onto its side in a spray of sparks.
+      view.onTopple = (x, y, z) => {
+        this.sparks.burst(x, y, z, 0.55);
+        this.impacts.shock(x, y, z, 0.3);
+      };
       view.root.name = i === 0 ? 'my-top' : 'their-top';
       this.stage.add(view.root, view.shadowMesh, view.debris);
       if (i === 0) this.myView = view;
@@ -1302,14 +1330,21 @@ export class MatchSystem extends createSystem({
 
   /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
   /** A rival for a new match, from the archetypes your level has reached; the same all match. */
-  /** Keeps the last 2 s of both tops for a replay. */
-  private record() {
+  /** Keeps the last 2 s of both tops (and their clashes) for a replay. */
+  private record(clash: Clash | null) {
     const b = this.replayBuf;
-    const o = this.replayAt * 10;
-    const m = this.mine;
-    const t = this.theirs;
-    b[o] = m.x; b[o + 1] = m.z; b[o + 2] = m.angle; b[o + 3] = m.wobble; b[o + 4] = m.damage;
-    b[o + 5] = t.x; b[o + 6] = t.z; b[o + 7] = t.angle; b[o + 8] = t.wobble; b[o + 9] = t.damage;
+    const o = this.replayAt * REC;
+    for (let k = 0; k < 2; k++) {
+      const t = this.tops[k];
+      const p = o + k * REC_TOP;
+      b[p] = t.x; b[p + 1] = t.z; b[p + 2] = t.angle; b[p + 3] = t.wobble; b[p + 4] = t.damage;
+      b[p + 5] = t.spin; b[p + 6] = t.vx; b[p + 7] = t.vz; b[p + 8] = t.kick; b[p + 9] = t.kickX; b[p + 10] = t.kickZ;
+    }
+    // The clash in this step, if any (strength 0: none), to strike its sparks again in the replay.
+    const c = o + 2 * REC_TOP;
+    b[c] = clash ? clash.strength : 0;
+    b[c + 1] = clash ? clash.x : 0;
+    b[c + 2] = clash ? clash.z : 0;
     this.replayAt = (this.replayAt + 1) % REPLAY_STEPS;
     this.replayCount = Math.min(REPLAY_STEPS, this.replayCount + 1);
   }
@@ -1318,17 +1353,17 @@ export class MatchSystem extends createSystem({
   private startReplay() {
     const n = this.replayCount;
     if (n < 30) return;
-    const frames = new Float32Array(n * 10);
+    const frames = new Float32Array(n * REC);
     for (let i = 0; i < n; i++) {
-      const src = ((this.replayAt - n + i + REPLAY_STEPS) % REPLAY_STEPS) * 10;
-      frames.set(this.replayBuf.subarray(src, src + 10), i * 10);
+      const src = ((this.replayAt - n + i + REPLAY_STEPS) % REPLAY_STEPS) * REC;
+      frames.set(this.replayBuf.subarray(src, src + REC), i * REC);
     }
     this.ghosts[0].spec = this.mine.spec;
     this.ghosts[1].spec = this.theirs.spec;
     this.ghosts[0].hand = this.mine.hand;
     this.ghosts[1].hand = this.theirs.hand;
     // Starts after the slow-motion moment; the result card waits for it.
-    this.replay = { t: -SLOW_MO_TIME - 0.4, frames, n, out: [this.mine, this.theirs] };
+    this.replay = { t: -SLOW_MO_TIME - 0.4, frames, n, out: [this.mine, this.theirs], at: -1 };
     this.resultTimer = Math.max(this.resultTimer, RESULT_TIME + n / 120 / REPLAY_SPEED + 1.3);
     this.replayCount = 0;
   }
@@ -1371,8 +1406,9 @@ export class MatchSystem extends createSystem({
       return;
     }
     const f = r.frames;
-    this.ghosts.forEach((g, k) => {
-      const o = i * 10 + k * 5;
+    for (let k = 0; k < 2; k++) {
+      const g = this.ghosts[k];
+      const o = i * REC + k * REC_TOP;
       g.state = 'spinning';
       g.finish = null;
       g.x = f[o];
@@ -1380,8 +1416,34 @@ export class MatchSystem extends createSystem({
       g.angle = f[o + 2];
       g.wobble = f[o + 3];
       g.damage = f[o + 4];
-      g.spin = 1;
-    });
+      // As it was: its spin, its travel and the kick of the last hit (so it leans as it did).
+      g.spin = f[o + 5];
+      g.vx = f[o + 6];
+      g.vz = f[o + 7];
+      g.kick = f[o + 8];
+      g.kickX = f[o + 9];
+      g.kickZ = f[o + 10];
+    }
+    // The clashes again, as they happened: sparks, a ring, the tops punched, and their sound.
+    for (let s = Math.max(0, r.at + 1); s <= i; s++) {
+      const c = s * REC + 2 * REC_TOP;
+      const strength = f[c];
+      if (strength <= 0) continue;
+      const x = f[c + 1];
+      const z = f[c + 2];
+      const y = this.arena.height(x, z);
+      this.sparks.burst(x, y, z, strength);
+      if (strength > HARD_HIT) {
+        this.impacts.shock(x, y, z, strength);
+        this.myView.hit(strength, x - f[s * REC], z - f[s * REC + 1], 0.1);
+        this.theirView.hit(strength, x - f[s * REC + REC_TOP], z - f[s * REC + REC_TOP + 1], 0.1);
+      }
+      if (strength > 0.3 && this.sinceClashSound > 0.08) {
+        playClash(strength * 0.8, x, this.myBuild.ring, this.theirBuild.ring, z);
+        this.sinceClashSound = 0;
+      }
+    }
+    r.at = Math.max(r.at, i);
   }
 
   /**
@@ -2247,6 +2309,7 @@ export class MatchSystem extends createSystem({
 
   private toReady() {
     this.trails.clear();
+    this.impacts.clear();
     if (this.phase === 'placing') return;
     this.readySince = this.time;
     this.matchOver = false;
@@ -2306,6 +2369,8 @@ export class MatchSystem extends createSystem({
       this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
       playGong();
     }
+    // The countdown to the rip, after the first session's lessons (not over its hints).
+    this.count = !this.demo && this.progress.guide === 'done' ? { t: -0.4, beat: 0 } : null;
     this.bar.mesh.visible = true;
     this.barMessage = 'READY';
     this.barPoints = [this.myPoints, this.theirPoints];
@@ -2476,6 +2541,31 @@ export class MatchSystem extends createSystem({
 
   /** Launches both tops. aim: radians off straight-at-center for the player's top. */
   /**
+   * "3, 2, 1, RIP!" before each round, as a cue only: the rip is taken whenever it comes (before,
+   * on or after the beat), with the same power, and the rival still launches with it, so nothing
+   * about the round changes. It waits for the arena, the rival's entrance and any stamp showing.
+   */
+  private updateCountdown(dt: number) {
+    const c = this.count;
+    if (!c) return;
+    if (this.phase !== 'ready' && this.phase !== 'pulling') {
+      this.count = null;
+      return;
+    }
+    if (c.beat === 0 && (this.entrance || !this.sizeSettled || this.stamp.mesh.visible)) return;
+    c.t += dt;
+    if (c.t < 0) return;
+    while (c.beat < 4 && c.beat * COUNT_BEAT <= c.t) {
+      const rip = c.beat === 3;
+      this.stamp.show(rip ? 'RIP!' : String(3 - c.beat), '', rip ? 'mine' : 'neutral', rip ? 0.45 : COUNT_BEAT - 0.3, rip ? 1.3 : 1.1);
+      if (rip) playStamp();
+      else playTick();
+      c.beat++;
+    }
+    if (c.beat >= 4) this.count = null;
+  }
+
+  /**
    * Launches both tops. Yours from `from` (or its usual spot) along `dir` (or `aim` off straight
    * ahead, angled into its orbit); `steep` 0..1 trades launch speed for spin.
    */
@@ -2501,6 +2591,7 @@ export class MatchSystem extends createSystem({
     if (perfect && !this.demo) this.perfectInMatch = true;
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
+    this.count = null;
     this.stamp.show(perfect ? 'WHITE HOT!' : 'RIP!', '', 'mine', 0.35);
     if (perfect) this.featDone('whiteHot');
     this.matchLog.rip = Math.max(this.matchLog.rip, power);
@@ -3128,13 +3219,18 @@ export class MatchSystem extends createSystem({
       steps++;
       this.elapsed += STEP;
       const clash = step(this.arena, this.mine, this.theirs);
-      this.record();
+      this.record(clash);
       // A charge rebounding off your Ward: said once per Ward, and it counts as stopping the move.
       if (this.mine.guard <= 0) this.parried = false;
       if (clash?.parry && !this.parried) {
         this.parried = true;
         this.stamp.show('PARRIED!', 'it bounced off your Ward', 'mine', 0.6);
         this.impacts.hit(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
+        // The Ward's own look: a pale shockwave, sparks, your top barely moved, theirs thrown back.
+        this.impacts.shock(clash.x, this.arena.height(clash.x, clash.z), clash.z, 0.9, SEAL_COLOR.ward);
+        this.sparks.burst(clash.x, this.arena.height(clash.x, clash.z), clash.z, 0.7);
+        this.myView.hit(0.3, clash.x - this.mine.x, clash.z - this.mine.z);
+        this.theirView.hit(1, clash.x - this.theirs.x, clash.z - this.theirs.z);
         playClash(1, clash.x);
         this.featDone('interrupt');
         if (import.meta.env.DEV) console.log('[STRIKE] ward parried a charge');
@@ -3144,6 +3240,9 @@ export class MatchSystem extends createSystem({
         // The Hammer lands: a heavy ring and a shower of sparks where the rims met.
         this.sparks.burst(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
         this.impacts.hit(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
+        this.impacts.shock(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1, SEAL_COLOR.hammer);
+        this.myView.hit(1, clash.x - this.mine.x, clash.z - this.mine.z);
+        this.theirView.hit(1, clash.x - this.theirs.x, clash.z - this.theirs.z);
         playBurst(clash.x);
         if (import.meta.env.DEV) console.log(`[STRIKE] hammer landed: rival damage ${this.theirs.damage.toFixed(2)}`);
       }
@@ -3178,11 +3277,23 @@ export class MatchSystem extends createSystem({
           this.hitStop = clash.strength > 0.85 ? 0.11 : 0.07;
           this.myView.shake(clash.strength);
           this.theirView.shake(clash.strength);
+          // The tops take the hit: they swell, recoil and flare, holding the pose through the stop;
+          // a shockwave rolls over the floor and leaves a scorch.
+          this.myView.hit(clash.strength, clash.x - this.mine.x, clash.z - this.mine.z, this.hitStop);
+          this.theirView.hit(clash.strength, clash.x - this.theirs.x, clash.z - this.theirs.z, this.hitStop);
+          this.impacts.shock(clash.x, y, clash.z, clash.strength);
+          this.lastPop = this.elapsed;
           this.bar.hit(0);
           this.bar.hit(1);
           this.roomLight.hit();
           this.accumulator = 0;
           duck(0.5, 0.15);
+        }
+        else if (clash.strength > 0.3 && this.elapsed - this.lastPop > 0.15) {
+          // A lighter hit: a smaller punch, no stop.
+          this.lastPop = this.elapsed;
+          this.myView.hit(clash.strength * 0.6, clash.x - this.mine.x, clash.z - this.mine.z);
+          this.theirView.hit(clash.strength * 0.6, clash.x - this.theirs.x, clash.z - this.theirs.z);
         }
         if (this.sinceClashSound > 0.06) {
           playClash(clash.strength, clash.x, this.myBuild.ring, this.theirBuild.ring, clash.z);
@@ -3266,8 +3377,9 @@ export class MatchSystem extends createSystem({
         if (youWon && !this.demo && this.progress.wonMatchIn(this.arena.layout.name)) this.featDone('everyArena');
         // A won match: sparks run round the rim for a moment.
         if (youWon) {
-          this.celebrate = 1.6;
-          if (COMFORT.flashes) this.pillar.play(this.arena.layout, maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), TEAM_MINE);
+          this.celebrate = 2.2;
+          // The pillar rises either way: in the Calm modes slowly and without its shimmer (no flash).
+          this.pillar.play(this.arena.layout, maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), TEAM_MINE, COMFORT.flashes ? 'win' : 'calm');
           // The win leaves the machine: a warm ring rolls out across your room.
           if (COMFORT.flashes) this.roomLight.wave();
         } else if (COMFORT.flashes) {
@@ -3293,8 +3405,9 @@ export class MatchSystem extends createSystem({
         this.featDone(k === 'ramp' ? 'ramp' : k === 'sling' ? 'sling' : k === 'strike' ? 'strike' : '');
         if (k === 'strike' && loser.finish === 'burst' && this.myBuild.seal === 'hammer') this.featDone('hammer');
       }
-      // Every knockout, yours or theirs, slows for a moment.
-      if (loser.finish !== 'spin') this.slowMo = SLOW_MO_TIME * 0.5;
+      // Every finish, yours or theirs (a spin-out too), holds still for a beat, then slows for a moment.
+      this.slowMo = SLOW_MO_TIME * 0.5;
+      this.koFreeze = KO_FREEZE;
       const won = this.myPoints > this.theirPoints || (decided && v === 1);
       const cause = recent && v === 1 ? `YOUR ${recent}` : theirs && v === -1 && loser.finish !== 'spin' ? `THEIR ${this.rivalShapeKind}`.toUpperCase() : '';
       this.lastCause = cause ? `${cause} → ${FINISH_WORD[loser.finish ?? 'spin']}` : '';
