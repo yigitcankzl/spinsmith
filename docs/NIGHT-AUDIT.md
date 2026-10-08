@@ -25,7 +25,7 @@ Working memory for the overnight RC pass. Local commits only: no push, no deploy
 - Not now: new table detection, Chisel retune, matchup predictor, IWSDK fork for bundle, two-step perf fallback (Quest data first).
 
 ## Active work
-- A-G done and red-teamed; final gates next.
+- A-H done and red-teamed (H: Smith's board 16% larger, judge 2); final gates run.
 
 ## Tests (latest)
 - typecheck pass; check:sim all passed; build pass (f062546, d30cc7c).
@@ -33,11 +33,16 @@ Working memory for the overnight RC pass. Local commits only: no push, no deploy
 - Runtime: forge hover shows the part's line (Halo, Gale); marks hidden under the hand (docs/night/after-G-marks-under-hand.png).
 - Runtime: result -> pinch -> ready (was pulling), then a rip launches; forge card shows "Next: Leech, ..."; OUTLAST card shows its reason; 299 label strings fit (harness /tmp/lbl).
 
+- Final gates (844f69f, emulator + hand driver): clean-save first session home -> play -> rip -> ramps -> result (lost 2-3, tip shown) -> forge fit Spur + quench -> rematch intro "Watch your Spur"; reload keeps level/xp/matches/guide/Spur. Workshop: Pillar dropped -> TRY round -> back -> SAVE starts a match on My Arena 1 (16 arenas); after a won match and reload, My Arena 1 and its pillar, level 2, Spur kept. Console: only "An active XRSession already exists" from a doubled emulator enter (harness), no game errors.
+- Draw calls same states as baseline (fresh save): home 134 (142), fight 142 (134), forge 146 (144); workshop demo save 96 (96). Demo save: home 184-200, fight 172, forge 186 (more unlocked things on the table).
+- Reports: arenas and tops no warnings; shaping complete (19 rows; sim/shaping/arena/tuning code unchanged since baseline). Build pass: main chunk 2,600 kB (729 kB gzip) vs 2,597 kB; dist 3.5 MB.
+- Screenshots: docs/night/final-*.png.
+
 ## Commits
-- cb4fbe3 baseline audit. f062546 result-pinch fix + card legibility (red-team: text fit failed -> fixed in d30cc7c). d30cc7c why you won/lost + forge guidance + label layout rewrite. 58ee030 D placement. 582435a E per-frame garbage + C red-team fixes. 274382b F docs. cc6d697 G depth-tested marks. 1812b01 E red-team fixes.
+- cb4fbe3 baseline audit. f062546 result-pinch fix + card legibility (red-team: text fit failed -> fixed in d30cc7c). d30cc7c why you won/lost + forge guidance + label layout rewrite. 58ee030 D placement. 582435a E per-frame garbage + C red-team fixes. 274382b F docs. cc6d697 G depth-tested marks. 1812b01 E red-team fixes. 844f69f H board size.
 
 ## Next step
-- Final gates: all reports, build, clean-save first session, match/forge/workshop flows, reload persistence, screenshots, draw calls vs baseline.
+- Done without a headset. Remaining: owner/Quest blockers below.
 ## Quest-only / owner blockers
 - Hand-tracking reliability, slap/press thresholds, table height and reach, passthrough look, hand overlap, long comfort, real fps on Quest 3/3S.
 - Hosting (fixed HTTPS URL), store packaging and dashboard, team details, video upload.
