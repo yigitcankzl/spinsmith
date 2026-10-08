@@ -187,7 +187,7 @@ export const CORES: Core[] = [
 export const TIPS: Tip[] = [
   { id: 'chisel', name: 'Chisel', spinDrain: 0.0535, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
   { id: 'spur', name: 'Spur', spinDrain: 0.0533, roam: 0.45, cruise: 0.58, drive: 2.6, maxSpeed: 1.9, seek: 4, center: 0, gear: 1.25, weight: 4, blurb: 'Turns toward the rival sooner; Chisel runs wide on the rim' },
-  { id: 'awl', name: 'Awl', spinDrain: 0.0523, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
+  { id: 'awl', name: 'Awl', spinDrain: 0.053, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
   { id: 'dome', name: 'Dome', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.84, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
   { id: 'pin', name: 'Pin', spinDrain: 0.0485, roam: 0.2, cruise: 0.44, drive: 1.5, maxSpeed: 1.8, seek: 0, center: 0, gear: 0.6, weight: 3, blurb: 'Stays still, spins longest' },
   { id: 'bead', name: 'Bead', spinDrain: 0.0525, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
@@ -351,8 +351,8 @@ export const RIVALS: Rival[] = [
   { name: 'Drifter', move: 'pull', style: 'spins longest, waits you out', title: 'the Long Spin', intro: 'I can wait all day.', win: 'Still spinning.', lose: 'You outlasted the drift.', tip: 'Knock it out before its spin outlasts yours: a Striker or a Spur hunts it down', build: { ring: 'halo', core: 'bolt', tip: 'pin', spin: -1, color: 0 }, level: 1 },
   { name: 'Leech', move: 'pull', style: 'opposite spin: steals yours', title: 'the Spin Thief', intro: 'Your spin looks tasty.', win: 'Thanks for the spin.', lose: 'Nothing left to steal.', tip: 'It steals spin from opposite spinners: tap the spin token to match its left spin', build: { ring: 'cog', core: 'clamp', tip: 'awl', spin: -1, color: 0 }, level: 4 },
   { name: 'Hookjaw', move: 'charge', style: 'lifts you over low walls', title: 'the Wall Breaker', intro: 'Walls are suggestions.', win: 'Over you go.', lose: 'You kept your feet.', tip: 'Cup your top when it charges, or forge a Stilt: a tall top rides over its lift', build: { ring: 'hook', core: 'stub', tip: 'spur', spin: -1, color: 0 }, level: 6 },
-  { name: 'Sawtooth', move: 'charge', style: 'chips you toward a shatter', title: 'the Iron Champion', intro: 'Every hit takes a piece.', win: 'In pieces.', lose: 'Not a scratch? Fine.', tip: 'Every hit chips you: a Clamp core or a Ward keeps you whole', build: { ring: 'saw', core: 'stub', tip: 'bead', spin: -1, color: 0 }, level: 9 },
-  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', title: 'the Crown', intro: 'The crown is earned here.', win: 'Not yet, smith.', lose: 'Wear it well.', tip: "Tall and locked: a Stub's low hits get under it, or tip it with a Tilt", build: { ring: 'anvil', core: 'stilt', tip: 'pin', spin: -1, color: 0 }, level: 12 },
+  { name: 'Sawtooth', move: 'charge', style: 'chips you toward a shatter', title: 'the Iron Champion', intro: 'Every hit takes a piece.', win: 'In pieces.', lose: 'Not a scratch? Fine.', tip: 'Every hit chips you: a Clamp core or a Ward keeps you whole', build: { ring: 'saw', core: 'stub', tip: 'bead', spin: -1, color: 0 }, level: 8 },
+  { name: 'Bastion', move: 'quake', style: 'tall, locked and patient', title: 'the Crown', intro: 'The crown is earned here.', win: 'Not yet, smith.', lose: 'Wear it well.', tip: "Tall and locked: a Stub's low hits get under it, or tip it with a Tilt", build: { ring: 'anvil', core: 'stilt', tip: 'pin', spin: -1, color: 0 }, level: 10 },
 ];
 
 /**

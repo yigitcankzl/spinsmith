@@ -67,8 +67,8 @@ export const LEVEL_UNLOCKS: Record<number, string> = {
 export const RIVAL_UNLOCKS: Record<number, string> = {
   4: 'rival:Leech',
   6: 'rival:Hookjaw',
-  9: 'rival:Sawtooth',
-  12: 'rival:Bastion',
+  8: 'rival:Sawtooth',
+  10: 'rival:Bastion',
 };
 
 /** The newer arenas, opened beside a level's part or paint (the classics come with LEVEL_UNLOCKS). */
@@ -80,7 +80,7 @@ export const ARENA_UNLOCKS: Record<number, string> = {
   8: 'arena:Glacier Steps',
   10: 'arena:Neon Speedway',
   14: 'arena:Meteor Pit',
-  18: 'arena:Colossus Bowl',
+  12: 'arena:Colossus Bowl',
   20: 'arena:Grand Anvil',
 };
 

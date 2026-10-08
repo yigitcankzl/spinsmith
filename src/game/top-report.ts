@@ -5,7 +5,7 @@
 import { ARENAS } from './arenas.ts';
 import { allBuilds, buildName, CORES, RINGS, specFromBuild, TIPS } from './parts.ts';
 import type { TopBuild } from './parts.ts';
-import { Arena, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, verdict } from './sim.ts';
+import { Arena, launchSpin, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, verdict } from './sim.ts';
 
 export interface TopReport {
   /** Win rate per build, best first. */
@@ -46,8 +46,8 @@ export function playBuilds(start: number, end: number, opponents: number, arenas
         const db = LAUNCH_TILT + (rnd() - 0.5) * 0.8;
         const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa);
         const sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
-        a.launch(0, spawn, Math.sin(da) * sa, -Math.cos(da) * sa, 0.55 + 0.45 * pa, 1);
-        b.launch(0, -spawn, Math.sin(db) * sb * hb, Math.cos(db) * sb, 0.55 + 0.45 * pb, hb);
+        a.launch(0, spawn, Math.sin(da) * sa, -Math.cos(da) * sa, launchSpin(pa), 1);
+        b.launch(0, -spawn, Math.sin(db) * sb * hb, Math.cos(db) * sb, launchSpin(pb), hb);
         let t = 0;
         while (verdict(a, b, t) === 0) {
           step(arena, a, b);

@@ -439,6 +439,7 @@ export class MatchSystem extends createSystem({
   private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
+  private replayedOnce = false;
   private rivalHeld = 0;
   private holdSaid = false;
   private strikeTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.strikePress), right: new TableTouch(TUNE.strikePress) };
@@ -3235,7 +3236,12 @@ export class MatchSystem extends createSystem({
       if (recent && v === 1) {
         // The stamp names the cause (SLAG! / YOUR RAMP); the card keeps to the score.
         // The decisive move plays out slowly for a moment, in a shower of sparks, then again as a replay.
-        if (loser.finish !== 'spin' && !this.demo) this.startReplay();
+        // The replay means the finishing blow: the knockout that wins the match, and the session's first
+        // knockout of your making (so the move is seen once); the rest go straight on (~4 s a match saved).
+        if (loser.finish !== 'spin' && !this.demo && (decided || !this.replayedOnce)) {
+          this.replayedOnce = true;
+          this.startReplay();
+        }
         if (loser.finish !== 'spin') {
           this.slowMo = SLOW_MO_TIME;
           this.sparks.burst(loser.x, this.arena.height(loser.x, loser.z), loser.z, 1);

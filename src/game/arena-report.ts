@@ -4,7 +4,7 @@
  * and by the arena builder to warn about layouts that play badly.
  */
 import type { ArenaLayout } from './layout.ts';
-import { Arena, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TYPES, verdict } from './sim.ts';
+import { Arena, launchSpin, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TYPES, verdict } from './sim.ts';
 
 export interface ArenaReport {
   /** Median round length (s). */
@@ -46,8 +46,8 @@ export function reportArena(layout: ArenaLayout, roundsPerPair = 12): ArenaRepor
         const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa);
         const sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
         const spawn = layout.shape === 'oval' ? layout.radius * 0.78 * 0.72 : layout.radius * 0.72;
-        a.launch(0, spawn, Math.sin(da) * sa, -Math.cos(da) * sa, 0.55 + 0.45 * pa, 1);
-        b.launch(0, -spawn, -Math.sin(db) * sb, Math.cos(db) * sb, 0.55 + 0.45 * pb, -1);
+        a.launch(0, spawn, Math.sin(da) * sa, -Math.cos(da) * sa, launchSpin(pa), 1);
+        b.launch(0, -spawn, -Math.sin(db) * sb, Math.cos(db) * sb, launchSpin(pb), -1);
         let t = 0;
         while (verdict(a, b, t) === 0) {
           if (step(arena, a, b)) clashes++;
