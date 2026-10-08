@@ -2735,7 +2735,7 @@ export class MatchSystem extends createSystem({
       const what = { charge: 'a charge', quake: 'a quake', pull: 'a pull' }[this.rival.move];
       if (!this.tellTaught) {
         this.tellTaught = true;
-        this.label.set(`${this.rival.name} winds up ${what}!\n${this.forgeBar.full ? 'Strike now to stop it' : 'Brace: cup your own top'}`);
+        this.label.set(`${this.rival.name} winds up ${what}!\n${this.forgeBar.full ? ((this.myBuild.seal ?? 'anvil') === 'ward' ? 'Ward up: let it hit you' : 'Strike now to stop it') : 'Brace: cup your own top'}`);
         this.labelTimer = 2.5;
       }
       if (import.meta.env.DEV) console.log(`[TELL] ${this.rival.name} ${this.rival.move} at t ${this.elapsed.toFixed(1)}`);
@@ -2818,8 +2818,9 @@ export class MatchSystem extends createSystem({
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
   private doStrike(ox = 0, oz = 0) {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
-    const cut = this.tellAt >= 0 && this.theirs.tell > 0;
     const seal = this.myBuild.seal ?? 'anvil';
+    // The Ward is a parry, not an interrupt: the move still comes, and a charge rebounds off it.
+    const cut = this.tellAt >= 0 && this.theirs.tell > 0 && seal !== 'ward';
     // Cups and slings let go first, so none is left holding forever.
     for (const s of ['left', 'right'] as const) {
       this.endSling(s, false);

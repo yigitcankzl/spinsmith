@@ -96,7 +96,7 @@ export class StrikeBar {
   private lastClash = -99;
 
   /** Each round starts with the bar this full, so the strike comes in time to matter. */
-  static readonly START = 0.3;
+  static readonly START = 0.2;
 
   reset() {
     this.value = StrikeBar.START;

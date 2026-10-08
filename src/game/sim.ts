@@ -82,11 +82,12 @@ const CUP_PULL = 250;
 export const SLING_SPEED = 0.45;
 
 /**
- * A rip's spin from its power (0..1), one formula for the game and the reports. (A narrower 0.7..1.0
- * spread made the rip matter less but cut rounds under the report's 12 s floor; not shipped.)
+ * A rip's spin from its power (0..1), one formula for the game and the reports. Narrower than it was
+ * (0.55..1.0), so a better pull starts a round ahead instead of deciding it; the strike bar starting
+ * emptier keeps rounds long enough (docs: shaping report targets).
  */
 export function launchSpin(power: number): number {
-  return 0.55 + 0.45 * power;
+  return 0.62 + 0.36 * power;
 }
 /** A cup lets go after this long if nothing rolled in (s). */
 export const CUP_HOLD = 2;
@@ -819,7 +820,10 @@ export const TILT = { shove: 0.16, time: 1.6 };
 export const HAMMER = 3;
 export const HAMMER_TIME = 5;
 /** Ward: for WARD_TIME s your top cannot be knocked out and takes half the knockback. */
-export const WARD_TIME = 3;
+export const WARD_TIME = 4;
+/** A top that dashed or charged within PARRY_WINDOW s and hits a Ward takes WARD_PARRY times the knockback. */
+const WARD_PARRY = 4;
+const PARRY_WINDOW = 0.8;
 /** A clash at least this strong (0..1, as Clash.strength) is solid enough for the Hammer. */
 const HAMMER_MIN = 0.3;
 const HAMMER_FLOOR = 0.22;
@@ -841,7 +845,12 @@ export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox =
     // Your top digs in: the tip holds while everything else slides.
     mine.anchor = TILT.time + 0.3;
   } else if (seal === 'hammer') mine.hammer = HAMMER_TIME;
-  else if (seal === 'ward') mine.guard = WARD_TIME;
+  else if (seal === 'ward') {
+    // A parry, not an interrupt: the rival's move still comes, and a charge rebounds off the Ward.
+    mine.guard = WARD_TIME;
+    arena.lastStrike = arena.elapsed;
+    return;
+  }
   else {
     rivalMove(arena, mine, rival, 'charge');
     const v = Math.hypot(mine.vx, mine.vz) || 1;
@@ -1055,8 +1064,11 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   // A top braced in a well is knocked back less.
   const braceA = (arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(a.x, a.z) : 1) * (a.rushing > 0 || a.guard > 0 ? 0.5 : 1);
   const braceB = (arena && arena.shapes.length ? 1 - WELL_BRACE * arena.well(b.x, b.z) : 1) * (b.rushing > 0 || b.guard > 0 ? 0.5 : 1);
-  const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA) * braceA;
-  const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB) * braceB;
+  // A charge into a Ward rebounds: the charger takes the knockback it meant to give.
+  const parryA = b.guard > 0 && a.sinceDash < PARRY_WINDOW ? WARD_PARRY : 1;
+  const parryB = a.guard > 0 && b.sinceDash < PARRY_WINDOW ? WARD_PARRY : 1;
+  const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA) * braceA * parryA;
+  const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB) * braceB * parryB;
   a.vx -= nx * ja;
   a.vz -= nz * ja;
   b.vx += nx * jb;

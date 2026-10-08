@@ -97,11 +97,11 @@ export const RIVAL_SIGNATURE: Record<string, string> = {
 
 /** Strike seals (docs/DUEL-DESIGN.md): the Anvil Strike is yours from the start. */
 export const SEAL_UNLOCKS: Record<number, string> = {
-  4: 'seal:rush',
+  2: 'seal:rush',
+  3: 'seal:tilt',
+  5: 'seal:ward',
   7: 'seal:magnet',
-  10: 'seal:tilt',
-  13: 'seal:hammer',
-  16: 'seal:ward',
+  9: 'seal:hammer',
 };
 
 /** Emblem glows earned by Smith Order stamps: this many stamps, this glow. */

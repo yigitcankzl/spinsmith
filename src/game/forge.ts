@@ -31,7 +31,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import { playDrawer, playLocked, playMachine, playPick, playPlace, playRemove } from './audio.js';
-import { unlockHint } from './progress.js';
+import { SEAL_UNLOCKS, unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
 import { addStem, ORANGE, TEXT_DIM } from './ui.js';
 import { tag } from './builder.js';
@@ -637,7 +637,7 @@ export class Forge {
       const owned = SEALS.filter((s) => s === 'anvil' || this.progress.isUnlocked(`seal:${s}`));
       const seal = owned[(owned.indexOf(this.build.seal ?? 'anvil') + 1) % owned.length];
       this.build = { ...this.build, seal };
-      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : 'Earn more strikes: Rush at Lv 4, Magnet at Lv 7, Tilt at Lv 10, Hammer at Lv 13, Ward at Lv 16');
+      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : `Earn more strikes: ${Object.entries(SEAL_UNLOCKS).map(([lv, k]) => `${SEAL_NAMES[k.slice(5) as Seal]} at Lv ${lv}`).join(', ')}`);
       this.showSeal();
     } else if (item.kind === 'emblem') {
       // The next glow you have earned (the forge's orange is always yours).

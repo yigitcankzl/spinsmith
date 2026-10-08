@@ -232,7 +232,7 @@ export const SEAL_BLURBS: Record<Seal, string> = {
   magnet: 'The rival is dragged toward the nearest slag pit',
   tilt: 'The arena dips toward your palm: the rival slides, your top holds',
   hammer: 'Your next solid hit lands three times as hard: go for the shatter',
-  ward: 'For 3 s your top cannot be knocked out and barely moves',
+  ward: 'For 4 s your top cannot be knocked out; a charge into it rebounds on the charger',
 };
 
 /** Emblem glows: the forge's orange first; the rest are earned (levels 15-19, order stamps). Never cyan, the rival's color. */
