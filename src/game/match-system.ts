@@ -9,7 +9,7 @@ import { TABLE_Y } from './reach.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -110,7 +110,11 @@ const BUTTON_REACH = 0.035;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
 /** Launch power at or above this is a perfect rip: extra starting spin. */
 const PERFECT = TUNE.perfect;
-const PERFECT_SPIN = 1.1;
+/** White hot: the most spin a rip gives; its real reward is a head start on the strike bar. */
+const PERFECT_SPIN = 1.0;
+const PERFECT_BAR = 0.25;
+/** How long a rival holds its ready move while your strike is ready (s). */
+const RIVAL_HOLD = 4;
 /** Far ramps (and the dev key's) grow at this rate (m/s) while the pinch is held. */
 const RAY_BUMP_RATE = 0.05;
 /** A near ramp is set after the pinch is held this long (s); a brush of the fingers sets nothing. */
@@ -435,6 +439,8 @@ export class MatchSystem extends createSystem({
   private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
+  private rivalHeld = 0;
+  private holdSaid = false;
   private strikeTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.strikePress), right: new TableTouch(TUNE.strikePress) };
   /** When the bar last became full: the strike arms half a second later (a hand already resting there is not a strike). */
   private fullSince = -1;
@@ -2479,7 +2485,8 @@ export class MatchSystem extends createSystem({
     const th = this.theirs.hand;
     // The launch angles into each top's own orbit direction (mirrored for left spin); aim stays as pulled.
     const mySpeed = speed * (1 - STEEP_SLOW * steep);
-    const mySpin = (perfect ? PERFECT_SPIN : 0.55 + 0.45 * power) * (1 + STEEP_SPIN * steep);
+    const mySpin = (perfect ? PERFECT_SPIN : launchSpin(power)) * (1 + STEEP_SPIN * steep);
+    if (perfect) this.forgeBar.value = Math.min(1, this.forgeBar.value + PERFECT_BAR);
     const sx = from ? from.x : 0;
     const sz = from ? from.z : this.SPAWN;
     if (dir) this.mine.launch(sx, sz, dir.x * mySpeed, dir.z * mySpeed, mySpin, mh);
@@ -2496,14 +2503,16 @@ export class MatchSystem extends createSystem({
     const first = this.progress.matches === 0 && !this.demo;
     // The very first match holds both tops in a little longer, so its one lesson (the ramp) has time.
     this.arena.grace = first ? FIRST_GRACE : TUNING.grace;
-    const aiPower = first ? 0.7 + Math.random() * 0.1 : aiMin + Math.random() * (0.98 - aiMin);
+    // Stronger rivals sometimes rip white hot too.
+    const aiPower = first ? 0.7 + Math.random() * 0.1 : Math.random() < 0.5 * skill ? 1 : aiMin + Math.random() * (0.98 - aiMin);
+    this.rivalHeld = 0;
     const aiAim = first ? (Math.random() - 0.5) * 0.3 : (Math.random() - 0.5) * (1.0 - 0.6 * skill);
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
     // From its spot this round, toward the middle, angled into its orbit.
     const aiDir = aiAim + LAUNCH_TILT * th;
     const [rx, rz] = this.rivalSpot();
     const inward = Math.atan2(-rx, -rz);
-    this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, 0.55 + 0.45 * aiPower, th);
+    this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, launchSpin(aiPower), th);
     this.phase = 'fight';
     this.elapsed = 0;
     this.lastHardHit = -1;
@@ -2511,7 +2520,7 @@ export class MatchSystem extends createSystem({
     this.clashes = 0;
     // Say how it launched: white hot, or the kind of launch the pull's angle gave.
     const kind = steep > 0.6 ? 'Spin launch: slow, long spin' : steep < 0.25 && power > 0.5 && (from || dir) ? 'Dash launch' : '';
-    this.label.set(perfect ? 'White hot!\nExtra spin' : kind);
+    this.label.set(perfect ? 'White hot!\nA head start on the strike' : kind);
     this.labelTimer = perfect || kind ? 1.5 : 0;
     this.launchFrom = null;
     console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''} from ${sx.toFixed(3)},${sz.toFixed(3)} steep ${steep.toFixed(2)} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)} from ${rx.toFixed(3)},${rz.toFixed(3)}`);
@@ -2705,7 +2714,20 @@ export class MatchSystem extends createSystem({
     if (clash) this.rivalBar.clash(clash, this.elapsed, false);
     const them = this.theirs;
     if (this.tellAt < 0) {
-      if (!them.alive || !this.mine.alive || !this.rivalBar.spend(this.elapsed, TUNING.grace + 2)) return;
+      if (!them.alive || !this.mine.alive) return;
+      // A mind game: once you know the tells, a rival with its move ready waits while your strike is
+      // ready too (up to RIVAL_HOLD s), so striking early wastes the answer and holding it is a choice.
+      if (this.tellTaught && this.rivalBar.full && this.forgeBar.full && this.rivalHeld < RIVAL_HOLD) {
+        if (this.rivalHeld === 0 && !this.holdSaid) {
+          this.holdSaid = true;
+          this.label.set(`${this.rival.name} is waiting for your strike\nHold it to answer its move`);
+          this.labelTimer = 2.5;
+        }
+        this.rivalHeld += STEP;
+        return;
+      }
+      if (!this.rivalBar.spend(this.elapsed, TUNING.grace + 2)) return;
+      this.rivalHeld = 0;
       this.tellAt = this.elapsed + TELL_TIME;
       them.tell = TELL_TIME;
       playTell();

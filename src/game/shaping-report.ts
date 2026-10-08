@@ -4,7 +4,7 @@
  */
 import { rimRadius } from './layout.ts';
 import { ARENAS } from './arenas.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
 import { SHAPE_SIZE, ShapingCharges, StrikeBar, behindOn } from './shaping.ts';
 
@@ -375,8 +375,8 @@ export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: P
             layout,
             a: x,
             b: y,
-            launchA: [0, side * spawn, side * Math.sin(da) * sa, -side * Math.cos(da) * sa, 0.55 + 0.45 * pa, side],
-            launchB: [0, -side * spawn, -side * Math.sin(db) * sb, side * Math.cos(db) * sb, 0.55 + 0.45 * pb, -side],
+            launchA: [0, side * spawn, side * Math.sin(da) * sa, -side * Math.cos(da) * sa, launchSpin(pa), side],
+            launchB: [0, -side * spawn, -side * Math.sin(db) * sb, side * Math.cos(db) * sb, launchSpin(pb), -side],
           };
           const r = playRound(setup, policy, rivalPolicy, rnd);
           const twin = policy === POLICIES.none ? r : playRound(setup, POLICIES.none, rivalPolicy, rnd);

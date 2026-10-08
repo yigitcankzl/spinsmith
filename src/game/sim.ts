@@ -80,6 +80,14 @@ const CUP_DRAG = 5;
 const CUP_PULL = 250;
 /** How fast a sling throws the caught top (sim m/s). */
 export const SLING_SPEED = 0.45;
+
+/**
+ * A rip's spin from its power (0..1), one formula for the game and the reports. (A narrower 0.7..1.0
+ * spread made the rip matter less but cut rounds under the report's 12 s floor; not shipped.)
+ */
+export function launchSpin(power: number): number {
+  return 0.55 + 0.45 * power;
+}
 /** A cup lets go after this long if nothing rolled in (s). */
 export const CUP_HOLD = 2;
 const WELL_DRAG = 3;
@@ -384,6 +392,8 @@ export class Arena {
     t.vx = (dx / len) * speed;
     t.vz = (dz / len) * speed;
     t.kick = 0.9;
+    // Flung out of a hollow, it flies light for a moment: a sling toward a pit or wall can finish.
+    t.lifted = LIFT_TIME;
     return t;
   }
 
