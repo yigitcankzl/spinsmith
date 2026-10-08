@@ -21,7 +21,7 @@ export const TABLE_Y = -PEDESTAL / ARENA_SCALE;
 /** The drawer tabs of the forge and the workshop share one line along the near rim. */
 export const TAB_LINE = { z: 0.18, y: 0.006, gap: 0.066 };
 /** The workshop's five tabs on the same line, a little closer together. */
-export const WORKSHOP_TAB_GAP = 0.06;
+export const WORKSHOP_TAB_GAP = 0.052;
 /** The workshop's piece rail, above the near wall. */
 export const RAIL = { z: 0.16, y: 0.045 };
 /** Home: your top's dock, the forge's small anvil and the blueprint, on the near rim. */

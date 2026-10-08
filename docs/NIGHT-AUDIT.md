@@ -24,9 +24,17 @@ Working memory for the overnight RC pass. Local commits only: no push, no deploy
 - Not now: new table detection, Chisel retune, matchup predictor, IWSDK fork for bundle, two-step perf fallback (Quest data first).
 
 ## Active work
-## Tests
+- D (placement) next; C under red-team.
+
+## Tests (latest)
+- typecheck pass; check:sim all passed; build pass (f062546, d30cc7c).
+- Runtime: result -> pinch -> ready (was pulling), then a rip launches; forge card shows "Next: Leech, ..."; OUTLAST card shows its reason; 299 label strings fit (harness /tmp/lbl).
+
 ## Commits
+- cb4fbe3 baseline audit. f062546 result-pinch fix + card legibility (red-team: text fit failed -> fixed in d30cc7c). d30cc7c why you won/lost + forge guidance + label layout rewrite.
+
 ## Next step
+- D: WORKSHOP plaque off the anvil, workshop tab row inside the view; then E per-frame garbage; F docs.
 ## Quest-only / owner blockers
 - Hand-tracking reliability, slap/press thresholds, table height and reach, passthrough look, hand overlap, long comfort, real fps on Quest 3/3S.
 - Hosting (fixed HTTPS URL), store packaging and dashboard, team details, video upload.

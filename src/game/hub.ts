@@ -411,7 +411,7 @@ export class Hub {
     cradle.rotation.y = -0.5;
     const build = tag('WORKSHOP', 0.06, 46);
     // Above the roll and nudged left, clear of the anvil beside it.
-    build.position.set(home.x - 0.02, home.y + 0.05, home.z);
+    build.position.set(home.x - 0.045, home.y + 0.055, home.z);
     this.labels.push(build);
     this.blueprint.add(cradle, holder, build);
     this.root.add(this.blueprint);

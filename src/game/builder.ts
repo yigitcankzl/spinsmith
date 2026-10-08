@@ -304,7 +304,7 @@ const ARENAS_PER_PAGE = 5;
 const PLATE_GAP = WORKSHOP_TAB_GAP;
 const PLATE_Z = TAB_LINE.z;
 const PLATE_Y = TAB_LINE.y;
-const PLATE_W = 0.054;
+const PLATE_W = 0.048;
 const PLATE_H = 0.024;
 /** Back on the left rim, Try and Save on the right; Save's plate sits in front of its stamp slot. */
 const SAVE_AT = new Vector3(0.205, -0.006, 0.0);
