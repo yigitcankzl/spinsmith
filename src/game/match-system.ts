@@ -503,7 +503,7 @@ export class MatchSystem extends createSystem({
   );
   private reticle = new Mesh(
     new CircleGeometry(0.006, 20).rotateX(-Math.PI / 2),
-    new MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.85, depthTest: false }),
+    new MeshBasicMaterial({ color: 0x3fd0ff, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }),
   );
 
   init() {

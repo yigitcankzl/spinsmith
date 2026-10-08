@@ -1802,7 +1802,9 @@ export class ShapeMarks {
     const chevron = new ConeGeometry(0.008, 0.016, 3).rotateX(Math.PI / 2);
     for (let i = 0; i < count; i++) {
       const group = new Group();
-      const mats = [0, 1, 2, 3].map(() => new MeshBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false }));
+      // Depth-tested (pulled forward a little so the floor under a shape never hides them), so a
+      // real hand over the arena (the hand occluder writes depth) covers the marks, as it should.
+      const mats = [0, 1, 2, 3].map(() => new MeshBasicMaterial({ color, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
       const rings = [0, 1, 2].map((k) => {
         const m = new Mesh(ring, mats[k]);
         m.renderOrder = 20;
