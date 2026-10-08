@@ -359,6 +359,8 @@ export class MatchSystem extends createSystem({
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
   private titleShown = false;
   private titleT = 0;
+  /** What waits for the title to go (the no-table notice). */
+  private afterTitle: (() => void) | null = null;
   /** A ring around your top while a Hammer is armed (gold) or a Ward holds (pale violet). */
   private aura = new Mesh(new TorusGeometry(0.016, 0.0016, 8, 40).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffe066, transparent: true, depthWrite: false, blending: AdditiveBlending }));
   private label = new Label();
@@ -1758,9 +1760,14 @@ export class MatchSystem extends createSystem({
     this.toHub();
 
     if (!this.onTable) {
-      // No table found (or none labelled one): say so, then the first session's note returns.
-      this.label.set('No table found: the arena floats here\nMove it by its brass handle');
-      this.labelTimer = 5;
+      // No table found (or none labelled one): say so once the title is gone, then the first
+      // session's note returns.
+      const notice = () => {
+        this.label.set('No table found: the arena floats here\nMove it by its brass handle');
+        this.labelTimer = 5;
+      };
+      if (this.title.visible) this.afterTitle = notice;
+      else notice();
     }
   }
 
@@ -2004,8 +2011,12 @@ export class MatchSystem extends createSystem({
     const t = this.titleT;
     const m = this.title.material as MeshBasicMaterial;
     m.opacity = Math.min(1, Math.max(0, (t - 0.6) / 0.4)) * Math.min(1, Math.max(0, (3.6 - t) / 0.6));
-    this.title.position.set(0, 0.2 + Math.max(0, t - 3) * 0.05, -0.22);
-    if (t > 3.6) this.title.visible = false;
+    this.title.position.set(0, 0.27 + Math.max(0, t - 3) * 0.05, -0.22);
+    if (t > 3.6) {
+      this.title.visible = false;
+      this.afterTitle?.();
+      this.afterTitle = null;
+    }
   }
 
   private warnedPlane = false;
