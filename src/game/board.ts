@@ -104,8 +104,12 @@ export class SmithBoard {
         g.arc(cx, cy, R - 12, a - 0.2, a + 0.2);
         g.stroke();
       }
-      g.font = `700 ${r.met ? 34 : 32}px ${FONT}`;
-      engrave(g, r.met ? r.name.split(' ')[0].toUpperCase() : `LV ${r.level}`, cx, cy + 12, r.met ? TEXT : TEXT_DIM);
+      // Shrunk to sit inside its medallion's ring.
+      const label = r.met ? r.name.split(' ')[0].toUpperCase() : `LV ${r.level}`;
+      let size = r.met ? 34 : 32;
+      do g.font = `700 ${size--}px ${FONT}`;
+      while (g.measureText(label).width > 2 * R - 18 && size > 24);
+      engrave(g, label, cx, cy + 12, r.met ? TEXT : TEXT_DIM);
       g.font = `600 30px ${FONT}`;
       if (r.met) engrave(g, r.name.includes(' ') ? r.name.split(' ').slice(1).join(' ').toUpperCase() : '', cx, cy + R + 22, STEEL);
     });

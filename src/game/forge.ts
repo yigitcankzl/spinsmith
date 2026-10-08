@@ -811,7 +811,7 @@ export class Forge {
         name.rotation.x = -0.35;
         name.visible = false;
         this.tray.add(name);
-        const size = item.kind === 'ring' ? 0.46 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
+        const size = item.kind === 'ring' ? 0.42 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
         this.tray.add(model);
         const key = itemKey(item);
         this.slots.push({ item, drawer, model, name, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null, order: i });

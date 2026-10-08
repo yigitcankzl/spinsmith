@@ -125,9 +125,9 @@ export class MatchBar {
     g.textBaseline = 'middle';
     let size = 64;
     do g.font = `bold ${size--}px ${FONT}`;
-    while (g.measureText(message).width > 300 && size > 28);
-    // Between the two bars, never over them.
-    g.fillText(message, W / 2, 122, 300);
+    while (g.measureText(message).width > 300 && size > 44);
+    // Between the two bars, never over them; a line too long for the gap is left to the card above.
+    if (g.measureText(message).width <= 300) g.fillText(message, W / 2, 122);
     // After a round only: your smith level, the XP bar and the XP just earned (not during a fight,
     // when the eyes are on the tops).
     if (!xp.show) {
