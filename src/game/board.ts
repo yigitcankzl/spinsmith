@@ -43,7 +43,7 @@ export class SmithBoard {
   private tex: CanvasTexture;
   private key = '';
 
-  constructor(width = 0.31) {
+  constructor(width = 0.36) {
     this.canvas.width = W;
     this.canvas.height = H;
     this.tex = new CanvasTexture(this.canvas);

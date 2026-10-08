@@ -71,7 +71,7 @@ export const FORGE_AT = new Vector3(REACH_FORGE.x, REACH_FORGE.y, REACH_FORGE.z)
 const DOCK_AT = new Vector3(REACH_DOCK.x, REACH_DOCK.y, REACH_DOCK.z);
 const BLUEPRINT_AT = new Vector3(REACH_BLUEPRINT.x, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
 /** The Smith's board (where the first session's notes hang) and the champions' stands on the left rim. */
-const BOARD_AT = new Vector3(-0.17, 0.12, -0.25);
+const BOARD_AT = new Vector3(-0.195, 0.13, -0.25);
 const CHAMPION_AT = [new Vector3(-0.215, 0, 0.07), new Vector3(-0.23, 0, -0.01), new Vector3(-0.215, 0, -0.09)];
 /** The anvil and the dock on the rim are small models of the full ones. */
 const RIM_SCALE = 0.42;
