@@ -1310,8 +1310,12 @@ export class MatchSystem extends createSystem({
       return;
     }
     e.t += dt;
+    // The card and the match bar wait for the landing, so nothing stands in front of the portal.
+    const landed = e.t >= 1.3;
+    this.label.mesh.visible = landed && !!this.label.current;
+    this.bar.mesh.visible = landed;
     // On a real wall behind the arena when there is one; else in the dark beyond the far rim.
-    if (e.t === 0 || !e.from) e.from = this.portalWall(new Vector3()) ?? new Vector3(0, 0.03, -(maxRim(this.arena.layout) + 0.3));
+    if (e.t === 0 || !e.from) e.from = this.portalWall(new Vector3()) ?? new Vector3(0, 0.1, -(maxRim(this.arena.layout) + 0.3));
     const far = e.from.z;
     const open = Math.min(1, e.t / 0.4) * (e.t > 1.6 ? Math.max(0, 1 - (e.t - 1.6) / 0.4) : 1);
     // Off to the far right, clear of the card and the match bar over the far rim.
