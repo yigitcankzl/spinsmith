@@ -1,5 +1,5 @@
 import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum } from './audio.js';
+import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -2519,6 +2519,7 @@ export class MatchSystem extends createSystem({
       this.mine.launch(sx, sz, Math.sin(a) * mySpeed, -Math.cos(a) * mySpeed, mySpin, mh);
     }
     this.sparks.burst(sx, this.arena.height(sx, sz), sz, perfect ? 1 : power * 0.6);
+    playTouchdown(sx, sz, 0.6 + 0.4 * power);
     // The rival rips harder as you level up.
     // Difficulty is launch quality: the rival rips harder and aims steadier as you level up.
     const skill = Math.min(1, (this.progress.level - 1) / 15);
@@ -2537,6 +2538,7 @@ export class MatchSystem extends createSystem({
     const [rx, rz] = this.rivalSpot();
     const inward = Math.atan2(-rx, -rz);
     this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, launchSpin(aiPower), th);
+    playTouchdown(rx, rz, 0.6 + 0.4 * aiPower);
     this.phase = 'fight';
     this.elapsed = 0;
     this.lastHardHit = -1;
@@ -3187,7 +3189,7 @@ export class MatchSystem extends createSystem({
         if (t.sinceWall === 0) {
           // A near miss: the top slams the wall and sparks scrape off it.
           this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, Math.min(1, t.wallHit * 1.5));
-          if (this.sinceClashSound > 0.06) playClash(0.3 * Math.min(1, t.wallHit * 2), t.x);
+          if (this.sinceClashSound > 0.06) playScrape(Math.min(1, t.wallHit * 2), t.x, t.z);
         }
         if (t.sinceBump === 0) {
           this.arenaView.flashBumper(t.x, t.z);
@@ -3228,7 +3230,7 @@ export class MatchSystem extends createSystem({
       if (t.finish === 'pocket') playPocket(t.x);
       else if (t.finish === 'over') playOver(t.x);
       else if (t.finish === 'burst') playBurst(t.x);
-      else if (t.finish === 'spin') playTopple();
+      else if (t.finish === 'spin') playTopple(t.x, t.z);
     }
     if (v !== 2) {
       duck(0.25, 1.2);
@@ -3250,6 +3252,7 @@ export class MatchSystem extends createSystem({
       this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
       if (decided) {
         const youWon = this.myPoints > this.theirPoints;
+        playMatch(youWon);
         this.matchLog.won = youWon;
         this.matchLog.score = `${this.myPoints} - ${this.theirPoints}`;
         if (youWon && this.theirPoints === 0) this.featDone('flawless');

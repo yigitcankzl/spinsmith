@@ -36,7 +36,7 @@ import {
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
-import { playLocked, playPick, playRemove } from './audio.js';
+import { playHover, playLocked, playPick, playRemove } from './audio.js';
 import type { Progress } from './progress.js';
 import { addSlab, FONT, glass, GUIDE, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { tag } from './builder.js';
@@ -134,6 +134,8 @@ export class Hub {
   private topKey = '';
   private held: { item: Pickable; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   private time = 0;
+  /** What was pointed at last frame (pointing at a new one ticks). */
+  private hoverWas: Pickable | null = null;
   /** When home last appeared (for the stations' pop-in). */
   private shownAt = -10;
   /** The first session: every station shows its name. */
@@ -287,6 +289,8 @@ export class Hub {
 
     let hovered: Pickable | null = null;
     for (const h of pointers) if (h.tracked) hovered ??= this.under(h);
+    if (hovered && hovered !== this.hoverWas) playHover();
+    this.hoverWas = hovered;
     this.items.forEach((it, i) => {
       const on = it === hovered;
       // The three stations always say what they are; the rest only in the first session or when pointed at.
