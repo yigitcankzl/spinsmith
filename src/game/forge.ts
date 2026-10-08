@@ -393,8 +393,8 @@ export class Forge {
       if (s.drawer !== this.drawer) continue;
       const locked = this.locked(s);
       const on = s === hovered && !locked;
-      // Names show as the drawer opens, then only for the part pointed at, fitted or new (no clump of tags).
-      s.name.visible = s === hovered || s === this.focus || this.isOn(s.item) || this.drawerT < 3;
+      // Names show as the drawer opens, then only for the part pointed at or new (no clump of tags).
+      s.name.visible = s === hovered || s === this.focus || this.drawerT < 3;
       s.flash = Math.max(0, s.flash - dt);
       const pad = this.padColor.copy(locked ? PAD_LOCKED : this.isOn(s.item) ? PAD_ON : on ? PAD_HOVER : PAD_IDLE);
       // A part just fitted flashes white; the first session's new part breathes until fitted.

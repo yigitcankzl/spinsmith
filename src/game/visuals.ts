@@ -1006,7 +1006,7 @@ function floorTexture(): CanvasTexture {
 let SHELL: Group | null = null;
 
 /** Wall heights (m) by wall type. */
-const WALL_HEIGHT: Record<Wall, number> = { low: 0.007, standard: 0.012, high: 0.028, none: 0 };
+export const WALL_HEIGHT: Record<Wall, number> = { low: 0.007, standard: 0.012, high: 0.028, none: 0 };
 /** How far a pocket's trough runs out past the rim: onto the pedestal's top, not into the air. */
 const POCKET_REACH = 0.008;
 
@@ -1304,15 +1304,19 @@ export class ArenaView {
       const plinth = add(
         new Mesh(
           // The forge shell's profile (flared foot, inset waist, broad shoulder), bottom to top so it faces out.
+          // Closed at the bottom (under the deepest floor), so no table shows between the wall and the plinth.
           new LatheGeometry(
             [
-              [0.02, -1],
-              [0.011, -0.89],
-              [0.017, -0.71],
-              [0.022, -0.33],
-              [0.019, -0.15],
-              [0.008, 0],
-            ].map(([dr, y]) => new Vector2(0.15 + dr, y * this.pedestalHeight)),
+              new Vector2(0, -this.pedestalHeight),
+              ...[
+                [0.02, -1],
+                [0.011, -0.89],
+                [0.017, -0.71],
+                [0.022, -0.33],
+                [0.019, -0.15],
+                [0.008, 0],
+              ].map(([dr, y]) => new Vector2(0.15 + dr, y * this.pedestalHeight)),
+            ],
             64,
           ),
           // Lit by the room (the environment map), like the forge shell: a painted metal plinth, not a black hole.

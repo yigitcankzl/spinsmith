@@ -32,12 +32,12 @@ export const BLUEPRINT_AT: Spot = { x: 0.08, y: 0, z: 0.185 };
 export const COMFORT_AT: Spot = { x: -0.075, y: 0, z: 0.2 };
 /** The forge: where your top stands on the anvil, and the part tray: an arc of this radius around it, spanning this angle toward the player. */
 export const WORK: Spot = { x: 0, y: 0.07, z: 0.06 };
-export const TRAY = { r: 0.125, y: 0.035, gap: 0.047 };
+export const TRAY = { r: 0.11, y: 0.035, gap: 0.047 };
 
 /** The arc the tray spans for n parts: a third of a circle, opening up to a half circle so parts keep their gap. */
 export function traySpan(n: number): number {
-  // At most 0.85 of a half circle: the ends stay in front of the anvil, not beside it.
-  return Math.min(0.85 * Math.PI, Math.max((2 * Math.PI) / 3, (n * TRAY.gap) / TRAY.r));
+  // At most 0.8 of a half circle: the ends stay in front of the anvil, not beside it.
+  return Math.min(0.8 * Math.PI, Math.max((2 * Math.PI) / 3, (n * TRAY.gap) / TRAY.r));
 }
 
 /**

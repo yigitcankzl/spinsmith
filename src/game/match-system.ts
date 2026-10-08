@@ -26,7 +26,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -1904,8 +1904,10 @@ export class MatchSystem extends createSystem({
     this.label.mesh.scale.setScalar(1.25 * grow);
     this.bar.mesh.scale.setScalar(0.21 * grow);
     // Their heights grow with them, so the card stays clear above the bar.
-    this.bar.mesh.position.y = 0.05 * grow;
-    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = LABEL_AT.y * grow;
+    // A wall higher than the standard one lifts them clear of it.
+    const lift = Math.max(0, WALL_HEIGHT[L.wall] - WALL_HEIGHT.standard);
+    this.bar.mesh.position.y = (0.05 + lift) * grow;
+    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
