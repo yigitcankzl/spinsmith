@@ -309,6 +309,10 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** A quench in progress (a breath of steam before the forge closes). */
+  private quenching: { t: number; build: TopBuild } | null = null;
+  /** This match's rival intro (portal, VS) has played: a drawn 0-0 round does not repeat it. */
+  private introDone = false;
   /** The frame-rate guard: average frame time, how long it has been slow, and whether it lightened. */
   private fpsAvg = 1 / 72;
   private slowFor = 0;
@@ -724,9 +728,9 @@ export class MatchSystem extends createSystem({
     if (this.sealPop.visible) {
       const t = (this.sealPop.userData.t += Math.min(delta, 0.1));
       const me = this.mine;
-      this.sealPop.position.set(me.x, this.arena.height(me.x, me.z) + 0.03 + t * 0.05, me.z);
+      this.sealPop.position.set(me.x, this.arena.height(me.x, me.z) + 0.018 + t * 0.012, me.z);
       this.sealPop.rotation.set(1.2, t * 8, 0);
-      this.sealPop.scale.setScalar(2.2 * Math.min(1, t / 0.12) * Math.max(0, 1 - Math.max(0, t - 0.5) / 0.3));
+      this.sealPop.scale.setScalar(1.5 * Math.min(1, t / 0.12) * Math.max(0, 1 - Math.max(0, t - 0.5) / 0.3));
       if (t > 0.8) this.sealPop.visible = false;
     }
     if (this.celebrate > 0) {
@@ -811,6 +815,14 @@ export class MatchSystem extends createSystem({
         this.updateBuilder(dt);
         break;
       case 'forge':
+        if (this.quenching) {
+          // Steam rising off the quench slot, then the forge folds away.
+          const q = this.quenching;
+          q.t += dt;
+          if (Math.floor(q.t * 12) !== Math.floor((q.t - dt) * 12)) this.steam();
+          if (q.t > 0.9) this.leaveForge(q.build);
+          break;
+        }
         this.forge.update(this.pointers, dt);
         // The arena floor sinks as the forge rises out of it.
         this.stage.position.y = -FORGE_SINK * this.forge.opened;
@@ -845,6 +857,8 @@ export class MatchSystem extends createSystem({
           this.menuButton.set('Leave?');
           this.label.set('Leave this match?\nPinch Menu again to go home');
           this.labelTimer = 3;
+          // The pinch was for Menu: it does not also grab the rip cord.
+          break;
         }
         if (this.menuArmed > -10 && this.time - this.menuArmed >= 3) {
           this.menuArmed = -10;
@@ -1156,6 +1170,14 @@ export class MatchSystem extends createSystem({
 
   /** Back home from the forge; a saved build becomes your top. */
   private leaveForge(build: TopBuild | null) {
+    // A quench takes a breath in the forge first: the hiss, the cold wash and steam, then home.
+    if (build && !this.quenching) {
+      this.quenching = { t: 0, build };
+      this.roomLight.quench();
+      playQuench();
+      return;
+    }
+    this.quenching = null;
     this.forge.close();
     this.stage.position.y = 0;
     if (build) this.myBuild = { ...build };
@@ -1164,8 +1186,6 @@ export class MatchSystem extends createSystem({
     // A quenched top is a moment: steam off the rim, and its name.
     if (build) {
       this.stamp.show('FORGED!', buildName(build).toUpperCase(), 'mine', 1.1);
-      this.roomLight.quench();
-      playQuench();
       for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.08, 0.02, 0.1, 0.8);
       playStamp();
     }
@@ -1244,7 +1264,8 @@ export class MatchSystem extends createSystem({
       this.ghosts[1].state = this.theirs.state;
       return;
     }
-    if (was < 0) this.stamp.show('REPLAY', 'pinch to skip', 'neutral', 0.8);
+    // The REPLAY plate stays up for the whole replay (rewards queue behind it).
+    if (was < 0) this.stamp.show('REPLAY', 'pinch to skip', 'neutral', r.n / 120 / REPLAY_SPEED);
     const i = Math.floor(r.t * 120 * REPLAY_SPEED);
     const skip = this.hands.left.justPinched || this.hands.right.justPinched;
     if (i >= r.n + 100 || skip) {
@@ -1290,7 +1311,7 @@ export class MatchSystem extends createSystem({
     }
     e.t += dt;
     // On a real wall behind the arena when there is one; else in the dark beyond the far rim.
-    if (e.t === 0 || !e.from) e.from = this.portalWall(new Vector3()) ?? new Vector3(0.24, 0.16, -(maxRim(this.arena.layout) + 0.22));
+    if (e.t === 0 || !e.from) e.from = this.portalWall(new Vector3()) ?? new Vector3(0, 0.03, -(maxRim(this.arena.layout) + 0.3));
     const far = e.from.z;
     const open = Math.min(1, e.t / 0.4) * (e.t > 1.6 ? Math.max(0, 1 - (e.t - 1.6) / 0.4) : 1);
     // Off to the far right, clear of the card and the match bar over the far rim.
@@ -1309,7 +1330,10 @@ export class MatchSystem extends createSystem({
     const them = this.theirs;
     const u = (e.t - 0.4) / 0.9;
     const view = this.theirView.root;
-    if (u < 0) view.visible = false;
+    if (u < 0) {
+      view.visible = false;
+      this.theirView.shadowMesh.visible = false;
+    }
     else if (u < 1) {
       // From the portal to its spot: a high arc.
       const y = this.arena.height(them.x, them.z);
@@ -1317,7 +1341,7 @@ export class MatchSystem extends createSystem({
       view.position.set(px + (them.x - px) * u, py + (y - py) * u + 0.12 * Math.sin(u * Math.PI), far + (them.z - far) * u);
       view.rotation.set(0.6 * (1 - u), 0, 0);
       // A circuit's champion comes through huge, and shrinks to fight size as it lands.
-      view.scale.setScalar(e.champion ? 1 + 2.5 * (1 - u) * (1 - u) : 1);
+      view.scale.setScalar(e.champion ? 1 + 1.5 * (1 - u) * (1 - u) : 1);
       this.theirView.shadowMesh.visible = false;
       if (Math.floor(e.t * 30) !== Math.floor((e.t - dt) * 30)) this.sparks.burst(view.position.x, view.position.y - 0.01, view.position.z, 0.1);
     } else if (u - dt / 0.9 < 1) {
@@ -1377,18 +1401,19 @@ export class MatchSystem extends createSystem({
       const up = l.y - floor;
       if (up < 0 || up > 0.12) return;
       m.visible = true;
-      m.position.set(l.x, floor + 0.0015, l.z);
+      // Light from above and behind you: the shadow falls a little ahead of the hand.
+      m.position.set(l.x, floor + 0.0015, l.z - up * 0.5);
       const k = 1 - up / 0.12;
-      m.scale.setScalar(0.03 + 0.03 * (1 - k));
+      m.scale.setScalar(0.05 + 0.04 * (1 - k));
       const mat = m.material as MeshBasicMaterial;
       if (hot) {
         mat.color.setHex(0xff8a2a);
         mat.blending = AdditiveBlending;
-        mat.opacity = 0.35 + 0.4 * k;
+        mat.opacity = 0.5 + 0.5 * k;
       } else {
         mat.color.setHex(0x000000);
         mat.blending = NormalBlending;
-        mat.opacity = 0.25 * k;
+        mat.opacity = 0.45 * k;
       }
     });
   }
@@ -1448,10 +1473,17 @@ export class MatchSystem extends createSystem({
       if (!m.visible) continue;
       const t = (m.userData.t += dt);
       const mat = m.material as MeshBasicMaterial;
-      // White-hot (0 s), orange (1 s), dull red (3 s), then a faint scorch.
-      const k = Math.min(1, t / 3);
-      mat.color.setRGB(1, Math.max(0.12, 0.95 - k * 0.85), Math.max(0.02, 0.8 - k * 1.6));
-      mat.opacity = t < 3 ? 1 : Math.max(0.25, 1 - (t - 3) / 3);
+      // White-hot (0 s), orange (1 s), dull red (3 s), then a dark scorch on the wood.
+      if (t < 3) {
+        const k = t / 3;
+        mat.blending = AdditiveBlending;
+        mat.color.setRGB(1, Math.max(0.12, 0.95 - k * 0.85), Math.max(0.02, 0.8 - k * 1.6));
+        mat.opacity = 1;
+      } else {
+        mat.blending = NormalBlending;
+        mat.color.setHex(0x1a0f0a);
+        mat.opacity = Math.min(0.6, (t - 3) * 0.6);
+      }
     }
   }
 
@@ -1469,6 +1501,13 @@ export class MatchSystem extends createSystem({
     this.lite = true;
     this.world.renderer.xr.setFoveation?.(1);
     console.warn(`[PERF] averaging ${(1 / this.fpsAvg).toFixed(0)} fps: lighter rendering (foveation 1, no room dimming)`);
+  }
+
+  /** A puff of steam off the forge's quench slot (pale sparks rising). */
+  private steam() {
+    const q = this.forge.quenchSpot(this.handAt);
+    this.stage.worldToLocal(q);
+    this.sparks.burst(q.x + (Math.random() - 0.5) * 0.02, q.y, q.z + (Math.random() - 0.5) * 0.02, 0.25);
   }
 
   /** The match in two lines: the result and score, then each round's finish, the best rip and the XP. */
@@ -1630,6 +1669,7 @@ export class MatchSystem extends createSystem({
     this.myPoints = 0;
     this.theirPoints = 0;
     this.wasDown = false;
+    this.introDone = false;
     this.matchLog = { rounds: [], rip: 0, xp: 0, won: false, score: '' };
     for (const m of [...this.palmPrints, ...this.scorches]) m.visible = false;
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
@@ -2117,8 +2157,9 @@ export class MatchSystem extends createSystem({
       const vs = `VS ${this.rival.name.toUpperCase()}`;
       const sub = c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title;
       if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
-      else this.entrance = { t: 0, vs, sub, champion: !!c?.champion };
-      this.label.set(`${this.rival.name}, ${this.rival.title}\n"${this.rival.intro}"`);
+      else if (!this.introDone) this.entrance = { t: 0, vs, sub, champion: !!c?.champion };
+      this.introDone = true;
+      this.label.set(`${this.rival.name}, ${this.rival.title}\n"${this.rival.intro}"${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
     }
     else {
       this.label.set('');
@@ -2311,7 +2352,7 @@ export class MatchSystem extends createSystem({
     this.offDeskShown = false;
     this.lastCause = '';
     // Personal bests are their own small moment (the first record is just kept).
-    if (!this.demo && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
+    if (!this.demo && this.progress.guide === 'done' && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
     const mh = this.mine.hand;
     const th = this.theirs.hand;
     // The launch angles into each top's own orbit direction (mirrored for left spin); aim stays as pulled.
@@ -2495,7 +2536,9 @@ export class MatchSystem extends createSystem({
       const a = Math.atan2(l!.z, l!.x);
       const r = rimRadius(this.arena.layout, a);
       this.doStrike(Math.cos(a) * r, Math.sin(a) * r);
-      this.printPalm(l!.x, l!.z, a);
+      // Under the palm itself (between the wrist and the fingertip).
+      const palm = this.handAt.copy(this.toLocal(h.wrist)).lerp(this.toLocal(h.index), 0.5);
+      this.printPalm(palm.x, palm.z, a);
       break;
     }
     // The arena's rails warm as the bar fills, and glow when it is full: the tops are what the eyes follow.
@@ -3011,7 +3054,7 @@ export class MatchSystem extends createSystem({
       // A finish within 1.5 s of the player's shape names it as the cause.
       const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind).toUpperCase() : null;
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
-      if (!this.demo && v === 1 && loser.finish !== 'spin' && this.progress.best('fastestKo', Math.round(this.elapsed * 10) / 10)) this.stamp.later('NEW BEST!', `Fastest knockout: ${this.elapsed.toFixed(1)} s`, 'mine', 1);
+      if (!this.demo && this.progress.guide === 'done' && v === 1 && loser.finish !== 'spin' && this.progress.best('fastestKo', Math.round(this.elapsed * 10) / 10)) this.stamp.later('NEW BEST!', `Fastest knockout: ${this.elapsed.toFixed(1)} s`, 'mine', 1);
       if (v === 1 && loser.finish !== 'spin' && recent && this.lastShape) {
         const k = this.lastShape.kind;
         this.featDone(k === 'ramp' ? 'ramp' : k === 'sling' ? 'sling' : k === 'strike' ? 'strike' : '');
@@ -3097,7 +3140,7 @@ export class MatchSystem extends createSystem({
       const ox = x / (Math.hypot(x, z) || 1);
       const oz = z / (Math.hypot(x, z) || 1);
       const fy = this.arena.height(x, z);
-      this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.03, fy + 0.006, z + oz * 0.03, 1], [1.35, x + ox * 0.03, fy + 0.03, z + oz * 0.03, 0], [2.2, x + ox * 0.03, fy + 0.05, z + oz * 0.03, 0]], this.frameDt);
+      this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.05, fy + 0.006, z + oz * 0.05, 1], [1.35, x + ox * 0.05, fy + 0.03, z + oz * 0.05, 0], [2.2, x + ox * 0.05, fy + 0.05, z + oz * 0.05, 0]], this.frameDt);
       ghost = true;
     } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.progress.matches === 2 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set('New: jab a fingertip down into the floor\na cup opens and catches the top that rolls in');
@@ -3185,7 +3228,7 @@ export class MatchSystem extends createSystem({
     }
     if (this.rewardHold > 0) this.rewardHold -= dt;
     // Unlocks wait for the match's end (never between rounds), then show one after another.
-    else if (!this.reveal && this.matchOver && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+    else if (!this.reveal && !this.replay && this.matchOver && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
       this.revealedHere = true;
       const key = this.reveals.shift()!;
       const obj = unlockModel(key, this.arenas);

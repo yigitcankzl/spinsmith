@@ -818,6 +818,11 @@ export class Forge {
     this.quench.add(name);
   }
 
+  /** Where the quench slot is (world). */
+  quenchSpot(out: Vector3): Vector3 {
+    return this.quench.getWorldPosition(out);
+  }
+
   /** Dev: world positions of the top, the tabs, the open drawer's parts and the quench slot. */
   debugPositions(): string {
     this.root.updateWorldMatrix(true, true);

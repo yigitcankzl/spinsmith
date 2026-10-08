@@ -62,7 +62,7 @@ export class RoomLight {
     a = uDim * smoothstep(uR0, uR1, d);
     // A won match: a warm ring rolls out across the room.
     if (uWave > 0.0) {
-      float band = exp(-pow((d - uWave) / 0.18, 2.0));
+      float band = exp(-pow((d - uWave) / 0.4, 2.0));
       gl_FragColor = vec4(mix(uTint * a, vec3(1.0, 0.55, 0.15), band * 0.6), max(a * (1.0 - band), band * 0.4));
       return;
     }

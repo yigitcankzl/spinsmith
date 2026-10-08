@@ -1886,7 +1886,8 @@ export class Stamp {
 
   /** Stamps after whatever shows now (and after anything stamped in the same frame). */
   later(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1) {
-    this.queue.push([word, sub, side, hold]);
+    // At most three wait: a pile of rewards is not a sequence anyone reads.
+    if (this.queue.length < 3) this.queue.push([word, sub, side, hold]);
   }
 
   constructor(width = 0.2) {
@@ -2027,7 +2028,7 @@ export function forgeEnvironment(renderer: WebGLRenderer): Texture {
  */
 export class GhostHand {
   readonly root = new Group();
-  private tip = new Mesh(new SphereGeometry(0.007, 14, 10), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
+  private tip = new Mesh(new SphereGeometry(0.009, 14, 10), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
   private ring = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.8, depthWrite: false, side: DoubleSide }));
   private trail = new Mesh(new SphereGeometry(0.0025, 8, 6), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0.4, depthWrite: false }));
   private t = 0;
