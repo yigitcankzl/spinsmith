@@ -27,7 +27,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -249,6 +249,8 @@ export class MatchSystem extends createSystem({
   private hitStop = 0;
   private lastHardHit = -1;
   private impacts = new Impacts();
+  private trails = new Trails();
+  private trailT = 0;
   private showcase = new Group();
   /** First-session hints: arrows teaching the rip, and a marker where a bump would pay off. */
   private ripArrows = new Group();
@@ -533,6 +535,7 @@ export class MatchSystem extends createSystem({
       this.arenaView.root,
       this.sparks.points,
       this.impacts.root,
+      this.trails.mesh,
       this.ripArrows,
       this.bumpMark,
       this.marks.root,
@@ -744,7 +747,8 @@ export class MatchSystem extends createSystem({
     }
     // On the result card and at home, the card steps back while a stamp holds the far rim (one
     // thing there at a time); in a fight its instructions (a tell, strike now) stay at full strength.
-    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible && (this.phase === 'result' || this.phase === 'hub' || this.phase === 'ready'));
+    // On the result the stamp takes the card's place, so the card steps away entirely.
+    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible && (this.phase === 'result' || this.phase === 'hub' || this.phase === 'ready'), this.phase === 'result' ? 0 : 0.2);
     this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
@@ -958,6 +962,17 @@ export class MatchSystem extends createSystem({
     this.sparks.rim = maxRim(this.arena.layout) + 0.01;
     this.sparks.update(vdt);
     this.impacts.update(vdt);
+    // Trails behind both tops while they fight.
+    this.trailT += vdt;
+    if (this.trailT >= 1 / 30) {
+      this.trailT = 0;
+      if (this.phase === 'fight') {
+        this.tops.forEach((t, side) => {
+          if (t.state === 'spinning') this.trails.drop(side as 0 | 1, t.x, this.arena.height(t.x, t.z), t.z, Math.hypot(t.vx, t.vz));
+        });
+      }
+    }
+    this.trails.update(vdt);
     this.updateGuide();
     for (const c of this.showcase.children) c.rotation.y += dt * 0.4;
     this.updateRewards(dt);
@@ -1911,6 +1926,9 @@ export class MatchSystem extends createSystem({
     const lift = Math.max(0, WALL_HEIGHT[L.wall] - WALL_HEIGHT.standard);
     this.bar.mesh.position.y = (0.05 + lift) * grow;
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
+    // The result's stamp stands in the card's slot above the bar, leaving the arena and the winner in view.
+    if (this.phase === 'result') this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y, this.label.mesh.position.z + 0.01);
+    else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);

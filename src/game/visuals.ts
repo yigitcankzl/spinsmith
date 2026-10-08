@@ -34,6 +34,8 @@ import {
   RepeatWrapping,
   RingGeometry,
   SphereGeometry,
+  Sprite,
+  SpriteMaterial,
   Shape,
   SRGBColorSpace,
   TorusGeometry,
@@ -253,6 +255,29 @@ export function mergeByMaterial(root: Object3D): Group {
   for (const { material, geos } of groups.values()) out.add(new Mesh(merge(geos), material));
   return out;
 }
+
+/** Three tapered arcs round a ring, white on transparent: a spinning top's motion streaks. */
+const SPIN_STREAKS = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d')!;
+  g.lineCap = 'round';
+  for (let k = 0; k < 3; k++) {
+    const a0 = (k / 3) * Math.PI * 2;
+    // Each arc is drawn in short steps, bright at its head and fading along its tail.
+    for (let i = 0; i < 24; i++) {
+      const t = i / 24;
+      g.strokeStyle = `rgba(255,255,255,${(1 - t) ** 1.5})`;
+      g.lineWidth = 34 * (1 - t * 0.7);
+      g.beginPath();
+      g.arc(128, 128, 92, a0 - t * 1.6, a0 - (t + 1 / 24) * 1.6, true);
+      g.stroke();
+    }
+  }
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+})();
 
 /** A spark emblem (four-point star in a ring), white on transparent, tinted by its material. */
 function emblemTexture(): CanvasTexture {
@@ -583,7 +608,7 @@ export class TopView {
     // A blur halo in the body color at the blade's height, bright while spinning fast.
     this.blur = new Mesh(
       new RingGeometry(ring.radius * 0.5, ring.radius * 1.12, 48).rotateX(-Math.PI / 2),
-      new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.4), transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
+      new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.12), map: SPIN_STREAKS, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
     );
     this.blurColor = (this.blur.material as MeshBasicMaterial).color.clone();
     this.blur.position.y = topHeight(ring, base) - 0.002;
@@ -720,7 +745,9 @@ export class TopView {
     const risk = Math.max(0, (top.damage - 0.45) / 0.55);
     // Hot metal (docs/DUEL-DESIGN.md): it glows red early, since a hot top flies further from the strike.
     const heat = Math.max(0, (top.damage - 0.12) / 0.88);
-    blur.opacity = top.state === 'spinning' ? Math.max(0.28 * Math.min(1, Math.max(0, top.spin)), this.flashT * 9, 0.4 * heat) : 0;
+    blur.opacity = top.state === 'spinning' ? Math.max(0.5 * Math.min(1, Math.max(0, top.spin)), this.flashT * 9, 0.6 * heat) : 0;
+    // The streaks sweep round a fraction as fast as the top, so the spin reads as motion.
+    this.blur.rotation.y = this.spinner.rotation.y * 0.12;
     blur.color.copy(this.blurColor).lerp(this.danger, Math.min(1, heat * 1.3)).lerp(this.white, Math.min(1, this.flashT * 12));
     this.explode(0.35 * risk * (0.85 + 0.15 * Math.sin(time * 30)), null, time);
   }
@@ -1659,9 +1686,9 @@ export class Label {
   }
 
   /** Each frame: a new message fades in over 0.16 s; while something else holds the eye (a stamp), it steps back. */
-  update(dt: number, dim = false) {
+  update(dt: number, dim = false, dimTo = 0.2) {
     const m = this.mesh.material as MeshBasicMaterial;
-    const target = dim ? 0.2 : 1;
+    const target = dim ? dimTo : 1;
     m.opacity += Math.max(-dt / 0.15, Math.min(dt / 0.16, target - m.opacity));
     // The card's body fades with it.
     (this.slab.material as MeshStandardMaterial).opacity = m.opacity;
@@ -1742,8 +1769,14 @@ export class Impacts {
   private streaks: { mesh: Mesh; t: number }[] = [];
   private nextRing = 0;
   private nextStreak = 0;
+  /** A hard clash flares at blade height, facing the eye, so a big hit reads from a seated angle. */
+  private flare = new Sprite(new SpriteMaterial({ map: SOFT_SHADOW, color: 0xffffff, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false }));
+  private flareT = 1;
+  private flareSize = 0;
 
   constructor() {
+    this.flare.visible = false;
+    this.root.add(this.flare);
     for (let i = 0; i < 4; i++) {
       const mesh = new Mesh(
         new RingGeometry(0.8, 1, 32).rotateX(-Math.PI / 2),
@@ -1772,6 +1805,12 @@ export class Impacts {
     r.size = 0.02 + 0.04 * strength;
     r.mesh.position.set(x, y + 0.002, z);
     r.mesh.visible = true;
+    if (strength >= 0.8 && COMFORT.flashes) {
+      this.flareT = 0;
+      this.flareSize = 0.035 + 0.025 * strength;
+      this.flare.position.set(x, y + 0.012, z);
+      this.flare.visible = true;
+    }
   }
 
   /** A streak behind a top dashing in direction (dx, dz). */
@@ -1785,6 +1824,15 @@ export class Impacts {
   }
 
   update(dt: number) {
+    if (this.flare.visible) {
+      this.flareT += dt / 0.12;
+      const k = Math.min(1, this.flareT);
+      this.flare.scale.setScalar(this.flareSize * (0.5 + 0.8 * Math.sqrt(k)));
+      const m = this.flare.material;
+      m.opacity = (1 - k) ** 2;
+      m.color.setRGB(1, 1 - 0.45 * k, 1 - 0.8 * k);
+      if (k >= 1) this.flare.visible = false;
+    }
     for (const r of this.rings) {
       if (!r.mesh.visible) continue;
       r.t += dt / 0.18;
@@ -1801,6 +1849,61 @@ export class Impacts {
       (s.mesh.material as MeshBasicMaterial).opacity = 0.8 * (1 - k);
       if (k >= 1) s.mesh.visible = false;
     }
+  }
+}
+
+/**
+ * Floor trails: a fading ribbon of soft additive dots behind each top (yours orange, the rival's
+ * cyan), longer and brighter the faster it moves, so a 1 cm top's path reads at a glance.
+ */
+export class Trails {
+  static readonly PER = 24;
+  readonly mesh: InstancedMesh;
+  private age = new Float32Array(Trails.PER * 2).fill(9);
+  private size = new Float32Array(Trails.PER * 2);
+  private at = new Float32Array(Trails.PER * 2 * 3);
+  private next = [0, 0];
+  private readonly m = new Matrix4();
+  private readonly v = new Vector3();
+  private readonly s = new Vector3();
+  private readonly q = new Quaternion();
+
+  constructor() {
+    this.mesh = new InstancedMesh(
+      new PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ map: SOFT_SHADOW, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+      Trails.PER * 2,
+    );
+    this.mesh.frustumCulled = false;
+    const colors = [new Color(0xff8a2a).multiplyScalar(0.9), new Color(0x4fd1ff).multiplyScalar(0.8)];
+    for (let i = 0; i < Trails.PER * 2; i++) {
+      this.mesh.setColorAt(i, colors[i < Trails.PER ? 0 : 1]);
+      this.mesh.setMatrixAt(i, this.m.makeScale(0, 0, 0));
+    }
+  }
+
+  /** A dot under top `side` (0 yours, 1 the rival's) moving at `speed` (arena units/s). */
+  drop(side: 0 | 1, x: number, y: number, z: number, speed: number) {
+    const i = side * Trails.PER + this.next[side];
+    this.next[side] = (this.next[side] + 1) % Trails.PER;
+    this.age[i] = 0;
+    this.size[i] = 0.01 + Math.min(0.014, speed * 0.03);
+    this.at.set([x, y + 0.0015, z], i * 3);
+  }
+
+  clear() {
+    this.age.fill(9);
+  }
+
+  update(dt: number) {
+    for (let i = 0; i < Trails.PER * 2; i++) {
+      this.age[i] += dt;
+      const k = Math.max(0, 1 - this.age[i] / 0.45);
+      this.v.fromArray(this.at, i * 3);
+      const r = this.size[i] * k;
+      this.mesh.setMatrixAt(i, this.m.compose(this.v, this.q, this.s.set(r, 1, r)));
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
   }
 }
 

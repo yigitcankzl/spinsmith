@@ -12,6 +12,7 @@
  * - Drop the top in the quench slot beside the anvil to save it and go home.
  */
 import {
+  AdditiveBlending,
   BoxGeometry,
   Color,
   CircleGeometry,
@@ -25,6 +26,7 @@ import {
   MeshMatcapMaterial,
   Object3D,
   Quaternion,
+  RingGeometry,
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
@@ -34,7 +36,7 @@ import type { Progress } from './progress.js';
 import { addStem, ORANGE, TEXT_DIM } from './ui.js';
 import { tag } from './builder.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
-import { TAB_LINE, traySpot, WORK as REACH_WORK } from './reach.js';
+import { TAB_LINE, TRAY, traySpot, WORK as REACH_WORK } from './reach.js';
 import type { HandState } from './hands.js';
 import { buildName, CORES, migrateBuild, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, roleOf, SEAL_BLURBS, SEAL_NAMES, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from './parts.js';
 import { SEALS } from './sim.js';
@@ -171,7 +173,7 @@ export function itemKey(item: Item): string | null {
 }
 
 /** Pedestal colors: idle, pointed at, on your top, locked. */
-const PAD_IDLE = new Color(0x8a919c);
+const PAD_IDLE = new Color(0xb8c0cc);
 const PAD_HOVER = new Color(0xdfe8f5);
 const PAD_ON = new Color(ORANGE);
 const PAD_LOCKED = new Color(0x2a2e35);
@@ -829,13 +831,22 @@ export class Forge {
       });
     }
     // The pedestals: one instanced mesh for all, recolored per state; hidden ones sink away.
-    const graphite = new CylinderGeometry(0.009, 0.01, 0.002, 24);
+    const graphite = new CylinderGeometry(0.011, 0.012, 0.002, 24);
     this.pads = new InstancedMesh(graphite, new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xffffff) }), pads.length);
     pads.forEach((p, i) => {
       this.pads.setMatrixAt(i, this.m.makeTranslation(p.x, p.y - 0.016, p.z));
       this.pads.setColorAt(i, PAD_IDLE);
     });
     this.tray.add(this.pads);
+    // A warm band of light along the tray's arc: the parts sit on a lit display, not a dark floor.
+    const span = 0.8 * Math.PI;
+    const band = new Mesh(
+      new RingGeometry(TRAY.r - 0.014, TRAY.r + 0.014, 64, 1, -Math.PI / 2 - span / 2 - 0.12, span + 0.24).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: 0xff9a4a, transparent: true, opacity: 0.22, blending: AdditiveBlending, depthWrite: false }),
+    );
+    band.scale.z = 0.8;
+    band.position.set(WORK.x, TRAY.y - 0.017, WORK.z);
+    this.tray.add(band);
   }
 
   /** The quench slot, set into the right rim: drop your top in to save it and go home. */

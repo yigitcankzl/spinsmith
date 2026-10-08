@@ -410,8 +410,8 @@ export class Hub {
     cradle.position.set(BLUEPRINT_AT.x, TABLE_Y, BLUEPRINT_AT.z);
     cradle.rotation.y = -0.5;
     const build = tag('WORKSHOP', 0.06, 46);
-    // Above the roll and nudged left, clear of the anvil beside it.
-    build.position.set(home.x - 0.045, home.y + 0.055, home.z);
+    // Low over the roll and toward the player: clear of the arena's rim and of the anvil.
+    build.position.set(home.x - 0.02, home.y + 0.04, home.z + 0.012);
     this.labels.push(build);
     this.blueprint.add(cradle, holder, build);
     this.root.add(this.blueprint);
@@ -504,7 +504,8 @@ export class Hub {
     this.rankTex = new CanvasTexture(this.rankCanvas);
     this.rankTex.colorSpace = SRGBColorSpace;
     const rank = new Mesh(new PlaneGeometry(0.1, 0.049), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
-    rank.rotation.x = -1;
+    // Laid back like a desk plaque, below the arena's front edge.
+    rank.rotation.x = -1.25;
     addSlab(rank, 0.1, 0.049, 0.08, 0.005);
     rank.scale.setScalar(0.8);
     // Held for 2 s, then pinched again, the level plate starts over as a new smith (shared headsets).
