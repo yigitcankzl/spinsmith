@@ -569,7 +569,8 @@ const DOCK_TOP = 0.097 * RIM_SCALE;
  * tapers to a point, a polished face with a hardy hole, a stepped heel, a narrow waist and splayed
  * feet) on an octagonal graphite plinth with a brass band and a glowing seam, a hammer against it.
  */
-export function anvilModel(): Group {
+/** Without the hammer in the forge, where it would lie among the tray's parts. */
+export function anvilModel(withHammer = true): Group {
   const iron = new MeshMatcapMaterial({ matcap: IRON });
   const steel = new MeshMatcapMaterial({ matcap: STEEL });
   const graphite = new MeshMatcapMaterial({ matcap: GRAPHITE });
@@ -604,7 +605,8 @@ export function anvilModel(): Group {
   hammer.position.set(0.075, 0, 0.045);
   hammer.rotation.z = 0.3;
   const g = new Group();
-  g.add(plinth, cap, band, seam, body, face, hardy, glow, hammer, softShadow(0.16));
+  g.add(plinth, cap, band, seam, body, face, hardy, glow, softShadow(0.16));
+  if (withHammer) g.add(hammer);
   return mergeByMaterial(g);
 }
 

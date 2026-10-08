@@ -1,6 +1,6 @@
 /**
  * The forge is the arena, transformed: its floor sinks, an anvil rises at the near third of the
- * bowl with your top on it, drawers slide out of the near rim and the stats rise on the far rim.
+ * bowl with your top on it, drawers slide out of the near rim and the stats rise over the right rim.
  * Everything is within a seated arm's reach and used the same way: pinch, carry, drop.
  * - Four drawer tabs on the near rim (Ring, Core, Tip, Style) choose which parts lie on the tray,
  *   a half circle around the anvil's near side. One kind at a time, at most six parts.
@@ -122,8 +122,8 @@ const TAB_GAP = TAB_LINE.gap;
 const TAB_H = 0.024;
 /** The quench slot, set into the right rim beside the anvil. */
 const QUENCH_AT = new Vector3(0.205, -0.006, 0.06);
-/** The stats plate stands on the far rim. */
-const STATS_AT = new Vector3(0, 0.16, -0.25);
+/** The stats plate stands over the right rim, above the quench slot: never behind your top on the anvil. */
+const STATS_AT = new Vector3(0.17, 0.12, -0.03);
 /** Your top on the anvil is this much larger than in the arena. */
 const DISPLAY_SCALE = 1.7;
 /** The transformation takes this long (s). */
@@ -209,7 +209,7 @@ export class Forge {
     TAB_W,
     TAB_H,
   );
-  private anvil = anvilModel();
+  private anvil = anvilModel(false);
   private quench = new Group();
   private display!: TopView;
   /** Tips the top toward the eyes so its face shows; it spins about its own axis inside. */
@@ -252,13 +252,16 @@ export class Forge {
     this.tabs.add(this.tabPlates.mesh);
     this.buildQuench();
     this.anvil.scale.setScalar(ANVIL_SCALE);
+    // Turned so its horn points back-right, away from the tray's parts.
+    this.anvil.rotation.y = -0.45;
     this.displayHolder.position.copy(WORK);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
     this.displayTilt.rotation.x = 0.5;
     this.displayHolder.add(this.displayTilt);
     this.stats.mesh.name = 'forge-stats';
     this.stats.mesh.position.copy(STATS_AT);
-    this.stats.mesh.rotation.x = -0.3;
+    this.stats.mesh.rotation.set(-0.15, -0.35, 0, 'YXZ');
+    this.stats.mesh.scale.setScalar(0.62);
     this.root.add(this.anvil, this.tray, this.tabs, this.quench, this.displayHolder, this.stats.mesh);
     this.rebuildDisplay();
     this.root.visible = false;
@@ -393,8 +396,8 @@ export class Forge {
       if (s.drawer !== this.drawer) continue;
       const locked = this.locked(s);
       const on = s === hovered && !locked;
-      // Names show as the drawer opens, then only for the part pointed at or new (no clump of tags).
-      s.name.visible = s === hovered || s === this.focus || this.drawerT < 3;
+      // Only the part pointed at or new shows its name (no clump of overlapping tags).
+      s.name.visible = s === hovered || s === this.focus;
       s.flash = Math.max(0, s.flash - dt);
       const pad = this.padColor.copy(locked ? PAD_LOCKED : this.isOn(s.item) ? PAD_ON : on ? PAD_HOVER : PAD_IDLE);
       // A part just fitted flashes white; the first session's new part breathes until fitted.
@@ -419,7 +422,7 @@ export class Forge {
     }
   }
 
-  /** The transformation: the anvil rises, the tray and tabs slide out, the stats rise on the far rim. */
+  /** The transformation: the anvil rises, the tray and tabs slide out, the stats rise over the right rim. */
   private animate(dt: number) {
     if (this.opening) {
       this.opened = Math.min(1, this.opened + dt / OPEN_TIME);
@@ -811,7 +814,7 @@ export class Forge {
         name.rotation.x = -0.35;
         name.visible = false;
         this.tray.add(name);
-        const size = item.kind === 'ring' ? 0.42 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
+        const size = item.kind === 'ring' ? 0.34 : item.kind === 'core' ? 0.5 : item.kind === 'tip' ? 0.5 : 0.7;
         this.tray.add(model);
         const key = itemKey(item);
         this.slots.push({ item, drawer, model, name, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null, order: i });
@@ -819,7 +822,7 @@ export class Forge {
       });
     }
     // The pedestals: one instanced mesh for all, recolored per state; hidden ones sink away.
-    const graphite = new CylinderGeometry(0.0135, 0.015, 0.003, 24);
+    const graphite = new CylinderGeometry(0.009, 0.01, 0.002, 24);
     this.pads = new InstancedMesh(graphite, new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xffffff) }), pads.length);
     pads.forEach((p, i) => {
       this.pads.setMatrixAt(i, this.m.makeTranslation(p.x, p.y - 0.016, p.z));
