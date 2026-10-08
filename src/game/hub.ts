@@ -72,7 +72,7 @@ const DOCK_AT = new Vector3(REACH_DOCK.x, REACH_DOCK.y, REACH_DOCK.z);
 const BLUEPRINT_AT = new Vector3(REACH_BLUEPRINT.x, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
 /** The Smith's board (where the first session's notes hang) and the champions' stands on the left rim. */
 const BOARD_AT = new Vector3(-0.195, 0.13, -0.25);
-const CHAMPION_AT = [new Vector3(-0.215, 0, 0.07), new Vector3(-0.23, 0, -0.01), new Vector3(-0.215, 0, -0.09)];
+const CHAMPION_AT = [new Vector3(-0.24, 0, 0.07), new Vector3(-0.25, 0, -0.01), new Vector3(-0.235, 0, -0.09)];
 /** The anvil and the dock on the rim are small models of the full ones. */
 const RIM_SCALE = 0.42;
 /** Starting over: hold the level plate this long (s), then pinch it again within this long. */
@@ -398,7 +398,7 @@ export class Hub {
   /** The blueprint: a rolled-up plan on the near rim, between the level plate and the anvil. */
   private buildBlueprint() {
     const blueprint = new Group();
-    const roll = new Mesh(new CylinderGeometry(0.007, 0.007, 0.055, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x5f8fc9) }));
+    const roll = new Mesh(new CylinderGeometry(0.007, 0.007, 0.055, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x46607e) }));
     const band = new Mesh(new CylinderGeometry(0.0076, 0.0076, 0.007, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
     blueprint.add(roll, band);
     const holder = new Group();
@@ -517,7 +517,7 @@ export class Hub {
     const dock = standModel();
     dock.scale.setScalar(RIM_SCALE);
     this.stand.add(dock);
-    const name = this.label('PLAY', this.stand, DOCK_TOP + 0.06);
+    const name = this.label('PLAY', this.stand, DOCK_TOP + 0.035);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
     this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3(), name });
@@ -587,7 +587,8 @@ export function anvilModel(): Group {
   face.position.set(0.004, ANVIL_FACE - 0.002, 0);
   const hardy = new Mesh(new BoxGeometry(0.008, 0.0045, 0.008), new MeshBasicMaterial({ color: 0x15161a }));
   hardy.position.set(0.04, ANVIL_FACE - 0.0015, 0);
-  const glow = new Mesh(new CircleGeometry(0.03, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0.5 }));
+  // Heat in the face, not a sticker on it: a soft additive glow.
+  const glow = new Mesh(new CircleGeometry(0.03, 24).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xff5a1a, map: SOFT_SHADOW, transparent: true, opacity: 0.35, blending: AdditiveBlending, depthWrite: false }));
   glow.position.y = ANVIL_FACE + 0.0003;
   // The hammer: a tapered graphite handle with a brass ferrule, an octagonal steel head and a peen.
   const hammer = new Group();

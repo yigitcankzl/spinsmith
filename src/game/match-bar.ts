@@ -107,11 +107,12 @@ export class MatchBar {
       g.font = `700 56px ${FONT}`;
       g.textAlign = dir === 1 ? 'left' : 'right';
       g.textBaseline = 'middle';
-      g.fillText(name, x0, 48);
+      // Clear of the plate's corner bolts.
+      g.fillText(name, x0 + dir * 40, 54);
       // Heat toward the match: one pip per point.
       for (let i = 0; i < toWin; i++) {
         g.beginPath();
-        const px = dir === 1 ? x0 + 30 + i * 74 : x0 - 30 - i * 74;
+        const px = dir === 1 ? x0 + 70 + i * 74 : x0 - 70 - i * 74;
         g.arc(px, 205, 26, 0, Math.PI * 2);
         g.fillStyle = i < points ? ORANGE : 'rgba(255,255,255,0.14)';
         g.fill();

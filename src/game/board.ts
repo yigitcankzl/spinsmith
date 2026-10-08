@@ -34,7 +34,7 @@ export interface BoardState {
 }
 
 const W = 1200;
-const H = 780;
+const H = 840;
 const GOLD = '#ffd34a';
 
 export class SmithBoard {
@@ -126,9 +126,9 @@ export class SmithBoard {
       g.stroke();
     }
     g.font = `600 30px ${FONT}`;
-    engrave(g, `${s.stamps} stamp${s.stamps === 1 ? '' : 's'}${s.nextGlow ? ` · a new emblem glow at ${s.nextGlow}` : ''} · feats ${s.feats}/${s.featsOf}`, W / 2, 708, STEEL);
+    engrave(g, `${s.stamps} stamp${s.stamps === 1 ? '' : 's'}${s.nextGlow ? ` · a new emblem glow at ${s.nextGlow}` : ''} · feats ${s.feats}/${s.featsOf}`, W / 2, 712, STEEL);
     g.font = `700 30px ${FONT}`;
-    engrave(g, `Challenge a friend: ?vs=${s.code} on their address fights your top`, W / 2, 750, ORANGE);
+    engrave(g, `Challenge a friend: ?vs=${s.code} on their address fights your top`, W / 2, 772, ORANGE);
     this.tex.needsUpdate = true;
   }
 }

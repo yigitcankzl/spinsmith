@@ -307,7 +307,7 @@ const PLATE_Y = TAB_LINE.y;
 const PLATE_W = 0.048;
 const PLATE_H = 0.024;
 /** Back on the left rim, Try and Save on the right; Save's plate sits in front of its stamp slot. */
-const SAVE_AT = new Vector3(0.205, -0.006, 0.0);
+const SAVE_AT = new Vector3(0.205, -0.006, -0.025);
 const ACTIONS_AT = [new Vector3(-0.205, 0.004, 0.1), new Vector3(0.205, 0.004, 0.1), new Vector3(0.215, 0.004, 0.045)];
 /** The tool rail across the near rim, no wider than the arena: its pieces this far apart, this much larger than life. */
 const RAIL_Z = RAIL.z;

@@ -17,8 +17,8 @@ const ARENA_RADIUS = 0.15;
 export const FORGE_SHELL_HEIGHT = 0.08;
 
 // Graphite, not mauve: the forge's machine color (the darkest large surface stays above #26282d, so passthrough never shows a hole).
-const iron = new MeshStandardMaterial({ color: 0x3a3d45, metalness: 0.7, roughness: 0.45 });
-const darkIron = new MeshStandardMaterial({ color: 0x2a2c32, metalness: 0.6, roughness: 0.55 });
+const iron = new MeshStandardMaterial({ color: 0x5b5f69, metalness: 0.45, roughness: 0.5 });
+const darkIron = new MeshStandardMaterial({ color: 0x41444b, metalness: 0.4, roughness: 0.55 });
 const ember = new MeshBasicMaterial({
   color: 0xff5a24,
   transparent: true,
@@ -61,9 +61,10 @@ root.add(topCollar);
 
 
 const clampGeo = new BoxGeometry(0.022, 0.042, 0.016);
-const shoulderGeo = new BoxGeometry(0.032, 0.007, 0.029);
+// Shallow enough to stay inside the lathe body (only the clamps stand proud of it).
+const shoulderGeo = new BoxGeometry(0.032, 0.007, 0.012);
 const boltGeo = new CylinderGeometry(0.0024, 0.0024, 0.003, 10).rotateX(Math.PI / 2);
-const portGeo = new CircleGeometry(0.009, 20);
+const portGeo = new CircleGeometry(0.0065, 20);
 
 for (let i = 0; i < 8; i++) {
   const frame = new Group();
@@ -78,7 +79,8 @@ for (let i = 0; i < 8; i++) {
   shoulder.position.set(0, -0.015, ARENA_RADIUS + 0.014);
   frame.add(clamp, shoulder);
 
-  for (const x of [-0.006, 0.006]) {
+  // The launch ports take the bolts' place on the front and back clamps.
+  for (const x of i === 0 || i === 4 ? [] : [-0.006, 0.006]) {
     const bolt = new Mesh(boltGeo, iron);
     bolt.name = 'Bolt';
     bolt.position.set(x, -0.039, ARENA_RADIUS + 0.03);

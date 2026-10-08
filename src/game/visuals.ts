@@ -18,6 +18,7 @@ import {
   InstancedMesh,
   Material,
   Matrix4,
+  LatheGeometry,
   Mesh,
   MeshBasicMaterial,
   MeshMatcapMaterial,
@@ -1301,12 +1302,23 @@ export class ArenaView {
     } else {
       const plinth = add(
         new Mesh(
-          new CylinderGeometry(0.15 + 0.012, 0.15 + 0.03, this.pedestalHeight, 64, 1, true),
-          own(new MeshMatcapMaterial({ matcap: makeMatcap('clay', P.pedestal), side: DoubleSide })),
+          // The forge shell's profile (flared foot, inset waist, broad shoulder), bottom to top so it faces out.
+          new LatheGeometry(
+            [
+              [0.02, -1],
+              [0.011, -0.89],
+              [0.017, -0.71],
+              [0.022, -0.33],
+              [0.019, -0.15],
+              [0.008, 0],
+            ].map(([dr, y]) => new Vector2(0.15 + dr, y * this.pedestalHeight)),
+            64,
+          ),
+          // Lit by the room (the environment map), like the forge shell: a painted metal plinth, not a black hole.
+          own(new MeshStandardMaterial({ color: new Color(P.pedestal).lerp(new Color(0x8a8d94), 0.25), metalness: 0.4, roughness: 0.55, side: DoubleSide })),
         ),
       );
       plinth.scale.set(scale * sx, 1, scale * sz);
-      plinth.position.y = -this.pedestalHeight / 2;
     }
   }
 
@@ -1952,8 +1964,8 @@ export class Stamp {
     while (g.measureText(word).width > 960 && size > 40);
     const grad = g.createLinearGradient(0, 40, 0, 190);
     if (side === 'rival') {
-      grad.addColorStop(0, '#e8fbff');
-      grad.addColorStop(1, '#4fd1ff');
+      grad.addColorStop(0, '#bff3ff');
+      grad.addColorStop(1, '#1fb6ff');
     } else if (side === 'neutral') {
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(1, '#c9d3e0');
@@ -1963,14 +1975,16 @@ export class Stamp {
       grad.addColorStop(1, '#ff8a2a');
     }
     g.lineJoin = 'round';
-    g.lineWidth = 18;
+    g.lineWidth = 22;
     g.strokeStyle = 'rgba(10, 12, 16, 0.9)';
     g.strokeText(word, 512, sub ? 108 : 128);
     g.fillStyle = grad;
     g.fillText(word, 512, sub ? 108 : 128);
     if (sub) {
-      g.font = `700 44px ${FONT}`;
-      g.lineWidth = 10;
+      let subSize = 56;
+      do g.font = `700 ${subSize--}px ${FONT}`;
+      while (g.measureText(sub).width > 960 && subSize > 30);
+      g.lineWidth = 12;
       g.strokeText(sub, 512, 220);
       g.fillStyle = '#f4f1ea';
       g.fillText(sub, 512, 220);
@@ -2038,26 +2052,28 @@ function palmTexture(): CanvasTexture {
 }
 
 /**
- * The forge's light for metal (the environment map): a dark room with a warm, low softbox on one
- * side, a cool steel strip high behind and a thin bright line overhead, so spinning blades sweep
- * a warm and a cool highlight instead of a grey studio. Rendered once at load.
+ * The forge's light for metal (the environment map): a lit neutral room, like the real one seen
+ * through passthrough, with a warm softbox low on one side, a cool strip high behind and a bright
+ * line overhead (all brighter than white, so chrome catches real highlights), and a dark table
+ * below. Rendered once at load.
  */
 export function forgeEnvironment(renderer: WebGLRenderer): Texture {
   const scene = new Scene();
-  scene.background = new Color(0x0b0c10);
-  const box = (w: number, h: number, color: number, x: number, y: number, z: number, ry = 0) => {
-    const m = new Mesh(new PlaneGeometry(w, h), new MeshBasicMaterial({ color, side: DoubleSide }));
+  scene.background = new Color(0x8e9198);
+  const box = (w: number, h: number, color: number, power: number, x: number, y: number, z: number) => {
+    const m = new Mesh(new PlaneGeometry(w, h), new MeshBasicMaterial({ color: new Color(color).multiplyScalar(power), side: DoubleSide, toneMapped: false }));
     m.position.set(x, y, z);
     m.lookAt(0, 0, 0);
-    m.rotation.z += ry;
     scene.add(m);
   };
-  box(3, 1.4, 0xffa060, -3, 0.4, 1, 0); // warm softbox, low on the left
-  box(5, 0.5, 0x8fb7ff, 1.5, 2.2, -3); // cool strip behind
-  box(4, 0.12, 0xffffff, 0, 3, 0.5); // bright line overhead
-  box(2, 1, 0x40261a, 3, -0.5, 1); // a dim ember bounce on the right
+  box(3, 1.4, 0xffa060, 4, -3, 0.4, 1); // warm softbox, low on the left
+  box(5, 0.5, 0x8fb7ff, 3, 1.5, 2.2, -3); // cool strip behind
+  box(4, 0.12, 0xffffff, 6, 0, 3, 0.5); // bright line overhead
+  box(1.6, 1, 0xfff4e8, 2.5, -0.8, 3.2, -0.6); // a ceiling light
+  box(2, 1, 0xff7a3a, 1.2, 3, -0.5, 1); // an ember bounce on the right
+  box(8, 8, 0x1c1d21, 1, 0, -2, 0); // the table and floor below
   const pmrem = new PMREMGenerator(renderer);
-  const env = pmrem.fromScene(scene, 0.02).texture;
+  const env = pmrem.fromScene(scene, 0.04).texture;
   pmrem.dispose();
   return env;
 }

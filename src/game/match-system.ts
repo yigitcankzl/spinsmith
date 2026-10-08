@@ -82,7 +82,7 @@ const INTRO_TIME = 2.5;
 /** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
 const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
-const LABEL_AT = new Vector3(0, 0.115, -0.21);
+const LABEL_AT = new Vector3(0, 0.14, -0.21);
 /** A match arena's near rim stays this far out (arena-local, as the 0.17 arenas): a bigger one slides back. */
 const NEAR_RIM = 0.17;
 const MOVE_WORD = { charge: 'charges', quake: 'quakes the floor', pull: 'pulls you to the pits' } as const;
@@ -541,7 +541,7 @@ export class MatchSystem extends createSystem({
     this.shock.visible = false;
     {
       const glow = (o: number) => new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: o, depthWrite: false, blending: AdditiveBlending });
-      const palm = new MeshBasicMaterial({ color: 0xffd23a, map: PALM, transparent: true, opacity: 0.9, depthWrite: false, blending: AdditiveBlending });
+      const palm = new MeshBasicMaterial({ color: 0xff8a2a, map: PALM, transparent: true, opacity: 0.9, depthWrite: false, blending: AdditiveBlending });
       this.slapMark.add(new Mesh(new RingGeometry(0.028, 0.033, 40).rotateX(-Math.PI / 2), glow(0.6)), new Mesh(new PlaneGeometry(0.05, 0.05).rotateX(-Math.PI / 2), palm));
       this.slapMark.visible = false;
       this.root.add(this.slapMark);
@@ -563,7 +563,8 @@ export class MatchSystem extends createSystem({
     this.title.renderOrder = 5;
     this.root.add(this.title);
     // Low over the arena's middle, in front of the far card and the match bar.
-    this.stamp.mesh.position.set(0, 0.045, 0.03);
+    // Above the tops, not on them.
+    this.stamp.mesh.position.set(0, 0.075, 0.03);
     this.root.add(this.stamp.mesh);
     this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
@@ -614,7 +615,7 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.tableMask);
     // The match bar: a metal strip set into the far rim, tipped back toward the player, under the
     // round messages, so score and fight share one view.
-    this.bar.mesh.position.set(0, 0.03, -0.205);
+    this.bar.mesh.position.set(0, 0.05, -0.205);
     this.bar.mesh.rotation.x = -0.55;
     this.bar.mesh.scale.setScalar(0.21);
     this.root.add(this.bar.mesh);
@@ -1092,8 +1093,9 @@ export class MatchSystem extends createSystem({
     this.bar.mesh.visible = false;
     // The first session says where to reach next.
     this.label.set(this.guideNote());
-    // Notes hang over the far rim; the beacon marks the dock or the anvil.
-    this.label.mesh.position.copy(LABEL_AT);
+    // Notes hang over the far rim; the beacon marks the dock or the anvil. Once the Smith's board
+    // hangs over the left, they move right of it.
+    this.label.mesh.position.set(this.progress.guide === 'done' ? 0.165 : LABEL_AT.x, LABEL_AT.y, LABEL_AT.z);
     this.label.mesh.scale.setScalar(1.25);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
@@ -1192,7 +1194,7 @@ export class MatchSystem extends createSystem({
     const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:spur' : null;
     this.progress.advance('fit');
     // The card rides higher in the forge (the stats plate sits on the far rim).
-    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + 0.1, LABEL_AT.z);
+    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + 0.11, LABEL_AT.z);
     const r = this.nextRival;
     let friend = false;
     try {
@@ -1892,13 +1894,17 @@ export class MatchSystem extends createSystem({
     this.stage.scale.setScalar(this.viewK);
     this.builder.viewScale = this.viewK;
     const far = rimRadius(L, -Math.PI / 2) * this.viewK;
-    this.label.mesh.position.z = Math.min(LABEL_AT.z, -(far + 0.04));
+    // In the forge the card stands back behind the stats plate.
+    this.label.mesh.position.z = Math.min(LABEL_AT.z - (p === 'forge' ? 0.03 : 0), -(far + 0.04));
     this.bar.mesh.position.z = Math.min(-0.205, -(far + 0.035));
     // Further away, the card and the bar grow so they read the same.
     const reach = TUNE.reach / ARENA_SCALE;
     const grow = Math.max(1, (reach + this.pushed / ARENA_SCALE + far) / (reach + 0.17));
     this.label.mesh.scale.setScalar(1.25 * grow);
     this.bar.mesh.scale.setScalar(0.21 * grow);
+    // Their heights grow with them, so the card stays clear above the bar.
+    this.bar.mesh.position.y = 0.05 * grow;
+    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = LABEL_AT.y * grow;
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
@@ -1974,7 +1980,7 @@ export class MatchSystem extends createSystem({
     post.position.z = -0.01;
     const grip = new Mesh(new TorusGeometry(0.009, 0.003, 8, 20), brass);
     this.handle.add(post, grip);
-    this.handle.position.set(0, -0.026, 0.215);
+    this.handle.position.set(0, -0.026, 0.245);
     this.handle.visible = false;
   }
 

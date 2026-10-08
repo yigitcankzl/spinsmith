@@ -76,11 +76,11 @@ export interface ArenaLayout {
 export const MIN_RADIUS = 0.12;
 export const MAX_RADIUS = 0.26;
 /**
- * Arenas up to this far-reaching rim (corners included) show at full size everywhere; a bigger one
+ * Arenas up to this far-reaching rim (corners included, the standard 15 cm arena's) show at full size everywhere; a bigger one
  * shows shrunk to it at home, in the forge and in the workshop, where the props stand around a
  * small arena, and opens out to full size for a match.
  */
-export const DISPLAY_RIM = 0.19;
+export const DISPLAY_RIM = 0.155;
 
 /** The farthest the rim reaches from the center in any direction (a square's corners). */
 export function maxRim(layout: ArenaLayout): number {

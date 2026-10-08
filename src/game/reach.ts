@@ -32,18 +32,20 @@ export const BLUEPRINT_AT: Spot = { x: 0.08, y: 0, z: 0.185 };
 export const COMFORT_AT: Spot = { x: -0.075, y: 0, z: 0.2 };
 /** The forge: where your top stands on the anvil, and the part tray: an arc of this radius around it, spanning this angle toward the player. */
 export const WORK: Spot = { x: 0, y: 0.07, z: 0.06 };
-export const TRAY = { r: 0.105, y: 0.035, gap: 0.047 };
+export const TRAY = { r: 0.125, y: 0.035, gap: 0.047 };
 
 /** The arc the tray spans for n parts: a third of a circle, opening up to a half circle so parts keep their gap. */
 export function traySpan(n: number): number {
-  return Math.min(Math.PI, Math.max((2 * Math.PI) / 3, (n * TRAY.gap) / TRAY.r));
+  // At most 0.85 of a half circle: the ends stay in front of the anvil, not beside it.
+  return Math.min(0.85 * Math.PI, Math.max((2 * Math.PI) / 3, (n * TRAY.gap) / TRAY.r));
 }
 
 /** The i-th of n parts on the forge tray. */
 export function traySpot(i: number, n: number): Spot {
   const span = traySpan(n);
   const a = Math.PI / 2 + span / 2 - (span * (i + 0.5)) / n;
-  return { x: WORK.x + Math.cos(a) * TRAY.r, y: TRAY.y, z: WORK.z + Math.sin(a) * TRAY.r };
+  // Flattened toward the player, so the nearest parts stay clear of the drawer tabs.
+  return { x: WORK.x + Math.cos(a) * TRAY.r, y: TRAY.y, z: WORK.z + Math.sin(a) * TRAY.r * 0.8 };
 }
 
 /** Distance (m) and angle below eye level (degrees) of an arena-local spot, for a tray `drop` below the eyes. */
@@ -64,7 +66,7 @@ export function touchTargets(): [string, Spot][] {
     ['workshop tab, outer', { x: 2 * WORKSHOP_TAB_GAP, y: TAB_LINE.y, z: TAB_LINE.z }],
     ['rail, center', { x: 0, y: RAIL.y, z: RAIL.z }],
     ['rail, end', { x: 0.092, y: RAIL.y, z: RAIL.z }],
-    ['tray, nearest', { x: 0, y: TRAY.y, z: WORK.z + TRAY.r }],
+    ['tray, nearest', { x: 0, y: TRAY.y, z: WORK.z + TRAY.r * 0.8 }],
     ['tray, outer', traySpot(0, 6)],
     ['top on the anvil', WORK],
     ['dock', { ...DOCK_AT, y: TABLE_Y + 0.04 }],

@@ -146,7 +146,7 @@ export class DialPlate {
     this.mesh = new Mesh(new PlaneGeometry(width, height), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
   }
 
-  draw(title: string, subtitle: string, dials: Dial[], message: string, subtitleColor = TEXT_DIM) {
+  draw(title: string, subtitle: string, dials: Dial[], message: string, subtitleColor = '#b4bfd0') {
     const key = JSON.stringify([title, subtitle, dials, message, subtitleColor]);
     if (key === this.key) return;
     this.key = key;
@@ -158,7 +158,7 @@ export class DialPlate {
     g.textAlign = 'center';
     g.font = `700 64px ${FONT}`;
     engrave(g, title.toUpperCase(), W / 2, 62, TEXT);
-    g.font = `600 36px ${FONT}`;
+    g.font = `600 46px ${FONT}`;
     engrave(g, subtitle, W / 2, 116, subtitleColor);
     const R = 74;
     dials.forEach((d, i) => {
@@ -206,10 +206,10 @@ export class DialPlate {
       engrave(g, d.label, cx, cy + R + 36, STEEL);
     });
     // What just happened, or what to do next.
-    let size = 36;
+    let size = 44;
     do g.font = `600 ${size--}px ${FONT}`;
-    while (g.measureText(message).width > W - 80 && size > 16);
-    engrave(g, message, W / 2, H - 50, STEEL);
+    while (g.measureText(message).width > W - 80 && size > 24);
+    engrave(g, message, W / 2, H - 46, TEXT);
     this.tex.needsUpdate = true;
   }
 }

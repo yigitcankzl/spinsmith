@@ -123,7 +123,7 @@ const TAB_H = 0.024;
 /** The quench slot, set into the right rim beside the anvil. */
 const QUENCH_AT = new Vector3(0.205, -0.006, 0.06);
 /** The stats plate stands on the far rim. */
-const STATS_AT = new Vector3(0, 0.1, -0.2);
+const STATS_AT = new Vector3(0, 0.145, -0.25);
 /** Your top on the anvil is this much larger than in the arena. */
 const DISPLAY_SCALE = 1.7;
 /** The transformation takes this long (s). */
@@ -393,6 +393,8 @@ export class Forge {
       if (s.drawer !== this.drawer) continue;
       const locked = this.locked(s);
       const on = s === hovered && !locked;
+      // Names show as the drawer opens, then only for the part pointed at, fitted or new (no clump of tags).
+      s.name.visible = s === hovered || s === this.focus || this.isOn(s.item) || this.drawerT < 3;
       s.flash = Math.max(0, s.flash - dt);
       const pad = this.padColor.copy(locked ? PAD_LOCKED : this.isOn(s.item) ? PAD_ON : on ? PAD_HOVER : PAD_IDLE);
       // A part just fitted flashes white; the first session's new part breathes until fitted.
@@ -808,7 +810,7 @@ export class Forge {
         name.rotation.x = -0.35;
         name.visible = false;
         this.tray.add(name);
-        const size = item.kind === 'ring' ? 0.62 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
+        const size = item.kind === 'ring' ? 0.52 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
         this.tray.add(model);
         const key = itemKey(item);
         this.slots.push({ item, drawer, model, name, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null, order: i });
@@ -816,7 +818,7 @@ export class Forge {
       });
     }
     // The pedestals: one instanced mesh for all, recolored per state; hidden ones sink away.
-    const graphite = new CylinderGeometry(0.017, 0.019, 0.003, 24);
+    const graphite = new CylinderGeometry(0.0135, 0.015, 0.003, 24);
     this.pads = new InstancedMesh(graphite, new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xffffff) }), pads.length);
     pads.forEach((p, i) => {
       this.pads.setMatrixAt(i, this.m.makeTranslation(p.x, p.y - 0.016, p.z));
