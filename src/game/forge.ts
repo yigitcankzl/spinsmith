@@ -410,9 +410,10 @@ export class Forge {
     // The card only redraws when what is pointed at changes (no new build object every frame).
     if (!this.heldPart && hovered !== this.cardFor) {
       this.cardFor = hovered;
-      this.showCard(hovered ? this.withItem(hovered.item) : null);
+      // The hint first: the card reads it.
       if (hovered) this.hint(this.locked(hovered) ? `${hovered.item.name}: locked, ${hovered.hint}` : `${hovered.item.name}: ${hovered.item.blurb}`);
       else this.hint(null);
+      this.showCard(hovered ? this.withItem(hovered.item) : null);
     }
   }
 

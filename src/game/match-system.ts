@@ -1196,7 +1196,8 @@ export class MatchSystem extends createSystem({
     const r = this.nextRival;
     let friend = false;
     try {
-      friend = !!sessionStorage.getItem('spinsmith.vs');
+      // As challenger() decides: a code that decodes, after the first session.
+      friend = this.progress.guide === 'done' && !!decodeBuild(sessionStorage.getItem('spinsmith.vs') ?? '');
     } catch {
       // No storage: no challenge waits.
     }
@@ -1296,7 +1297,7 @@ export class MatchSystem extends createSystem({
     if (this.hands.left.justPinched || this.hands.right.justPinched) {
       this.replay = null;
       // Only the REPLAY plate goes (not the finish stamp before it, nor rewards queued behind).
-      if (r.t >= 0) this.stamp.cut();
+      if (was >= 0) this.stamp.cut();
       // The result card does not wait out the skipped replay.
       this.resultTimer = Math.min(this.resultTimer, 1.5);
       return;
