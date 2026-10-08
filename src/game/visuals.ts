@@ -2,6 +2,7 @@ import {
   AdditiveBlending,
   BufferAttribute,
   BoxGeometry,
+  CapsuleGeometry,
   BufferGeometry,
   CanvasTexture,
   CatmullRomCurve3,
@@ -51,7 +52,7 @@ import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena
 import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
 import { Arena, RAMP_SIGMA, Top, WELL_SIGMA } from './sim.js';
-import { addSlab, FONT, glass, ORANGE, slabMaterial, TEXT } from './ui.js';
+import { addSlab, FONT, glass, GUIDE, ORANGE, slabMaterial, TEXT } from './ui.js';
 import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
 import { ARENA_SCALE, TABLE_Y } from './reach.js';
 import { insidePoly } from './room.js';
@@ -1317,6 +1318,10 @@ export class ArenaView {
     const ao = add(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), own(new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }))));
     ao.scale.set(0.15 * 3.1 * (layout.radius / 0.15) * (layout.shape === 'square' ? 1.12 : 1), 1, 0.15 * 3.1 * (layout.radius / 0.15) * (layout.shape === 'oval' ? 0.78 : 1));
     ao.position.y = -this.pedestalHeight + 0.0006;
+    // A tight, darker contact ring hugging the foot: the wide one alone leaves the base floating.
+    const contact = add(new Mesh(ao.geometry, own(new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0x000000, transparent: true, opacity: 0.85, depthWrite: false }))));
+    contact.scale.copy(ao.scale).multiplyScalar(2.15 / 3.1);
+    contact.position.y = ao.position.y + 0.0003;
 
     // Pedestal: the forge shell for forge arenas, a plain themed plinth for the others.
     const sx = layout.shape === 'square' ? 1.12 : 1;
@@ -1907,6 +1912,58 @@ export class Trails {
   }
 }
 
+/** A vertical fade, bright at the bottom and gone at the top, for light pillars. */
+const PILLAR_FADE = (() => {
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createLinearGradient(0, 64, 0, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 64);
+  return new CanvasTexture(c);
+})();
+
+/**
+ * A wall of light rising from the rim for a won match or a new level: it climbs over 0.4 s and
+ * fades over 0.8 s (gold for a level, your orange for a win).
+ */
+export class Pillar {
+  readonly mesh = new Mesh(
+    new CylinderGeometry(1, 1, 1, 48, 1, true).translate(0, 0.5, 0),
+    new MeshBasicMaterial({ map: PILLAR_FADE, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, toneMapped: false }),
+  );
+  private t = -1;
+
+  constructor() {
+    this.mesh.visible = false;
+  }
+
+  play(rim: number, y: number, color: number) {
+    this.t = 0;
+    this.mesh.scale.set(rim, 0.001, rim);
+    this.mesh.position.y = y;
+    (this.mesh.material as MeshBasicMaterial).color.set(color).multiplyScalar(1.4);
+    this.mesh.visible = true;
+  }
+
+  update(dt: number) {
+    if (this.t < 0) return;
+    this.t += dt;
+    const up = Math.min(1, this.t / 0.4);
+    const fade = Math.max(0, (this.t - 0.4) / 0.8);
+    this.mesh.scale.y = 0.16 * (1 - (1 - up) ** 3);
+    (this.mesh.material as MeshBasicMaterial).opacity = 0.8 * Math.min(1, this.t / 0.1) * (1 - fade);
+    if (fade >= 1) {
+      this.t = -1;
+      this.mesh.visible = false;
+    }
+  }
+}
+
 /** What a shape mark draws: a live shape or a ghost of one being made. */
 export interface ShapeMarkSpec {
   kind: 'ramp' | 'well';
@@ -2050,7 +2107,8 @@ export class Stamp {
   private tex: CanvasTexture;
   private t = -1;
   private hold = 1;
-  private queue: [string, string, 'mine' | 'rival' | 'neutral', number][] = [];
+  private size = 1;
+  private queue: [string, string, 'mine' | 'rival' | 'neutral', number, number][] = [];
 
   /** Ends what shows now at once (a skipped replay's plate); what waits shows next. */
   cut() {
@@ -2059,9 +2117,9 @@ export class Stamp {
   }
 
   /** Stamps after whatever shows now (and after anything stamped in the same frame). */
-  later(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1) {
+  later(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1, size = 1) {
     // At most three wait: a pile of rewards is not a sequence anyone reads.
-    if (this.queue.length < 3) this.queue.push([word, sub, side, hold]);
+    if (this.queue.length < 3) this.queue.push([word, sub, side, hold, size]);
   }
 
   constructor(width = 0.2) {
@@ -2074,8 +2132,9 @@ export class Stamp {
     this.mesh.visible = false;
   }
 
-  /** Stamps `word` (and a small line under it) for `hold` seconds; side picks the colors. */
-  show(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1) {
+  /** Stamps `word` (and a small line under it) for `hold` seconds; side picks the colors; size weighs it (1.5 for a decided match, a level). */
+  show(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1, weight = 1) {
+    this.size = weight;
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, 1024, 256);
     g.textAlign = 'center';
@@ -2104,11 +2163,11 @@ export class Stamp {
     if (sub) {
       let subSize = 56;
       do g.font = `700 ${subSize--}px ${FONT}`;
-      while (g.measureText(sub).width > 960 && subSize > 30);
+      while (g.measureText(sub).width > 960 && subSize > 40);
       g.lineWidth = 12;
-      g.strokeText(sub, 512, 220);
+      g.strokeText(sub, 512, 220, 980);
       g.fillStyle = '#f4f1ea';
-      g.fillText(sub, 512, 220);
+      g.fillText(sub, 512, 220, 980);
     }
     this.tex.needsUpdate = true;
     this.t = 0;
@@ -2129,7 +2188,7 @@ export class Stamp {
     // In over 0.12 s from 1.5x with a 1.08 overshoot, hold, then sink and fade over 0.3 s.
     const k = t < 0.12 ? 1.5 - 0.5 * (t / 0.12) - 0.08 * Math.sin((t / 0.12) * Math.PI) : 1;
     const out = Math.max(0, (t - 0.12 - this.hold) / 0.3);
-    this.mesh.scale.setScalar(k * (1 - 0.15 * out));
+    this.mesh.scale.setScalar(this.size * k * (1 - 0.15 * out));
     m.opacity = Math.min(1, t / 0.05) * (1 - out);
     if (out >= 1) {
       this.t = -1;
@@ -2206,15 +2265,20 @@ export function forgeEnvironment(renderer: WebGLRenderer): Texture {
  */
 export class GhostHand {
   readonly root = new Group();
-  private tip = new Mesh(new SphereGeometry(0.009, 14, 10), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false }));
-  private ring = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.8, depthWrite: false, side: DoubleSide }));
-  private trail = new Mesh(new SphereGeometry(0.0025, 8, 6), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0.4, depthWrite: false }));
+  /** Thumb and index fingertips: they close together as the pinch plays, so it reads as a pinch, not a dot. */
+  private index = new Mesh(new CapsuleGeometry(0.0042, 0.014, 4, 10), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false }));
+  private thumb = new Mesh(new CapsuleGeometry(0.0046, 0.011, 4, 10), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false }));
+  private ring = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.8, depthWrite: false, side: DoubleSide }));
+  private trail = new Mesh(new SphereGeometry(0.0025, 8, 6), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.4, depthWrite: false }));
   private t = 0;
 
   constructor() {
-    this.root.add(this.tip, this.ring, this.trail);
+    this.root.add(this.index, this.thumb, this.ring, this.trail);
     this.root.visible = false;
     this.ring.rotation.x = -Math.PI / 2;
+    // The index comes down from above and behind, the thumb from below and in front.
+    this.index.rotation.x = 0.5;
+    this.thumb.rotation.x = -1.1;
   }
 
   /** Plays keyframes [time s, x, y, z, pinch] in a loop (the last time is the loop length). */
@@ -2232,16 +2296,20 @@ export class GhostHand {
     const y = a[2] + (b[2] - a[2]) * e;
     const z = a[3] + (b[3] - a[3]) * e;
     const pinch = a[4] + (b[4] - a[4]) * e;
-    this.tip.position.set(x, y, z);
+    // The fingertips' gap closes with the pinch.
+    const gap = 0.005 + 0.016 * (1 - pinch);
+    this.index.position.set(x, y + 0.006 + gap * 0.6, z - gap * 0.5);
+    this.thumb.position.set(x, y + 0.002 - gap * 0.2, z + 0.004 + gap * 0.7);
     this.ring.position.set(x, y, z);
     this.ring.scale.setScalar(0.009 + 0.014 * (1 - pinch));
-    (this.ring.material as MeshBasicMaterial).color.setHex(pinch > 0.8 ? 0xff8a2a : 0xffd23a);
+    (this.ring.material as MeshBasicMaterial).color.setHex(pinch > 0.8 ? 0xffffff : GUIDE);
     // A faint echo a moment behind shows the direction.
     const back = Math.max(0, u - 0.25);
     this.trail.position.set(a[1] + (b[1] - a[1]) * back, a[2] + (b[2] - a[2]) * back, a[3] + (b[3] - a[3]) * back);
     // Fades at the loop's ends.
     const fade = Math.min(1, this.t / 0.3, (len - this.t) / 0.3);
-    (this.tip.material as MeshBasicMaterial).opacity = 0.8 * fade;
+    (this.index.material as MeshBasicMaterial).opacity = 0.85 * fade;
+    (this.thumb.material as MeshBasicMaterial).opacity = 0.85 * fade;
     (this.ring.material as MeshBasicMaterial).opacity = 0.8 * fade;
   }
 

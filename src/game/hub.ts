@@ -38,7 +38,7 @@ import {
 } from '@iwsdk/core';
 import { playLocked, playPick, playRemove } from './audio.js';
 import type { Progress } from './progress.js';
-import { addSlab, FONT, glass, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
+import { addSlab, FONT, glass, GUIDE, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
@@ -124,9 +124,9 @@ export class Hub {
   private labels: Mesh[] = [];
   /** A breathing ring of light that shows where to reach next during the first session. */
   /** The first move shown, not written: ember dots running in an arc from the dock into the arena. */
-  private path = new InstancedMesh(new SphereGeometry(0.004, 8, 6), new MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }), 9);
+  private path = new InstancedMesh(new SphereGeometry(0.004, 8, 6), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }), 9);
   private pathOn = false;
-  private beacon = new Mesh(new RingGeometry(0.028, 0.034, 40), new MeshBasicMaterial({ color: ORANGE, transparent: true, depthWrite: false }));
+  private beacon = new Mesh(new RingGeometry(0.028, 0.034, 40), new MeshBasicMaterial({ color: GUIDE, transparent: true, depthWrite: false }));
   private rankCanvas = document.createElement('canvas');
   private rankTex!: CanvasTexture;
   private rankKey = '';
@@ -217,6 +217,11 @@ export class Hub {
       this.standTop.root.position.y = DOCK_TOP;
       this.standHolder.add(this.standTop.root);
     }
+  }
+
+  /** Where the first session's ghost hand picks your top up: the beacon over the dock, while nothing is carried (else null). */
+  ghostFrom(): Vector3 | null {
+    return this.beacon.visible && !this.held && this.pathOn ? this.beacon.position : null;
   }
 
   /** Dev photo mode: the station names, the level plate's card and the board stay hidden. */

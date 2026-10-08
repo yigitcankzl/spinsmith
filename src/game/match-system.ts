@@ -4,7 +4,7 @@ import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
-import { addStem, titleMesh } from './ui.js';
+import { addStem, GUIDE, titleMesh } from './ui.js';
 import { TABLE_Y } from './reach.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
@@ -27,7 +27,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -250,11 +250,12 @@ export class MatchSystem extends createSystem({
   private lastHardHit = -1;
   private impacts = new Impacts();
   private trails = new Trails();
+  private pillar = new Pillar();
   private trailT = 0;
   private showcase = new Group();
   /** First-session hints: arrows teaching the rip, and a marker where a bump would pay off. */
   private ripArrows = new Group();
-  private bumpMark = new Mesh(new RingGeometry(0.012, 0.016, 32).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffd28a, transparent: true, depthWrite: false }));
+  private bumpMark = new Mesh(new RingGeometry(0.012, 0.016, 32).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: GUIDE, transparent: true, depthWrite: false }));
   private bumpHintShown = false;
   /** Unlocks waiting to be shown over the arena, and the one showing. */
   private reveals: string[] = [];
@@ -488,7 +489,7 @@ export class MatchSystem extends createSystem({
   /** The next match's rival, picked at home and shown there with its arena. */
   private nextRival: Rival | null = null;
   /** While ready: a faint line on the floor around where you can launch from. */
-  private launchZone = new Mesh(new BufferGeometry(), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0.5, depthWrite: false, side: 2 }));
+  private launchZone = new Mesh(new BufferGeometry(), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.5, depthWrite: false, side: 2 }));
   /** Seconds left before a transient fight message clears. */
   private labelTimer = 0;
   private pullEnd = new Vector3();
@@ -536,6 +537,7 @@ export class MatchSystem extends createSystem({
       this.sparks.points,
       this.impacts.root,
       this.trails.mesh,
+      this.pillar.mesh,
       this.ripArrows,
       this.bumpMark,
       this.marks.root,
@@ -973,6 +975,7 @@ export class MatchSystem extends createSystem({
       }
     }
     this.trails.update(vdt);
+    this.pillar.update(Math.min(delta, 0.1));
     this.updateGuide();
     for (const c of this.showcase.children) c.rotation.y += dt * 0.4;
     this.updateRewards(dt);
@@ -3172,8 +3175,12 @@ export class MatchSystem extends createSystem({
         // A won match: sparks run round the rim for a moment.
         if (youWon) {
           this.celebrate = 1.6;
+          this.pillar.play(maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), TEAM_MINE);
           // The win leaves the machine: a warm ring rolls out across your room.
           if (COMFORT.flashes) this.roomLight.wave();
+        } else if (COMFORT.flashes) {
+          // A loss has its own beat: a cold ring rolls out instead.
+          this.roomLight.wave(true);
         }
         // A loss leaves something to try next time.
         text = youWon ? `You win the match!\n${this.rival.name}: "${this.rival.lose}"` : `You lose the match\nTip: ${this.rival.tip}`;
@@ -3199,7 +3206,7 @@ export class MatchSystem extends createSystem({
       const won = this.myPoints > this.theirPoints || (decided && v === 1);
       const cause = recent && v === 1 ? `YOUR ${recent}` : theirs && v === -1 && loser.finish !== 'spin' ? `THEIR ${this.rivalShapeKind}`.toUpperCase() : '';
       this.lastCause = cause ? `${cause} → ${FINISH_WORD[loser.finish ?? 'spin']}` : '';
-      this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause, v === 1 ? 'mine' : 'rival', 1.1);
+      this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
       if (recent && v === 1) {
         // The stamp names the cause (SLAG! / YOUR RAMP); the card keeps to the score.
         // The decisive move plays out slowly for a moment, in a shower of sparks, then again as a replay.
@@ -3230,6 +3237,14 @@ export class MatchSystem extends createSystem({
     const ready = g === 'launch' && this.phase === 'ready' && !this.demo;
     // A ghost hand shows the move: the rip at the first launch, the ramp in the first fight.
     let ghost = false;
+    // The first hub: the ghost hand picks your top off its stand and carries it into the arena.
+    const from = this.phase === 'hub' && g === 'launch' && !this.demo ? this.hub.ghostFrom() : null;
+    if (from) {
+      const top = from.y + 0.03;
+      const h = this.arena.height(0, 0);
+      this.ghost.play([[0, from.x, top + 0.04, from.z, 0], [0.5, from.x, top, from.z, 0], [0.75, from.x, top, from.z, 1], [1.8, 0, h + 0.05, 0, 1], [2.1, 0, h + 0.015, 0, 1], [2.3, 0, h + 0.015, 0, 0], [3, 0, h + 0.06, 0, 0]], this.frameDt);
+      ghost = true;
+    }
     if (ready) {
       const x = this.mine.x;
       const z = this.mine.z;
@@ -3241,7 +3256,7 @@ export class MatchSystem extends createSystem({
     if (ready) {
       if (this.ripArrows.children.length === 0) {
         for (let i = 0; i < 3; i++) {
-          this.ripArrows.add(new Mesh(new ConeGeometry(0.008, 0.012, 3).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, depthWrite: false })));
+          this.ripArrows.add(new Mesh(new ConeGeometry(0.008, 0.012, 3).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: GUIDE, transparent: true, depthWrite: false })));
         }
       }
       const y = this.arena.height(0, this.SPAWN) + 0.006;
@@ -3298,8 +3313,9 @@ export class MatchSystem extends createSystem({
     if (award.levels.length) {
       playLevelUp();
       for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
+      this.pillar.play(maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), 0xffd34a);
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
-      this.stamp.later(`LEVEL ${this.progress.level}!`, this.progress.rank.toUpperCase(), 'mine', 1.2);
+      this.stamp.later(`LEVEL ${this.progress.level}!`, this.progress.rank.toUpperCase(), 'mine', 1.2, 1.5);
     }
     this.reveals.push(...award.unlocked);
     // The first session's own part goes first: the forge calls for it next.
@@ -3320,7 +3336,7 @@ export class MatchSystem extends createSystem({
     // Beating a circuit's champion for the first time clears the circuit: a moment of its own.
     const c = circuitOf(this.rival.name);
     if (fresh & MARK.beaten && c?.champion) {
-      this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name} is beaten`, 'mine', 2.2);
+      this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name} is beaten`, 'mine', 2.2, 1.5);
       playLevelUp();
       this.featDone(c.circuit.startsWith('Cinder') ? 'cinder' : c.circuit.startsWith('Iron') ? 'iron' : 'crown');
     }

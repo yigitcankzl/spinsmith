@@ -23,6 +23,8 @@ export async function loadFonts() {
 export const GLASS = 'rgba(9, 13, 21, 0.9)';
 export const GLASS_LIGHT = 'rgba(22, 30, 44, 0.9)';
 export const ORANGE = '#ff8a2a';
+/** Every teaching visual (ghost hand, beacon, path, rip arrows, launch zone): one pale gold, never your team orange. */
+export const GUIDE = 0xffd23a;
 /** Cyan belongs to the rival; neutral UI accents use steel. */
 export const CYAN = '#4fd1ff';
 export const STEEL = '#c9d3e0';

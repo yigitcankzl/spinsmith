@@ -20,6 +20,7 @@ export class RoomLight {
     uR0: { value: 0.4 },
     uR1: { value: 0.85 },
     uWave: { value: -1 },
+    uWaveColor: { value: new Color(1, 0.55, 0.15) },
   };
   private readonly warm = new Color(0.16, 0.06, 0.0);
   private readonly cold = new Color(0.02, 0.08, 0.18);
@@ -31,9 +32,11 @@ export class RoomLight {
     this.coolT = 1.4;
   }
 
-  /** A won match: a ring of warm light rolls out from the arena across the room (1.6 s). */
-  wave() {
+  /** A decided match: a ring of light rolls out from the arena across the room (1.6 s), warm for a win, cold for a loss. */
+  wave(cold = false) {
     this.waveT = 0;
+    if (cold) this.uniforms.uWaveColor.value.setRGB(0.2, 0.55, 1);
+    else this.uniforms.uWaveColor.value.setRGB(1, 0.55, 0.15);
   }
   private waveT = -1;
 
@@ -47,7 +50,7 @@ export class RoomLight {
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
-          '#include <common>\nvarying vec3 vRoomWorld;\nuniform float uDim;\nuniform vec3 uTint;\nuniform vec3 uCenter;\nuniform float uTableY;\nuniform float uR0;\nuniform float uR1;\nuniform float uWave;',
+          '#include <common>\nvarying vec3 vRoomWorld;\nuniform float uDim;\nuniform vec3 uTint;\nuniform vec3 uCenter;\nuniform float uTableY;\nuniform float uR0;\nuniform float uR1;\nuniform float uWave;\nuniform vec3 uWaveColor;',
         )
         .replace(
           '#include <dithering_fragment>',
@@ -60,10 +63,10 @@ export class RoomLight {
     vec3 hit = cameraPosition + dir * t;
     float d = distance(hit.xz, uCenter.xz);
     a = uDim * smoothstep(uR0, uR1, d);
-    // A won match: a warm ring rolls out across the room.
+    // A decided match: a ring rolls out across the room.
     if (uWave > 0.0) {
       float band = exp(-pow((d - uWave) / 0.4, 2.0));
-      gl_FragColor = vec4(mix(uTint * a, vec3(1.0, 0.55, 0.15), band * 0.6), max(a * (1.0 - band), band * 0.4));
+      gl_FragColor = vec4(mix(uTint * a, uWaveColor, band * 0.6), max(a * (1.0 - band), band * 0.4));
       return;
     }
   }
