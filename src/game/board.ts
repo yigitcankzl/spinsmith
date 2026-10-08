@@ -1,11 +1,14 @@
 /**
- * The Smith's board on the far rim at home: today's Smith Order, the rivals as medallions with
- * the three marks earned against each, and the ledger of order stamps. One machined plate, one
- * canvas, one draw call; pinch it to take today's order.
+ * The Smith's board, centred over the arena's far rim at home. Its front shows the one thing that
+ * matters today: the Smith Order, with the ledger as a row of stamps (point at it and pinch to take
+ * the order). Its back, shown while asked for (a pinch on the level plate), holds the rest: the
+ * rivals as medallions with the three marks earned against each, the ledger in full, feats and
+ * your top's challenge code. One machined plate, one canvas, one draw call.
  */
-import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
+import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
 import type { Order } from './orders.js';
-import { addSlab, engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
+import { ARENA_SCALE } from './reach.js';
+import { addSlab, engrave, metalPlate, ORANGE, PLATE_DEPTH, pxPerM, setType, signTexture, STEEL, TEXT, TEXT_DIM, wrap } from './ui.js';
 
 export interface BoardRival {
   name: string;
@@ -29,111 +32,135 @@ export interface BoardState {
   /** Feats earned, of how many. */
   feats: number;
   featsOf: number;
-  /** Your top's challenge code (a friend adds ?vs=CODE to the address to fight it). */
+  /** Your top's challenge code (a friend opens the game with it to fight your top). */
   code: string;
 }
 
 const W = 1200;
-const H = 840;
-const GOLD = '#ffd34a';
+const H = 480;
+/** Seen from about this far (m): over the far rim, in the read band. */
+const DIST = 1.2;
+/** A finished ledger and a top with every mark: white-hot steel, not gold (gold teaches). */
+const GILT = '#ffffff';
 
 export class SmithBoard {
   readonly mesh: Mesh;
   private canvas = document.createElement('canvas');
   private tex: CanvasTexture;
   private key = '';
+  private readonly k: number;
 
-  constructor(width = 0.36) {
+  /** `width` in arena-local units (ARENA_SCALE world metres each). */
+  constructor(width = 0.3) {
     this.canvas.width = W;
     this.canvas.height = H;
-    this.tex = new CanvasTexture(this.canvas);
-    this.tex.colorSpace = SRGBColorSpace;
-    this.tex.anisotropy = 4;
+    this.tex = signTexture(this.canvas);
+    this.k = pxPerM(W, width * ARENA_SCALE);
     this.mesh = new Mesh(new PlaneGeometry(width, (width * H) / W), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
     this.mesh.name = 'smith-board';
-    addSlab(this.mesh, width, (width * H) / W, 0.06, 0.01);
+    addSlab(this.mesh, width, (width * H) / W, 0.06, PLATE_DEPTH / ARENA_SCALE);
   }
 
-  draw(s: BoardState) {
-    const key = JSON.stringify(s);
+  /** Draws the order side, or (back) the rivals and the ledger; redraws only on change. */
+  draw(s: BoardState, back = false) {
+    const key = JSON.stringify(s) + back;
     if (key === this.key) return;
     this.key = key;
     const g = this.canvas.getContext('2d')!;
     metalPlate(g, W, H);
     if (s.gilded) {
-      g.strokeStyle = GOLD;
-      g.lineWidth = 8;
+      g.strokeStyle = GILT;
+      g.lineWidth = 4;
       g.strokeRect(14, 14, W - 28, H - 28);
     }
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    // Today's order.
-    g.font = `700 40px ${FONT}`;
-    engrave(g, s.order ? `SMITH ORDER · ${s.order.date}` : 'SMITH ORDER', W / 2, 62, s.done ? TEXT_DIM : ORANGE);
+    if (back) this.drawBack(g, s);
+    else this.drawOrder(g, s);
+    this.tex.needsUpdate = true;
+  }
+
+  private drawOrder(g: CanvasRenderingContext2D, s: BoardState) {
+    setType(g, 'caption', this.k, DIST);
+    engrave(g, s.done ? 'ORDER DONE' : "TODAY'S ORDER", W / 2, 62, TEXT_DIM);
     if (s.order) {
-      let size = 58;
-      do g.font = `700 ${size--}px ${FONT}`;
-      while (g.measureText(s.order.text).width > W - 100 && size > 24);
-      engrave(g, s.order.text, W / 2, 132, TEXT);
-      g.font = `600 36px ${FONT}`;
-      const next = s.tomorrow ? `DONE · tomorrow: ${s.tomorrow.rival} on ${s.tomorrow.arena}` : 'DONE: a new order comes tomorrow';
-      engrave(g, s.done ? next : `${s.order.arena} · pinch the board to take it`, W / 2, 192, s.done ? '#6fd36f' : STEEL);
+      const t = setType(g, 'title', this.k, DIST);
+      const lines = wrap(g, s.order.text, W - 140, 2);
+      const y0 = 168 - ((lines.length - 1) * t * 1.15) / 2;
+      lines.forEach((l, i) => engrave(g, l, W / 2, y0 + i * t * 1.15, s.done ? TEXT_DIM : TEXT, W - 140));
+      setType(g, 'caption', this.k, DIST);
+      // The board hangs out of reach: it is taken by pointing at it and pinching.
+      const next = s.tomorrow ? `TOMORROW: ${s.tomorrow.rival} ON ${s.tomorrow.arena}` : 'A NEW ORDER COMES TOMORROW';
+      engrave(g, (s.done ? next : `${s.order.arena} · POINT AND PINCH TO TAKE IT`).toUpperCase(), W / 2, 280, s.done ? STEEL : ORANGE, W - 120);
     }
     g.fillStyle = 'rgba(0,0,0,0.35)';
-    g.fillRect(60, 236, W - 120, 3);
-    // The rivals: a medallion each, three notches for the marks.
-    g.font = `700 32px ${FONT}`;
-    engrave(g, 'RIVALS', W / 2, 272, STEEL);
+    g.fillRect(80, 330, W - 160, 3);
+    this.drawStamps(g, s, 396);
+  }
+
+  private drawBack(g: CanvasRenderingContext2D, s: BoardState) {
+    setType(g, 'caption', this.k, DIST);
+    engrave(g, 'RIVALS', W / 2, 50, TEXT_DIM);
     const n = s.rivals.length;
-    const R = 62;
+    const col = (W - 80) / n;
+    const R = 40;
     s.rivals.forEach((r, i) => {
-      const cx = (W * (i + 0.5)) / n;
-      const cy = 380;
+      const cx = 40 + col * (i + 0.5);
+      const cy = 126;
       g.fillStyle = r.met ? '#3a3f48' : '#16191e';
       g.beginPath();
       g.arc(cx, cy, R, 0, Math.PI * 2);
       g.fill();
-      g.strokeStyle = r.marks === 7 ? GOLD : r.met ? '#8a94a3' : '#2c3138';
-      g.lineWidth = r.marks === 7 ? 6 : 3;
+      g.strokeStyle = r.marks === 7 ? GILT : r.met ? '#8a94a3' : '#2c3138';
+      g.lineWidth = r.marks === 7 ? 5 : 3;
       g.stroke();
       // Three notches around the top: beaten, knockout, by your shape.
       for (let k = 0; k < 3; k++) {
-        const a = -Math.PI / 2 + (k - 1) * 0.55;
+        const a = -Math.PI / 2 + (k - 1) * 0.6;
         g.strokeStyle = r.marks & (1 << k) ? ORANGE : 'rgba(0,0,0,0.6)';
-        g.lineWidth = 9;
+        g.lineWidth = 8;
         g.beginPath();
-        g.arc(cx, cy, R - 12, a - 0.2, a + 0.2);
+        g.arc(cx, cy, R - 10, a - 0.22, a + 0.22);
         g.stroke();
       }
-      // Shrunk to sit inside its medallion's ring.
-      const label = r.met ? r.name.split(' ')[0].toUpperCase() : `LV ${r.level}`;
-      let size = r.met ? 34 : 32;
-      do g.font = `700 ${size--}px ${FONT}`;
-      while (g.measureText(label).width > 2 * R - 18 && size > 24);
-      engrave(g, label, cx, cy + 12, r.met ? TEXT : TEXT_DIM);
-      g.font = `600 30px ${FONT}`;
-      if (r.met) engrave(g, r.name.includes(' ') ? r.name.split(' ').slice(1).join(' ').toUpperCase() : '', cx, cy + R + 22, STEEL);
+      // The name under its medallion, on two even lines when it has two words; unmet rivals show
+      // only the level they come at.
+      const c = setType(g, 'caption', this.k, DIST);
+      const lines = r.met ? wrap(g, r.name.toUpperCase(), col - 12, 2) : [`LV ${r.level}`];
+      lines.forEach((l, j) => engrave(g, l, cx, cy + R + 30 + j * c * 1.1, r.met ? TEXT : TEXT_DIM, col - 8));
     });
     g.fillStyle = 'rgba(0,0,0,0.35)';
-    g.fillRect(60, 526, W - 120, 3);
-    // The ledger: one stamp per order done.
-    g.font = `700 32px ${FONT}`;
-    engrave(g, 'LEDGER', W / 2, 566, s.gilded ? GOLD : STEEL);
+    g.fillRect(80, 262, W - 160, 3);
+    this.drawStamps(g, s, 304);
+    setType(g, 'caption', this.k, DIST);
+    const glow = s.nextGlow ? ` · NEXT EMBLEM GLOW AT ${s.nextGlow}` : '';
+    engrave(g, `${s.stamps} STAMP${s.stamps === 1 ? '' : 'S'}${glow} · ${s.feats} OF ${s.featsOf} FEATS`, W / 2, 362, STEEL, W - 120);
+    // Your top as a short code for a friend's game: shown here, on request, never as an address.
+    const label = 'CHALLENGE CODE';
+    setType(g, 'caption', this.k, DIST);
+    const lw = g.measureText(label).width;
+    setType(g, 'title', this.k, DIST);
+    const cw = g.measureText(s.code).width;
+    const x = (W - lw - 32 - cw) / 2;
+    g.textAlign = 'left';
+    engrave(g, s.code, x + lw + 32, 424, TEXT);
+    setType(g, 'caption', this.k, DIST);
+    engrave(g, label, x, 428, TEXT_DIM);
+    g.textAlign = 'center';
+  }
+
+  /** The ledger: one stamp per order done, in a row centred at y. */
+  private drawStamps(g: CanvasRenderingContext2D, s: BoardState, y: number) {
     const shown = Math.min(14, Math.max(s.stamps, 7));
     for (let i = 0; i < shown; i++) {
-      const cx = W / 2 + (i - (shown - 1) / 2) * 74;
+      const cx = W / 2 + (i - (shown - 1) / 2) * 62;
       g.beginPath();
-      g.arc(cx, 640, 28, 0, Math.PI * 2);
-      g.fillStyle = i < s.stamps ? ORANGE : '#16191e';
+      g.arc(cx, y, 22, 0, Math.PI * 2);
+      g.fillStyle = i < s.stamps ? (s.gilded ? '#d8dde6' : '#8a94a3') : '#16191e';
       g.fill();
-      g.strokeStyle = i < s.stamps ? '#ffd2a8' : '#2c3138';
+      g.strokeStyle = i < s.stamps ? '#eef3fa' : '#2c3138';
       g.lineWidth = 3;
       g.stroke();
     }
-    g.font = `600 30px ${FONT}`;
-    engrave(g, `${s.stamps} stamp${s.stamps === 1 ? '' : 's'}${s.nextGlow ? ` · a new emblem glow at ${s.nextGlow}` : ''} · feats ${s.feats}/${s.featsOf}`, W / 2, 712, STEEL);
-    g.font = `700 30px ${FONT}`;
-    engrave(g, `Challenge a friend: ?vs=${s.code} on their address fights your top`, W / 2, 772, ORANGE);
-    this.tex.needsUpdate = true;
   }
 }

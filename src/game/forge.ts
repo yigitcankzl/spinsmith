@@ -33,8 +33,7 @@ import {
 import { playDrawer, playLocked, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import { SEAL_UNLOCKS, unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
-import { addStem, ORANGE, TEXT_DIM } from './ui.js';
-import { tag } from './builder.js';
+import { addStem, Nameplate, ORANGE, SIGN_TILT, tag, TEXT_DIM } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import { TAB_LINE, TRAY, traySpot, WORK as REACH_WORK } from './reach.js';
 import type { HandState } from './hands.js';
@@ -297,10 +296,7 @@ export class Forge {
     const seal = this.build.seal ?? 'anvil';
     if (slot.name.userData.seal !== seal) {
       slot.name.userData.seal = seal;
-      const old = slot.name as Mesh;
-      const fresh = tag(SEAL_NAMES[seal].toUpperCase(), 0.05, 44);
-      (old.material as MeshBasicMaterial).map?.dispose();
-      old.material = fresh.material;
+      (slot.name.userData.plate as Nameplate).set(SEAL_NAMES[seal].toUpperCase());
     }
   }
 
@@ -818,7 +814,7 @@ export class Forge {
         model.position.copy(home);
         model.visible = false;
         // Its name over it, tipped toward the player (parts, paints and tokens alike).
-        const name = tag(item.name.toUpperCase(), 0.05, 44);
+        const name = tag(item.name.toUpperCase(), 0.05);
         name.position.set(home.x, home.y + 0.028, home.z);
         name.rotation.x = -0.35;
         name.visible = false;
@@ -853,9 +849,10 @@ export class Forge {
   private buildQuench() {
     this.quench.position.copy(QUENCH_AT);
     this.quench.add(rimSlot());
-    const name = tag('QUENCH TO SAVE', 0.07, 40);
-    name.position.set(0, 0.03, 0);
-    name.rotation.x = -0.4;
+    // Lying on the rim in front of the slot, at the touch band's pitch.
+    const name = tag('QUENCH TO SAVE', 0.08);
+    name.position.set(0, 0.01, 0.048);
+    name.rotation.x = -SIGN_TILT;
     this.quench.add(name);
   }
 

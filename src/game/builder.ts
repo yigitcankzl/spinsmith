@@ -17,14 +17,13 @@ import {
   OctahedronGeometry,
   PlaneGeometry,
   SphereGeometry,
-  SRGBColorSpace,
   TorusGeometry,
   Vector2,
   Vector3,
 } from '@iwsdk/core';
 import { arenaWarning } from './arena-report.js';
 import type { ArenaReport } from './arena-report.js';
-import { addSlab, addStem, engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
+import { addSlab, addStem, engrave, metalPlate, ORANGE, PLATE_DEPTH, pxPerM, setType, signTexture, STEEL as UI_STEEL } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import { ARENA_SCALE, RAIL, TABLE_Y, TAB_LINE, WORKSHOP_TAB_GAP } from './reach.js';
 import { miniArena } from './visuals.js';
@@ -84,42 +83,47 @@ function saveArenas(list: ArenaLayout[]) {
   }
 }
 
-/** A pinchable 3D card with text, lit while pointed at. Used for the few actions (try, save, back). */
+/**
+ * A pinchable metal PLATE with one engraved CAPS word (the match's MENU): steel while idle, white
+ * while pointed at, orange while it is the one action to take (LEAVE?). Sharp at arm's length.
+ */
 export class Button {
   readonly mesh: Mesh;
   private canvas = document.createElement('canvas');
   private tex: CanvasTexture;
   private text = '';
   private lit = false;
+  private hot = false;
+  private readonly k: number;
 
   constructor(
     readonly id: string,
     readonly width: number,
     readonly height: number,
+    /** Seen from about this far (m). */
+    private readonly dist = 0.65,
   ) {
-    this.canvas.width = 256;
-    this.canvas.height = Math.round((256 * height) / width);
-    this.tex = new CanvasTexture(this.canvas);
-    this.tex.colorSpace = SRGBColorSpace;
+    this.canvas.width = 768;
+    this.canvas.height = Math.round((768 * height) / width);
+    this.k = pxPerM(768, width * ARENA_SCALE);
+    this.tex = signTexture(this.canvas);
     this.mesh = new Mesh(new PlaneGeometry(width, height), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
     this.mesh.name = `button-${id}`;
-    addSlab(this.mesh, width, height, 0.08, 0.006);
+    addSlab(this.mesh, width, height, 0.06, PLATE_DEPTH / ARENA_SCALE);
   }
 
-  set(text: string, lit = this.lit) {
-    if (text === this.text && lit === this.lit) return;
+  set(text: string, lit = this.lit, hot = this.hot) {
+    if (text === this.text && lit === this.lit && hot === this.hot) return;
     this.text = text;
     this.lit = lit;
+    this.hot = hot;
     const g = this.canvas.getContext('2d')!;
     const { width: w, height: h } = this.canvas;
-    glass(g, w, h, lit ? '#ffd2a8' : ORANGE, lit ? 'rgba(255, 138, 42, 0.92)' : GLASS_LIGHT);
-    g.fillStyle = TEXT;
+    metalPlate(g, w, h, false);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    let size = Math.round(h * 0.5);
-    do g.font = `bold ${size--}px ${FONT}`;
-    while (g.measureText(text).width > w - 16 && size > 10);
-    g.fillText(text, w / 2, h / 2 + 1);
+    setType(g, 'title', this.k, this.dist);
+    engrave(g, text, w / 2, h / 2 + 2, hot ? ORANGE : lit ? '#ffffff' : UI_STEEL, w - 40);
     this.tex.needsUpdate = true;
   }
 
@@ -130,36 +134,6 @@ export class Button {
     this.text = '';
     this.set(t, lit);
   }
-}
-
-/** A small floating text tag (piece names, row names, the status line). */
-export function tag(text: string, width: number, size = 40) {
-  const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 64;
-  const g = c.getContext('2d')!;
-  g.fillStyle = TEXT;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  let s = size;
-  do g.font = `700 ${s--}px ${FONT}`;
-  while (g.measureText(text).width > 220 && s > 10);
-  // A small dark plaque behind the name, with the forge's orange underline: one sign style.
-  const w = Math.min(252, g.measureText(text).width + 28);
-  g.fillStyle = 'rgba(12, 14, 19, 0.82)';
-  g.beginPath();
-  g.roundRect(128 - w / 2, 6, w, 52, 10);
-  g.fill();
-  g.fillStyle = ORANGE;
-  g.fillRect(128 - w / 2 + 10, 52, w - 20, 3);
-  g.fillStyle = TEXT;
-  g.fillText(text, 128, 31);
-  const tex = new CanvasTexture(c);
-  tex.colorSpace = SRGBColorSpace;
-  const sign = new Mesh(new PlaneGeometry(width, width / 4), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
-  // The plaque's body: as wide as its painted plate (w of 256), 52 of 64 tall.
-  addSlab(sign, (width * w) / 256, (width / 4) * (52 / 64), 0.19, Math.min(0.004, width * 0.05));
-  return sign;
 }
 
 const STEEL = makeMatcap('metal', 0xc8ccd6);
@@ -310,9 +284,14 @@ const PLATE_Z = TAB_LINE.z;
 const PLATE_Y = TAB_LINE.y;
 const PLATE_W = 0.048;
 const PLATE_H = 0.024;
-/** Back on the left rim, Try and Save on the right; Save's plate sits in front of its stamp slot. */
+/** Back left and Try right on the tabs' line; Save's plate sits in front of its stamp slot on the right rim. */
 const SAVE_AT = new Vector3(0.205, -0.006, -0.025);
-const ACTIONS_AT = [new Vector3(-0.23, 0.004, 0.12), new Vector3(0.23, 0.004, 0.12), new Vector3(0.215, 0.004, 0.045)];
+const ACTIONS_AT = [
+  // Back and Try at the two ends of the tabs' own line, one tab gap past them.
+  new Vector3(-(((DRAWERS - 1) / 2) * PLATE_GAP + PLATE_GAP * 1.6), PLATE_Y, PLATE_Z),
+  new Vector3(((DRAWERS - 1) / 2) * PLATE_GAP + PLATE_GAP * 1.6, PLATE_Y, PLATE_Z),
+  new Vector3(0.215, PLATE_Y, 0.045),
+];
 /** The tool rail across the near rim, no wider than the arena: its pieces this far apart, this much larger than life. */
 const RAIL_Z = RAIL.z;
 const RAIL_Y = RAIL.y;
@@ -393,10 +372,10 @@ export class Builder {
   private plates = new RimTabs(PLATES.slice(0, DRAWERS), rowSpots(DRAWERS, PLATE_GAP, PLATE_Z, PLATE_Y), PLATE_W, PLATE_H);
   private actions = new RimTabs(
     PLATES.slice(DRAWERS),
-    ACTIONS_AT.map((at) => ({ at, yaw: Math.atan2(-at.x, 0.32 - at.z) })),
+    // Facing straight ahead at the tabs' pitch, so the whole row reads as one panel.
+    ACTIONS_AT.map((at) => ({ at, yaw: 0 })),
     0.05,
     PLATE_H,
-    0.9,
   );
   /** Save: a stamp slot set into the right rim; pinch it to save and play. */
   private saveSlot = rimSlot();
@@ -427,10 +406,9 @@ export class Builder {
     // names engraved on a strip below.
     const bar = new Mesh(new CylinderGeometry(0.003, 0.003, RAIL_W, 12).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
     bar.position.set(0, RAIL_Y - 0.004, RAIL_Z);
-    this.namesCanvas.width = 1400;
-    this.namesCanvas.height = 100;
-    this.namesTex = new CanvasTexture(this.namesCanvas);
-    this.namesTex.colorSpace = SRGBColorSpace;
+    this.namesCanvas.width = 2400;
+    this.namesCanvas.height = Math.round((2400 * 0.012) / RAIL_W);
+    this.namesTex = signTexture(this.namesCanvas);
     this.names = new Mesh(new PlaneGeometry(RAIL_W, 0.012), new MeshBasicMaterial({ map: this.namesTex, transparent: true, depthWrite: false }));
     addSlab(this.names, RAIL_W, 0.012, 0.2, 0.003);
     // Just in front of and below the rail, above the drawer tabs.
@@ -537,7 +515,7 @@ export class Builder {
       s.model.scale.setScalar(ITEM_SCALE * pop * (on ? 1.2 : 1));
     }
     this.plates.draw((i) => ({ on: i === this.tab, hover: i === hoveredPlate }));
-    this.actions.draw((i) => ({ hover: i + DRAWERS === hoveredPlate || (i === 2 && hoveredPlate === PLATES.length), hot: i > 0 }));
+    this.actions.draw((i) => ({ hover: i + DRAWERS === hoveredPlate || (i === 2 && hoveredPlate === PLATES.length), hot: i === 2 }));
     this.saveSlot.scale.setScalar(hoveredPlate >= PLATES.length - 1 ? 1.15 : 1);
     this.hint(hovered ? this.nameOf(hovered.piece) : null);
 
@@ -1053,19 +1031,18 @@ export class Builder {
     const g = this.namesCanvas.getContext('2d')!;
     const W = this.namesCanvas.width;
     const H = this.namesCanvas.height;
-    metalPlate(g, W, H);
+    metalPlate(g, W, H, false);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const k = W / RAIL_W;
+    // BODY type at about half a metre; a name wider than its piece's space is squeezed, never shrunk or cut.
+    setType(g, 'body', pxPerM(W, RAIL_W * ARENA_SCALE), 0.5);
+    const room = ITEM_GAP * k * 0.94;
     for (const s of shown) {
-      // Each name fits the space under its own piece.
       const name = this.nameOf(s.piece).toUpperCase();
-      let size = 54;
-      do g.font = `700 ${size--}px ${FONT}`;
-      while (g.measureText(name).width > ITEM_GAP * k * 0.94 && size > 20);
       // The end names stay on the strip.
-      const half = g.measureText(name).width / 2 + 16;
-      engrave(g, name, Math.max(half, Math.min(W - half, W / 2 + s.home.x * k)), H / 2 + 2, UI_STEEL);
+      const half = Math.min(room, g.measureText(name).width) / 2 + 16;
+      engrave(g, name, Math.max(half, Math.min(W - half, W / 2 + s.home.x * k)), H / 2 + 2, UI_STEEL, room);
     }
     this.namesTex.needsUpdate = true;
   }

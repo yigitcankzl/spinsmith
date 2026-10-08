@@ -52,7 +52,7 @@ import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena
 import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
 import { Arena, RAMP_SIGMA, Top, WELL_SIGMA } from './sim.js';
-import { addSlab, FONT, glass, GUIDE, ORANGE, slabMaterial, TEXT } from './ui.js';
+import { addSlab, CYAN, FONT, glass, GLASS_DEPTH, GUIDE, ORANGE, pxPerM, setType, signTexture, slabMaterial, TEXT, TYPE, wrap } from './ui.js';
 import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
 import { ARENA_SCALE, TABLE_Y } from './reach.js';
 import { insidePoly } from './room.js';
@@ -1654,7 +1654,11 @@ export class Cord {
   }
 }
 
-/** A floating text card; redraws only when the text changes. */
+/**
+ * The message card: GLASS, read never touched. Its first line is a TITLE headline, the rest BODY
+ * sentences, each wrapped into even lines (no word left alone on a last line) at fixed sizes, so the
+ * same role reads the same size on every message. Redraws only when the text changes.
+ */
 export class Label {
   readonly mesh: Mesh;
   private canvas = document.createElement('canvas');
@@ -1662,25 +1666,31 @@ export class Label {
   private text = '';
   private slab: Mesh;
   private strip: Mesh;
+  private readonly k: number;
 
-  constructor(width = 0.22) {
-    // Drawn at twice the old resolution (about 30 texels a degree at the far rim) and filtered at
-    // grazing angles, so the lower line stays sharp on the headset.
+  constructor(
+    width = 0.22,
+    /** World metres per unit of its parent at its usual scale (the arena's, with the card's 1.25). */
+    scale = ARENA_SCALE * 1.25,
+    /** Seen from about this far (m). */
+    private readonly dist = 1.2,
+  ) {
+    // About 30 texels a degree at the far rim, filtered at grazing angles.
     this.canvas.width = 1024;
     this.canvas.height = 320;
-    this.tex = new CanvasTexture(this.canvas);
-    this.tex.colorSpace = SRGBColorSpace;
-    this.tex.anisotropy = 4;
+    this.tex = signTexture(this.canvas);
+    this.k = pxPerM(1024, width * scale);
     this.mesh = new Mesh(
       new PlaneGeometry(width, (width * 160) / 512),
       new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }),
     );
-    this.slab = addSlab(this.mesh, width, (width * 160) / 512);
+    this.slab = addSlab(this.mesh, width, (width * 160) / 512, 0.08, GLASS_DEPTH / scale);
     // Its own copy: it fades with the card.
     this.slab.material = slabMaterial();
     (this.slab.material as MeshStandardMaterial).transparent = true;
-    // A lit strip along the card's lower edge, like the light bar of a machine's display.
-    this.strip = new Mesh(new BoxGeometry(width * 0.5, 0.0016, 0.002), new MeshBasicMaterial({ color: new Color(ORANGE).multiplyScalar(1.6), toneMapped: false, transparent: true }));
+    // A lit strip along the card's lower edge, like the light bar of a machine's display: cool
+    // white, not orange (orange is kept for you and the action to take).
+    this.strip = new Mesh(new BoxGeometry(width * 0.5, 0.0016, 0.002), new MeshBasicMaterial({ color: new Color(TEXT).multiplyScalar(1.2), toneMapped: false, transparent: true }));
     this.strip.position.set(0, (-width * 80) / 512 - 0.0004, -0.002);
     this.mesh.add(this.strip);
   }
@@ -1718,47 +1728,29 @@ export class Label {
     const H = 320;
     g.clearRect(0, 0, W, H);
     if (!text) return;
-    glass(g, W, H, ORANGE);
+    glass(g, W, H);
     g.fillStyle = TEXT;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    // Every line wraps greedily at the card's width; the sizes step down together until the whole
-    // text fits in at most four lines (headline bold, the rest semibold, never a lost word).
+    // The headline in at most two even lines, each sentence after it in at most two; a card with
+    // more than fits keeps its sizes and lets fillText narrow the longest lines.
     const MAX = 940;
-    const wrapAt = (line: string, font: string): string[] => {
-      g.font = font;
-      const out: string[] = [];
-      let cur = '';
-      for (const word of line.split(' ')) {
-        const next = cur ? `${cur} ${word}` : word;
-        if (cur && g.measureText(next).width > MAX) {
-          out.push(cur);
-          cur = word;
-        } else cur = next;
-      }
-      if (cur) out.push(cur);
-      return out;
-    };
     const [first, ...rest] = text.split('\n');
-    let lines: [string, string][] = [];
-    for (let head = 112; head >= 40; head -= 4) {
-      const body = Math.min(68, head - 16);
-      const hf = `700 ${head}px ${FONT}`;
-      const bf = `600 ${body}px ${FONT}`;
-      lines = [...wrapAt(first, hf).map((l): [string, string] => [l, hf]), ...rest.flatMap((r) => wrapAt(r, bf).map((l): [string, string] => [l, bf]))];
-      const fits = lines.every(([l, f]) => {
-        g.font = f;
-        return g.measureText(l).width <= MAX;
-      });
-      const tall = lines.reduce((t, [, f]) => t + parseInt(f.split(' ')[1]) * 1.12, 0);
-      if (lines.length <= 4 && fits && tall <= H - 24) break;
+    const lines: [string, 'title' | 'body'][] = [];
+    setType(g, 'title', this.k, this.dist);
+    for (const l of wrap(g, first, MAX, 2)) lines.push([l, 'title']);
+    setType(g, 'body', this.k, this.dist);
+    for (const r of rest) for (const l of wrap(g, r, MAX, 2)) lines.push([l, 'body']);
+    const size = (role: 'title' | 'body') => Math.round((TYPE[role].dmm * this.dist * this.k) / 1000) * 1.18;
+    // Too many lines for the card: the body's last lines join up (squeezed) rather than shrink.
+    while (lines.length > 2 && lines.reduce((t, [, r]) => t + size(r), 0) > H - 28) {
+      const [last] = lines.pop()!;
+      lines[lines.length - 1][0] += ` ${last}`;
     }
-    // Each line takes its own height, the block centred on the card.
-    const heights = lines.map(([, f]) => parseInt(f.split(' ')[1]) * 1.12);
+    const heights = lines.map(([, r]) => size(r));
     let y = H / 2 - heights.reduce((a, b) => a + b, 0) / 2;
-    lines.forEach(([line, font], i) => {
-      g.font = font;
-      // A single word too long for the card still stays on it (squeezed).
+    lines.forEach(([line, role], i) => {
+      setType(g, role, this.k, this.dist);
       g.fillText(line, W / 2, y + heights[i] / 2, MAX);
       y += heights[i];
     });
@@ -2142,11 +2134,14 @@ export class Stamp {
     if (this.queue.length < 3) this.queue.push([word, sub, side, hold, size]);
   }
 
+  /** Canvas px per world metre (its usual home: the card's slot over the far rim, about 1.2 m away). */
+  private readonly k: number;
+
   constructor(width = 0.2) {
     this.canvas.width = 1024;
     this.canvas.height = 256;
-    this.tex = new CanvasTexture(this.canvas);
-    this.tex.colorSpace = SRGBColorSpace;
+    this.tex = signTexture(this.canvas);
+    this.k = pxPerM(1024, width * ARENA_SCALE);
     this.mesh = new Mesh(new PlaneGeometry(width, width / 4), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false, depthTest: false }));
     this.mesh.renderOrder = 30;
     this.mesh.visible = false;
@@ -2159,31 +2154,29 @@ export class Stamp {
     g.clearRect(0, 0, 1024, 256);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    let size = 150;
-    do g.font = `700 ${size--}px ${FONT}`;
-    while (g.measureText(word).width > 960 && size > 40);
+    // DISPLAY type at a fixed size; a long word is narrowed to the canvas, never shrunk.
+    setType(g, 'display', this.k, 1.2);
     const grad = g.createLinearGradient(0, 40, 0, 190);
     if (side === 'rival') {
       grad.addColorStop(0, '#bff3ff');
-      grad.addColorStop(1, '#1fb6ff');
+      grad.addColorStop(1, CYAN);
     } else if (side === 'neutral') {
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(1, '#c9d3e0');
     } else {
+      // White-hot to orange: gold is kept for teaching.
       grad.addColorStop(0, '#fff1d6');
-      grad.addColorStop(0.5, '#ffd23a');
-      grad.addColorStop(1, '#ff8a2a');
+      grad.addColorStop(1, ORANGE);
     }
     g.lineJoin = 'round';
     g.lineWidth = 22;
     g.strokeStyle = 'rgba(10, 12, 16, 0.9)';
-    g.strokeText(word, 512, sub ? 108 : 128);
+    g.strokeText(word, 512, sub ? 108 : 128, 960);
     g.fillStyle = grad;
-    g.fillText(word, 512, sub ? 108 : 128);
+    g.fillText(word, 512, sub ? 108 : 128, 960);
     if (sub) {
-      let subSize = 56;
-      do g.font = `700 ${subSize--}px ${FONT}`;
-      while (g.measureText(sub).width > 960 && subSize > 40);
+      // BODY under the word (MATCH WON, +1 LEVEL).
+      setType(g, 'body', this.k, 1.2);
       g.lineWidth = 12;
       g.strokeText(sub, 512, 220, 980);
       g.fillStyle = '#f4f1ea';
