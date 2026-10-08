@@ -38,7 +38,7 @@ import {
 } from '@iwsdk/core';
 import { playLocked, playPick, playRemove } from './audio.js';
 import type { Progress } from './progress.js';
-import { FONT, glass, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
+import { addSlab, FONT, glass, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { tag } from './builder.js';
 import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
@@ -505,6 +505,7 @@ export class Hub {
     this.rankTex.colorSpace = SRGBColorSpace;
     const rank = new Mesh(new PlaneGeometry(0.1, 0.049), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
     rank.rotation.x = -1;
+    addSlab(rank, 0.1, 0.049, 0.08, 0.005);
     rank.scale.setScalar(0.8);
     // Held for 2 s, then pinched again, the level plate starts over as a new smith (shared headsets).
     const plate = new Group();

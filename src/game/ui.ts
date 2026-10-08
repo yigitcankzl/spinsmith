@@ -2,7 +2,7 @@
  * The look of every panel, card and button: dark tinted glass with cut corners, thin glowing edges
  * (orange for SpinSmith and the player, steel for neutral UI; cyan is kept for the rival) and light, spaced lettering.
  */
-import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
+import { CanvasTexture, ExtrudeGeometry, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, Shape, SRGBColorSpace } from '@iwsdk/core';
 
 /** The one display font of every panel, card and label (Rajdhani, SIL OFL, in public/fonts). */
 export const FONT = 'Rajdhani, system-ui, sans-serif';
@@ -187,4 +187,38 @@ export function engrave(g: CanvasRenderingContext2D, text: string, x: number, y:
   g.fillText(text, x, y - 1);
   g.fillStyle = color;
   g.fillText(text, x, y);
+}
+
+const SLAB = new MeshStandardMaterial({ color: 0x2b2f37, metalness: 0.6, roughness: 0.38 });
+
+/**
+ * Gives a sign a body: its cut-corner outline as a bevelled graphite slab `depth` thick, set just
+ * behind the sign's plane (added as its child, so it follows the sign). A sign seen from the side
+ * reads as a machined plate, not a sheet of paper. `cut` is the corner cut as a share of the
+ * shorter side (the canvas panels use 0.08 for glass, 0.06 for metal).
+ */
+export function addSlab(sign: Object3D, width: number, height: number, cut = 0.08, depth = 0.005): Mesh {
+  const c = Math.min(width, height) * cut;
+  const b = Math.min(depth * 0.4, Math.min(width, height) * 0.04);
+  // Inset by the bevel so the bevelled edge lines up with the painted outline.
+  const w = width / 2 - b;
+  const h = height / 2 - b;
+  const k = Math.max(0, c - b * 0.6);
+  const shape = new Shape();
+  shape.moveTo(-w + k, h);
+  shape.lineTo(w - k, h);
+  shape.lineTo(w, h - k);
+  shape.lineTo(w, -h + k);
+  shape.lineTo(w - k, -h);
+  shape.lineTo(-w + k, -h);
+  shape.lineTo(-w, -h + k);
+  shape.lineTo(-w, h - k);
+  shape.closePath();
+  const geo = new ExtrudeGeometry(shape, { depth: depth - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 1 });
+  // Its front face just behind the sign.
+  geo.translate(0, 0, -depth + b - 0.0004);
+  const slab = new Mesh(geo, SLAB);
+  slab.name = 'slab';
+  sign.add(slab);
+  return slab;
 }

@@ -4,7 +4,7 @@
  * your smith level along the bottom.
  */
 import { CanvasTexture, Color, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
-import { CYAN, FONT, metalPlate, ORANGE, STEEL, TEXT } from './ui.js';
+import { addSlab, CYAN, FONT, metalPlate, ORANGE, STEEL, TEXT } from './ui.js';
 
 /** The spin bars' slots on the plate canvas (px): width and top. */
 const BAR_W = 500;
@@ -33,6 +33,7 @@ export class MatchBar {
     this.tex.colorSpace = SRGBColorSpace;
     this.mesh = new Mesh(new PlaneGeometry(1.6, 0.377), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
     this.mesh.name = 'match-bar';
+    addSlab(this.mesh, 1.6, 0.377, 0.06, 0.03);
     this.mesh.visible = false;
     // Plate coordinates of the bar slots (the canvas is 1400 x 330 on a 1.6 x 0.377 plane).
     const px = (x: number) => (x / 1400 - 0.5) * 1.6;

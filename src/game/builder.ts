@@ -24,7 +24,7 @@ import {
 } from '@iwsdk/core';
 import { arenaWarning } from './arena-report.js';
 import type { ArenaReport } from './arena-report.js';
-import { engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
+import { addSlab, engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import { ARENA_SCALE, RAIL, TAB_LINE, WORKSHOP_TAB_GAP } from './reach.js';
 import { miniArena } from './visuals.js';
@@ -103,6 +103,7 @@ export class Button {
     this.tex.colorSpace = SRGBColorSpace;
     this.mesh = new Mesh(new PlaneGeometry(width, height), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
     this.mesh.name = `button-${id}`;
+    addSlab(this.mesh, width, height, 0.08, 0.006);
   }
 
   set(text: string, lit = this.lit) {
@@ -155,7 +156,10 @@ export function tag(text: string, width: number, size = 40) {
   g.fillText(text, 128, 31);
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
-  return new Mesh(new PlaneGeometry(width, width / 4), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  const sign = new Mesh(new PlaneGeometry(width, width / 4), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  // The plaque's body: as wide as its painted plate (w of 256), 52 of 64 tall.
+  addSlab(sign, (width * w) / 256, (width / 4) * (52 / 64), 0.19, Math.min(0.004, width * 0.05));
+  return sign;
 }
 
 const STEEL = makeMatcap('metal', 0xc8ccd6);
@@ -428,6 +432,7 @@ export class Builder {
     this.namesTex = new CanvasTexture(this.namesCanvas);
     this.namesTex.colorSpace = SRGBColorSpace;
     this.names = new Mesh(new PlaneGeometry(RAIL_W, 0.012), new MeshBasicMaterial({ map: this.namesTex, transparent: true, depthWrite: false }));
+    addSlab(this.names, RAIL_W, 0.012, 0.2, 0.003);
     // Just in front of and below the rail, above the drawer tabs.
     this.names.position.set(0, RAIL_Y - 0.008, RAIL_Z + 0.016);
     this.names.rotation.x = -0.7;

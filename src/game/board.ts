@@ -5,7 +5,7 @@
  */
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
 import type { Order } from './orders.js';
-import { engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
+import { addSlab, engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
 
 export interface BoardRival {
   name: string;
@@ -51,6 +51,7 @@ export class SmithBoard {
     this.tex.anisotropy = 4;
     this.mesh = new Mesh(new PlaneGeometry(width, (width * H) / W), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
     this.mesh.name = 'smith-board';
+    addSlab(this.mesh, width, (width * H) / W, 0.06, 0.01);
   }
 
   draw(s: BoardState) {

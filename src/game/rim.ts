@@ -3,9 +3,9 @@
  * rims. Tabs and buttons engraved on metal plates along the near rim, the staggered pop of a
  * drawer's items, and the dial plate on the far rim.
  */
-import { BufferAttribute, BufferGeometry, CanvasTexture, CylinderGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, MeshMatcapMaterial, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from '@iwsdk/core';
+import { BufferAttribute, BufferGeometry, CanvasTexture, CylinderGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, MeshMatcapMaterial, MeshStandardMaterial, PlaneGeometry, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from '@iwsdk/core';
 import { makeMatcap, mergeByMaterial } from './visuals.js';
-import { engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
+import { addSlab, engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
 
 /** Where a drawer's i-th item is in its pop-in, 0..1, t seconds after the drawer opened. */
 export function popIn(t: number, i: number): number {
@@ -42,6 +42,13 @@ export class RimTabs {
   private canvas = document.createElement('canvas');
   private tex: CanvasTexture;
   private key = '';
+  /** Keys travel: each tab's press depth now (m along its face normal), its normal, and the rest pose. */
+  private depth: number[];
+  private normals: Vector3[] = [];
+  private keys!: Mesh;
+  private restPlate!: Float32Array;
+  private restKeys!: Float32Array;
+  private lastT = 0;
 
   constructor(
     readonly labels: string[],
@@ -52,6 +59,7 @@ export class RimTabs {
     tilt = 1.1,
   ) {
     const n = labels.length;
+    this.depth = labels.map(() => 0);
     this.canvas.width = 256 * n;
     this.canvas.height = Math.round((256 * height) / width);
     this.tex = new CanvasTexture(this.canvas);
@@ -81,19 +89,63 @@ export class RimTabs {
     geo.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
     geo.setIndex(index);
     this.mesh = new Mesh(geo, new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
+    // Each tab is a machined key: a slab under its plate, all merged into one mesh.
+    const keys = new Group();
+    spots.forEach((s) => {
+      const key = new Group();
+      key.applyMatrix4(m.makeRotationY(s.yaw).multiply(lean).setPosition(s.at));
+      addSlab(key, width, height, 0.06, 0.006);
+      keys.add(key);
+      this.normals.push(new Vector3(0, 0, 1).applyMatrix4(m.setPosition(0, 0, 0)).normalize());
+    });
+    const merged = mergeByMaterial(keys);
+    this.keys = merged.children[0] as Mesh;
+    this.mesh.add(merged);
+    this.restPlate = (geo.getAttribute('position').array as Float32Array).slice();
+    this.restKeys = (this.keys.geometry.getAttribute('position').array as Float32Array).slice();
+  }
+
+  /** Moves each key toward its travel: the open drawer sits pressed in, the one pointed at rises to meet the finger. */
+  private travel(looks: TabLook[]) {
+    const now = performance.now() / 1000;
+    const dt = Math.min(0.1, now - this.lastT);
+    this.lastT = now;
+    let moved = false;
+    looks.forEach((l, i) => {
+      const target = l.on ? -0.0035 : l.hover ? 0.002 : 0;
+      const next = this.depth[i] + (target - this.depth[i]) * Math.min(1, dt * 18);
+      if (Math.abs(next - this.depth[i]) > 1e-6) moved = true;
+      this.depth[i] = Math.abs(next - target) < 1e-5 ? target : next;
+    });
+    if (!moved) return;
+    const n = this.labels.length;
+    const shift = (attr: BufferAttribute, rest: Float32Array, per: number) => {
+      const a = attr.array as Float32Array;
+      for (let i = 0; i < n; i++) {
+        const d = this.normals[i];
+        const k = this.depth[i];
+        for (let v = i * per; v < (i + 1) * per; v++) {
+          a[v * 3] = rest[v * 3] + d.x * k;
+          a[v * 3 + 1] = rest[v * 3 + 1] + d.y * k;
+          a[v * 3 + 2] = rest[v * 3 + 2] + d.z * k;
+        }
+      }
+      attr.needsUpdate = true;
+    };
+    shift(this.mesh.geometry.getAttribute('position') as BufferAttribute, this.restPlate, 4);
+    const keysPos = this.keys.geometry.getAttribute('position') as BufferAttribute;
+    shift(keysPos, this.restKeys, keysPos.count / n);
   }
 
   /** Redraws only when a tab's look changed. */
   draw(look: (i: number) => TabLook) {
     // A key of three flags per tab, built without objects; the looks are only read on a redraw.
     let key = '';
-    for (let i = 0; i < this.labels.length; i++) {
-      const l = look(i);
-      key += `${l.on ? 1 : 0}${l.hover ? 1 : 0}${l.hot ? 1 : 0}`;
-    }
+    const looks = this.labels.map((_, i) => look(i));
+    for (const l of looks) key += `${l.on ? 1 : 0}${l.hover ? 1 : 0}${l.hot ? 1 : 0}`;
+    this.travel(looks);
     if (key === this.key) return;
     this.key = key;
-    const looks = this.labels.map((_, i) => look(i));
     const g = this.canvas.getContext('2d')!;
     const H = this.canvas.height;
     g.clearRect(0, 0, this.canvas.width, H);
@@ -119,6 +171,9 @@ export class RimTabs {
   }
 }
 
+const BEZEL = new MeshStandardMaterial({ color: 0xb8bec8, metalness: 1, roughness: 0.28 });
+const DOME = new MeshStandardMaterial({ color: 0xffffff, metalness: 0, roughness: 0.04, transparent: true, opacity: 0.18, depthWrite: false });
+
 export interface Dial {
   label: string;
   /** 0..100 */
@@ -137,13 +192,43 @@ export class DialPlate {
   private tex: CanvasTexture;
   private key = '';
 
-  constructor(width = 0.26, height = 0.108) {
+  private gauges = new Group();
+  private gaugeCount = -1;
+
+  constructor(
+    private readonly width = 0.26,
+    private readonly height = 0.108,
+  ) {
     this.canvas.width = 1200;
     this.canvas.height = Math.round((1200 * height) / width);
     this.tex = new CanvasTexture(this.canvas);
     this.tex.colorSpace = SRGBColorSpace;
     this.tex.anisotropy = 4;
     this.mesh = new Mesh(new PlaneGeometry(width, height), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
+    addSlab(this.mesh, width, height, 0.06, 0.008);
+    this.mesh.add(this.gauges);
+  }
+
+  /** Each painted dial sits under a steel bezel and a glass dome that catch the room's light. */
+  private buildGauges(n: number) {
+    this.gaugeCount = n;
+    this.gauges.clear();
+    if (!n) return;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    const r = (74 / W) * this.width;
+    const raw = new Group();
+    for (let i = 0; i < n; i++) {
+      const x = ((i + 0.5) / n - 0.5) * this.width;
+      const y = (0.5 - 268 / H) * this.height;
+      const bezel = new Mesh(new TorusGeometry(r * 1.04, r * 0.11, 8, 40), BEZEL);
+      bezel.position.set(x, y, 0.0006);
+      const dome = new Mesh(new SphereGeometry(r, 24, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2), DOME);
+      dome.scale.z = 0.35;
+      dome.position.set(x, y, 0.0006);
+      raw.add(bezel, dome);
+    }
+    this.gauges.add(mergeByMaterial(raw));
   }
 
   draw(title: string, subtitle: string, dials: Dial[], message: string, subtitleColor = '#b4bfd0') {
@@ -154,6 +239,7 @@ export class DialPlate {
     const W = this.canvas.width;
     const H = this.canvas.height;
     metalPlate(g, W, H);
+    if (dials.length !== this.gaugeCount) this.buildGauges(dials.length);
     g.textBaseline = 'middle';
     g.textAlign = 'center';
     g.font = `700 64px ${FONT}`;
