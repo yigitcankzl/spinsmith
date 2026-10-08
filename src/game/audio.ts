@@ -146,6 +146,18 @@ function impulse(a: AudioContext, seconds: number): AudioBuffer {
   return b;
 }
 
+/** Dev and capture: a stream of everything the game plays (after the limiter), or null before audio starts. */
+let tap: MediaStreamAudioDestinationNode | null = null;
+export function audioTap(): MediaStream | null {
+  const a = audio();
+  if (!a || !master) return null;
+  if (!tap) {
+    tap = a.createMediaStreamDestination();
+    master.connect(tap);
+  }
+  return tap.stream;
+}
+
 /** Music dips under a big moment (a hard hit, the strike, a knockout) and comes back. */
 export function duck(depth = 0.35, hold = 0.25) {
   const a = ctx;

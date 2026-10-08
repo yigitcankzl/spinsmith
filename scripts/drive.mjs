@@ -39,7 +39,11 @@ export default async function run({ page, frame, workspaceRoot }) {
       requestAnimationFrame(draw);
     };
     draw();
-    const rec = new MediaRecorder(out.captureStream(60), { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 16e6 });
+    // With the game's sound when it can be tapped.
+    const stream = out.captureStream(60);
+    const sound = window.__audioTap?.();
+    for (const t of sound?.getAudioTracks() ?? []) stream.addTrack(t);
+    const rec = new MediaRecorder(stream, { mimeType: sound ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp9', videoBitsPerSecond: 16e6 });
     const parts = [];
     rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
     rec.start(500);
@@ -75,7 +79,7 @@ export default async function run({ page, frame, workspaceRoot }) {
   await target.evaluate(() => delete window.__rec);
   const webm = `${video}.webm`;
   writeFileSync(webm, Buffer.from(b64, 'base64'));
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', webm, '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-r', '60', video]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', webm, '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-r', '60', '-c:a', 'aac', '-b:a', '192k', video]);
   rmSync(webm);
   return { video, mb: +(b64.length * 0.75 / 1e6).toFixed(1), state: result };
 }

@@ -442,4 +442,6 @@ export function installDriver() {
     },
   };
   w.drive = api;
+  // For recording (scripts/drive.mjs): the game's sound as a stream.
+  void import('./game/audio.js').then((m) => ((window as unknown as { __audioTap: () => MediaStream | null }).__audioTap = m.audioTap));
 }
