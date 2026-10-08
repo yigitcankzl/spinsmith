@@ -309,6 +309,8 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** Dev: photo mode for store art (see update). */
+  photo = false;
   /** A quench in progress (a breath of steam before the forge closes). */
   private quenching: { t: number; build: TopBuild } | null = null;
   /** This match's rival intro (portal, VS) has played: a drawn 0-0 round does not repeat it. */
@@ -722,6 +724,11 @@ export class MatchSystem extends createSystem({
       return;
     }
     this.label.update(Math.min(delta, 0.1));
+    // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
+    if (this.photo) {
+      for (const o of [this.label.mesh, this.bar.mesh, this.menuButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
+      this.hub.photo();
+    }
     this.guardFrameRate(delta);
     this.stamp.update(Math.min(delta, 0.1));
     this.updatePrints(Math.min(delta, 0.1));

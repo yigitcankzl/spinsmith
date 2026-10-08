@@ -219,6 +219,15 @@ export class Hub {
     }
   }
 
+  /** Dev photo mode: the station names, the level plate's card and the board stay hidden. */
+  photo() {
+    this.photoMode = true;
+    this.board.mesh.visible = false;
+    for (const it of this.items) if (it.action.kind === 'reset' || it.action.kind === 'comfort') it.model.visible = false;
+    this.beacon.visible = this.path.visible = false;
+  }
+  private photoMode = false;
+
   hide() {
     this.root.visible = false;
     if (this.held) this.returnHome(this.held.item);
@@ -277,7 +286,7 @@ export class Hub {
       const on = it === hovered;
       // The three stations always say what they are; the rest only in the first session or when pointed at.
       const station = it.action.kind === 'play' || it.action.kind === 'forge' || it.action.kind === 'workshop';
-      if (it.name) it.name.visible = (!it.quiet && (this.teaching || station)) || on;
+      if (it.name) it.name.visible = !this.photoMode && ((!it.quiet && (this.teaching || station)) || on);
       const p = popIn(this.time - this.shownAt, i);
       const k = (on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1) * Math.max(0.001, p * p * (3 - 2 * p));
       it.model.scale.setScalar(k);

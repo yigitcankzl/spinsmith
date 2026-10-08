@@ -58,6 +58,7 @@ interface Game {
   progress: { level: number; matches: number; guide: string };
   SPAWN: number;
   gazeOff: boolean;
+  photo: boolean;
   menuButton: { mesh: { visible: boolean; getWorldPosition(v: Vector3): Vector3 } };
 }
 
@@ -389,6 +390,14 @@ export function installDriver() {
       await glide(side, point, new Vector3(...(to as [number, number, number])), dur);
     },
     pinch: setPinch,
+    /** Photo mode for store art: cards, buttons and stamps hidden; the hands moved out of view. */
+    async photo(on = true) {
+      game().photo = on;
+      if (!on) return api.rest();
+      const g = game();
+      const low = g.root.localToWorld(new Vector3(0, -0.6, 0.6));
+      await Promise.all((['left', 'right'] as const).map((side) => glide(side, 'pinch', low.clone().setX(low.x + (side === 'left' ? -0.3 : 0.3)), 0.2, 0)));
+    },
     /** Sets a challenge code (as ?vs=CODE would) for the next match. */
     challenge(code: string) {
       sessionStorage.setItem('spinsmith.vs', code);
