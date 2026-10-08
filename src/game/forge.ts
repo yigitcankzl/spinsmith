@@ -147,6 +147,8 @@ interface Slot {
   item: Item;
   drawer: Drawer;
   model: Object3D;
+  /** Its place in its drawer (for the drawer's pop-in order). */
+  order: number;
   /** Its name, below it on the tray. */
   name: Object3D;
   home: Vector3;
@@ -398,14 +400,16 @@ export class Forge {
       if (s === this.focus) pad.copy(PAD_ON).lerp(this.white, 0.5 + 0.5 * Math.sin(this.time * 5));
       this.pads.setColorAt(s.pad, pad);
       // Out of the drawer one after another, then a slow turn; lifted while pointed at.
-      const pop = popIn(this.drawerT, this.slots.filter((x) => x.drawer === this.drawer).indexOf(s));
+      const pop = popIn(this.drawerT, s.order);
       const pulse = s.flash > 0 ? 1 + 0.25 * Math.sin((s.flash / 0.8) * Math.PI) : 1;
       s.model.position.set(s.home.x, s.home.y + (on ? 0.012 : 0) - 0.02 * (1 - pop), s.home.z);
       s.model.rotation.y += dt * (on ? 2 : 0.4);
       s.model.scale.setScalar(s.size * pop * (on ? 1.15 : 1) * pulse * (locked ? 0.7 : 1));
     }
     this.pads.instanceColor!.needsUpdate = true;
-    if (!this.heldPart) {
+    // The card only redraws when what is pointed at changes (no new build object every frame).
+    if (!this.heldPart && hovered !== this.cardFor) {
+      this.cardFor = hovered;
       this.showCard(hovered ? this.withItem(hovered.item) : null);
       if (hovered) this.hint(this.locked(hovered) ? `${hovered.item.name}: locked, ${hovered.hint}` : `${hovered.item.name}: ${hovered.item.blurb}`);
       else this.hint(null);
@@ -530,7 +534,11 @@ export class Forge {
     const target = slotKind && d < EXPLODE_R ? Math.min(1, (EXPLODE_R - d) / (EXPLODE_R - SNAP)) : 0;
     this.explode += (target - this.explode) * 0.25;
     this.display.explode(this.explode, slotKind, this.time);
-    this.showCard(this.withItem(held.item));
+    if (this.cardHeld !== held.item) {
+      this.cardHeld = held.item;
+      this.cardFor = undefined;
+      this.showCard(this.withItem(held.item));
+    }
     if (h.pinching && h.tracked) {
       held.lost = 0;
       return;
@@ -762,9 +770,14 @@ export class Forge {
   }
 
   private hinted: string | null = null;
+  /** The slot the stats card was last drawn for (undefined: redraw). */
+  private cardFor: Slot | null | undefined = undefined;
+  private cardHeld: Item | null = null;
 
   private say(text: string) {
     this.message = text;
+    this.cardFor = undefined;
+    this.cardHeld = null;
     this.hooks.said?.(text);
     this.cardKey = '';
     this.showCard(null);
@@ -797,7 +810,7 @@ export class Forge {
         const size = item.kind === 'ring' ? 0.62 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
         this.tray.add(model);
         const key = itemKey(item);
-        this.slots.push({ item, drawer, model, name, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null });
+        this.slots.push({ item, drawer, model, name, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null, order: i });
         pads.push(home);
       });
     }

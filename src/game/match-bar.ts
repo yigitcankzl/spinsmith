@@ -14,7 +14,7 @@ export class MatchBar {
   readonly mesh: Mesh;
   private canvas = document.createElement('canvas');
   private tex: CanvasTexture;
-  private key = '';
+  private last = { ready: false, my: 0, their: 0, n0: '', n1: '', msg: '', show: false, level: 0, fraction: 0, gained: 0 };
   /** The spin bars as meshes over the plate (animated every frame): fill, and the chip behind it. */
   private fill: [Mesh, Mesh];
   private chip: [Mesh, Mesh];
@@ -86,9 +86,11 @@ export class MatchBar {
     // The spin fills are meshes (animate()); the plate redraws only for names, pips and words.
     const a = 0;
     const b = 0;
-    const key = [myPoints, theirPoints, names, message, xp.show, xp.level, xp.fraction.toFixed(3), xp.gained].join('|');
-    if (key === this.key) return;
-    this.key = key;
+    // Compared field by field (no string built every frame).
+    const k = this.last;
+    const fraction = Math.round(xp.fraction * 1000);
+    if (k.ready && k.my === myPoints && k.their === theirPoints && k.n0 === names[0] && k.n1 === names[1] && k.msg === message && k.show === xp.show && k.level === xp.level && k.fraction === fraction && k.gained === xp.gained) return;
+    Object.assign(k, { ready: true, my: myPoints, their: theirPoints, n0: names[0], n1: names[1], msg: message, show: xp.show, level: xp.level, fraction, gained: xp.gained });
     const g = this.canvas.getContext('2d')!;
     const W = 1400;
     metalPlate(g, W, 330);

@@ -314,6 +314,11 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** Shape marks, pooled for updateShapes, and the floor height lookup they use. */
+  private specPool: ShapeMarkSpec[] = [];
+  private specsMine: ShapeMarkSpec[] = [];
+  private specsTheirs: ShapeMarkSpec[] = [];
+  private heightAt = (x: number, z: number) => this.arena.height(x, z);
   /** This round's rip power (for the OUTLAST reason). */
   private lastRip = 1;
   /** In the forge: the next bout in a line (the rival's style and the arena), under the forge's words. */
@@ -734,11 +739,11 @@ export class MatchSystem extends createSystem({
     }
     // On the result card and at home, the card steps back while a stamp holds the far rim (one
     // thing there at a time); in a fight its instructions (a tell, strike now) stay at full strength.
-    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible && (this.phase === 'result' || this.phase === 'hub'));
+    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible && (this.phase === 'result' || this.phase === 'hub' || this.phase === 'ready'));
     this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
-      for (const o of [this.label.mesh, this.bar.mesh, this.menuButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
+      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
       this.hub.photo();
     }
     this.guardFrameRate(delta);
@@ -1189,7 +1194,13 @@ export class MatchSystem extends createSystem({
     // The card rides higher in the forge (the stats plate sits on the far rim).
     this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + 0.1, LABEL_AT.z);
     const r = this.nextRival;
-    this.forgeNext = r ? `Next: ${r.name}, ${r.style}, in ${this.arenas[this.arenaIndex].name}` : '';
+    let friend = false;
+    try {
+      friend = !!sessionStorage.getItem('spinsmith.vs');
+    } catch {
+      // No storage: no challenge waits.
+    }
+    this.forgeNext = friend ? "Next: a friend's top (challenge code)" : r ? `Next: ${r.name}, ${r.style}, in ${this.arenas[this.arenaIndex].name}` : '';
     this.forge.open(focus);
   }
 
@@ -1284,7 +1295,8 @@ export class MatchSystem extends createSystem({
     // A pinch skips it, even before it starts (its plate goes with it).
     if (this.hands.left.justPinched || this.hands.right.justPinched) {
       this.replay = null;
-      this.stamp.cut();
+      // Only the REPLAY plate goes (not the finish stamp before it, nor rewards queued behind).
+      if (r.t >= 0) this.stamp.cut();
       // The result card does not wait out the skipped replay.
       this.resultTimer = Math.min(this.resultTimer, 1.5);
       return;
@@ -1551,12 +1563,16 @@ export class MatchSystem extends createSystem({
    * differs enough), else a weak rip, else the clashes.
    */
   private outlastReason(won: boolean): string {
+    // Endurance stats only span about 20-33 across all builds, so a 5-point gap is a real edge. It
+    // is named by the part that makes it: the ring when the rings' drain differs, else the tip.
     const mine = statsOf(this.mine.spec).stamina;
     const theirs = statsOf(this.theirs.spec).stamina;
-    const myTip = TIPS.find((t) => t.id === this.myBuild.tip)?.name ?? 'tip';
-    const theirTip = TIPS.find((t) => t.id === this.theirBuild.tip)?.name ?? 'tip';
-    if (won && mine - theirs >= 15) return `Your ${myTip} outspun its ${theirTip}`;
-    if (!won && theirs - mine >= 15) return `Its ${theirTip} spins longer than your ${myTip}`;
+    const myRing = RINGS.find((r) => r.id === this.myBuild.ring);
+    const theirRing = RINGS.find((r) => r.id === this.theirBuild.ring);
+    const byRing = !!myRing && !!theirRing && myRing.drain !== theirRing.drain;
+    const part = (b: TopBuild, ring: (typeof RINGS)[number] | undefined) => (byRing ? `${ring?.name ?? ''} ring` : `${TIPS.find((t) => t.id === b.tip)?.name ?? ''} tip`);
+    if (won && mine - theirs >= 5) return `Your ${part(this.myBuild, myRing)} outspun its ${part(this.theirBuild, theirRing)}`;
+    if (!won && theirs - mine >= 5) return `Its ${part(this.theirBuild, theirRing)} spins longer than your ${part(this.myBuild, myRing)}`;
     if (!won && this.lastRip < 0.6) return `Weak rip: ${Math.round(this.lastRip * 100)}%`;
     return won ? 'Your spin lasted through the clashes' : 'Your spin ran out in the clashes';
   }
@@ -1567,7 +1583,7 @@ export class MatchSystem extends createSystem({
     // Each round: who took it and how ("you SLAG", "they OUTLAST").
     const rounds = m.rounds.map((r) => (r.startsWith('-') ? `they ${r.slice(1)}` : `you ${r}`)).join(' · ');
     // After a loss the report keeps the rival's tip: something to forge or try next.
-    if (!m.won) return `Lost ${m.score} vs ${this.rival.name} · ${rounds}\nTry: ${this.rival.tip}`;
+    if (!m.won) return `Lost ${m.score} vs ${this.rival.name}\nTry: ${this.rival.tip}`;
     return `Won ${m.score} vs ${this.rival.name}\n${rounds} · best rip ${Math.round(m.rip * 100)}% · +${m.xp} XP`;
   }
 
@@ -2934,19 +2950,34 @@ export class MatchSystem extends createSystem({
   }
 
   /** Marks for live shapes and ghosts, the charge embers, and a crunch when a top runs into a shape. */
+  /** A pooled shape mark (the marks are rebuilt every frame without allocating). */
+  private specAt(i: number): ShapeMarkSpec {
+    return (this.specPool[i] ??= { kind: 'ramp', x: 0, z: 0, dx: 0, dz: 0, strength: 0, ghost: false });
+  }
+
   private updateShapes() {
-    const mark = (s: FloorShape): ShapeMarkSpec => ({ kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false, sigma: s.sigma });
-    const specs = this.arena.shapes.filter((s) => s.owner !== 'rival').map(mark);
-    this.rivalMarks.show(this.phase === 'fight' ? this.arena.shapes.filter((s) => s.owner === 'rival').map(mark) : [], (x, z) => this.arena.height(x, z), this.time);
-    for (const side of ['left', 'right'] as const) {
-      const d = this.shaping[side];
-      if (d && !d.shape) specs.push({ kind: 'ramp', x: d.x, z: d.z, dx: d.dx, dz: d.dz, strength: 1, ghost: true });
+    const fight = this.phase === 'fight';
+    const mine = this.specsMine;
+    const theirs = this.specsTheirs;
+    mine.length = theirs.length = 0;
+    let n = 0;
+    if (fight) {
+      for (const s of this.arena.shapes) {
+        const m = this.specAt(n++);
+        Object.assign(m, { kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false, sigma: s.sigma });
+        (s.owner === 'rival' ? theirs : mine).push(m);
+      }
+      for (const side of ['left', 'right'] as const) {
+        const d = this.shaping[side];
+        if (d && !d.shape) mine.push(Object.assign(this.specAt(n++), { kind: 'ramp', x: d.x, z: d.z, dx: d.dx, dz: d.dz, strength: 1, ghost: true, sigma: undefined }));
+      }
+      if (this.devRampSince >= 0 && this.gazeHit.ok) {
+        const r = Math.hypot(this.gazeHit.x, this.gazeHit.z) || 1;
+        mine.push(Object.assign(this.specAt(n++), { kind: 'ramp', x: this.gazeHit.x, z: this.gazeHit.z, dx: this.gazeHit.x / r, dz: this.gazeHit.z / r, strength: this.devRampAmp() / SHAPE_SIZE.ramp, ghost: true, sigma: undefined }));
+      }
     }
-    if (this.devRampSince >= 0 && this.gazeHit.ok) {
-      const r = Math.hypot(this.gazeHit.x, this.gazeHit.z) || 1;
-      specs.push({ kind: 'ramp', x: this.gazeHit.x, z: this.gazeHit.z, dx: this.gazeHit.x / r, dz: this.gazeHit.z / r, strength: this.devRampAmp() / SHAPE_SIZE.ramp, ghost: true });
-    }
-    this.marks.show(this.phase === 'fight' ? specs : [], (x, z) => this.arena.height(x, z), this.time);
+    this.rivalMarks.show(theirs, this.heightAt, this.time);
+    this.marks.show(mine, this.heightAt, this.time);
     this.pips.root.visible = this.phase === 'fight' || this.phase === 'ready' || this.phase === 'pulling';
     this.pips.set(this.charges.charges, this.charges.refilling);
     for (const s of this.arena.shapes) {

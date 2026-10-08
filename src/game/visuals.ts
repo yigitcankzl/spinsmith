@@ -1917,11 +1917,10 @@ export class Stamp {
   private hold = 1;
   private queue: [string, string, 'mine' | 'rival' | 'neutral', number][] = [];
 
-  /** Ends what shows now at once (a skipped replay's plate), and anything waiting. */
+  /** Ends what shows now at once (a skipped replay's plate); what waits shows next. */
   cut() {
     this.t = -1;
     this.mesh.visible = false;
-    this.queue.length = 0;
   }
 
   /** Stamps after whatever shows now (and after anything stamped in the same frame). */

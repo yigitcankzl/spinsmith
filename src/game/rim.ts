@@ -85,10 +85,15 @@ export class RimTabs {
 
   /** Redraws only when a tab's look changed. */
   draw(look: (i: number) => TabLook) {
-    const looks = this.labels.map((_, i) => look(i));
-    const key = JSON.stringify(looks);
+    // A key of three flags per tab, built without objects; the looks are only read on a redraw.
+    let key = '';
+    for (let i = 0; i < this.labels.length; i++) {
+      const l = look(i);
+      key += `${l.on ? 1 : 0}${l.hover ? 1 : 0}${l.hot ? 1 : 0}`;
+    }
     if (key === this.key) return;
     this.key = key;
+    const looks = this.labels.map((_, i) => look(i));
     const g = this.canvas.getContext('2d')!;
     const H = this.canvas.height;
     g.clearRect(0, 0, this.canvas.width, H);
