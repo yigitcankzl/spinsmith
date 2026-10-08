@@ -2012,9 +2012,8 @@ export class MatchSystem extends createSystem({
     const lift = Math.max(0, WALL_HEIGHT[L.wall] - WALL_HEIGHT.standard);
     this.bar.mesh.position.y = (BAR_Y + lift) * grow;
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
-    // The result's stamp stands in the card's slot above the bar, leaving the arena and the winner in view.
-    // In a bout every stamp stands in the card's slot above the bar, never over the tops in play.
-    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y, this.label.mesh.position.z + 0.01);
+    // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
+    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + 0.07 * grow, this.label.mesh.position.z + 0.01);
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
