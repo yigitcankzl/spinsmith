@@ -28,7 +28,7 @@ import {
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
-import { playDrawer, playLocked, playMachine, playPick, playPlace, playRemove } from './audio.js';
+import { playDip, playDrawer, playFit, playLocked, playMachine, playPick, playPlace, playRemove, playTooth } from './audio.js';
 import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
 import { ORANGE, TEXT_DIM } from './ui.js';
@@ -350,7 +350,7 @@ export class Forge {
       this.clicks--;
       this.clickTimer = 0.07;
       this.twist += 0.35;
-      playPick();
+      playTooth(this.clicks);
     }
     if (this.twist > 0) {
       const step = Math.min(this.twist, dt * 6);
@@ -636,7 +636,8 @@ export class Forge {
       }
       this.say(item.kind === 'preset' ? `${item.name}: ${buildName(next)}` : `${item.name} fitted: ${item.blurb}`);
     }
-    playPlace();
+    if (item.kind === 'color') playDip();
+    else playFit();
     this.rebuildDisplay();
     if (slot && JSON.stringify(this.build) !== before) {
       slot.flash = 0.8;
