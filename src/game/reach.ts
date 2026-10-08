@@ -23,7 +23,7 @@ export const TAB_LINE = { z: 0.18, y: 0.006, gap: 0.066 };
 /** The workshop's five tabs on the same line, a little closer together. */
 export const WORKSHOP_TAB_GAP = 0.052;
 /** The workshop's piece rail, above the near wall. */
-export const RAIL = { z: 0.16, y: 0.045 };
+export const RAIL = { z: 0.16, y: 0.03 };
 /** Home: your top's dock, the forge's small anvil and the blueprint, on the near rim. */
 export const DOCK_AT: Spot = { x: -0.14, y: 0, z: 0.165 };
 export const FORGE_AT: Spot = { x: 0.14, y: 0, z: 0.165 };
@@ -40,12 +40,26 @@ export function traySpan(n: number): number {
   return Math.min(0.85 * Math.PI, Math.max((2 * Math.PI) / 3, (n * TRAY.gap) / TRAY.r));
 }
 
-/** The i-th of n parts on the forge tray. */
+/**
+ * The i-th of n parts on the forge tray: on an arc flattened toward the player (the nearest parts
+ * stay clear of the drawer tabs), spaced evenly along it, so the ends are as far apart as the middle.
+ */
 export function traySpot(i: number, n: number): Spot {
   const span = traySpan(n);
-  const a = Math.PI / 2 + span / 2 - (span * (i + 0.5)) / n;
-  // Flattened toward the player, so the nearest parts stay clear of the drawer tabs.
-  return { x: WORK.x + Math.cos(a) * TRAY.r, y: TRAY.y, z: WORK.z + Math.sin(a) * TRAY.r * 0.8 };
+  const rz = TRAY.r * 0.8;
+  const a0 = Math.PI / 2 + span / 2;
+  // ponytail: arc length by 64 steps, fine for a handful of parts.
+  const steps = 64;
+  const len: number[] = [0];
+  for (let k = 1; k <= steps; k++) {
+    const a = a0 - (span * (k - 0.5)) / steps;
+    len.push(len[k - 1] + (Math.hypot(TRAY.r * Math.sin(a), rz * Math.cos(a)) * span) / steps);
+  }
+  const want = (len[steps] * (i + 0.5)) / n;
+  let k = 1;
+  while (k < steps && len[k] < want) k++;
+  const a = a0 - (span * (k - 1 + (want - len[k - 1]) / (len[k] - len[k - 1]))) / steps;
+  return { x: WORK.x + Math.cos(a) * TRAY.r, y: TRAY.y, z: WORK.z + Math.sin(a) * rz };
 }
 
 /** Distance (m) and angle below eye level (degrees) of an arena-local spot, for a tray `drop` below the eyes. */

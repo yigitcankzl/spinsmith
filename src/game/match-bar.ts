@@ -125,8 +125,9 @@ export class MatchBar {
     g.textBaseline = 'middle';
     let size = 64;
     do g.font = `bold ${size--}px ${FONT}`;
-    while (g.measureText(message).width > 340 && size > 44);
-    g.fillText(message, W / 2, 122);
+    while (g.measureText(message).width > 300 && size > 28);
+    // Between the two bars, never over them.
+    g.fillText(message, W / 2, 122, 300);
     // After a round only: your smith level, the XP bar and the XP just earned (not during a fight,
     // when the eyes are on the tops).
     if (!xp.show) {
@@ -136,16 +137,16 @@ export class MatchBar {
     g.font = `700 48px ${FONT}`;
     g.fillStyle = TEXT;
     g.textAlign = 'left';
-    g.fillText(`Lv ${xp.level}`, 40, 280);
+    g.fillText(`Lv ${xp.level}`, 80, 268);
     g.fillStyle = 'rgba(255,255,255,0.1)';
-    g.fillRect(220, 268, 820, 26);
+    g.fillRect(250, 256, 780, 26);
     g.fillStyle = STEEL;
-    g.fillRect(220, 268, 820 * xp.fraction, 26);
+    g.fillRect(250, 256, 780 * xp.fraction, 26);
     if (xp.gained > 0) {
       g.fillStyle = ORANGE;
       g.textAlign = 'right';
       g.font = `700 48px ${FONT}`;
-      g.fillText(`+${xp.gained} XP`, W - 40, 280);
+      g.fillText(`+${xp.gained} XP`, W - 80, 268);
     }
     this.tex.needsUpdate = true;
   }

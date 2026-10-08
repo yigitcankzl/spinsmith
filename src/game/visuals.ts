@@ -463,7 +463,7 @@ export function ringMeshes(ring: Ring, color: number, base: number, glow = new M
   }
   const bladeMesh = new Mesh(merge(metal), BLADE_METAL);
   bladeMesh.position.y = base;
-  const layerMesh = new Mesh(extrudeOutline(sample(d.layer), CHIP_R * 0.9, 0.0025), new MeshMatcapMaterial({ matcap: makeMatcap('clay', color) }));
+  const layerMesh = new Mesh(extrudeOutline(sample(d.layer), CHIP_R * 0.9, 0.0025), new MeshStandardMaterial({ color, metalness: 0, roughness: 0.32 }));
   layerMesh.position.y = base + top;
   // The chip: a dome in a lighter body color, the emblem glowing on top.
   const light = new Color(color).lerp(new Color(0xffffff), 0.35).getHex();
@@ -1007,7 +1007,8 @@ let SHELL: Group | null = null;
 
 /** Wall heights (m) by wall type. */
 const WALL_HEIGHT: Record<Wall, number> = { low: 0.007, standard: 0.012, high: 0.028, none: 0 };
-const POCKET_REACH = 0.03;
+/** How far a pocket's trough runs out past the rim: onto the pedestal's top, not into the air. */
+const POCKET_REACH = 0.008;
 
 /** Points along the rim from angle a0 to a1, pushed out (or in) by `offset`, at height y. */
 function rimPath(layout: ArenaLayout, a0: number, a1: number, offset: number, y: number) {
@@ -1174,7 +1175,7 @@ export class ArenaView {
     };
     const wallMat = own(new MeshMatcapMaterial({ matcap: P.wall, side: DoubleSide }));
     const accent = own(new MeshBasicMaterial({ color: P.accent, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }));
-    const trough = own(new MeshBasicMaterial({ color: 0x15110f, side: DoubleSide }));
+    const trough = own(new MeshBasicMaterial({ color: 0x26282d, side: DoubleSide }));
     const H = WALL_HEIGHT[layout.wall];
 
     // Walls in the gaps between pockets (the whole rim when there are none).

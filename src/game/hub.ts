@@ -517,7 +517,7 @@ export class Hub {
     const dock = standModel();
     dock.scale.setScalar(RIM_SCALE);
     this.stand.add(dock);
-    const name = this.label('PLAY', this.stand, DOCK_TOP + 0.035);
+    const name = this.label('PLAY', this.stand, DOCK_TOP + 0.06);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
     this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3(), name });

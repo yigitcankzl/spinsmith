@@ -3,7 +3,7 @@
  * rims. Tabs and buttons engraved on metal plates along the near rim, the staggered pop of a
  * drawer's items, and the dial plate on the far rim.
  */
-import { BufferAttribute, BufferGeometry, CanvasTexture, CylinderGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, MeshMatcapMaterial, PlaneGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from '@iwsdk/core';
+import { BufferAttribute, BufferGeometry, CanvasTexture, CylinderGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, MeshMatcapMaterial, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from '@iwsdk/core';
 import { makeMatcap, mergeByMaterial } from './visuals.js';
 import { engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
 
@@ -221,7 +221,7 @@ export class DialPlate {
  */
 export function rimSlot(): Group {
   const g = new Group();
-  const block = new Mesh(new CylinderGeometry(0.03, 0.033, 0.03, 8).rotateY(Math.PI / 8).translate(0, -0.015, 0), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57) }));
+  const block = new Mesh(new CylinderGeometry(0.03, 0.033, 0.03, 8).rotateY(Math.PI / 8).translate(0, -0.015, 0), new MeshStandardMaterial({ color: 0x5b5f69, metalness: 0.45, roughness: 0.5 }));
   const lip = new Mesh(new TorusGeometry(0.026, 0.0028, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xe2b866) }));
   const well = new Mesh(new CylinderGeometry(0.024, 0.024, 0.002, 8).rotateY(Math.PI / 8).translate(0, -0.004, 0), new MeshBasicMaterial({ color: 0xff7a2a }));
   g.add(block, lip, well);

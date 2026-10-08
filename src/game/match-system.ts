@@ -83,6 +83,8 @@ const INTRO_TIME = 2.5;
 const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
 const LABEL_AT = new Vector3(0, 0.14, -0.21);
+/** The workshop shows the arena a little smaller, so its near rim stays behind the piece rail. */
+const WORKSHOP_RIM = 0.13;
 /** A match arena's near rim stays this far out (arena-local, as the 0.17 arenas): a bigger one slides back. */
 const NEAR_RIM = 0.17;
 const MOVE_WORD = { charge: 'charges', quake: 'quakes the floor', pull: 'pulls you to the pits' } as const;
@@ -563,8 +565,7 @@ export class MatchSystem extends createSystem({
     this.title.renderOrder = 5;
     this.root.add(this.title);
     // Low over the arena's middle, in front of the far card and the match bar.
-    // Above the tops, not on them.
-    this.stamp.mesh.position.set(0, 0.075, 0.03);
+    this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.root.add(this.stamp.mesh);
     this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
@@ -1194,7 +1195,7 @@ export class MatchSystem extends createSystem({
     const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:spur' : null;
     this.progress.advance('fit');
     // The card rides higher in the forge (the stats plate sits on the far rim).
-    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + 0.11, LABEL_AT.z);
+    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + 0.12, LABEL_AT.z);
     const r = this.nextRival;
     let friend = false;
     try {
@@ -1857,7 +1858,7 @@ export class MatchSystem extends createSystem({
       }
     } else this.fitLayout = null;
     // While the workshop resizes, the shown size holds still so the rim follows the hand.
-    const k = match ? 1 : this.builder.resizing ? this.viewK : Math.min(1, DISPLAY_RIM / rim);
+    const k = match ? 1 : this.builder.resizing ? this.viewK : Math.min(1, (p === 'build' ? WORKSHOP_RIM : DISPLAY_RIM) / rim);
     const scale = match ? this.matchScale : 1;
     const push = match ? this.matchPush : 0;
     const e = Math.min(1, dt * 3);

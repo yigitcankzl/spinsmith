@@ -123,7 +123,7 @@ const TAB_H = 0.024;
 /** The quench slot, set into the right rim beside the anvil. */
 const QUENCH_AT = new Vector3(0.205, -0.006, 0.06);
 /** The stats plate stands on the far rim. */
-const STATS_AT = new Vector3(0, 0.145, -0.25);
+const STATS_AT = new Vector3(0, 0.16, -0.25);
 /** Your top on the anvil is this much larger than in the arena. */
 const DISPLAY_SCALE = 1.7;
 /** The transformation takes this long (s). */
@@ -699,7 +699,8 @@ export class Forge {
   }
 
   private showCard(preview: TopBuild | null) {
-    const message = this.hinted ?? this.message;
+    // The guide card already says the message: the plate only adds the part pointed at.
+    const message = this.hinted ?? (this.hooks.said ? '' : this.message);
     const key = JSON.stringify([this.build, preview, message]);
     if (key === this.cardKey) return;
     this.cardKey = key;
@@ -810,7 +811,7 @@ export class Forge {
         name.rotation.x = -0.35;
         name.visible = false;
         this.tray.add(name);
-        const size = item.kind === 'ring' ? 0.52 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
+        const size = item.kind === 'ring' ? 0.46 : item.kind === 'core' ? 0.7 : item.kind === 'tip' ? 0.8 : 1;
         this.tray.add(model);
         const key = itemKey(item);
         this.slots.push({ item, drawer, model, name, home, pad: pads.length, flash: 0, size, key, hint: key ? unlockHint(key) : null, order: i });

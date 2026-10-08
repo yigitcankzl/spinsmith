@@ -428,7 +428,8 @@ export class Builder {
     this.namesTex = new CanvasTexture(this.namesCanvas);
     this.namesTex.colorSpace = SRGBColorSpace;
     this.names = new Mesh(new PlaneGeometry(RAIL_W, 0.012), new MeshBasicMaterial({ map: this.namesTex, transparent: true, depthWrite: false }));
-    this.names.position.set(0, RAIL_Y - 0.021, RAIL_Z + 0.012);
+    // Just in front of and below the rail, above the drawer tabs.
+    this.names.position.set(0, RAIL_Y - 0.008, RAIL_Z + 0.016);
     this.names.rotation.x = -0.7;
     this.tools.add(bar, this.names, this.items);
     TRAY.forEach(([, pieces], t) => {
