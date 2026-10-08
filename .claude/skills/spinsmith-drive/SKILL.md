@@ -78,6 +78,13 @@ H.264), without the emulator's gizmos and panels. One call is at most about 100 
 takes in several clips. Check a frame with `ffmpeg -ss 5 -i clip.mp4 -frames:v 1 /tmp/f.jpg` and
 Read it. Label emulator footage as captured in the emulator.
 
+## The trailer, in one command
+
+`scripts/trailer.sh [out-dir]` records the seven trailer shots (rise and title, portal, ramp
+knockout and replay, strike, cup and sling, forge and quench, a won match) with the game's sound,
+then cuts `spinsmith-trailer-rough.mp4` with title cards, every shot labelled as emulator footage.
+`CUT_ONLY=1 scripts/trailer.sh` recuts from the recorded shots.
+
 ## Limits
 
 The emulator's hands are canned poses blended by a pinch value; the driver moves them perfectly.

@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Records the emulator trailer shots with the hand driver and cuts a rough trailer with title
+# cards (dev server with --allow-browser-automation; see .claude/skills/spinsmith-drive/SKILL.md).
+#   scripts/trailer.sh [out-dir]        record every shot, then cut
+#   CUT_ONLY=1 scripts/trailer.sh       cut again from the shots already recorded
+# Output: <out-dir>/shots/*.mp4 and <out-dir>/spinsmith-trailer-rough.mp4 (emulator footage, labelled).
+set -uo pipefail
+cd "$(dirname "$0")/.."
+OUT=${1:-$HOME/Desktop/spinsmith-videos}
+S=$OUT/shots
+mkdir -p "$S"
+D=scripts/drive.sh
+E=scripts/emu.sh
+rec() { DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$S/$1" $D "${@:2}" >/dev/null; }
+phase() { $D '["peek","phase"]' 2>/dev/null; }
+home() { [ "$(phase)" = '"hub"' ] || { $D '["tap","menu"]' '["wait",0.3]' '["tap","menu"]' '["wait",2]' >/dev/null; sleep 1; }; }
+logs() { $E logs 40; }
+
+if [ -z "${CUT_ONLY:-}" ]; then
+  # 1. The arena rises and the title (a fresh page, the title shows once per session).
+  $D '["demo"]' >/dev/null 2>&1; sleep 10
+  npx @iwsdk/cli xr enter >/dev/null 2>&1; npx @iwsdk/cli xr set-input-mode --input-json '{"mode":"hand"}' >/dev/null 2>&1; $E front
+  rec 01-rise-title.mp4 '["wait",13]'
+  # 2. The rival's portal entrance.
+  rec 02-portal.mp4 '["tap","play"]' '["wait",3.5]'
+  # 3. Rip, a ramp that knocks the rival out, and its replay (retried until the ramp is the cause).
+  for _ in 1 2 3 4 5; do
+    sleep 3; home_or_ready=$(phase); [ "$home_or_ready" = '"hub"' ] && $D '["tap","play"]' '["wait",3.5]' >/dev/null
+    rec 03-rip-ramp-replay.mp4 '["rip",{"power":0.95}]' '["wait",3.2]' '["ramp",{"hold":0.15}]' '["key","KeyK"]' '["wait",9]'
+    logs | grep -q "YOUR RAMP →" && break
+  done
+  # 4. The strike (a new match so the round is fresh).
+  sleep 3; home; $D '["tap","play"]' '["wait",3.5]' >/dev/null
+  rec 04-strike.mp4 '["rip",{"power":0.8}]' '["wait",2.8]' '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",3.5]'
+  # 5. Cup and sling.
+  for _ in 1 2 3; do
+    sleep 5; [ "$(phase)" = '"hub"' ] && $D '["tap","play"]' '["wait",3.5]' >/dev/null
+    rec 05-cup-sling.mp4 '["rip",{"power":0.7}]' '["wait",3]' '["cup"]' '["wait",0.4]' '["sling"]' '["wait",2.5]'
+    logs | grep -q "sling" && break
+  done
+  # 6. The forge: a part onto the top, then the quench.
+  sleep 4; home
+  rec 06-forge.mp4 '["tap","forge"]' '["wait",2.5]' '["drag","Saw","top"]' '["wait",1]' '["drag","top","quench"]' '["wait",3]'
+  # 7. A won match.
+  sleep 3; home
+  rec 07-match-win.mp4 '["tap","play"]' '["wait",3.5]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",5.5]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",10]'
+fi
+
+# The cut: title cards between trimmed shots, every shot labelled as emulator footage.
+T=$(mktemp -d)
+FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+card() {
+  ffmpeg -y -loglevel error -f lavfi -i "color=c=0x14161b:s=1920x1080:d=2.2:r=30" -f lavfi -i anullsrc=r=48000:cl=stereo -t 2.2 \
+    -vf "drawtext=fontfile=$FONT:text='$2':fontcolor=0xff8a2a:fontsize=92:x=(w-text_w)/2:y=(h-text_h)/2-30,drawtext=fontfile=$FONT:text='$3':fontcolor=0xd9d4cc:fontsize=40:x=(w-text_w)/2:y=(h/2)+60,fade=t=in:st=0:d=0.3,fade=t=out:st=1.9:d=0.3" \
+    -c:v libx264 -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 -shortest "$T/$1.mp4"
+}
+clip() {
+  local end; end=$(echo "$4 - 0.3" | bc)
+  ffmpeg -y -loglevel error -ss "$3" -i "$S/$2" -t "$4" \
+    -vf "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=30,drawtext=fontfile=$FONT:text='Captured in the IWER emulator':fontcolor=white@0.55:fontsize=26:x=w-text_w-30:y=h-50,fade=t=in:st=0:d=0.2,fade=t=out:st=$end:d=0.3" \
+    -af "afade=t=in:st=0:d=0.2,afade=t=out:st=$end:d=0.3" -c:v libx264 -crf 20 -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 "$T/$1.mp4"
+}
+card c0 "SPINSMITH" "A spinning-top battle on your real table"
+clip s1 01-rise-title.mp4 6.5 5
+card c1 "THEY COME FOR YOU" "Seven rivals, each with a move of its own"
+clip s2 02-portal.mp4 0.6 4
+card c2 "RESHAPE THE ARENA" "Pinch the floor and a ramp throws your rival out"
+clip s3 03-rip-ramp-replay.mp4 0.5 14
+card c3 "STRIKE THE TABLE" "Slap your real desk and a shockwave runs through the arena"
+clip s4 04-strike.mp4 2 8
+card c4 "CATCH AND SLING" "Press a cup into the floor, then let it fly"
+clip s5 05-cup-sling.mp4 1.5 8
+card c5 "FORGE IT BY HAND" "226 builds, every part changes the physics"
+clip s6 06-forge.mp4 0.5 12
+clip s7 07-match-win.mp4 15 13
+card c6 "SPINSMITH" "Hands only. Seated. Play in the Quest browser, no install."
+for n in c0 s1 c1 s2 c2 s3 c3 s4 c4 s5 c5 s6 s7 c6; do echo "file '$T/$n.mp4'"; done > "$T/list.txt"
+ffmpeg -y -loglevel error -f concat -safe 0 -i "$T/list.txt" -c:v libx264 -crf 20 -pix_fmt yuv420p -c:a aac -b:a 192k "$OUT/spinsmith-trailer-rough.mp4"
+echo "$OUT/spinsmith-trailer-rough.mp4 ($(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/spinsmith-trailer-rough.mp4") s)"

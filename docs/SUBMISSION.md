@@ -93,7 +93,8 @@ reshape the arena to win.*
 | 2:00-2:15 | A full round from the pull to a shatter, in one take | |
 | 2:15-2:25 | End card: logo, "Play in the Quest browser, no install", the link | |
 
-Footage: label each shot with where it was captured. On a Quest: passthrough, daylight, a real
+Footage: label each shot with where it was captured. `scripts/trailer.sh` records the emulator
+version of the main shots and cuts a rough 80 s trailer from them. On a Quest: passthrough, daylight, a real
 wooden table near its edge (for the off-the-desk shot), a wall behind it (the portal), in-headset
 audio, two takes each. In the emulator, every shot can be staged and recorded with the hand
 driver (`DRIVE_VIDEO=... scripts/drive.sh ...`, see `.claude/skills/spinsmith-drive/SKILL.md`):
