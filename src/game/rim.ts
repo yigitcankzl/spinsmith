@@ -5,7 +5,8 @@
  */
 import { AdditiveBlending, BufferAttribute, BufferGeometry, CanvasTexture, Color, CylinderGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, MeshMatcapMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, RingGeometry, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from '@iwsdk/core';
 import { makeMatcap, mergeByMaterial } from './visuals.js';
-import { addSlab, engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
+import { ARENA_SCALE } from './reach.js';
+import { addSlab, engrave, metalPlate, ORANGE, PLATE_DEPTH, pxPerM, setType, SIGN_TILT, signTexture, STEEL, TEXT } from './ui.js';
 
 /** Where a drawer's i-th item is in its pop-in, 0..1, t seconds after the drawer opened. */
 export function popIn(t: number, i: number): number {
@@ -35,9 +36,12 @@ export interface TabLook {
   hot?: boolean;
 }
 
+/** Canvas px across one tab: sharp at arm's length (about 35 texels a degree at 0.5 m). */
+const TAB_PX = 512;
+
 /**
  * Engraved metal tabs, any number, laid at given spots: one mesh and one canvas (each tab is a
- * column of the canvas), so all of them cost a single draw call.
+ * column of the canvas), so all of them cost a single draw call. Labels are TITLE type.
  */
 export class RimTabs {
   readonly mesh: Mesh;
@@ -64,17 +68,15 @@ export class RimTabs {
     readonly spots: TabSpot[],
     readonly width: number,
     readonly height: number,
-    /** How far the plates lean back toward the sky (radians). */
-    tilt = 1.1,
+    /** How far the plates lean back toward the sky (radians): the touch band's one pitch. */
+    tilt = SIGN_TILT,
   ) {
     const n = labels.length;
     this.depth = labels.map(() => 0);
     this.speed = labels.map(() => 0);
-    this.canvas.width = 256 * n;
-    this.canvas.height = Math.round((256 * height) / width);
-    this.tex = new CanvasTexture(this.canvas);
-    this.tex.colorSpace = SRGBColorSpace;
-    this.tex.anisotropy = 4;
+    this.canvas.width = TAB_PX * n;
+    this.canvas.height = Math.round((TAB_PX * height) / width);
+    this.tex = signTexture(this.canvas);
     const pos: number[] = [];
     const uv: number[] = [];
     const index: number[] = [];
@@ -104,7 +106,7 @@ export class RimTabs {
     spots.forEach((s) => {
       const key = new Group();
       key.applyMatrix4(m.makeRotationY(s.yaw).multiply(lean).setPosition(s.at));
-      addSlab(key, width, height, 0.06, 0.006);
+      addSlab(key, width, height, 0.06, PLATE_DEPTH / ARENA_SCALE);
       keys.add(key);
       this.normals.push(new Vector3(0, 0, 1).applyMatrix4(m.setPosition(0, 0, 0)).normalize());
       this.turns.push(new Quaternion().setFromRotationMatrix(m));
@@ -178,21 +180,21 @@ export class RimTabs {
     const g = this.canvas.getContext('2d')!;
     const H = this.canvas.height;
     g.clearRect(0, 0, this.canvas.width, H);
+    // Seen from about half a metre; small plates carry no rivets.
+    const k = pxPerM(TAB_PX, this.width * ARENA_SCALE);
     this.labels.forEach((label, i) => {
-      const x = i * 256;
       const l = looks[i];
       g.save();
-      g.translate(x, 0);
-      metalPlate(g, 256, H);
+      g.translate(i * TAB_PX, 0);
+      metalPlate(g, TAB_PX, H, false);
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      let size = Math.round(H * 0.5);
-      do g.font = `700 ${size--}px ${FONT}`;
-      while (g.measureText(label).width > 220 && size > 10);
-      engrave(g, label, 128, H / 2 + 2, l.on || l.hot ? ORANGE : l.hover ? '#ffffff' : STEEL);
+      setType(g, 'title', k, 0.5);
+      engrave(g, label, TAB_PX / 2, H / 2 + 2, l.on || l.hot ? ORANGE : l.hover ? '#ffffff' : STEEL, TAB_PX - 40);
+      // Selected: orange text and a short orange underline.
       if (l.on) {
         g.fillStyle = ORANGE;
-        g.fillRect(256 * 0.3, H * 0.86, 256 * 0.4, H * 0.06);
+        g.fillRect(TAB_PX * 0.3, H * 0.84, TAB_PX * 0.4, H * 0.05);
       }
       g.restore();
     });
@@ -230,11 +232,9 @@ export class DialPlate {
   ) {
     this.canvas.width = 1200;
     this.canvas.height = Math.round((1200 * height) / width);
-    this.tex = new CanvasTexture(this.canvas);
-    this.tex.colorSpace = SRGBColorSpace;
-    this.tex.anisotropy = 4;
+    this.tex = signTexture(this.canvas);
     this.mesh = new Mesh(new PlaneGeometry(width, height), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
-    addSlab(this.mesh, width, height, 0.06, 0.008);
+    addSlab(this.mesh, width, height, 0.06, PLATE_DEPTH / ARENA_SCALE);
     this.mesh.add(this.gauges);
   }
 
@@ -271,10 +271,13 @@ export class DialPlate {
     if (dials.length !== this.gaugeCount) this.buildGauges(dials.length);
     g.textBaseline = 'middle';
     g.textAlign = 'center';
-    g.font = `700 64px ${FONT}`;
-    engrave(g, title.toUpperCase(), W / 2, 62, TEXT);
-    g.font = `600 52px ${FONT}`;
-    engrave(g, subtitle, W / 2, 116, subtitleColor);
+    // On the far rim, about 1.15 m from the eyes.
+    const k = pxPerM(W, this.width * ARENA_SCALE);
+    const D = 1.15;
+    setType(g, 'title', k, D);
+    engrave(g, title.toUpperCase(), W / 2, 60, TEXT, W - 80);
+    setType(g, 'caption', k, D);
+    engrave(g, subtitle.toUpperCase(), W / 2, 122, subtitleColor, W - 80);
     const R = 74;
     dials.forEach((d, i) => {
       const cx = W * ((i + 0.5) / dials.length);
@@ -317,14 +320,12 @@ export class DialPlate {
       g.beginPath();
       g.arc(cx, cy, 9, 0, Math.PI * 2);
       g.fill();
-      g.font = `700 54px ${FONT}`;
-      engrave(g, d.label, cx, cy + R + 40, STEEL);
+      setType(g, 'caption', k, D);
+      engrave(g, d.label.toUpperCase(), cx, cy + R + 38, STEEL, W / dials.length - 16);
     });
-    // What just happened, or what to do next.
-    let size = 44;
-    do g.font = `600 ${size--}px ${FONT}`;
-    while (g.measureText(message).width > W - 80 && size > 24);
-    engrave(g, message, W / 2, H - 46, TEXT);
+    // What just happened, or what to do next: BODY, one line (a long one is squeezed, never shrunk).
+    setType(g, 'body', k, D);
+    engrave(g, message, W / 2, H - 46, TEXT, W - 80);
     this.tex.needsUpdate = true;
   }
 }

@@ -5,9 +5,11 @@
  * - A blueprint on the near rim opens the arena workshop: the arena turns into a drafting table.
  * - A row of arena miniatures floats behind the arena: point at one and pinch, it flies to your
  *   hand; drop it on the arena (or tap it) to switch.
- * - Once the first session is over: the Smith's board over the far rim's left (today's order, the
- *   rivals' medallions, the ledger; pinch it to take the order) and your champions, the last three
- *   tops that won a match, on small stands along the left rim (pinch one to make it your top).
+ * - Once the first session is over: the Smith's board centred over the far rim (today's order and
+ *   the ledger; point at it and pinch to take the order; a quick pinch on the level plate turns it
+ *   round to the rivals and the full ledger) and your champions, the last three tops that won a
+ *   match, on small stands along the left rim (pinch one to make it your top).
+ * - Every station's name is a metal plate laid on the near rim at one pitch (SIGN_TILT).
  * Table things are arena-local (arena center at the origin, +Z toward the player).
  */
 import {
@@ -38,17 +40,16 @@ import {
 } from '@iwsdk/core';
 import { playHover, playLocked, playPick, playRemove } from './audio.js';
 import type { Progress } from './progress.js';
-import { addSlab, FONT, glass, GUIDE, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
-import { tag } from './builder.js';
+import { addSlab, engrave, GUIDE, metalPlate, Nameplate, ORANGE, PLATE_DEPTH, pxPerM, setType, SIGN_TILT, signTexture, STEEL as UI_STEEL, tag, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
 import { RIVALS } from './parts.js';
 import { SmithBoard } from './board.js';
 import { encodeBuild } from './challenge.js';
 import { popIn } from './rim.js';
-import { COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
+import { ARENA_SCALE, COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
-import { FEATS, MAX_LEVEL, STAMP_UNLOCKS, xpToNext } from './progress.js';
+import { FEATS, MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
 
 export type HubAction =
@@ -70,8 +71,20 @@ const HAND_LOSS_GRACE = 0.1;
 export const FORGE_AT = new Vector3(REACH_FORGE.x, REACH_FORGE.y, REACH_FORGE.z);
 const DOCK_AT = new Vector3(REACH_DOCK.x, REACH_DOCK.y, REACH_DOCK.z);
 const BLUEPRINT_AT = new Vector3(REACH_BLUEPRINT.x, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
-/** The Smith's board (where the first session's notes hang) and the champions' stands on the left rim. */
-const BOARD_AT = new Vector3(-0.195, 0.13, -0.25);
+/**
+ * The Smith's board, centred just over the far rim in the read band (about 1.2 m from the eyes), and
+ * the champions' stands on the left rim.
+ */
+const BOARD_AT = new Vector3(0, 0.085, -0.215);
+/** How long the board shows its back (the rivals) after a pinch on the level plate (s). */
+const BOARD_BACK_TIME = 12;
+/** Station names lie on the table this far in front of their station (arena-local), at one pitch. */
+const SIGN_AHEAD = 0.05;
+const SIGN_Y = 0.012;
+/** The level plate's canvas (px) and size (arena-local; shown at 0.8). */
+const RANK_W = 1024;
+const RANK_H = 280;
+const RANK_SIZE = 0.1;
 const CHAMPION_AT = [new Vector3(-0.24, 0, 0.07), new Vector3(-0.25, 0, -0.01), new Vector3(-0.235, 0, -0.09)];
 /** The anvil and the dock on the rim are small models of the full ones. */
 const RIM_SCALE = 0.42;
@@ -122,6 +135,11 @@ export class Hub {
   private standHolder = new Group();
   private items: Pickable[] = [];
   private labels: Mesh[] = [];
+  /** PLAY's plate: its second line names the next match. */
+  private playSign = new Nameplate(0.08, 0.026);
+  private boardState: Parameters<SmithBoard['draw']>[0] | null = null;
+  /** Seconds the board still shows its back. */
+  private boardBack = 0;
   /** A breathing ring of light that shows where to reach next during the first session. */
   /** The first move shown, not written: ember dots running in an arc from the dock into the arena. */
   private path = new InstancedMesh(new SphereGeometry(0.004, 8, 6), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }), 9);
@@ -166,7 +184,7 @@ export class Hub {
     this.buildComfort();
     this.beacon.rotation.x = -Math.PI / 2;
     this.board.mesh.position.copy(BOARD_AT);
-    this.board.mesh.rotation.x = -0.25;
+    this.board.mesh.rotation.x = -0.15;
     this.items.push({ action: { kind: 'order' }, carry: false, model: this.board.mesh, home: BOARD_AT.clone() });
     this.root.add(this.anvil, this.stand, this.beacon, this.board.mesh, this.champions, this.path);
     this.path.visible = false;
@@ -194,7 +212,7 @@ export class Hub {
     this.champions.visible = !this.teaching;
     if (!this.teaching) {
       const next = Object.keys(STAMP_UNLOCKS).map(Number).find((n) => n > progress.stamps) ?? null;
-      this.board.draw({
+      this.boardState = {
         order,
         done: order ? progress.hasOrder(order.date) : false,
         tomorrow,
@@ -205,7 +223,8 @@ export class Hub {
         code: encodeBuild(build),
         feats: progress.feats.size,
         featsOf: Object.keys(FEATS).length,
-      });
+      };
+      this.board.draw(this.boardState, this.boardBack > 0);
       this.fillChampions(progress);
     }
     const onAnvil = progress.guide === 'forge' || progress.guide === 'fit';
@@ -241,8 +260,8 @@ export class Hub {
     this.held = null;
   }
 
-  /** One frame: hover, pinch, carry, drop. Returns what the player chose, if anything. */
-  update(pointers: HandState[], dt: number, head: Vector3): HubAction | null {
+  /** One frame: hover, pinch, carry, drop. Returns what the player chose, if anything. (The signs no longer turn to the head.) */
+  update(pointers: HandState[], dt: number, _head?: Vector3): HubAction | null {
     this.time += dt;
     // Before the first match, ember dots show the way from the dock into the arena.
     this.path.visible = this.pathOn && !this.held;
@@ -264,11 +283,8 @@ export class Hub {
     this.beacon.scale.setScalar(1 + 0.35 * k);
     (this.beacon.material as MeshBasicMaterial).opacity = 0.35 + 0.5 * (1 - k);
     if (this.standTop) this.standTop.root.rotation.y += dt * 0.8;
-    // Station names turn to face the player.
-    for (const l of this.labels) {
-      l.getWorldPosition(this.p);
-      l.lookAt(this.q.copy(head).setY(this.p.y));
-    }
+    // The board turns back to today's order a while after it was asked for the rivals.
+    if (this.boardBack > 0 && (this.boardBack -= dt) <= 0 && this.boardState) this.board.draw(this.boardState, false);
     if (this.held) return this.updateHeld(dt);
     // Holding the level plate fills its bar; at 2 s a second pinch within 3 s confirms.
     this.armed = Math.max(0, this.armed - dt);
@@ -281,6 +297,11 @@ export class Hub {
         this.armed = RESET_CONFIRM;
         playLocked();
         return { kind: 'armReset' };
+      }
+      // A quick pinch (let go before the hold counts) turns the board round to the rivals, or back.
+      if (!this.teaching && this.boardState) {
+        this.boardBack = this.boardBack > 0 ? 0 : BOARD_BACK_TIME;
+        this.board.draw(this.boardState, this.boardBack > 0);
       }
       this.hold = null;
     }
@@ -396,9 +417,15 @@ export class Hub {
     return off < GRAB_RAY ? off + 0.05 : Infinity;
   }
 
-  private label(text: string, parent: Object3D, y: number): Mesh {
-    const l = tag(text, 0.06, 46);
-    l.position.y = y;
+  /**
+   * A station's name: a plate lying on the table just in front of it (at `x, z` in `parent`'s space,
+   * which stands on the table), leaning back at the touch band's one pitch, never turning.
+   */
+  private label(text: string, parent: Object3D, x: number, z: number, plate?: Nameplate): Mesh {
+    const l = plate?.mesh ?? tag(text, 0.06, 0.55);
+    plate?.set(text);
+    l.position.set(x, SIGN_Y, z);
+    l.rotation.x = -SIGN_TILT;
     parent.add(l);
     this.labels.push(l);
     return l;
@@ -418,12 +445,11 @@ export class Hub {
     const cradle = new Mesh(new BoxGeometry(0.04, 0.012, 0.016).translate(0, 0.006, 0), new MeshMatcapMaterial({ matcap: GRAPHITE }));
     cradle.position.set(BLUEPRINT_AT.x, TABLE_Y, BLUEPRINT_AT.z);
     cradle.rotation.y = -0.5;
-    const build = tag('WORKSHOP', 0.06, 46);
-    // Low over the roll and toward the player: clear of the arena's rim and of the anvil.
-    build.position.set(home.x - 0.02, home.y + 0.04, home.z + 0.012);
-    this.labels.push(build);
-    this.blueprint.add(cradle, holder, build);
+    this.blueprint.add(cradle, holder);
     this.root.add(this.blueprint);
+    // On the table in front of the roll, between the level plate and the anvil's name.
+    const build = this.label('WORKSHOP', this.blueprint, BLUEPRINT_AT.x - 0.008, BLUEPRINT_AT.z + SIGN_AHEAD - 0.01);
+    build.position.y += TABLE_Y;
     this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home, name: build });
   }
 
@@ -439,7 +465,10 @@ export class Hub {
     knob.position.copy(home);
     this.comfortKnob = knob;
     this.root.add(knob);
-    this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, name: this.label('COMFORT', knob, 0.03), quiet: true });
+    // Its name lies beside it, not on the knob (the knob turns).
+    const name = this.label('COMFORT', this.root, COMFORT_AT.x, COMFORT_AT.z + 0.03);
+    name.position.y += TABLE_Y;
+    this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, name, quiet: true });
   }
 
   /** Turns the dial's notch to mode i of n. */
@@ -457,50 +486,44 @@ export class Hub {
     model.rotation.y = -0.6;
     body.add(model);
     this.anvil.add(body);
-    const name = this.label('FORGE', this.anvil, ANVIL_FACE * RIM_SCALE + 0.035);
+    const name = this.label('FORGE', this.anvil, 0, SIGN_AHEAD);
     this.items.push({ action: { kind: 'forge' }, carry: false, model: body, home: new Vector3(), name });
   }
 
-  /** A short brass stand at the near rim holding your top: carry it into the arena to play. */
-  /** Your smith level beside the stand: level, rank and the bar toward the next level. */
+  /**
+   * Your smith level on the plate beside the dock: level and rank, the bar toward the next level,
+   * where the level road leads next, and (after the first session) how the rivals' circuit stands.
+   * The next match itself is PLAY's second line.
+   */
   private drawRank(progress: Progress, nextMatch: string | null) {
     const next = progress.next;
-    const key = `${progress.level}|${progress.rank}|${progress.xp}|${progress.fraction.toFixed(3)}|${next?.key}|${nextMatch}|${progress.guide}`;
+    const [match, bout] = nextMatch ? nextMatch.split(' · ') : ['', ''];
+    this.playSign.set('PLAY', match.toUpperCase());
+    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}|${bout}|${progress.guide}`;
     if (key === this.rankKey) return;
     this.rankKey = key;
     const g = this.rankCanvas.getContext('2d')!;
-    glass(g, 512, 250, ORANGE);
-    g.fillStyle = TEXT;
+    // Seen from about 0.45 m, shown at 0.8 of its size.
+    const k = pxPerM(RANK_W, RANK_SIZE * 0.8 * ARENA_SCALE);
+    const D = 0.45;
+    metalPlate(g, RANK_W, RANK_H);
     g.textBaseline = 'middle';
-    g.font = `700 54px ${FONT}`;
-    g.fillText(`Lv ${progress.level}`, 28, 52);
-    g.fillStyle = ORANGE;
-    g.font = `700 34px ${FONT}`;
-    g.fillText(progress.rank.toUpperCase(), 190, 54);
-    g.fillStyle = 'rgba(255,255,255,0.1)';
-    g.fillRect(28, 100, 456, 20);
+    g.textAlign = 'left';
+    setType(g, 'title', k, D);
+    const lv = `LV ${progress.level}`;
+    engrave(g, lv, 48, 60, TEXT);
+    const lvW = g.measureText(lv).width;
+    setType(g, 'caption', k, D);
+    engrave(g, progress.rank.toUpperCase(), 48 + lvW + 36, 64, UI_STEEL, RANK_W - 140 - lvW);
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    g.fillRect(48, 112, RANK_W - 96, 18);
     g.fillStyle = UI_STEEL;
-    g.fillRect(28, 100, 456 * progress.fraction, 20);
-    // XP as numbers too, so a level's progress reads at a glance.
-    if (progress.level < MAX_LEVEL) {
-      g.fillStyle = TEXT;
-      g.font = `600 22px ${FONT}`;
-      g.textAlign = 'right';
-      g.fillText(`${progress.xp} / ${xpToNext(progress.level)} XP`, 484, 82);
-      g.textAlign = 'left';
-    }
-    // Where progress leads next.
-    g.fillStyle = TEXT;
-    g.font = `600 28px ${FONT}`;
+    g.fillRect(48, 112, (RANK_W - 96) * progress.fraction, 18);
     // The first session has one goal (its match); the level road shows after it.
-    if (progress.guide === 'done') g.fillText(next ? `Next: ${unlockLabel(next.key)} at Lv ${next.level}` : 'Every part is yours', 28, 160);
-    // Who and where the next match is (picked at home: the rotation or your pinned arena).
-    if (nextMatch) {
-      g.fillStyle = ORANGE;
-      let size = 28;
-      do g.font = `700 ${size--}px ${FONT}`;
-      while (g.measureText(`Next match: ${nextMatch}`).width > 456 && size > 16);
-      g.fillText(`Next match: ${nextMatch}`, 28, 210);
+    if (progress.guide === 'done') {
+      setType(g, 'caption', k, D);
+      engrave(g, (next ? `NEXT: ${unlockLabel(next.key)} at LV ${next.level}` : 'EVERY PART IS YOURS').toUpperCase(), 48, 176, UI_STEEL, RANK_W - 96);
+      engrave(g, `${bout ? `${bout.toUpperCase()} · ` : ''}PINCH FOR RIVALS`, 48, 230, TEXT_DIM, RANK_W - 96);
     }
     this.rankTex.needsUpdate = true;
   }
@@ -508,27 +531,27 @@ export class Hub {
   /** Your top's dock on the near rim, with your smith level on a plate between it and the anvil. */
   private buildStand() {
     this.stand.position.set(DOCK_AT.x, TABLE_Y, DOCK_AT.z);
-    this.rankCanvas.width = 512;
-    this.rankCanvas.height = 250;
-    this.rankTex = new CanvasTexture(this.rankCanvas);
-    this.rankTex.colorSpace = SRGBColorSpace;
-    const rank = new Mesh(new PlaneGeometry(0.1, 0.049), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
-    // Laid back like a desk plaque, below the arena's front edge.
-    rank.rotation.x = -1.25;
-    addSlab(rank, 0.1, 0.049, 0.08, 0.005);
+    this.rankCanvas.width = RANK_W;
+    this.rankCanvas.height = RANK_H;
+    this.rankTex = signTexture(this.rankCanvas);
+    const h = (RANK_SIZE * RANK_H) / RANK_W;
+    const rank = new Mesh(new PlaneGeometry(RANK_SIZE, h), new MeshBasicMaterial({ map: this.rankTex, transparent: true, depthWrite: false }));
+    // Laid back at the touch band's pitch, below the arena's front edge.
+    rank.rotation.x = -SIGN_TILT;
+    addSlab(rank, RANK_SIZE, h, 0.06, PLATE_DEPTH / (ARENA_SCALE * 0.8));
     rank.scale.setScalar(0.8);
     // Held for 2 s, then pinched again, the level plate starts over as a new smith (shared headsets).
     const plate = new Group();
-    plate.position.set(0, TABLE_Y + 0.045, DOCK_AT.z + 0.04);
-    this.holdBar.position.set(-0.04, -0.022, 0.012);
-    this.holdBar.rotation.x = -1;
+    plate.position.set(0, TABLE_Y + 0.03, DOCK_AT.z + 0.04);
+    this.holdBar.position.set(-0.04, -0.016, 0.012);
+    this.holdBar.rotation.x = -SIGN_TILT;
     plate.add(rank, this.holdBar);
     this.root.add(plate);
     this.items.push({ action: { kind: 'reset' }, carry: false, model: plate, home: plate.position.clone() });
     const dock = standModel();
     dock.scale.setScalar(RIM_SCALE);
     this.stand.add(dock);
-    const name = this.label('PLAY', this.stand, DOCK_TOP + 0.06);
+    const name = this.label('PLAY', this.stand, 0, SIGN_AHEAD, this.playSign);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
     this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3(), name });
@@ -554,8 +577,10 @@ export class Hub {
       view.root.position.y = DOCK_TOP * 0.8;
       this.championViews.push(view);
       holder.add(stand, view.root);
-      const name = tag(`${c.wins} win${c.wins === 1 ? '' : 's'}`, 0.07, 44);
-      name.position.set(holder.position.x, TABLE_Y + DOCK_TOP + 0.045, holder.position.z);
+      const name = tag(`${c.wins} WIN${c.wins === 1 ? '' : 'S'}`, 0.05, 0.6);
+      // Lying on the table toward the arena's middle, at the touch band's pitch.
+      name.position.set(holder.position.x + 0.035, TABLE_Y + SIGN_Y, holder.position.z);
+      name.rotation.x = -SIGN_TILT;
       this.labels.push(name);
       this.champions.add(holder, name);
       this.items.push({ action: { kind: 'champion', index: i }, carry: false, model: holder, home: holder.position.clone(), name });

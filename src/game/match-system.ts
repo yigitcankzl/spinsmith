@@ -4,9 +4,8 @@ import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
-import { addStem, GUIDE, titleMesh } from './ui.js';
+import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
-import { TABLE_Y } from './reach.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
@@ -85,6 +84,13 @@ const INTRO_TIME = 2.5;
 const HAND_LOSS_GRACE = 0.1;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
 const LABEL_AT = new Vector3(0, 0.14, -0.21);
+/** At home after the first session the Smith's board fills the card's slot: notes hang just above it. */
+const HOME_NOTE_Y = 0.2;
+/** The match bar sits right under the card, its top edge on the card's lower edge (the two read as one display). */
+const BAR_Y = 0.063;
+const BAR_BACK = 0.021;
+/** The MENU plate's height over the arena floor (arena-local), at the rim's height like the tabs. */
+const MENU_Y = 0.012;
 /** The workshop shows the arena a little smaller, so its near rim stays behind the piece rail. */
 const WORKSHOP_RIM = 0.13;
 /** A match arena's near rim stays this far out (arena-local, as the 0.17 arenas): a bigger one slides back. */
@@ -164,7 +170,7 @@ export class MatchSystem extends createSystem({
   private print = new Group();
   /** The ring round the print that runs down over PRESS_WAIT (then the arena places itself). */
   private printWait = new Mesh(new RingGeometry(0.08, 0.09, 64, 1, Math.PI / 2, Math.PI * 2).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.9, depthWrite: false, blending: AdditiveBlending }));
-  private printLabel = new Label(0.2);
+  private printLabel = new Label(0.2, 1.25, 0.6);
   private touches: Record<Side, TableTouch> = { left: new TableTouch(TUNE.press), right: new TableTouch(TUNE.press) };
   /** The floor mesh needs one more sync (the arena was reset or a shape just ended). */
   private arenaDirty = true;
@@ -268,7 +274,7 @@ export class MatchSystem extends createSystem({
   /** One unlock shown per result card (the first session's part first); the rest wait for the next ones. */
   private revealedHere = false;
   private rewardHold = 0;
-  /** Home screen buttons, in front of the arena; and the small Menu button during a match. */
+  /** Home screen buttons, in front of the arena; and the small MENU plate during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
   private hub = new Hub();
   private menuButton = new Button('menu', 0.07, 0.026);
@@ -590,11 +596,10 @@ export class MatchSystem extends createSystem({
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
-    this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
-    // Leaning back on a post down to the table, like the machine's other signs.
-    this.menuButton.mesh.rotation.set(-0.5, 0.4, 0, 'YXZ');
-    addStem(this.menuButton.mesh, 0.026, 0.05 - TABLE_Y - 0.026 * 0.45, -0.5);
-    this.menuButton.set('Menu');
+    // A plate laid on the left of the near rim at the touch band's one pitch, like every sign you pinch.
+    this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14);
+    this.menuButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
+    this.menuButton.set('MENU');
     this.menuButton.mesh.visible = false;
     this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];
     if (import.meta.env.DEV) {
@@ -637,7 +642,7 @@ export class MatchSystem extends createSystem({
     this.world.createTransformEntity(this.tableMask);
     // The match bar: a metal strip set into the far rim, tipped back toward the player, under the
     // round messages, so score and fight share one view.
-    this.bar.mesh.position.set(0, 0.05, -0.205);
+    this.bar.mesh.position.set(0, BAR_Y, LABEL_AT.z + BAR_BACK);
     this.bar.mesh.rotation.x = -0.55;
     this.bar.mesh.scale.setScalar(0.21);
     this.root.add(this.bar.mesh);
@@ -899,20 +904,20 @@ export class MatchSystem extends createSystem({
         if (this.pickButton([this.menuButton]) === 'menu') {
           if (this.time - this.menuArmed < 3) {
             this.menuArmed = -10;
-            this.menuButton.set('Menu');
+            this.menuButton.set('MENU', undefined, false);
             this.toHub();
             break;
           }
           this.menuArmed = this.time;
-          this.menuButton.set('Leave?');
-          this.label.set('Leave this match?\nPinch Menu again to go home');
+          this.menuButton.set('LEAVE?', undefined, true);
+          this.label.set('Leave this match?\nPinch MENU again to go home');
           this.labelTimer = 3;
           // The pinch was for Menu: it does not also grab the rip cord.
           break;
         }
         if (this.menuArmed > -10 && this.time - this.menuArmed >= 3) {
           this.menuArmed = -10;
-          this.menuButton.set('Menu');
+          this.menuButton.set('MENU', undefined, false);
         }
         this.updateReadyPinch();
         break;
@@ -1129,8 +1134,8 @@ export class MatchSystem extends createSystem({
     // The first session says where to reach next.
     this.label.set(this.guideNote());
     // Notes hang over the far rim; the beacon marks the dock or the anvil. Once the Smith's board
-    // hangs over the left, they move right of it.
-    this.label.mesh.position.set(this.progress.guide === 'done' ? 0.165 : LABEL_AT.x, LABEL_AT.y, LABEL_AT.z);
+    // hangs there, they move up over it.
+    this.label.mesh.position.set(LABEL_AT.x, this.progress.guide === 'done' ? HOME_NOTE_Y : LABEL_AT.y, LABEL_AT.z);
     this.label.mesh.scale.setScalar(1.25);
     if (import.meta.env.DEV) this.hubLogPending = true;
   }
@@ -1933,23 +1938,24 @@ export class MatchSystem extends createSystem({
     const far = rimRadius(L, -Math.PI / 2) * this.viewK;
     // In the forge the card stands back behind the stats plate.
     this.label.mesh.position.z = Math.min(LABEL_AT.z - (p === 'forge' ? 0.03 : 0), -(far + 0.04));
-    this.bar.mesh.position.z = Math.min(-0.205, -(far + 0.035));
     // Further away, the card and the bar grow so they read the same.
     const reach = TUNE.reach / ARENA_SCALE;
     const grow = Math.max(1, (reach + this.pushed / ARENA_SCALE + far) / (reach + 0.17));
     this.label.mesh.scale.setScalar(1.25 * grow);
     this.bar.mesh.scale.setScalar(0.21 * grow);
+    // The bar's top edge under the card's lower edge (it leans back, the card stands upright).
+    this.bar.mesh.position.z = this.label.mesh.position.z + BAR_BACK * grow;
     // Their heights grow with them, so the card stays clear above the bar.
     // A wall higher than the standard one lifts them clear of it.
     const lift = Math.max(0, WALL_HEIGHT[L.wall] - WALL_HEIGHT.standard);
-    this.bar.mesh.position.y = (0.05 + lift) * grow;
+    this.bar.mesh.position.y = (BAR_Y + lift) * grow;
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
     // The result's stamp stands in the card's slot above the bar, leaving the arena and the winner in view.
     // In a bout every stamp stands in the card's slot above the bar, never over the tops in play.
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y, this.label.mesh.position.z + 0.01);
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
-    this.menuButton.mesh.position.set(-0.2, 0.05, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
+    this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
   }
 
