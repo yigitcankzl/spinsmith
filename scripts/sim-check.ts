@@ -893,5 +893,43 @@ TUNING.grace = 0;
   assert.ok(COMFORT.sound && COMFORT.flashes && !COMFORT.gentle, 'a full turn is back to standard');
 }
 
+// 26. The rip's speed is measured over a window: 3 mm of tracking jitter neither makes an honest
+// mid rip white hot nor changes its power with the refresh rate, and a real full rip still is.
+{
+  const { RipMeter, ripPower } = await import('../src/game/rip.ts');
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(2 * Math.PI * rnd());
+  /** Pulls `len` m at `speed` m/s, sampled at `hz` with jitter; lets go at the end of the pull. */
+  const pull = (len: number, speed: number, hz: number) => {
+    const meter = new RipMeter();
+    const dt = 1 / hz;
+    let maxPull = 0;
+    let peak = 0;
+    for (let t = 0; t <= len / speed + 1e-9; t += dt) {
+      const dist = Math.max(0, speed * t + gauss() * 0.003);
+      maxPull = Math.max(maxPull, dist);
+      peak = meter.push(dt, dist);
+    }
+    return ripPower(maxPull, peak, 0.05, 0.22, 1.0);
+  };
+  const means: number[] = [];
+  for (const hz of [72, 90, 120]) {
+    let hot = 0;
+    let sum = 0;
+    for (let i = 0; i < 400; i++) {
+      const p = pull(0.18, 0.75, hz);
+      sum += p;
+      if (p >= 0.92) hot++;
+    }
+    means.push(sum / 400);
+    assert.ok(hot / 400 < 0.05, `an honest mid rip at ${hz} Hz is rarely white hot (${((hot / 400) * 100).toFixed(1)}%)`);
+    let full = 0;
+    for (let i = 0; i < 400; i++) if (pull(0.22, 1.0, hz) >= 0.92) full++;
+    assert.ok(full / 400 >= 0.8, `a full rip at ${hz} Hz is white hot (${((full / 400) * 100).toFixed(1)}%)`);
+  }
+  assert.ok(Math.max(...means) - Math.min(...means) < 0.03, `the refresh rate barely changes a rip's power (${means.map((m) => m.toFixed(3)).join(' / ')})`);
+}
+
 console.log('sim-check: all passed');
 

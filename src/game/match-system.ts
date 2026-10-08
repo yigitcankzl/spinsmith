@@ -5,6 +5,7 @@ import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { addStem, GUIDE, titleMesh } from './ui.js';
+import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { TABLE_Y } from './reach.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
@@ -439,6 +440,10 @@ export class MatchSystem extends createSystem({
   private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
+  private tipFresh = { left: true, right: true };
+  private slapAt = new Vector3();
+  private rip = new RipMeter();
+  private openFor = 0;
   private replayedOnce = false;
   private rivalHeld = 0;
   private holdSaid = false;
@@ -2357,6 +2362,8 @@ export class MatchSystem extends createSystem({
     this.maxPull = 0;
     this.peakSpeed = 0;
     this.lastPull = 0;
+    this.rip.reset();
+    this.openFor = 0;
   }
 
   /**
@@ -2371,10 +2378,11 @@ export class MatchSystem extends createSystem({
     if (h.pinching && h.tracked) {
       const dist = h.pinch.distanceTo(this.pullStart);
       this.maxPull = Math.max(this.maxPull, dist);
-      // Decays within ~0.1 s, so only a rip that is still moving at release keeps its speed.
-      const speed = (dist - this.lastPull) / Math.max(dt, 1e-3);
-      this.peakSpeed = Math.max(this.peakSpeed * 0.9, speed);
+      // Speed over a 40 ms window, fading within ~0.1 s: only a rip still moving at release keeps it,
+      // and neither tracking jitter nor the refresh rate makes it white hot (src/game/rip.ts).
+      this.peakSpeed = this.rip.push(dt, dist);
       this.lastPull = dist;
+      this.openFor = 0;
       this.pullEnd.copy(h.pinch);
       const power = this.pullPower();
       this.showCharge(power, dt);
@@ -2383,6 +2391,9 @@ export class MatchSystem extends createSystem({
       this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%` : power > 0 ? `${pct}%` : 'Pull back and let go');
       this.lostFor = 0;
       if (dist < MAX_PULL) return;
+    } else if (h.tracked && (this.openFor += dt) < RIP_RELEASE) {
+      // Open for a single blurred frame (a fast hand): not a release yet; the pull goes on if it closes again.
+      return;
     } else if (!h.tracked) {
       // Tracking lost mid-pull. A fast rip often loses the hand right at release, so a clear rip
       // still launches; anything else waits briefly for the hand, then cancels without a launch.
@@ -2394,6 +2405,7 @@ export class MatchSystem extends createSystem({
         this.cordTone.update(null);
         this.chargeRing.visible = false;
         this.toReady();
+        this.failSay('Lost your hand\nKeep it in view while you pull');
         return;
       }
     }
@@ -2403,8 +2415,9 @@ export class MatchSystem extends createSystem({
     this.chargeRing.visible = false;
     const power = this.pullPower();
     if (power < MIN_POWER) {
-      // A tap or a hold without a pull does nothing; the top is ready again.
+      // A tap or a hold without a pull does nothing; the top is ready again, and the card says why.
       this.toReady();
+      if (this.maxPull > 0.01) this.failSay('Too soft\nPull farther, let go while moving');
       return;
     }
     const end = this.p.copy(this.toLocal(this.pullEnd));
@@ -2428,8 +2441,14 @@ export class MatchSystem extends createSystem({
 
   /** Rip power from the motion alone: distance travelled and speed at the moment of release. */
   private pullPower() {
-    if (this.maxPull < MIN_PULL) return 0;
-    return Math.min(1, 0.4 * Math.min(1, this.maxPull / FULL_PULL) + 0.6 * Math.min(1, this.peakSpeed / FULL_SPEED));
+    return ripPower(this.maxPull, this.peakSpeed, MIN_PULL, FULL_PULL, FULL_SPEED);
+  }
+
+  /** Why a gesture did nothing, on the card for 2 s (once the first session is over, so its own hints stay). */
+  private failSay(text: string) {
+    if (this.progress.guide !== 'done' || this.demo) return;
+    this.label.set(text);
+    this.labelTimer = 2;
   }
 
   /** While ripping: the top spins up, the cord heats from white to orange, a glow ring grows under it. */
@@ -2543,10 +2562,15 @@ export class MatchSystem extends createSystem({
         this.shaping[side] = null;
         this.pressing[side] = false;
         this.endSling(side, false);
+        // The fingertip's speed starts over when the hand comes back (a hand regained lower is not a press).
+        this.tipFresh[side] = true;
         continue;
       }
       const l = this.toLocal(h.pinch);
       if (h.pinching) {
+        // Keep the fingertip's height current while pinching, so letting go is not read as a fast press.
+        this.tipY[side] = this.toLocal(h.index).y;
+        this.tipDown[side] = 0;
         let d = this.shaping[side];
         // Pinching a cup that holds a top grabs it to sling, before any ramp.
         if (!d && h.justPinched && open && this.startSling(side, l.x, l.z)) continue;
@@ -2597,6 +2621,12 @@ export class MatchSystem extends createSystem({
       // A fingertip pressed into the floor makes a well, once per press, if it came down with
       // intent (a hand resting or drifting down does not) and not just as a ramp was let go.
       const tip = this.toLocal(h.index);
+      if (this.tipFresh[side]) {
+        this.tipFresh[side] = false;
+        this.tipY[side] = tip.y;
+        this.tipDown[side] = 0;
+        continue;
+      }
       const depth = this.arena.inside(tip.x, tip.z) ? this.arena.height(tip.x, tip.z) - tip.y : -1;
       // Downward speed (m/s), smoothed over about 80 ms so tracking jitter is not a press.
       const raw = ((this.tipY[side] - tip.y) * ARENA_SCALE) / Math.max(1e-3, this.frameDt);
@@ -2604,7 +2634,12 @@ export class MatchSystem extends createSystem({
       const down = (this.tipDown[side] += (raw - this.tipDown[side]) * (1 - Math.exp(-this.frameDt / 0.08)));
       if (depth > 0.004 && !this.pressing[side] && open) {
         this.pressing[side] = true;
-        if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
+        // With the strike armed, a palm coming down outside the rim is a slap, not a cup at the edge.
+        const palm = this.handAt.copy(this.toLocal(h.wrist)).lerp(tip, 0.5);
+        const slapping = this.forgeBar.full && this.taught('strike') && normRadius(this.arena.layout, palm.x, palm.z) > 1.0;
+        if (slapping) {
+          if (import.meta.env.DEV) console.log('[SHAPE] well ignored: a slap outside the rim');
+        } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
         else if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${down.toFixed(2)} m/s down`);
       } else if (depth < 0) this.pressing[side] = false;
     }
@@ -2656,12 +2691,16 @@ export class MatchSystem extends createSystem({
     const tableY = this.root.position.y - PEDESTAL * this.rootK;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      const l = h.tracked ? this.toLocal(h.index) : null;
-      const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > 1.05;
+      // Outside is judged at the palm (between the wrist and the fingertip): a palm on the print with
+      // its fingers toward the arena put the fingertip right on the old 1.05 line and missed.
+      const l = h.tracked ? this.slapAt.copy(this.toLocal(h.wrist)).lerp(this.toLocal(h.index), 0.5) : null;
+      const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > 1.0;
       const hit = (COMFORT.gentle ? this.touches : this.strikeTouch)[side].update(outside ? h.low : null, dt, tableY - 0.05, tableY + 0.05);
       if (hit === null) continue;
       if (!armed) {
         if (import.meta.env.DEV) console.log(`[STRIKE] pressed with the bar at ${Math.round(this.forgeBar.value * 100)}%`);
+        // Not full yet: a dull clunk says so (once the strike is taught).
+        if (this.taught('strike')) playLocked();
         continue;
       }
       // The shockwave starts on the rim beside the palm; the palm leaves a molten print on the desk.
