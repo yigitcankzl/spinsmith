@@ -51,6 +51,11 @@ loadFonts()
       else if (enter) enter.textContent = 'Open this page on a Meta Quest';
     });
     world.visibilityState.subscribe((v) => landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive));
+    // Installed from the store (a standalone PWA): straight into the game, no 2D page (Meta's PWA
+    // rule; opening the app's icon counts as the user's gesture). In a browser tab, ENTER as usual.
+    if (matchMedia('(display-mode: standalone)').matches) {
+      void navigator.xr?.isSessionSupported('immersive-ar').then((ar) => ar && world.launchXR()).catch(() => undefined);
+    }
     // Emulator helper: move one hand at a time with the mouse (dev builds only).
     if (import.meta.env.DEV) void import('./dev-hands.js').then((m) => m.installDevHands());
     // A hand driver for agents and demo shots: window.drive (dev builds only, see src/dev-drive.ts).
