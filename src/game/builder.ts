@@ -11,9 +11,9 @@ import {
   LatheGeometry,
   LineBasicMaterial,
   LineSegments,
+  Material,
   Mesh,
   MeshBasicMaterial,
-  MeshMatcapMaterial,
   OctahedronGeometry,
   PlaneGeometry,
   SphereGeometry,
@@ -31,7 +31,7 @@ import { playDrawer, playMachine, playPick, playPlace, playRemove } from './audi
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
 import { Arena } from './sim.js';
-import { makeMatcap } from './visuals.js';
+import { BRASS, GRAPHITE, metal, plastic, STEEL } from './materials.js';
 
 /**
  * The arena workshop. Instead of a menu, a tray of little 3D pieces sits beside the arena, within
@@ -136,8 +136,6 @@ export class Button {
   }
 }
 
-const STEEL = makeMatcap('metal', 0xc8ccd6);
-const BRASS = makeMatcap('metal', 0xe2b866);
 const THEME_COLOR: Record<Theme, number> = { forge: 0xff6a2a, stone: 0x8fb7c9, clockwork: 0xe2b866, ice: 0x9fe8ff, lava: 0xff2a0a, void: 0xb86cff };
 
 /** A neutral layout used only to draw floor miniatures. */
@@ -161,14 +159,14 @@ const MINI: ArenaLayout = {
 /** The little 3D model for a piece (about 2.5 cm). */
 function pieceModel(p: Piece): Group {
   const g = new Group();
-  const m = (geo: BufferGeometry, mat: MeshMatcapMaterial | MeshBasicMaterial) => {
+  const m = (geo: BufferGeometry, mat: Material) => {
     const mesh = new Mesh(geo, mat);
     g.add(mesh);
     return mesh;
   };
-  const steel = new MeshMatcapMaterial({ matcap: STEEL });
-  const brass = new MeshMatcapMaterial({ matcap: BRASS });
-  const clay = (c: number) => new MeshMatcapMaterial({ matcap: makeMatcap('clay', c) });
+  const steel = STEEL;
+  const brass = BRASS;
+  const clay = plastic;
   const glow = (c: number) => new MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9, blending: AdditiveBlending, depthWrite: false });
   switch (p.kind) {
     case 'pocket':
@@ -228,7 +226,7 @@ function pieceModel(p: Piece): Group {
       // One gem per theme in a cluster: tap or drop it to step to the next theme.
       THEMES.forEach((t, i) => {
         const a = (i / THEMES.length) * Math.PI * 2;
-        m(new OctahedronGeometry(0.0055), new MeshMatcapMaterial({ matcap: makeMatcap('metal', THEME_COLOR[t]) })).position.set(Math.cos(a) * 0.006, 0.007, Math.sin(a) * 0.006);
+        m(new OctahedronGeometry(0.0055), metal(THEME_COLOR[t])).position.set(Math.cos(a) * 0.006, 0.007, Math.sin(a) * 0.006);
       });
       break;
     case 'extra': {
@@ -238,7 +236,7 @@ function pieceModel(p: Piece): Group {
         m(new TorusGeometry(0.011, 0.0012, 6, 28).rotateX(Math.PI / 2), brass).position.y = 0.002;
         for (let i = 0; i < 3; i++) m(new CylinderGeometry(0.0028, 0.0028, 0.012, 10), steel).position.set(Math.cos((i * 2 * Math.PI) / 3) * 0.011, 0.006, Math.sin((i * 2 * Math.PI) / 3) * 0.011);
       } else if (p.value === 'shrink') m(new TorusGeometry(0.01, 0.0025, 8, 24).rotateX(Math.PI / 2), glow(c)).position.y = 0.003;
-      else m(new CylinderGeometry(0.011, 0.011, 0.003, 24), new MeshMatcapMaterial({ matcap: makeMatcap('metal', c) })).position.y = 0.0015;
+      else m(new CylinderGeometry(0.011, 0.011, 0.003, 24), metal(c)).position.y = 0.0015;
       break;
     }
   }
@@ -404,7 +402,7 @@ export class Builder {
     this.root.name = 'arena-workshop';
     // The rail: a brass bar across the near rim; the open drawer's pieces stand on it, their
     // names engraved on a strip below.
-    const bar = new Mesh(new CylinderGeometry(0.003, 0.003, RAIL_W, 12).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
+    const bar = new Mesh(new CylinderGeometry(0.003, 0.003, RAIL_W, 12).rotateZ(Math.PI / 2), BRASS);
     bar.position.set(0, RAIL_Y - 0.004, RAIL_Z);
     this.namesCanvas.width = 2400;
     this.namesCanvas.height = Math.round((2400 * 0.012) / RAIL_W);
@@ -1052,7 +1050,7 @@ export class Builder {
 function rotationModel(on: boolean): Group {
   const g = new Group();
   const color = on ? 0xff8a2a : 0x8a919c;
-  const base = new Mesh(new CylinderGeometry(0.034, 0.036, 0.012, 32), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57) }));
+  const base = new Mesh(new CylinderGeometry(0.034, 0.036, 0.012, 32), GRAPHITE);
   base.position.y = 0.006;
   const ring = new Mesh(new TorusGeometry(0.022, 0.003, 8, 40, Math.PI * 1.6).rotateX(Math.PI / 2), new MeshBasicMaterial({ color }));
   ring.position.y = 0.014;
@@ -1064,7 +1062,7 @@ function rotationModel(on: boolean): Group {
 
 /** Blueprint lines: thin, light steel, see-through. */
 const GUIDE_LINE = new LineBasicMaterial({ color: 0xc9d3e0, transparent: true, opacity: 0.35, depthWrite: false });
-const KNOB = new MeshMatcapMaterial({ matcap: BRASS });
+const KNOB = BRASS;
 
 /** Merges indexed or plain geometries with positions and normals only. */
 function mergePlain(parts: BufferGeometry[]): BufferGeometry {

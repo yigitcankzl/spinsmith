@@ -23,7 +23,6 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
-  MeshMatcapMaterial,
   Object3D,
   Quaternion,
   RingGeometry,
@@ -42,7 +41,8 @@ import { SEALS } from './sim.js';
 import type { Seal } from './sim.js';
 import type { TopBuild, TopStats } from './parts.js';
 import { ANVIL_FACE, anvilModel } from './hub.js';
-import { coreMesh, makeMatcap, ringMeshes, tipMesh, TopView } from './visuals.js';
+import { coreMesh, ringMeshes, tipMesh, TopView } from './visuals.js';
+import { BRASS, GUNMETAL, metal, plastic } from './materials.js';
 
 const STORE_KEY = 'spinsmith.top.v1';
 
@@ -829,7 +829,8 @@ export class Forge {
     }
     // The pedestals: one instanced mesh for all, recolored per state; hidden ones sink away.
     const graphite = new CylinderGeometry(0.011, 0.012, 0.002, 24);
-    this.pads = new InstancedMesh(graphite, new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xffffff) }), pads.length);
+    // Lit metal discs, tinted per instance (the state colors below).
+    this.pads = new InstancedMesh(graphite, metal(0xffffff), pads.length);
     pads.forEach((p, i) => {
       this.pads.setMatrixAt(i, this.m.makeTranslation(p.x, p.y - 0.016, p.z));
       this.pads.setColorAt(i, PAD_IDLE);
@@ -880,7 +881,7 @@ export class Forge {
 /** A struck coin with the seal's mark: a hammer head (anvil), an arrow (rush), a horseshoe (magnet). */
 export function sealModel(seal: Seal): Object3D {
   const g = new Group();
-  const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x8a6a3a) }));
+  const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), BRASS);
   g.add(coin);
   const mat = new MeshBasicMaterial({ color: 0xffb04a });
   if (seal === 'anvil') {
@@ -938,7 +939,7 @@ export function itemModel(item: Item): Object3D {
   } else if (item.kind === 'spin') {
     // A token with a curved arrow showing the spin direction.
     const mat = new MeshBasicMaterial({ color: 0xffb347 });
-    const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x5d6068) }));
+    const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), GUNMETAL);
     const arc = new Mesh(new TorusGeometry(0.01, 0.0018, 6, 24, Math.PI * 1.5).rotateX(-Math.PI / 2), mat);
     arc.position.y = 0.003;
     const head = new Mesh(new ConeGeometry(0.0035, 0.007, 12).rotateZ(-Math.PI / 2), mat);
@@ -947,14 +948,14 @@ export function itemModel(item: Item): Object3D {
     g.add(coin, arc, head);
   } else if (item.kind === 'color') {
     // A paint pot.
-    const pot = new Mesh(new CylinderGeometry(0.014, 0.012, 0.018, 20), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x7d828c) }));
+    const pot = new Mesh(new CylinderGeometry(0.014, 0.012, 0.018, 20), metal(0x9298a2));
     pot.position.y = 0.009;
-    const paint = new Mesh(new CircleGeometry(0.0125, 20).rotateX(-Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', item.value) }));
+    const paint = new Mesh(new CircleGeometry(0.0125, 20).rotateX(-Math.PI / 2), plastic(item.value));
     paint.position.y = 0.0186;
     g.add(pot, paint);
   } else if (item.kind === 'emblem') {
     // A coin with a ring of glows: the emblem's color.
-    const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x5d6068) }));
+    const coin = new Mesh(new CylinderGeometry(0.016, 0.016, 0.004, 24), GUNMETAL);
     g.add(coin);
     EMBLEM_COLORS.slice(0, 4).forEach((c, i) => {
       const a = (i / 4) * Math.PI * 2;

@@ -22,7 +22,6 @@ import {
   LatheGeometry,
   Mesh,
   MeshBasicMaterial,
-  MeshMatcapMaterial,
   MeshStandardMaterial,
   Object3D,
   Path,
@@ -46,7 +45,10 @@ import {
   Scene,
   Texture,
   WebGLRenderer,
+  BackSide,
+  SpotLight,
 } from '@iwsdk/core';
+import { BODY, BRASS as BRASS_METAL, GRAPHITE, GUNMETAL, LATHE_NORMAL, metal, plastic, STEEL, topPlastic } from './materials.js';
 import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena-shell.scene-asset.js';
 import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
@@ -61,9 +63,9 @@ import { playLand, playTick } from './audio.js';
 import type { Core, Ring, TipShape, TopBuild } from './parts.js';
 
 /**
- * Visual style: matte clay bodies, light metal parts, a glowing core.
- * All shading uses matcaps we generate here: cheap on Quest, no licensing,
- * and no dependency on real-room reflections we cannot capture.
+ * Visual style: light metal heroes on a dark matte machine body, brass trim, a glowing core.
+ * Surfaces are lit (materials.ts) by the forge's environment map and the arena's key light; the
+ * matcap below remains only for a few small props.
  */
 
 type MatcapKind = 'clay' | 'metal' | 'chrome';
@@ -125,9 +127,6 @@ export function makeMatcap(kind: MatcapKind, hex: number): DataTexture {
   return tex;
 }
 
-const LIGHT_STEEL = makeMatcap('metal', 0xc8ccd6);
-const BRASS = makeMatcap('metal', 0xe2b866);
-
 /**
  * Tops in the style of modern battle tops: a chrome blade with sharp contact points, a colored
  * plastic layer and an emblem chip on top, a dark ratchet below, and a bit with a gear ring and
@@ -135,7 +134,11 @@ const BRASS = makeMatcap('metal', 0xe2b866);
  */
 /** Real metal on the blades and ratchets: reflections of the room environment sweep across them as they spin. */
 const BRUSHED = brushedTexture();
-const BLADE_METAL = new MeshStandardMaterial({ color: 0xc4cad5, metalness: 1, roughness: 0.34, map: BRUSHED, roughnessMap: BRUSHED });
+/** The turning marks as a normal map too, so the brushing catches the light as the top turns. */
+const BLADE_NORMAL = LATHE_NORMAL.clone();
+BLADE_NORMAL.repeat.copy(BRUSHED.repeat);
+BLADE_NORMAL.offset.copy(BRUSHED.offset);
+const BLADE_METAL = new MeshStandardMaterial({ color: 0xc4cad5, metalness: 1, roughness: 0.34, map: BRUSHED, roughnessMap: BRUSHED, normalMap: BLADE_NORMAL });
 
 /**
  * Spun metal: fine concentric brushing with a few scratches, centered on the top's axis. The
@@ -177,7 +180,8 @@ function brushedTexture(): CanvasTexture {
   t.anisotropy = 4;
   return t;
 }
-const RATCHET_METAL = new MeshStandardMaterial({ color: 0x6b717d, metalness: 0.85, roughness: 0.45 });
+/** The ratchet is machine body: dark, machined. */
+const RATCHET_METAL = GUNMETAL;
 /** Bit: the tip below a gear ring that catches the rails. */
 const GEAR_H = 0.003;
 const GEAR_R = 0.0088;
@@ -205,21 +209,33 @@ function softShadowTexture(): CanvasTexture {
   return new CanvasTexture(c);
 }
 
-/** Merges geometries (positions and normals only) into one, so a part stays one mesh. */
-function merge(parts: BufferGeometry[]): BufferGeometry {
+/**
+ * Merges geometries into one, so a part stays one mesh: positions, normals, texture coordinates
+ * (zero where a part has none) for the detail maps, and vertex colors (white where none) if asked.
+ */
+function merge(parts: BufferGeometry[], colors = false): BufferGeometry {
   const flat = parts.map((g) => (g.index ? g.toNonIndexed() : g));
   const count = flat.reduce((n, g) => n + g.getAttribute('position').count, 0);
   const pos = new Float32Array(count * 3);
   const nor = new Float32Array(count * 3);
+  const uv = new Float32Array(count * 2);
+  const col = colors ? new Float32Array(count * 3).fill(1) : null;
   let o = 0;
   for (const g of flat) {
-    pos.set(g.getAttribute('position').array as Float32Array, o);
-    nor.set(g.getAttribute('normal').array as Float32Array, o);
-    o += g.getAttribute('position').count * 3;
+    const n = g.getAttribute('position').count;
+    pos.set(g.getAttribute('position').array as Float32Array, o * 3);
+    nor.set(g.getAttribute('normal').array as Float32Array, o * 3);
+    const t = g.getAttribute('uv');
+    if (t) uv.set(t.array as Float32Array, o * 2);
+    const c = g.getAttribute('color');
+    if (col && c && c.itemSize === 3) col.set(c.array as Float32Array, o * 3);
+    o += n;
   }
   const out = new BufferGeometry();
   out.setAttribute('position', new BufferAttribute(pos, 3));
   out.setAttribute('normal', new BufferAttribute(nor, 3));
+  out.setAttribute('uv', new BufferAttribute(uv, 2));
+  if (col) out.setAttribute('color', new BufferAttribute(col, 3));
   return out;
 }
 
@@ -238,21 +254,23 @@ export function mergeByMaterial(root: Object3D): Group {
     const m = o as Mesh;
     if (!m.isMesh || !m.visible) return;
     local.multiplyMatrices(inv, m.matrixWorld);
-    const mat = m.material as Material & { color?: Color; map?: unknown; matcap?: { uuid: string } | null; blending?: number };
+    const mat = m.material as Material & { color?: Color; map?: unknown; matcap?: { uuid: string } | null; blending?: number; vertexColors?: boolean };
     if (Array.isArray(m.material) || mat.map) {
       const keep = new Mesh(m.geometry, m.material);
       keep.applyMatrix4(local);
       out.add(keep);
       return;
     }
-    const key = [mat.type, mat.color?.getHex(), mat.matcap?.uuid, mat.transparent, mat.opacity, mat.side, mat.blending].join('|');
+    // Lit materials merge only with themselves (finish and maps differ at the same color).
+    const lit = (mat as Material & { isMeshStandardMaterial?: boolean }).isMeshStandardMaterial ? mat.uuid : '';
+    const key = [mat.type, mat.color?.getHex(), mat.matcap?.uuid, lit, mat.transparent, mat.opacity, mat.side, mat.blending].join('|');
     const geo = m.geometry.clone().applyMatrix4(local);
     if (!geo.getAttribute('normal')) geo.computeVertexNormals();
     const group = groups.get(key) ?? { material: mat, geos: [] };
     group.geos.push(geo);
     groups.set(key, group);
   });
-  for (const { material, geos } of groups.values()) out.add(new Mesh(merge(geos), material));
+  for (const { material, geos } of groups.values()) out.add(new Mesh(merge(geos, !!(material as Material & { vertexColors?: boolean }).vertexColors), material));
   return out;
 }
 
@@ -322,7 +340,8 @@ export function tipMesh(tip: TipShape, color = 0xe9e6df): Mesh {
   for (let i = 0; i < 12; i++) {
     parts.push(new BoxGeometry(0.0022, GEAR_H, 0.0016).translate(GEAR_R + 0.0008, h / 2 + GEAR_H / 2, 0).rotateY((i / 12) * Math.PI * 2));
   }
-  const m = new Mesh(merge(parts), new MeshMatcapMaterial({ matcap: makeMatcap('clay', color) }));
+  // Moulded POM: a hard, slightly glossy plastic (one per top, freed with it).
+  const m = new Mesh(merge(parts), new MeshStandardMaterial({ color, metalness: 0, roughness: 0.32 }));
   m.position.y = h / 2;
   return m;
 }
@@ -488,12 +507,12 @@ export function ringMeshes(ring: Ring, color: number, base: number, glow = new M
   }
   const bladeMesh = new Mesh(merge(metal), BLADE_METAL);
   bladeMesh.position.y = base;
-  const layerMesh = new Mesh(extrudeOutline(sample(d.layer), CHIP_R * 0.9, 0.0025), new MeshStandardMaterial({ color, metalness: 0, roughness: 0.32 }));
+  const layerMesh = new Mesh(extrudeOutline(sample(d.layer), CHIP_R * 0.9, 0.0025), topPlastic(color));
   layerMesh.position.y = base + top;
   // The chip: a dome in a lighter body color, the emblem glowing on top.
   const light = new Color(color).lerp(new Color(0xffffff), 0.35).getHex();
   const cap = Math.PI * 0.32;
-  const dome = new Mesh(new SphereGeometry(CHIP_R, 24, 10, 0, Math.PI * 2, 0, cap), new MeshMatcapMaterial({ matcap: makeMatcap('metal', light) }));
+  const dome = new Mesh(new SphereGeometry(CHIP_R, 24, 10, 0, Math.PI * 2, 0, cap), new MeshStandardMaterial({ color: light, metalness: 0.7, roughness: 0.3 }));
   dome.scale.y = d.dome;
   const domeTop = base + top + 0.0025;
   dome.position.y = domeTop - CHIP_R * Math.cos(cap) * d.dome;
@@ -1127,27 +1146,50 @@ export class TopView {
 interface Palette {
   floor: number;
   pit: number;
-  wall: DataTexture;
+  /** Walls and pillars (shared, never freed). */
+  wall: MeshStandardMaterial;
   rail: number;
   railHot: number;
   accent: number;
   pedestal: number;
 }
 
-const STONE = makeMatcap('clay', 0x9a948a);
-const FROST = makeMatcap('metal', 0xbfe0f2);
-const BASALT = makeMatcap('clay', 0x5a4c48);
-const VOID_METAL = makeMatcap('metal', 0x8a7ab0);
+/** Walls are seen from both sides (inside the bowl and over the rim). */
+const doubleSided = (m: MeshStandardMaterial) => {
+  const c = m.clone();
+  c.side = DoubleSide;
+  return c;
+};
+const STEEL_WALL = doubleSided(STEEL);
+const BRASS_WALL = doubleSided(BRASS_METAL);
+const STONE = doubleSided(plastic(0x9a948a));
+const FROST = doubleSided(metal(0xbfe0f2));
+const BASALT = doubleSided(plastic(0x5a4c48));
+const VOID_METAL = doubleSided(metal(0x8a7ab0));
 
 const PALETTES: Record<Theme, Palette> = {
   // Three layers at the rim: a dark body, a metal lip (walls and rails), one accent light.
-  forge: { floor: 0x5b5f69, pit: 0x2a2523, wall: LIGHT_STEEL, rail: 0x9aa1ad, railHot: 0xff8a2a, accent: 0xff6a1a, pedestal: 0x3a3d45 },
+  // The floor is spun steel, clearly lighter than the graphite shell around it.
+  forge: { floor: 0x7a7f88, pit: 0x2a2523, wall: STEEL_WALL, rail: 0x9aa1ad, railHot: 0xff8a2a, accent: 0xff6a1a, pedestal: BODY },
   stone: { floor: 0x606369, pit: 0x26262b, wall: STONE, rail: 0x9aa1ad, railHot: 0xffe2b8, accent: 0xf2e6d2, pedestal: 0x3d3f45 },
-  clockwork: { floor: 0x675d4d, pit: 0x2e2618, wall: BRASS, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0x463b2c },
+  clockwork: { floor: 0x675d4d, pit: 0x2e2618, wall: BRASS_WALL, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0x463b2c },
   ice: { floor: 0x6a7f8f, pit: 0x22303e, wall: FROST, rail: 0xb8c6d2, railHot: 0xffffff, accent: 0xe8f4ff, pedestal: 0x3e4a56 },
   lava: { floor: 0x4a3a36, pit: 0x3a0c04, wall: BASALT, rail: 0x8a7a72, railHot: 0xff5a10, accent: 0xff3a0a, pedestal: 0x2a201e },
   void: { floor: 0x3c3a4e, pit: 0x120c22, wall: VOID_METAL, rail: 0x9a8ab8, railHot: 0xe0b8ff, accent: 0xb86cff, pedestal: 0x252238 },
 };
+
+const plinths = new Map<number, MeshStandardMaterial>();
+/** A theme's plain plinth: matte machine body in the theme's dark color (shared, never freed). */
+function plinthMaterial(hex: number): MeshStandardMaterial {
+  let m = plinths.get(hex);
+  if (!m) {
+    m = GRAPHITE.clone();
+    m.color.setHex(hex);
+    m.side = DoubleSide;
+    plinths.set(hex, m);
+  }
+  return m;
+}
 
 /**
  * The stadium floor's surface, mapped across the arena (center at 0.5, 0.5, rim at the edge):
@@ -1228,6 +1270,13 @@ function floorTexture(): CanvasTexture {
   }
   g.closePath();
   g.fill();
+  // Contact shading: the floor darkens into the foot of the wall.
+  const foot = g.createRadialGradient(C, C, C * 0.88, C, C, C);
+  foot.addColorStop(0, 'rgba(0,0,0,0)');
+  foot.addColorStop(0.7, 'rgba(0,0,0,0.25)');
+  foot.addColorStop(1, 'rgba(0,0,0,0.6)');
+  g.fillStyle = foot;
+  g.fillRect(0, 0, S, S);
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
   t.anisotropy = 8;
@@ -1254,21 +1303,27 @@ function rimPath(layout: ArenaLayout, a0: number, a1: number, offset: number, y:
   return pts;
 }
 
-function tube(points: Vector3[], radius: number, mat: MeshBasicMaterial | MeshMatcapMaterial) {
+function tube(points: Vector3[], radius: number, mat: Material) {
   return new Mesh(new TubeGeometry(new CatmullRomCurve3(points), points.length * 2, radius, 6, false), mat);
 }
 
 /** A vertical band along the rim from a0 to a1 (the wall face), from the floor up to `height`. */
-function band(layout: ArenaLayout, a0: number, a1: number, offset: number, height: number, mat: MeshMatcapMaterial) {
+function band(layout: ArenaLayout, a0: number, a1: number, offset: number, height: number, mat: Material) {
   const pts = rimPath(layout, a0, a1, offset, 0);
   const pos: number[] = [];
-  for (let i = 0; i < pts.length - 1; i++) {
+  const uv: number[] = [];
+  // u runs along the rim (about one unit per 10 cm, for the brushing), v up the wall.
+  for (let i = 0, u = 0; i < pts.length - 1; i++) {
     const p = pts[i];
     const q = pts[i + 1];
+    const w = u + p.distanceTo(q) * 10;
     pos.push(p.x, -0.004, p.z, q.x, -0.004, q.z, q.x, height, q.z, p.x, -0.004, p.z, q.x, height, q.z, p.x, height, p.z);
+    uv.push(u, 0, w, 0, w, 1, u, 0, w, 1, u, 1);
+    u = w;
   }
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
   g.computeVertexNormals();
   return new Mesh(g, mat);
 }
@@ -1333,7 +1388,7 @@ export class ArenaView {
   private readonly tmp = new Color();
   private readonly railIdle = new Color();
   private readonly railHot = new Color();
-  private railMats: MeshBasicMaterial[] = [];
+  private railMats: MeshStandardMaterial[] = [];
   private railFlash: number[] = [];
   private bumperMats: MeshBasicMaterial[] = [];
   private bumperFlash: number[] = [];
@@ -1383,9 +1438,15 @@ export class ArenaView {
     this.geo.setAttribute('color', new BufferAttribute(this.colors, 3));
     this.geo.setAttribute('uv', new BufferAttribute(uv, 2));
     this.geo.setIndex(idx);
-    const floor = new Mesh(this.geo, new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0xffffff), map: FLOOR_TEXTURE, vertexColors: true }));
+    // Spun steel: the turning marks glint in rings as the head moves; the theme tints it through the vertex colors.
+    const floor = new Mesh(this.geo, new MeshStandardMaterial({ map: FLOOR_TEXTURE, vertexColors: true, metalness: 0.3, roughness: 0.45, normalMap: LATHE_NORMAL }));
     floor.frustumCulled = false;
-    this.root.add(floor, this.features);
+    // The key light: one warm, shadowless spot above the arena, a little toward the player, so the
+    // bowl and the tops stand in a pool of light (it lights lit materials only). Always on: hiding
+    // a light would recompile every lit material.
+    const key = new SpotLight(0xffd2a0, 1, 0, 0.75, 0.6, 2);
+    key.position.set(-0.04, 0.26, 0.08);
+    this.root.add(floor, this.features, key, key.target);
   }
 
   /** Rebuilds walls, pockets, rails, pillars, center features and pedestal for a layout. */
@@ -1405,7 +1466,7 @@ export class ArenaView {
       this.features.add(m);
       return m;
     };
-    const wallMat = own(new MeshMatcapMaterial({ matcap: P.wall, side: DoubleSide }));
+    const wallMat = P.wall;
     const accent = own(new MeshBasicMaterial({ color: P.accent, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }));
     const trough = own(new MeshBasicMaterial({ color: 0x26282d, side: DoubleSide }));
     const H = WALL_HEIGHT[layout.wall];
@@ -1441,7 +1502,8 @@ export class ArenaView {
     this.railMats = [];
     this.railFlash = [];
     for (const r of layout.rails) {
-      const mat = own(new MeshBasicMaterial({ color: P.rail }));
+      // Lit metal in the theme's rail color; heat shows as glow (emissive) over it.
+      const mat = own(new MeshStandardMaterial({ color: P.rail, metalness: 1, roughness: 0.3 }));
       this.railMats.push(mat);
       this.railFlash.push(0);
       add(tube(rimPath(layout, r.angle - r.half, r.angle + r.half, -0.004, Math.max(0.004, H * 0.9)), 0.0025, mat));
@@ -1450,7 +1512,7 @@ export class ArenaView {
     // Pillars and bumpers.
     this.bumperMats = [];
     this.bumperFlash = [];
-    const pillarMat = own(new MeshMatcapMaterial({ matcap: P.wall }));
+    const pillarMat = P.wall;
     this.orbit.clear();
     this.orbit.rotation.y = 0;
     this.features.add(this.orbit);
@@ -1555,8 +1617,7 @@ export class ArenaView {
             ],
             64,
           ),
-          // Lit by the room (the environment map), like the forge shell: a painted metal plinth, not a black hole.
-          own(new MeshStandardMaterial({ color: new Color(P.pedestal).lerp(new Color(0x8a8d94), 0.25), metalness: 0.4, roughness: 0.55, side: DoubleSide })),
+          plinthMaterial(P.pedestal),
         ),
       );
       plinth.scale.set(scale * sx, 1, scale * sz);
@@ -1619,7 +1680,9 @@ export class ArenaView {
     this.time += dt;
     this.railMats.forEach((m, i) => {
       this.railFlash[i] = Math.max(0, this.railFlash[i] - dt * 3);
-      m.color.copy(this.railIdle).lerp(this.railHot, Math.max(this.railFlash[i], this.charge));
+      const k = Math.max(this.railFlash[i], this.charge);
+      m.color.copy(this.railIdle).lerp(this.railHot, k);
+      m.emissive.copy(this.railHot).multiplyScalar(k);
     });
     this.bumperMats.forEach((m, i) => {
       this.bumperFlash[i] = Math.max(0, this.bumperFlash[i] - dt * 4);
@@ -2530,9 +2593,10 @@ export function miniArena(layout: ArenaLayout, current: boolean): Group {
   const g = new Group();
   outer.add(g);
   const square = layout.shape === 'square';
-  const base = new Mesh(new CylinderGeometry(MINI_R + 0.004, MINI_R + 0.006, 0.014, square ? 4 : 32, 1), new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0x4a4e57) }));
+  // Own materials (not the shared ones): the workshop darkens a locked miniature's colors.
+  const base = new Mesh(new CylinderGeometry(MINI_R + 0.004, MINI_R + 0.006, 0.014, square ? 4 : 32, 1), GRAPHITE.clone());
   base.position.y = 0.007;
-  const floor = new Mesh(new CircleGeometry(MINI_R, square ? 4 : 32).rotateX(-Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', MINI_FLOOR[layout.theme]) }));
+  const floor = new Mesh(new CircleGeometry(MINI_R, square ? 4 : 32).rotateX(-Math.PI / 2), plastic(MINI_FLOOR[layout.theme]).clone());
   floor.position.y = 0.0142;
   const rim = new Mesh(new TorusGeometry(MINI_R, current ? 0.003 : 0.002, 8, square ? 4 : 40).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: MINI_THEME[layout.theme] }));
   rim.position.y = 0.015;
@@ -2687,26 +2751,40 @@ function palmTexture(): CanvasTexture {
 }
 
 /**
- * The forge's light for metal (the environment map): a lit neutral room, like the real one seen
- * through passthrough, with a warm softbox low on one side, a cool strip high behind and a bright
- * line overhead (all brighter than white, so chrome catches real highlights), and a dark table
- * below. Rendered once at load.
+ * The forge's light (the environment map): a dome graded from a lit ceiling to a dark floor, so
+ * everything is lit from above and darker underneath, with a soft key panel overhead, a warm
+ * softbox low on one side, a cool steel strip high behind and a thin bright line overhead, so
+ * spinning blades sweep a warm and a cool highlight. Emitters go over white: the renderer's tone
+ * mapping rolls them off. Rendered once at load.
  */
 export function forgeEnvironment(renderer: WebGLRenderer): Texture {
   const scene = new Scene();
-  scene.background = new Color(0x8e9198);
-  const box = (w: number, h: number, color: number, power: number, x: number, y: number, z: number) => {
-    const m = new Mesh(new PlaneGeometry(w, h), new MeshBasicMaterial({ color: new Color(color).multiplyScalar(power), side: DoubleSide, toneMapped: false }));
+  scene.background = new Color(0x08090b);
+  const dome = new SphereGeometry(8, 32, 16);
+  const top = new Color(0x6c6f76);
+  const horizon = new Color(0x2c2e33);
+  const floor = new Color(0x060607);
+  const col = new Float32Array(dome.getAttribute('position').count * 3);
+  const c = new Color();
+  for (let i = 0; i < col.length / 3; i++) {
+    const y = dome.getAttribute('position').getY(i) / 8;
+    if (y > 0) c.copy(horizon).lerp(top, Math.sqrt(y));
+    else c.copy(horizon).lerp(floor, Math.min(1, -y * 3));
+    c.toArray(col, i * 3);
+  }
+  dome.setAttribute('color', new BufferAttribute(col, 3));
+  scene.add(new Mesh(dome, new MeshBasicMaterial({ vertexColors: true, side: BackSide })));
+  const box = (w: number, h: number, color: number, k: number, x: number, y: number, z: number) => {
+    const m = new Mesh(new PlaneGeometry(w, h), new MeshBasicMaterial({ color: new Color(color).multiplyScalar(k), side: DoubleSide }));
     m.position.set(x, y, z);
     m.lookAt(0, 0, 0);
     scene.add(m);
   };
-  box(3, 1.4, 0xffa060, 4, -3, 0.4, 1); // warm softbox, low on the left
-  box(5, 0.5, 0x8fb7ff, 3, 1.5, 2.2, -3); // cool strip behind
-  box(4, 0.12, 0xffffff, 6, 0, 3, 0.5); // bright line overhead
-  box(1.6, 1, 0xfff4e8, 2.5, -0.8, 3.2, -0.6); // a ceiling light
-  box(2, 1, 0xff7a3a, 1.2, 3, -0.5, 1); // an ember bounce on the right
-  box(8, 8, 0x1c1d21, 1, 0, -2, 0); // the table and floor below
+  box(3, 2.4, 0xfff4e8, 1.6, 0, 3.2, 0.6); // soft key panel overhead, a little toward the viewer
+  box(2.4, 1.2, 0xffa060, 1.4, -3, 0.5, 1); // warm softbox, low on the left
+  box(5, 0.5, 0x8fb7ff, 1.2, 1.5, 2.2, -3); // cool strip behind
+  box(4, 0.1, 0xffffff, 4, 0, 3, -0.6); // bright line overhead
+  box(2, 1, 0x40261a, 1, 3, -0.4, 1); // a dim ember bounce on the right
   const pmrem = new PMREMGenerator(renderer);
   const env = pmrem.fromScene(scene, 0.04).texture;
   pmrem.dispose();

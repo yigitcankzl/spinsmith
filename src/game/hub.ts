@@ -18,6 +18,7 @@ import {
   Matrix4,
   SphereGeometry,
   BoxGeometry,
+  BufferAttribute,
   BufferGeometry,
   ExtrudeGeometry,
   LatheGeometry,
@@ -30,7 +31,6 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
-  MeshMatcapMaterial,
   Object3D,
   PlaneGeometry,
   RingGeometry,
@@ -50,7 +50,8 @@ import { popIn } from './rim.js';
 import { ARENA_SCALE, COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
 import { FEATS, MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
-import { makeMatcap, mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
+import { mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
+import { bevelBox, BRASS, FORGED, GRAPHITE, GRAPHITE_AO, plastic, STEEL } from './materials.js';
 
 export type HubAction =
   | { kind: 'play' }
@@ -101,13 +102,9 @@ export const FLY_TIME = 0.3;
 /** Let go where it was picked up: a tap. */
 const TAP_MOVE = 0.03;
 
-const IRON = makeMatcap('metal', 0x9aa1ad);
-/** The forged-tech set: graphite bodies, light steel, brass trim, orange heat. */
-const GRAPHITE = makeMatcap('metal', 0x4a4e57);
-const STEEL = makeMatcap('chrome', 0xd6dce6);
+/** The forged-tech set (materials.ts): graphite bodies, light steel, brass trim, orange heat. */
 /** The table is this far below the arena floor (arena-local): props stand on the table itself. */
 const TABLE_Y = REACH_TABLE_Y;
-const BRASS = makeMatcap('metal', 0xe2b866);
 
 interface Pickable {
   /** What happens when it is carried into the arena or tapped. */
@@ -434,15 +431,15 @@ export class Hub {
   /** The blueprint: a rolled-up plan on the near rim, between the level plate and the anvil. */
   private buildBlueprint() {
     const blueprint = new Group();
-    const roll = new Mesh(new CylinderGeometry(0.007, 0.007, 0.055, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: makeMatcap('clay', 0x46607e) }));
-    const band = new Mesh(new CylinderGeometry(0.0076, 0.0076, 0.007, 16).rotateZ(Math.PI / 2), new MeshMatcapMaterial({ matcap: BRASS }));
+    const roll = new Mesh(new CylinderGeometry(0.007, 0.007, 0.055, 16).rotateZ(Math.PI / 2), plastic(0x5f8fc9));
+    const band = new Mesh(new CylinderGeometry(0.0076, 0.0076, 0.007, 16).rotateZ(Math.PI / 2), BRASS);
     blueprint.add(roll, band);
     const holder = new Group();
     holder.add(blueprint);
     blueprint.rotation.y = -0.5;
     const home = new Vector3(BLUEPRINT_AT.x, TABLE_Y + 0.0075 + 0.012, BLUEPRINT_AT.z);
     holder.position.copy(home);
-    const cradle = new Mesh(new BoxGeometry(0.04, 0.012, 0.016).translate(0, 0.006, 0), new MeshMatcapMaterial({ matcap: GRAPHITE }));
+    const cradle = new Mesh(bevelBox(0.04, 0.012, 0.016, 0.0015).translate(0, 0.006, 0), GRAPHITE);
     cradle.position.set(BLUEPRINT_AT.x, TABLE_Y, BLUEPRINT_AT.z);
     cradle.rotation.y = -0.5;
     this.blueprint.add(cradle, holder);
@@ -456,7 +453,7 @@ export class Hub {
   /** The comfort dial: a brass knob; each pinch turns it to the next mode (sound, flashes, the strike's gesture). */
   private buildComfort() {
     const knob = new Group();
-    const brass = new MeshMatcapMaterial({ matcap: BRASS });
+    const brass = BRASS;
     knob.add(new Mesh(new CylinderGeometry(0.011, 0.012, 0.008, 20).translate(0, 0.004, 0), brass));
     // The pointer notch shows the mode the dial is on.
     const notch = new Mesh(new BoxGeometry(0.003, 0.002, 0.009).translate(0, 0.009, 0.005), new MeshBasicMaterial({ color: ORANGE }));
@@ -607,20 +604,20 @@ const DOCK_TOP = 0.097 * RIM_SCALE;
  */
 /** Without the hammer in the forge, where it would lie among the tray's parts. */
 export function anvilModel(withHammer = true): Group {
-  const iron = new MeshMatcapMaterial({ matcap: IRON });
-  const steel = new MeshMatcapMaterial({ matcap: STEEL });
-  const graphite = new MeshMatcapMaterial({ matcap: GRAPHITE });
-  const plinth = new Mesh(new CylinderGeometry(0.048, 0.056, 0.07, 8), graphite);
+  const iron = FORGED;
+  const steel = STEEL;
+  const graphite = GRAPHITE;
+  const plinth = new Mesh(faceted(new CylinderGeometry(0.048, 0.056, 0.07, 8)), graphite);
   plinth.position.y = 0.035;
-  const cap = new Mesh(new CylinderGeometry(0.052, 0.05, 0.006, 8), graphite);
+  const cap = new Mesh(faceted(new CylinderGeometry(0.052, 0.05, 0.006, 8)), graphite);
   cap.position.y = 0.072;
-  const band = new Mesh(new TorusGeometry(0.049, 0.003, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshMatcapMaterial({ matcap: BRASS }));
+  const band = new Mesh(new TorusGeometry(0.049, 0.003, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), BRASS);
   band.position.y = 0.064;
   const seam = new Mesh(new TorusGeometry(0.053, 0.0015, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), new MeshBasicMaterial({ color: ORANGE }));
   seam.position.y = 0.012;
   const body = new Mesh(anvilBody(), iron);
   // The face: a polished steel plate with the square hardy hole near the heel.
-  const face = new Mesh(new BoxGeometry(0.1, 0.004, 0.046), steel);
+  const face = new Mesh(bevelBox(0.1, 0.004, 0.046, 0.0012), steel);
   face.position.set(0.004, ANVIL_FACE - 0.002, 0);
   const hardy = new Mesh(new BoxGeometry(0.008, 0.0045, 0.008), new MeshBasicMaterial({ color: 0x15161a }));
   hardy.position.set(0.04, ANVIL_FACE - 0.0015, 0);
@@ -631,9 +628,9 @@ export function anvilModel(withHammer = true): Group {
   const hammer = new Group();
   const handle = new Mesh(new CylinderGeometry(0.0035, 0.0052, 0.095, 8), graphite);
   handle.position.y = 0.0475;
-  const ferrule = new Mesh(new CylinderGeometry(0.0058, 0.0058, 0.008, 8), new MeshMatcapMaterial({ matcap: BRASS }));
+  const ferrule = new Mesh(new CylinderGeometry(0.0058, 0.0058, 0.008, 8), BRASS);
   ferrule.position.y = 0.088;
-  const head = new Mesh(new CylinderGeometry(0.0085, 0.0085, 0.026, 8).rotateZ(Math.PI / 2), steel);
+  const head = new Mesh(faceted(new CylinderGeometry(0.0085, 0.0085, 0.026, 8)).rotateZ(Math.PI / 2), steel);
   head.position.set(0.004, 0.096, 0);
   const peen = new Mesh(new ConeGeometry(0.0085, 0.014, 8).rotateZ(Math.PI / 2), steel);
   peen.position.set(-0.016, 0.096, 0);
@@ -702,10 +699,16 @@ export function standModel(): Group {
     [0.019, 0.097],
     [0, 0.097],
   ].map(([r, y]) => new Vector2(r, y));
-  const pedestal = new Mesh(new LatheGeometry(profile, 32), new MeshMatcapMaterial({ matcap: GRAPHITE }));
+  // Contact shading per profile point: dark at the foot on the table and under the collar and cup.
+  const occlusion = [0.55, 0.7, 0.85, 0.75, 1, 0.8, 0.65, 1, 0.7, 0.75, 1, 1, 1];
+  const lathe = new LatheGeometry(profile, 32);
+  const color = new Float32Array(lathe.getAttribute('position').count * 3);
+  for (let i = 0; i < color.length / 3; i++) color.fill(occlusion[i % profile.length], i * 3, i * 3 + 3);
+  lathe.setAttribute('color', new BufferAttribute(color, 3));
+  const pedestal = new Mesh(lathe, GRAPHITE_AO);
   const seam = new Mesh(new TorusGeometry(0.0115, 0.0012, 6, 24).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: ORANGE }));
   seam.position.y = 0.079;
-  const brass = new MeshMatcapMaterial({ matcap: BRASS });
+  const brass = BRASS;
   const g = new Group();
   g.add(pedestal, seam, softShadow(0.07));
   for (let i = 0; i < 3; i++) {
@@ -716,6 +719,13 @@ export function standModel(): Group {
     g.add(prong);
   }
   return mergeByMaterial(g);
+}
+
+/** Flat-shaded facets (an octagon reads machined, not soft). */
+function faceted(geo: BufferGeometry): BufferGeometry {
+  const flat = geo.toNonIndexed();
+  flat.computeVertexNormals();
+  return flat;
 }
 
 /** A soft round shadow on the table under a prop (size in m, arena-local). */

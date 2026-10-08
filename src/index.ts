@@ -1,4 +1,6 @@
-import { VisibilityState, World } from '@iwsdk/core';
+// First: exempts unlit materials (UI, labels, glows) from tone mapping before any are made.
+import './game/materials.js';
+import { NeutralToneMapping, VisibilityState, World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { MatchSystem } from './game/match-system.js';
 import { loadFonts } from './game/ui.js';
@@ -32,7 +34,11 @@ loadFonts()
   .then(() => World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions))
   .then((world) => {
     // Metal reflects the forge's light (a warm and a cool highlight), and the view's edges are
-    // rendered at lower resolution (fixed foveation) to pay for it on the headset.
+    // rendered at lower resolution (fixed foveation) to pay for it on the headset. Neutral tone
+    // mapping rolls bright highlights off instead of clipping them, and leaves mid-tones (and the
+    // unlit UI, which skips it) unchanged.
+    world.renderer.toneMapping = NeutralToneMapping;
+    world.renderer.toneMappingExposure = 1;
     world.scene.environment = forgeEnvironment(world.renderer);
     world.renderer.xr.setFoveation?.(0.5);
     world.registerSystem(MatchSystem);

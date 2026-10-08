@@ -1,24 +1,23 @@
 import {
   AdditiveBlending,
-  BoxGeometry,
+  BufferAttribute,
   CircleGeometry,
   CylinderGeometry,
   Group,
   LatheGeometry,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   TorusGeometry,
   Vector2,
 } from '@iwsdk/core';
+import { bevelBox, BRASS, GRAPHITE, GRAPHITE_AO, GUNMETAL } from '../game/materials.js';
 /** The shell is modelled around a 15 cm arena and scaled to the arena in play. */
 const ARENA_RADIUS = 0.15;
 
 export const FORGE_SHELL_HEIGHT = 0.08;
 
-// Graphite, not mauve: the forge's machine color (the darkest large surface stays above #26282d, so passthrough never shows a hole).
-const iron = new MeshStandardMaterial({ color: 0x5b5f69, metalness: 0.45, roughness: 0.5 });
-const darkIron = new MeshStandardMaterial({ color: 0x41444b, metalness: 0.4, roughness: 0.55 });
+// The machine body (materials.ts): matte hammered graphite, with machined collar and clamps in the
+// same color and brass bolts. The arena floor inside is clearly lighter steel.
 const ember = new MeshBasicMaterial({
   color: 0xff5a24,
   transparent: true,
@@ -31,21 +30,25 @@ const root = new Group();
 root.name = 'ForgeArenaShell';
 
 // One continuous, weighty silhouette: broad shoulder, inset waist and flared foot.
-const body = new Mesh(
-  new LatheGeometry(
-    // Listed bottom to top so the lathe faces point outward (top to bottom renders inside-out).
-    [
-      new Vector2(ARENA_RADIUS + 0.02, -FORGE_SHELL_HEIGHT),
-      new Vector2(ARENA_RADIUS + 0.011, -0.071),
-      new Vector2(ARENA_RADIUS + 0.017, -0.057),
-      new Vector2(ARENA_RADIUS + 0.022, -0.026),
-      new Vector2(ARENA_RADIUS + 0.019, -0.012),
-      new Vector2(ARENA_RADIUS + 0.008, -0.002),
-    ],
-    64,
-  ),
-  iron,
-);
+// Listed bottom to top so the lathe faces point outward (top to bottom renders inside-out).
+const profile = [
+  new Vector2(ARENA_RADIUS + 0.02, -FORGE_SHELL_HEIGHT),
+  new Vector2(ARENA_RADIUS + 0.011, -0.071),
+  new Vector2(ARENA_RADIUS + 0.017, -0.057),
+  new Vector2(ARENA_RADIUS + 0.022, -0.026),
+  new Vector2(ARENA_RADIUS + 0.019, -0.012),
+  new Vector2(ARENA_RADIUS + 0.008, -0.002),
+];
+// Contact shading per profile point: darker where it meets the table, in the waist and under the collar.
+const occlusion = [0.5, 0.72, 0.95, 1, 0.7, 0.55];
+const bodyGeo = new LatheGeometry(profile, 64);
+{
+  const n = bodyGeo.getAttribute('position').count;
+  const color = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) color.fill(occlusion[i % profile.length], i * 3, i * 3 + 3);
+  bodyGeo.setAttribute('color', new BufferAttribute(color, 3));
+}
+const body = new Mesh(bodyGeo, GRAPHITE_AO);
 body.name = 'ForgedPlinth';
 root.add(body);
 
@@ -53,16 +56,16 @@ root.add(body);
 // so the collar and trims stay dark here.
 const topCollar = new Mesh(
   new TorusGeometry(ARENA_RADIUS + 0.013, 0.004, 8, 64).rotateX(Math.PI / 2),
-  darkIron,
+  GUNMETAL,
 );
 topCollar.name = 'TopCollar';
 topCollar.position.y = -0.01;
 root.add(topCollar);
 
 
-const clampGeo = new BoxGeometry(0.022, 0.042, 0.016);
+const clampGeo = bevelBox(0.022, 0.042, 0.016, 0.0015);
 // Shallow enough to stay inside the lathe body (only the clamps stand proud of it).
-const shoulderGeo = new BoxGeometry(0.032, 0.007, 0.012);
+const shoulderGeo = bevelBox(0.032, 0.007, 0.012, 0.0012);
 const boltGeo = new CylinderGeometry(0.0024, 0.0024, 0.003, 10).rotateX(Math.PI / 2);
 const portGeo = new CircleGeometry(0.0065, 20);
 
@@ -71,17 +74,17 @@ for (let i = 0; i < 8; i++) {
   frame.name = `RadialClamp_${i + 1}`;
   frame.rotation.y = (i / 8) * Math.PI * 2;
 
-  const clamp = new Mesh(clampGeo, darkIron);
+  const clamp = new Mesh(clampGeo, GUNMETAL);
   clamp.name = 'ClampBody';
   clamp.position.set(0, -0.039, ARENA_RADIUS + 0.021);
-  const shoulder = new Mesh(shoulderGeo, iron);
+  const shoulder = new Mesh(shoulderGeo, GRAPHITE);
   shoulder.name = 'Shoulder';
   shoulder.position.set(0, -0.015, ARENA_RADIUS + 0.014);
   frame.add(clamp, shoulder);
 
   // The launch ports take the bolts' place on the front and back clamps.
   for (const x of i === 0 || i === 4 ? [] : [-0.006, 0.006]) {
-    const bolt = new Mesh(boltGeo, iron);
+    const bolt = new Mesh(boltGeo, BRASS);
     bolt.name = 'Bolt';
     bolt.position.set(x, -0.039, ARENA_RADIUS + 0.03);
     frame.add(bolt);

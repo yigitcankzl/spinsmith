@@ -1,4 +1,4 @@
-import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, MeshMatcapMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
@@ -27,7 +27,8 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
+import { BRASS } from './materials.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
@@ -2085,7 +2086,7 @@ export class MatchSystem extends createSystem({
 
   /** The move handle: a brass grip on a short post, out from the pedestal's near face. */
   private buildHandle() {
-    const brass = new MeshMatcapMaterial({ matcap: makeMatcap('metal', 0xe2b866) });
+    const brass = BRASS;
     const post = new Mesh(new CylinderGeometry(0.003, 0.003, 0.02, 10).rotateX(Math.PI / 2), brass);
     post.position.z = -0.01;
     const grip = new Mesh(new TorusGeometry(0.009, 0.003, 8, 20), brass);
@@ -3614,12 +3615,11 @@ export class MatchSystem extends createSystem({
     r.obj.scale.setScalar(1.6 * grow * (1 - leave));
     if (leave >= 1) {
       r.obj.removeFromParent();
-      // Its own geometry and materials (shared textures stay).
+      // Its own geometry. ponytail: materials stay (most are shared from materials.ts, and disposing
+      // one forces a recompile stall); a few per-reveal ones leak, fine at one reveal per unlock.
       r.obj.traverse((o) => {
         const m = o as Mesh;
-        if (!m.isMesh) return;
-        m.geometry.dispose();
-        (m.material as MeshBasicMaterial).dispose();
+        if (m.isMesh) m.geometry.dispose();
       });
       this.reveal = null;
     }
