@@ -82,13 +82,14 @@ Built and in the repo, measured with `npm run report:shaping` (rows "masher + st
   (stamina beat defense only 49%).
 - The strike is felt by `n²` (n = distance to the rim, 0..1): a top in the middle barely moves,
   so when you strike matters; your own top takes 60%.
-- **Seals:** Anvil, Rush (Lv 4), Magnet (Lv 7), within about a point of each other. A Quench
+- **Seals:** Anvil, Tilt (Lv 3), Rush (Lv 4), Ward (Lv 5, a parry since gameplay round 2), Magnet
+  (Lv 7), Hammer (Lv 9), within 3 points of the Anvil in `report:shaping`. A Quench
   (spin refill) was cut: even a 0.05 refill decided spin finishes (65% win).
 - **Rival tells:** charge (Rim Raider, Hookjaw, Sawtooth), quake (Iron Keep, Bastion), pull
   (Drifter, Leech), after the first match. A rival quench was cut for the same reason.
 - **Signature parts:** a rival knocked out once gives its part; new Gale and Bulwark rings and
   the Spindle core (`report:tops`, no warnings).
-- After the duel review: the bar starts each round a third full and fills on its own in 24 s
+- After the duel review: the bar starts each round a third full (a fifth since gameplay round 2) and fills on its own in 24 s
   (it filled in only a third of rounds before, too late to matter); the strike starts from the
   palm's spot on the rim (a top near your hand goes to the middle, one across the arena out); it
   lands 1.6x harder while you are behind; a hard slap, armed half a second after the bar fills,

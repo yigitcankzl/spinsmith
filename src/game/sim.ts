@@ -613,6 +613,8 @@ export interface Clash {
   strength: number;
   /** A Hammer landed in this clash. */
   hammer?: boolean;
+  /** A charge rebounded off a Ward in this clash. */
+  parry?: boolean;
 }
 
 const slopeTmp = { x: 0, z: 0 };
@@ -1110,7 +1112,7 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   b.damage += hitB > 1 ? Math.max(HAMMER_FLOOR, dB) : dB;
   if (a.damage >= 1) burstApart(a);
   if (b.damage >= 1) burstApart(b);
-  return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 1.6), hammer: hitA > 1 || hitB > 1 };
+  return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 1.6), hammer: hitA > 1 || hitB > 1, parry: parryA > 1 || parryB > 1 };
 }
 
 /** Points the winner scores: the pocket's value, 2 for over the wall or a burst, 1 out of spin. */

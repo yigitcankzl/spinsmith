@@ -440,6 +440,7 @@ export class MatchSystem extends createSystem({
   private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
+  private parried = false;
   private tipFresh = { left: true, right: true };
   private slapAt = new Vector3();
   private rip = new RipMeter();
@@ -1209,6 +1210,8 @@ export class MatchSystem extends createSystem({
       this.arenas = [...ARENAS];
       this.arenaIndex = 0;
       this.setArena(this.arenas[0]);
+      // The session's lessons start over too: the new smith gets every first-time card and replay.
+      this.tellTaught = this.holdSaid = this.replayedOnce = this.struckOnce = this.strikeTaught = this.cuppedOnce = false;
       playLevelUp();
       console.log('[HUB] new smith');
       this.toHub();
@@ -2446,7 +2449,8 @@ export class MatchSystem extends createSystem({
 
   /** Why a gesture did nothing, on the card for 2 s (once the first session is over, so its own hints stay). */
   private failSay(text: string) {
-    if (this.progress.guide !== 'done' || this.demo) return;
+    // Not over a match's opening card (the rival's intro), and not in the first session.
+    if (this.progress.guide !== 'done' || this.demo || this.myPoints + this.theirPoints === 0) return;
     this.label.set(text);
     this.labelTimer = 2;
   }
@@ -2569,7 +2573,8 @@ export class MatchSystem extends createSystem({
       const l = this.toLocal(h.pinch);
       if (h.pinching) {
         // Keep the fingertip's height current while pinching, so letting go is not read as a fast press.
-        this.tipY[side] = this.toLocal(h.index).y;
+        // Its own vector: toLocal() reuses one, and `l` (the pinch) is still in use below.
+        this.tipY[side] = this.root.worldToLocal(this.handAt.copy(h.index)).y;
         this.tipDown[side] = 0;
         let d = this.shaping[side];
         // Pinching a cup that holds a top grabs it to sling, before any ramp.
@@ -2635,8 +2640,11 @@ export class MatchSystem extends createSystem({
       if (depth > 0.004 && !this.pressing[side] && open) {
         this.pressing[side] = true;
         // With the strike armed, a palm coming down outside the rim is a slap, not a cup at the edge.
-        const palm = this.handAt.copy(this.toLocal(h.wrist)).lerp(tip, 0.5);
-        const slapping = this.forgeBar.full && this.taught('strike') && normRadius(this.arena.layout, palm.x, palm.z) > 1.0;
+        // (Not toLocal(): it would overwrite `tip`, which shares its vector.) Only a hand down at the
+        // table counts as a slap, so cups reached in over the rim still work with the bar full.
+        const palm = this.root.worldToLocal(this.handAt.copy(h.wrist)).lerp(tip, 0.5);
+        const atTable = h.low < this.root.position.y - PEDESTAL * this.rootK + 0.05;
+        const slapping = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, palm.x, palm.z) > 1.0;
         if (slapping) {
           if (import.meta.env.DEV) console.log('[SHAPE] well ignored: a slap outside the rim');
         } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
@@ -3113,6 +3121,16 @@ export class MatchSystem extends createSystem({
       this.elapsed += STEP;
       const clash = step(this.arena, this.mine, this.theirs);
       this.record();
+      // A charge rebounding off your Ward: said once per Ward, and it counts as stopping the move.
+      if (this.mine.guard <= 0) this.parried = false;
+      if (clash?.parry && !this.parried) {
+        this.parried = true;
+        this.stamp.show('PARRIED!', 'it bounced off your Ward', 'mine', 0.6);
+        this.impacts.hit(clash.x, this.arena.height(clash.x, clash.z), clash.z, 1);
+        playClash(1, clash.x);
+        this.featDone('interrupt');
+        if (import.meta.env.DEV) console.log('[STRIKE] ward parried a charge');
+      }
       if (clash?.hammer) {
         this.stamp.show('CRACKED!', '', this.mine.hammer === 0 ? 'mine' : 'rival', 0.5);
         // The Hammer lands: a heavy ring and a shower of sparks where the rims met.

@@ -190,19 +190,22 @@ an arena. First to 3 heat wins a match.
   emulator's play mode a left click is a pinch, so the game is playable by looking
   around with the mouse and click-holding.
 - **The duel layer** (`docs/DUEL-DESIGN.md`): a forge bar (the ring on the back of each hand)
-  starts each round a third full, fills on its own in 24 s and from solid clashes, three times
+  starts each round a fifth full (a white hot rip adds a quarter), fills on its own in 24 s and from solid clashes, three times
   as fast while your top is behind on spin. Full, press
   your palm on the table beside the arena: your strike. The seal you engrave in the forge's
   Style drawer picks it: the Anvil Strike (a shockwave from the middle that throws tops near the
-  rim, hot ones further; your own top is braced), the Rush (Lv 4: your top charges the rival),
-  the Magnet (Lv 7: the rival is dragged toward a slag pit), the Tilt (Lv 10: the arena dips
-  toward your palm; the rival slides, your top holds), the Hammer (Lv 13: your next solid hit
-  cracks three times as hard) or the Ward (Lv 16: for 3 s your top cannot be knocked out). A top
+  rim, hot ones further; your own top is braced), the Tilt (Lv 3: the arena dips toward your
+  palm; the rival slides, your top holds), the Rush (Lv 4: your top charges the rival), the Ward
+  (Lv 5: for 4 s your top cannot be knocked out, and a charge into it rebounds: "PARRIED!"), the
+  Magnet (Lv 7: the rival is dragged toward a slag pit) or the Hammer (Lv 9: your next solid hit
+  cracks three times as hard). A top
   that has taken a beating glows red: it flies further. The strike is staged: a short freeze, the
   seal rising off your top, its name stamped over the arena.
 - **Rival tells:** from the fourth match (the third, once you have struck) each rival has one big move (a charge, a quake or a
   pull). Its own bar fills like yours; when full it flashes and whines for a second, then the
-  move lands, unless your strike cuts it short ("INTERRUPTED!").
+  move lands, unless your strike cuts it short ("INTERRUPTED!") or your Ward turns it back. Once
+  you know the tells, a rival with its move ready waits a few seconds while your strike is ready
+  too: strike first, or hold the strike as the answer.
 - **Rival signature parts:** knock a rival out once and its part is yours (Rim Raider's Gale
   ring, Iron Keep's Bulwark ring, Drifter's Spindle core, ...).
 - **Framing and feel** (`Stamp` in `src/game/visuals.ts`): big stamped words over the arena for

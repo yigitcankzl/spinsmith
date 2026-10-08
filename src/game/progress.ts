@@ -73,14 +73,14 @@ export const RIVAL_UNLOCKS: Record<number, string> = {
 
 /** The newer arenas, opened beside a level's part or paint (the classics come with LEVEL_UNLOCKS). */
 export const ARENA_UNLOCKS: Record<number, string> = {
-  2: 'arena:Titan Crater',
-  3: 'arena:Orbit Foundry',
   5: 'arena:Twin Basins',
   6: 'arena:Ripple Pool',
   8: 'arena:Glacier Steps',
   10: 'arena:Neon Speedway',
-  14: 'arena:Meteor Pit',
   12: 'arena:Colossus Bowl',
+  14: 'arena:Meteor Pit',
+  15: 'arena:Titan Crater',
+  17: 'arena:Orbit Foundry',
   20: 'arena:Grand Anvil',
 };
 
@@ -97,8 +97,8 @@ export const RIVAL_SIGNATURE: Record<string, string> = {
 
 /** Strike seals (docs/DUEL-DESIGN.md): the Anvil Strike is yours from the start. */
 export const SEAL_UNLOCKS: Record<number, string> = {
-  2: 'seal:rush',
   3: 'seal:tilt',
+  4: 'seal:rush',
   5: 'seal:ward',
   7: 'seal:magnet',
   9: 'seal:hammer',
@@ -138,7 +138,7 @@ export const FEATS: Record<string, string> = {
   ramp: 'Ramp a rival out',
   sling: 'Sling a rival into a pit',
   strike: 'Knock a rival out with your strike',
-  interrupt: "Cut a rival's big move short",
+  interrupt: "Stop a rival's big move",
   whiteHot: 'Rip white hot',
   flawless: 'Win a match without giving up heat',
   comeback: 'Win a match from match point down',
