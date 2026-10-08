@@ -1,9 +1,14 @@
 # SpinSmith: testing notes
 
-Draft (Oct 7, 2026); final text before the deadline. For judges and anyone trying the build.
+Draft (Oct 8, 2026); final text before the deadline. In English, as the rules require. For judges and anyone trying the build.
 
 ## Before you start
 
+0. **Mark your desk (and a wall) in the Quest's Space Setup** (Settings > Physical space >
+   Space setup): label the desk as a table or desk, and the wall behind it as a wall. The arena
+   then stands on your real desk, thrown tops can skate off its real edge, and rivals arrive
+   through a portal on the wall. Without these labels the game still plays fully, on a floating
+   tray in front of you, and says so.
 1. **Sit at a table.** SpinSmith is seated: the arena stands on the table in front of you.
 2. **Hands only.** In Settings, turn on hand tracking and put the controllers down. Every action
    is a pinch, a pull or a fingertip press.
