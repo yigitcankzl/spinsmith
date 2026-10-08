@@ -1658,35 +1658,45 @@ export class Label {
     g.fillStyle = TEXT;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    // The headline (bold) never shrinks below 84 px and the lines under it (semibold) below 56 px:
-    // a line too long for that wraps instead of turning into a hairline. At most three lines.
-    const fit = (line: string, weight: string, from: number, floor: number) => {
-      let size = from;
-      do g.font = `${weight} ${size--}px ${FONT}`;
-      while (g.measureText(line).width > 940 && size > floor);
-      return size + 1;
-    };
-    const wrap = (line: string, weight: string, size: number): string[] => {
-      g.font = `${weight} ${size}px ${FONT}`;
-      if (g.measureText(line).width <= 940) return [line];
-      const words = line.split(' ');
-      let cut = words.length - 1;
-      while (cut > 1 && g.measureText(words.slice(0, cut).join(' ')).width > 940) cut--;
-      return [words.slice(0, cut).join(' '), words.slice(cut).join(' ')];
+    // Every line wraps greedily at the card's width; the sizes step down together until the whole
+    // text fits in at most four lines (headline bold, the rest semibold, never a lost word).
+    const MAX = 940;
+    const wrapAt = (line: string, font: string): string[] => {
+      g.font = font;
+      const out: string[] = [];
+      let cur = '';
+      for (const word of line.split(' ')) {
+        const next = cur ? `${cur} ${word}` : word;
+        if (cur && g.measureText(next).width > MAX) {
+          out.push(cur);
+          cur = word;
+        } else cur = next;
+      }
+      if (cur) out.push(cur);
+      return out;
     };
     const [first, ...rest] = text.split('\n');
-    const head = fit(first, '700', 112, 84);
-    const body = Math.min(68, head - 16);
-    const lines: [string, string, number][] = wrap(first, '700', head).map((part) => [part, '700', head]);
-    for (const r of rest) {
-      const size = fit(r, '600', body, 56);
-      for (const part of wrap(r, '600', size)) lines.push([part, '600', size]);
+    let lines: [string, string][] = [];
+    for (let head = 112; head >= 40; head -= 4) {
+      const body = Math.min(68, head - 16);
+      const hf = `700 ${head}px ${FONT}`;
+      const bf = `600 ${body}px ${FONT}`;
+      lines = [...wrapAt(first, hf).map((l): [string, string] => [l, hf]), ...rest.flatMap((r) => wrapAt(r, bf).map((l): [string, string] => [l, bf]))];
+      const fits = lines.every(([l, f]) => {
+        g.font = f;
+        return g.measureText(l).width <= MAX;
+      });
+      const tall = lines.reduce((t, [, f]) => t + parseInt(f.split(' ')[1]) * 1.12, 0);
+      if (lines.length <= 4 && fits && tall <= H - 24) break;
     }
-    const shown = lines.slice(0, 3);
-    const gap = shown.length === 3 ? 92 : 116;
-    shown.forEach(([line, weight, size], i) => {
-      g.font = `${weight} ${size}px ${FONT}`;
-      g.fillText(line, W / 2, H / 2 + (i - (shown.length - 1) / 2) * gap);
+    // Each line takes its own height, the block centred on the card.
+    const heights = lines.map(([, f]) => parseInt(f.split(' ')[1]) * 1.12);
+    let y = H / 2 - heights.reduce((a, b) => a + b, 0) / 2;
+    lines.forEach(([line, font], i) => {
+      g.font = font;
+      // A single word too long for the card still stays on it (squeezed).
+      g.fillText(line, W / 2, y + heights[i] / 2, MAX);
+      y += heights[i];
     });
     this.tex.needsUpdate = true;
   }
@@ -1906,6 +1916,13 @@ export class Stamp {
   private t = -1;
   private hold = 1;
   private queue: [string, string, 'mine' | 'rival' | 'neutral', number][] = [];
+
+  /** Ends what shows now at once (a skipped replay's plate), and anything waiting. */
+  cut() {
+    this.t = -1;
+    this.mesh.visible = false;
+    this.queue.length = 0;
+  }
 
   /** Stamps after whatever shows now (and after anything stamped in the same frame). */
   later(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1) {

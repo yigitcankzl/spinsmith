@@ -23,7 +23,7 @@ import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
-import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, makeMatcap, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Stamp, TEAM_MINE, TEAM_RIVAL, TopView } from './visuals.js';
@@ -213,6 +213,11 @@ export class MatchSystem extends createSystem({
     done: (build) => this.leaveForge(build),
     // The first session's part counts once the top is quenched (saved), not just fitted.
     fitted: () => undefined,
+    // The forge's words, big on the card, with what the next bout asks of your top.
+    said: (text) => {
+      if (this.phase !== 'forge') return;
+      this.label.set(this.forgeNext ? `${text}\n${this.forgeNext}` : text);
+    },
   }, this.progress);
   /** A demo round from the workshop's Try it: AI launches, no score, then back to the workshop. */
   private demo = false;
@@ -309,6 +314,10 @@ export class MatchSystem extends createSystem({
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
+  /** This round's rip power (for the OUTLAST reason). */
+  private lastRip = 1;
+  /** In the forge: the next bout in a line (the rival's style and the arena), under the forge's words. */
+  private forgeNext = '';
   /** Dev: photo mode for store art (see update). */
   photo = false;
   /** A quench in progress (a breath of steam before the forge closes). */
@@ -723,8 +732,10 @@ export class MatchSystem extends createSystem({
       for (const m of this.pinchRings) m.visible = false;
       return;
     }
-    // The card steps back while a stamp holds the far rim (one thing there at a time).
-    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible);
+    // On the result card and at home, the card steps back while a stamp holds the far rim (one
+    // thing there at a time); in a fight its instructions (a tell, strike now) stay at full strength.
+    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible && (this.phase === 'result' || this.phase === 'hub'));
+    this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
       for (const o of [this.label.mesh, this.bar.mesh, this.menuButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
@@ -1175,6 +1186,10 @@ export class MatchSystem extends createSystem({
     // The first session's forge visit is about one part: the one just earned.
     const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:spur' : null;
     this.progress.advance('fit');
+    // The card rides higher in the forge (the stats plate sits on the far rim).
+    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + 0.1, LABEL_AT.z);
+    const r = this.nextRival;
+    this.forgeNext = r ? `Next: ${r.name}, ${r.style}, in ${this.arenas[this.arenaIndex].name}` : '';
     this.forge.open(focus);
   }
 
@@ -1266,9 +1281,12 @@ export class MatchSystem extends createSystem({
     const r = this.replay!;
     const was = r.t;
     r.t += dt;
-    // A pinch skips it, even before it starts.
+    // A pinch skips it, even before it starts (its plate goes with it).
     if (this.hands.left.justPinched || this.hands.right.justPinched) {
       this.replay = null;
+      this.stamp.cut();
+      // The result card does not wait out the skipped replay.
+      this.resultTimer = Math.min(this.resultTimer, 1.5);
       return;
     }
     if (r.t < 0) {
@@ -1282,8 +1300,7 @@ export class MatchSystem extends createSystem({
     // The REPLAY plate stays up for the whole replay (rewards queue behind it).
     if (was < 0) this.stamp.show('REPLAY', 'pinch to skip', 'neutral', r.n / 120 / REPLAY_SPEED);
     const i = Math.floor(r.t * 120 * REPLAY_SPEED);
-    const skip = this.hands.left.justPinched || this.hands.right.justPinched;
-    if (i >= r.n + 100 || skip) {
+    if (i >= r.n + 100) {
       // The end: the real tops (out as they went) are drawn again.
       this.replay = null;
       return;
@@ -1529,12 +1546,29 @@ export class MatchSystem extends createSystem({
     this.sparks.burst(q.x + (Math.random() - 0.5) * 0.02, q.y, q.z + (Math.random() - 0.5) * 0.02, 0.25);
   }
 
+  /**
+   * Why an OUTLAST went the way it did, from what is already known: the tips' endurance (when it
+   * differs enough), else a weak rip, else the clashes.
+   */
+  private outlastReason(won: boolean): string {
+    const mine = statsOf(this.mine.spec).stamina;
+    const theirs = statsOf(this.theirs.spec).stamina;
+    const myTip = TIPS.find((t) => t.id === this.myBuild.tip)?.name ?? 'tip';
+    const theirTip = TIPS.find((t) => t.id === this.theirBuild.tip)?.name ?? 'tip';
+    if (won && mine - theirs >= 15) return `Your ${myTip} outspun its ${theirTip}`;
+    if (!won && theirs - mine >= 15) return `Its ${theirTip} spins longer than your ${myTip}`;
+    if (!won && this.lastRip < 0.6) return `Weak rip: ${Math.round(this.lastRip * 100)}%`;
+    return won ? 'Your spin lasted through the clashes' : 'Your spin ran out in the clashes';
+  }
+
   /** The match in two lines: the result and score, then each round's finish, the best rip and the XP. */
   private matchReport() {
     const m = this.matchLog;
     // Each round: who took it and how ("you SLAG", "they OUTLAST").
     const rounds = m.rounds.map((r) => (r.startsWith('-') ? `they ${r.slice(1)}` : `you ${r}`)).join(' · ');
-    return `${m.won ? 'Won' : 'Lost'} ${m.score} vs ${this.rival.name}\n${rounds} · best rip ${Math.round(m.rip * 100)}% · +${m.xp} XP`;
+    // After a loss the report keeps the rival's tip: something to forge or try next.
+    if (!m.won) return `Lost ${m.score} vs ${this.rival.name} · ${rounds}\nTry: ${this.rival.tip}`;
+    return `Won ${m.score} vs ${this.rival.name}\n${rounds} · best rip ${Math.round(m.rip * 100)}% · +${m.xp} XP`;
   }
 
   /** A feat earned for the first time: stamped after what shows now. */
@@ -2187,7 +2221,9 @@ export class MatchSystem extends createSystem({
       if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
       else if (!this.introDone) this.entrance = { t: 0, vs, sub, champion: !!c?.champion };
       this.introDone = true;
-      this.label.set(`${this.rival.name}, ${this.rival.title}\n"${this.rival.intro}"${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
+      // The first rematch says what the new part changes (the same rival: a clean comparison).
+      const watch = this.progress.matches === 1 && this.myBuild.tip === 'spur' ? `Watch your Spur: it turns on ${this.rival.name} sooner` : `"${this.rival.intro}"`;
+      this.label.set(`${this.rival.name}, ${this.rival.title}\n${watch}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
     }
     else {
       this.label.set('');
@@ -2380,6 +2416,7 @@ export class MatchSystem extends createSystem({
     this.stamp.show(perfect ? 'WHITE HOT!' : 'RIP!', '', 'mine', 0.35);
     if (perfect) this.featDone('whiteHot');
     this.matchLog.rip = Math.max(this.matchLog.rip, power);
+    this.lastRip = power;
     this.replayCount = 0;
     this.replay = null;
     this.offDeskShown = false;
@@ -3082,7 +3119,9 @@ export class MatchSystem extends createSystem({
         this.theirPoints = 0;
         this.matchOver = true;
       } else {
-        text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points} heat\n${score}`;
+        // A spin finish says why (the most common finish otherwise reads as luck).
+        const why = loser.finish === 'spin' ? this.outlastReason(v === 1) : '';
+        text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points} heat\n${why ? `${why} · ` : ''}${score}`;
       }
       // A finish within 1.5 s of the player's shape names it as the cause.
       const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind).toUpperCase() : null;
@@ -3156,7 +3195,7 @@ export class MatchSystem extends createSystem({
     // rule and how the rival plays), and later rounds say to rip again; it is never blank while waiting.
     if (!ready && this.phase === 'ready' && !this.demo && this.time - this.readySince > INTRO_TIME && !this.label.current) {
       const first = this.myPoints === 0 && this.theirPoints === 0;
-      this.label.set(first ? `${this.arena.layout.name}: ${this.arena.layout.rule ?? ''}\n${this.rival.name} ${this.rival.style}` : `Rip again\n${this.rival.name} ${this.rival.style}`);
+      this.label.set(first ? `${this.arena.layout.name}: ${this.arena.layout.rule ?? ''}\n${this.rival.name}: ${this.rival.style}` : `Rip again\n${this.rival.name}: ${this.rival.style}`);
     }
     // As soon as ramps work (the opening grace), so even a short round shows it.
     const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > TUNING.grace && this.theirs.alive;

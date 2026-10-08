@@ -179,6 +179,8 @@ export interface ForgeHooks {
   done(build: TopBuild): void;
   /** The first session's new part was fitted. */
   fitted?(): void;
+  /** What the forge just said (shown big on the card over the far rim too). */
+  said?(text: string): void;
 }
 
 type Target = { kind: 'slot'; slot: Slot } | { kind: 'top' } | { kind: 'quench' } | { kind: 'tab'; drawer: Drawer };
@@ -763,6 +765,7 @@ export class Forge {
 
   private say(text: string) {
     this.message = text;
+    this.hooks.said?.(text);
     this.cardKey = '';
     this.showCard(null);
     if (import.meta.env.DEV) console.log(`[FORGE] ${text} | ${buildName(this.build)} ${weightOf(this.build)} g spin ${this.build.spin}`);

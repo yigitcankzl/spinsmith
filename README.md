@@ -94,7 +94,7 @@ an arena. First to 3 heat wins a match.
   the slower (Cog rings much more), same spins grind each other down, tips dash on rails by
   their gear, Saw rings chip toward a shatter. The classic Striker (attack), Anvil (defense)
   and Halo (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
-  the opponent's cool teal; the opponent gets a random build each round.
+  the opponent's cool teal; each rival keeps its build and spin for the whole match (see Smith levels).
 - **Forge, by hand** (`src/game/forge.ts`, `docs/FORGE-STADIUM.md`): pinch the small anvil and
   the arena turns into the forge: its floor sinks, an anvil rises at the near third of the bowl
   with your top on it, four drawer tabs slide out of the near rim (Ring, Core, Tip, Style) and a
