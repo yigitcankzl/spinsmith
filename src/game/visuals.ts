@@ -1613,10 +1613,13 @@ export class Label {
   private text = '';
 
   constructor(width = 0.22) {
-    this.canvas.width = 512;
-    this.canvas.height = 160;
+    // Drawn at twice the old resolution (about 30 texels a degree at the far rim) and filtered at
+    // grazing angles, so the lower line stays sharp on the headset.
+    this.canvas.width = 1024;
+    this.canvas.height = 320;
     this.tex = new CanvasTexture(this.canvas);
     this.tex.colorSpace = SRGBColorSpace;
+    this.tex.anisotropy = 4;
     this.mesh = new Mesh(
       new PlaneGeometry(width, (width * 160) / 512),
       new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }),
@@ -1628,10 +1631,11 @@ export class Label {
     return this.text;
   }
 
-  /** Each frame: a new message fades in over 0.16 s. */
-  update(dt: number) {
+  /** Each frame: a new message fades in over 0.16 s; while something else holds the eye (a stamp), it steps back. */
+  update(dt: number, dim = false) {
     const m = this.mesh.material as MeshBasicMaterial;
-    if (m.opacity < 1) m.opacity = Math.min(1, m.opacity + dt / 0.16);
+    const target = dim ? 0.2 : 1;
+    m.opacity += Math.max(-dt / 0.15, Math.min(dt / 0.16, target - m.opacity));
   }
 
   set(text: string) {
@@ -1646,24 +1650,43 @@ export class Label {
       if (text) playTick();
     }
     const g = this.canvas.getContext('2d')!;
-    g.clearRect(0, 0, 512, 160);
+    const W = 1024;
+    const H = 320;
+    g.clearRect(0, 0, W, H);
     if (!text) return;
-    glass(g, 512, 160, ORANGE);
+    glass(g, W, H, ORANGE);
     g.fillStyle = TEXT;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    const lines = text.split('\n');
-    // The headline always reads bigger than the line under it.
-    let head = 56;
-    lines.forEach((line, i) => {
-      // Shrink each line until it fits the card.
-      let size = i === 0 ? 56 : Math.min(34, head - 8);
-      // The two loaded weights (ui.ts loadFonts): bold for the headline, semibold below.
-      const weight = i === 0 ? '700 ' : '600 ';
-      do g.font = `${weight}${size--}px ${FONT}`;
-      while (g.measureText(line).width > 470 && size > 12);
-      if (i === 0) head = size + 1;
-      g.fillText(line, 256, 80 + (i - (lines.length - 1) / 2) * 58);
+    // The headline (bold) never shrinks below 84 px and the lines under it (semibold) below 56 px:
+    // a line too long for that wraps instead of turning into a hairline. At most three lines.
+    const fit = (line: string, weight: string, from: number, floor: number) => {
+      let size = from;
+      do g.font = `${weight} ${size--}px ${FONT}`;
+      while (g.measureText(line).width > 940 && size > floor);
+      return size + 1;
+    };
+    const wrap = (line: string, weight: string, size: number): string[] => {
+      g.font = `${weight} ${size}px ${FONT}`;
+      if (g.measureText(line).width <= 940) return [line];
+      const words = line.split(' ');
+      let cut = words.length - 1;
+      while (cut > 1 && g.measureText(words.slice(0, cut).join(' ')).width > 940) cut--;
+      return [words.slice(0, cut).join(' '), words.slice(cut).join(' ')];
+    };
+    const [first, ...rest] = text.split('\n');
+    const head = fit(first, '700', 112, 84);
+    const body = Math.min(68, head - 16);
+    const lines: [string, string, number][] = wrap(first, '700', head).map((part) => [part, '700', head]);
+    for (const r of rest) {
+      const size = fit(r, '600', body, 56);
+      for (const part of wrap(r, '600', size)) lines.push([part, '600', size]);
+    }
+    const shown = lines.slice(0, 3);
+    const gap = shown.length === 3 ? 92 : 116;
+    shown.forEach(([line, weight, size], i) => {
+      g.font = `${weight} ${size}px ${FONT}`;
+      g.fillText(line, W / 2, H / 2 + (i - (shown.length - 1) / 2) * gap);
     });
     this.tex.needsUpdate = true;
   }

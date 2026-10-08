@@ -9,10 +9,20 @@ Working memory for the overnight RC pass. Local commits only: no push, no deploy
 - Screenshots: docs/night/baseline/01-09.
 - Reports: running (arenas, tops, shaping) -> /tmp/ed/base-*.txt.
 
-## Reviewer findings
-(pending: competition judge, game director, XR art/tech director)
+## Reviewer findings (docs/night/REVIEW-JUDGE.md, REVIEW-DIRECTOR.md, REVIEW-XR.md)
+- Judge: (1 crit) no hosted link / no Quest measurement [owner]; (2 high) UI outside comfortable view, tiny sub-lines, WORKSHOP plaque over anvil; (3 high) a pinch on the result card skips it and starts a launch (also via replay skip); (4 med) forge does not read (overlapping tip names, empty label); (5 med) room moments need Space Setup labels [docs].
+- Director: (1 high) rivals/arenas never ask for a build change (tips name moves, not parts; no next rival/arena at the forge); (2 high) OUTLAST (64-84% of rounds) gives no reason; (3 med-high) the loss tip is gone by the time you are home; (4 med) Chisel -> Spur lesson invisible; (5 low) README says random rival builds.
+- XR: (1 high) everything piles up above the far rim (card, bar, stamp, seal, portal, report); (2 high) the card is blurry and long lines shrink to hairlines (512x160 canvas, grid); (3 med, Quest) depth-test-off markers draw over real hands; (4 med, Quest) frame time unmeasured, fallback one-way; (5 med-low) per-frame garbage in forge/updateShapes/match bar/rim tabs.
 
 ## Decisions
+- A. Fix the result-pinch skip (judge 3; code evidence; reproduce in runtime first).
+- B. Card legibility and the far-rim pile (XR 1+2, judge 2): bigger canvas, a floor on the second line, no grid, the card fades while a stamp shows.
+- C. Why you won or lost, and what to forge (director 1-3, judge 4): an OUTLAST reason line, rival tips that name a part, the loss tip kept in the home report, a forge line with the part's effect and the next rival.
+- D. Placement: WORKSHOP plaque off the anvil; workshop tab row inside the view (judge 2, earlier playthroughs).
+- E. Per-frame garbage in the forge and match bar (XR 5; code evidence; cheap).
+- F. Docs: README rival line (director 5); Space Setup step 0 in the testing notes (judge 5).
+- Not now: new table detection, Chisel retune, matchup predictor, IWSDK fork for bundle, two-step perf fallback (Quest data first).
+
 ## Active work
 ## Tests
 ## Commits

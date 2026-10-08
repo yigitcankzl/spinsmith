@@ -723,7 +723,8 @@ export class MatchSystem extends createSystem({
       for (const m of this.pinchRings) m.visible = false;
       return;
     }
-    this.label.update(Math.min(delta, 0.1));
+    // The card steps back while a stamp holds the far rim (one thing there at a time).
+    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible);
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
       for (const o of [this.label.mesh, this.bar.mesh, this.menuButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
@@ -1265,6 +1266,11 @@ export class MatchSystem extends createSystem({
     const r = this.replay!;
     const was = r.t;
     r.t += dt;
+    // A pinch skips it, even before it starts.
+    if (this.hands.left.justPinched || this.hands.right.justPinched) {
+      this.replay = null;
+      return;
+    }
     if (r.t < 0) {
       // Not yet: the real tops are still showing the finish.
       this.ghosts[0].state = this.mine.state;
@@ -2222,7 +2228,12 @@ export class MatchSystem extends createSystem({
     }
     if (!pick) return;
     const h = this.hands[pick];
-    if (this.phase === 'result') this.toReady();
+    // On the result card a pinch only moves on (to the next round's ready); it never also grabs the
+    // rip cord, and while a replay plays it only skips the replay.
+    if (this.phase === 'result') {
+      if (!this.replay) this.toReady();
+      return;
+    }
     // Pinched over the arena: your top goes to that spot and launches from there; elsewhere it
     // launches from its usual spot near you.
     const l = this.toLocal(h.pinch);

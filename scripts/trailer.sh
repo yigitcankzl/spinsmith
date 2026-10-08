@@ -43,7 +43,7 @@ if [ -z "${CUT_ONLY:-}" ]; then
   rec 06-forge.mp4 '["tap","forge"]' '["wait",2.5]' '["drag","Saw","top"]' '["wait",1]' '["drag","top","quench"]' '["wait",3]'
   # 7. A won match.
   sleep 3; home
-  rec 07-match-win.mp4 '["tap","play"]' '["wait",3.5]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",5.5]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",10]'
+  rec 07-match-win.mp4 '["tap","play"]' '["wait",3.5]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",11]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",10]'
 fi
 
 # The cut: title cards between trimmed shots, every shot labelled as emulator footage.

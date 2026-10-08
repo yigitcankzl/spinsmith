@@ -20,7 +20,7 @@ export async function loadFonts() {
   await Promise.all(faces.map((f) => f.load().then((loaded) => document.fonts.add(loaded)).catch(() => undefined)));
 }
 
-export const GLASS = 'rgba(9, 13, 21, 0.86)';
+export const GLASS = 'rgba(9, 13, 21, 0.9)';
 export const GLASS_LIGHT = 'rgba(22, 30, 44, 0.9)';
 export const ORANGE = '#ff8a2a';
 /** Cyan belongs to the rival; neutral UI accents use steel. */
@@ -44,7 +44,7 @@ export function chamfer(g: CanvasRenderingContext2D, x: number, y: number, w: nu
 }
 
 /**
- * Paints a glass panel filling the canvas: tinted fill, a faint grid, a thin edge, short bright
+ * Paints a glass panel filling the canvas: tinted fill, a soft sheen, a thin edge, short bright
  * accents on two opposite corners and a steel rivet in each of the other two. Every SpinSmith
  * sign (match bar, notes, cards, buttons) is this panel.
  */
@@ -61,25 +61,6 @@ export function glass(g: CanvasRenderingContext2D, w: number, h: number, accent 
   sheen.addColorStop(0.4, 'rgba(255,255,255,0)');
   g.fillStyle = sheen;
   g.fill();
-  // A faint grid.
-  g.save();
-  g.clip();
-  g.strokeStyle = 'rgba(120, 160, 220, 0.06)';
-  g.lineWidth = 1;
-  const step = Math.max(24, Math.round(h / 14));
-  for (let x = 0; x < w; x += step) {
-    g.beginPath();
-    g.moveTo(x, 0);
-    g.lineTo(x, h);
-    g.stroke();
-  }
-  for (let y = 0; y < h; y += step) {
-    g.beginPath();
-    g.moveTo(0, y);
-    g.lineTo(w, y);
-    g.stroke();
-  }
-  g.restore();
   chamfer(g, m, m, w - 2 * m, h - 2 * m, c);
   g.strokeStyle = 'rgba(160, 190, 230, 0.35)';
   g.lineWidth = 2;
