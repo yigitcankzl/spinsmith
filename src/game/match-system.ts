@@ -750,7 +750,7 @@ export class MatchSystem extends createSystem({
     // On the result card and at home, the card steps back while a stamp holds the far rim (one
     // thing there at a time); in a fight its instructions (a tell, strike now) stay at full strength.
     // On the result the stamp takes the card's place, so the card steps away entirely.
-    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible && (this.phase === 'result' || this.phase === 'hub' || this.phase === 'ready'), this.phase === 'result' ? 0 : 0.2);
+    this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible && (this.phase === 'result' || this.phase === 'hub' || this.phase === 'ready' || this.phase === 'fight'), this.phase === 'result' || this.phase === 'fight' || this.phase === 'ready' ? 0 : 0.2);
     this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
@@ -1930,7 +1930,8 @@ export class MatchSystem extends createSystem({
     this.bar.mesh.position.y = (0.05 + lift) * grow;
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
     // The result's stamp stands in the card's slot above the bar, leaving the arena and the winner in view.
-    if (this.phase === 'result') this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y, this.label.mesh.position.z + 0.01);
+    // In a bout every stamp stands in the card's slot above the bar, never over the tops in play.
+    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y, this.label.mesh.position.z + 0.01);
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
@@ -2224,6 +2225,7 @@ export class MatchSystem extends createSystem({
   }
 
   private toReady() {
+    this.trails.clear();
     if (this.phase === 'placing') return;
     this.readySince = this.time;
     this.matchOver = false;
@@ -3175,7 +3177,7 @@ export class MatchSystem extends createSystem({
         // A won match: sparks run round the rim for a moment.
         if (youWon) {
           this.celebrate = 1.6;
-          this.pillar.play(maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), TEAM_MINE);
+          if (COMFORT.flashes) this.pillar.play(this.arena.layout, maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), TEAM_MINE);
           // The win leaves the machine: a warm ring rolls out across your room.
           if (COMFORT.flashes) this.roomLight.wave();
         } else if (COMFORT.flashes) {
@@ -3238,11 +3240,13 @@ export class MatchSystem extends createSystem({
     // A ghost hand shows the move: the rip at the first launch, the ramp in the first fight.
     let ghost = false;
     // The first hub: the ghost hand picks your top off its stand and carries it into the arena.
-    const from = this.phase === 'hub' && g === 'launch' && !this.demo ? this.hub.ghostFrom() : null;
-    if (from) {
+    const dock = this.phase === 'hub' && g === 'launch' && !this.demo ? this.hub.ghostFrom() : null;
+    if (dock) {
+      // The beacon is in the hub's space; the ghost lives in the stage's (scaled in the hub).
+      const from = this.ghost.root.parent!.worldToLocal(this.hub.root.localToWorld(this.p.copy(dock)));
       const top = from.y + 0.03;
       const h = this.arena.height(0, 0);
-      this.ghost.play([[0, from.x, top + 0.04, from.z, 0], [0.5, from.x, top, from.z, 0], [0.75, from.x, top, from.z, 1], [1.8, 0, h + 0.05, 0, 1], [2.1, 0, h + 0.015, 0, 1], [2.3, 0, h + 0.015, 0, 0], [3, 0, h + 0.06, 0, 0]], this.frameDt);
+      this.ghost.play([[0, from.x, top + 0.04, from.z, 0], [0.5, from.x, top, from.z, 0], [0.75, from.x, top, from.z, 1], [1.8, 0, h + 0.04, 0, 1], [2.1, 0, h + 0.012, 0, 1], [2.3, 0, h + 0.012, 0, 0], [3, 0, h + 0.05, 0, 0]], this.frameDt);
       ghost = true;
     }
     if (ready) {
@@ -3313,7 +3317,7 @@ export class MatchSystem extends createSystem({
     if (award.levels.length) {
       playLevelUp();
       for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
-      this.pillar.play(maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), 0xffd34a);
+      if (COMFORT.flashes) this.pillar.play(this.arena.layout, maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), 0xffd34a);
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
       this.stamp.later(`LEVEL ${this.progress.level}!`, this.progress.rank.toUpperCase(), 'mine', 1.2, 1.5);
     }

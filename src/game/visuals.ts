@@ -1698,6 +1698,8 @@ export class Label {
     // The card's body fades with it.
     (this.slab.material as MeshStandardMaterial).opacity = m.opacity;
     (this.strip.material as MeshBasicMaterial).opacity = m.opacity;
+    // Faded right out (the result's stamp has its place): not drawn at all.
+    this.mesh.visible = this.text.length > 0 && (m.opacity > 0.01 || target > 0);
   }
 
   set(text: string) {
@@ -1868,6 +1870,7 @@ export class Trails {
   private size = new Float32Array(Trails.PER * 2);
   private at = new Float32Array(Trails.PER * 2 * 3);
   private next = [0, 0];
+  private newest = 9;
   private readonly m = new Matrix4();
   private readonly v = new Vector3();
   private readonly s = new Vector3();
@@ -1880,6 +1883,7 @@ export class Trails {
       Trails.PER * 2,
     );
     this.mesh.frustumCulled = false;
+    this.mesh.visible = false;
     const colors = [new Color(0xff8a2a).multiplyScalar(0.9), new Color(0x4fd1ff).multiplyScalar(0.8)];
     for (let i = 0; i < Trails.PER * 2; i++) {
       this.mesh.setColorAt(i, colors[i < Trails.PER ? 0 : 1]);
@@ -1893,14 +1897,22 @@ export class Trails {
     this.next[side] = (this.next[side] + 1) % Trails.PER;
     this.age[i] = 0;
     this.size[i] = 0.01 + Math.min(0.014, speed * 0.03);
-    this.at.set([x, y + 0.0015, z], i * 3);
+    this.at[i * 3] = x;
+    this.at[i * 3 + 1] = y + 0.0015;
+    this.at[i * 3 + 2] = z;
+    this.newest = 0;
   }
 
   clear() {
     this.age.fill(9);
+    this.newest = 9;
   }
 
   update(dt: number) {
+    // Nothing to draw once every dot has faded (outside fights): no draw call, no upload.
+    this.newest += dt;
+    this.mesh.visible = this.newest < 0.45;
+    if (!this.mesh.visible) return;
     for (let i = 0; i < Trails.PER * 2; i++) {
       this.age[i] += dt;
       const k = Math.max(0, 1 - this.age[i] / 0.45);
@@ -1938,13 +1950,21 @@ export class Pillar {
   );
   private t = -1;
 
+  private sx = 1;
+  private sz = 1;
+
   constructor() {
     this.mesh.visible = false;
+    // Drawn before the other see-through things, so the match bar and cards stay readable over it.
+    this.mesh.renderOrder = -1;
   }
 
-  play(rim: number, y: number, color: number) {
+  /** Rises round an arena of this layout (its rim `rim` from the center, oval and square shapes followed). */
+  play(layout: ArenaLayout, rim: number, y: number, color: number) {
     this.t = 0;
-    this.mesh.scale.set(rim, 0.001, rim);
+    this.sx = rim * (layout.shape === 'square' ? 1.12 : 1);
+    this.sz = rim * (layout.shape === 'oval' ? 0.78 : layout.shape === 'square' ? 1.12 : 1);
+    this.mesh.scale.set(this.sx, 0.001, this.sz);
     this.mesh.position.y = y;
     (this.mesh.material as MeshBasicMaterial).color.set(color).multiplyScalar(1.4);
     this.mesh.visible = true;
@@ -1955,8 +1975,8 @@ export class Pillar {
     this.t += dt;
     const up = Math.min(1, this.t / 0.4);
     const fade = Math.max(0, (this.t - 0.4) / 0.8);
-    this.mesh.scale.y = 0.16 * (1 - (1 - up) ** 3);
-    (this.mesh.material as MeshBasicMaterial).opacity = 0.8 * Math.min(1, this.t / 0.1) * (1 - fade);
+    this.mesh.scale.y = 0.12 * (1 - (1 - up) ** 3);
+    (this.mesh.material as MeshBasicMaterial).opacity = 0.7 * Math.min(1, this.t / 0.1) * (1 - fade);
     if (fade >= 1) {
       this.t = -1;
       this.mesh.visible = false;
