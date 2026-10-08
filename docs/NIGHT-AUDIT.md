@@ -21,20 +21,23 @@ Working memory for the overnight RC pass. Local commits only: no push, no deploy
 - D. Placement: WORKSHOP plaque off the anvil; workshop tab row inside the view (judge 2, earlier playthroughs).
 - E. Per-frame garbage in the forge and match bar (XR 5; code evidence; cheap).
 - F. Docs: README rival line (director 5); Space Setup step 0 in the testing notes (judge 5).
+- G. Shape marks and the ray reticle depth-tested (real hands cover them; XR 3).
 - Not now: new table detection, Chisel retune, matchup predictor, IWSDK fork for bundle, two-step perf fallback (Quest data first).
 
 ## Active work
-- D (placement) next; C under red-team.
+- A-G done and red-teamed; final gates next.
 
 ## Tests (latest)
 - typecheck pass; check:sim all passed; build pass (f062546, d30cc7c).
+- E red-team: forge hover hint drawn a frame late, friend line on bad codes, replay skip cutting the finish stamp: fixed (1812b01). Stamp queue spilling rewards into home/ready kept (dimmed card, the player still sees the reward).
+- Runtime: forge hover shows the part's line (Halo, Gale); marks hidden under the hand (docs/night/after-G-marks-under-hand.png).
 - Runtime: result -> pinch -> ready (was pulling), then a rip launches; forge card shows "Next: Leech, ..."; OUTLAST card shows its reason; 299 label strings fit (harness /tmp/lbl).
 
 ## Commits
-- cb4fbe3 baseline audit. f062546 result-pinch fix + card legibility (red-team: text fit failed -> fixed in d30cc7c). d30cc7c why you won/lost + forge guidance + label layout rewrite.
+- cb4fbe3 baseline audit. f062546 result-pinch fix + card legibility (red-team: text fit failed -> fixed in d30cc7c). d30cc7c why you won/lost + forge guidance + label layout rewrite. 58ee030 D placement. 582435a E per-frame garbage + C red-team fixes. 274382b F docs. cc6d697 G depth-tested marks. 1812b01 E red-team fixes.
 
 ## Next step
-- D: WORKSHOP plaque off the anvil, workshop tab row inside the view; then E per-frame garbage; F docs.
+- Final gates: all reports, build, clean-save first session, match/forge/workshop flows, reload persistence, screenshots, draw calls vs baseline.
 ## Quest-only / owner blockers
 - Hand-tracking reliability, slap/press thresholds, table height and reach, passthrough look, hand overlap, long comfort, real fps on Quest 3/3S.
 - Hosting (fixed HTTPS URL), store packaging and dashboard, team details, video upload.
