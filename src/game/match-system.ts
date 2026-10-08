@@ -4,7 +4,8 @@ import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
-import { titleMesh } from './ui.js';
+import { addStem, titleMesh } from './ui.js';
+import { TABLE_Y } from './reach.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
@@ -572,7 +573,9 @@ export class MatchSystem extends createSystem({
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
     this.menuButton.mesh.position.set(-0.2, 0.05, 0.14);
-    this.menuButton.mesh.rotation.y = 0.4;
+    // Leaning back on a post down to the table, like the machine's other signs.
+    this.menuButton.mesh.rotation.set(-0.5, 0.4, 0, 'YXZ');
+    addStem(this.menuButton.mesh, 0.026, 0.05 - TABLE_Y - 0.026 * 0.45, -0.5);
     this.menuButton.set('Menu');
     this.menuButton.mesh.visible = false;
     this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];

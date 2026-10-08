@@ -2,7 +2,7 @@
  * The look of every panel, card and button: dark tinted glass with cut corners, thin glowing edges
  * (orange for SpinSmith and the player, steel for neutral UI; cyan is kept for the rival) and light, spaced lettering.
  */
-import { CanvasTexture, ExtrudeGeometry, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, Shape, SRGBColorSpace } from '@iwsdk/core';
+import { CanvasTexture, CylinderGeometry, ExtrudeGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, Shape, SRGBColorSpace } from '@iwsdk/core';
 
 /** The one display font of every panel, card and label (Rajdhani, SIL OFL, in public/fonts). */
 export const FONT = 'Rajdhani, system-ui, sans-serif';
@@ -189,7 +189,21 @@ export function engrave(g: CanvasRenderingContext2D, text: string, x: number, y:
   g.fillText(text, x, y);
 }
 
-const SLAB = new MeshStandardMaterial({ color: 0x2b2f37, metalness: 0.6, roughness: 0.38 });
+/** A slab material: graphite whose glancing edges catch a warm rim light, like machined metal. */
+export function slabMaterial(): MeshStandardMaterial {
+  const m = new MeshStandardMaterial({ color: 0x2b2f37, metalness: 0.6, roughness: 0.28 });
+  m.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      `float rimLight = pow(1.0 - saturate(abs(dot(normalize(vNormal), normalize(vViewPosition)))), 3.0);
+      outgoingLight += vec3(1.0, 0.62, 0.32) * rimLight * 0.55;
+      #include <opaque_fragment>`,
+    );
+  };
+  m.customProgramCacheKey = () => 'slab-rim';
+  return m;
+}
+const SLAB = slabMaterial();
 
 /**
  * Gives a sign a body: its cut-corner outline as a bevelled graphite slab `depth` thick, set just
@@ -221,4 +235,21 @@ export function addSlab(sign: Object3D, width: number, height: number, cut = 0.0
   slab.name = 'slab';
   sign.add(slab);
   return slab;
+}
+
+/**
+ * Stands a plate on the table: a graphite post from its lower edge straight down `length` (in the
+ * plate's own units) to a round foot. `tilt` is the plate's lean back (its rotation about X), undone
+ * so the post stays upright.
+ */
+export function addStem(sign: Object3D, height: number, length: number, tilt = 0) {
+  const pivot = new Group();
+  pivot.position.set(0, -height * 0.45, -0.004);
+  pivot.rotation.x = -tilt;
+  const stem = new Mesh(new CylinderGeometry(0.0028, 0.0034, length, 10), SLAB);
+  stem.position.y = -length / 2;
+  const foot = new Mesh(new CylinderGeometry(0.011, 0.013, 0.004, 20), SLAB);
+  foot.position.y = -length + 0.002;
+  pivot.add(stem, foot);
+  sign.add(pivot);
 }

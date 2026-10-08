@@ -24,9 +24,9 @@ import {
 } from '@iwsdk/core';
 import { arenaWarning } from './arena-report.js';
 import type { ArenaReport } from './arena-report.js';
-import { addSlab, engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
+import { addSlab, addStem, engrave, FONT, glass, GLASS_LIGHT, metalPlate, ORANGE, STEEL as UI_STEEL, TEXT } from './ui.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
-import { ARENA_SCALE, RAIL, TAB_LINE, WORKSHOP_TAB_GAP } from './reach.js';
+import { ARENA_SCALE, RAIL, TABLE_Y, TAB_LINE, WORKSHOP_TAB_GAP } from './reach.js';
 import { miniArena } from './visuals.js';
 import { playDrawer, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import type { HandState } from './hands.js';
@@ -453,6 +453,8 @@ export class Builder {
     this.dial.mesh.name = 'workshop-check';
     this.dial.mesh.position.copy(PLATE_AT);
     this.dial.mesh.rotation.x = -0.3;
+    // On a post down to the table behind the arena.
+    addStem(this.dial.mesh, 0.108, PLATE_AT.y - TABLE_Y - 0.108 * 0.45, -0.3);
     this.root.add(this.tools, this.plateGroup, this.dial.mesh, this.guides);
     this.showTab(0, false);
     this.root.visible = false;
@@ -514,11 +516,17 @@ export class Builder {
     // Hover feedback: pieces under a pointer lift and turn, plates light up.
     let hovered: Slot | null = null;
     let hoveredPlate = -1;
+    let plateGap = 1;
     for (const h of pointers) {
       if (!h.tracked) continue;
       hovered ??= this.slotUnder(h);
-      if (hoveredPlate < 0) hoveredPlate = this.plateUnder(h);
+      if (hoveredPlate < 0) {
+        hoveredPlate = this.plateUnder(h);
+        plateGap = h.gap;
+      }
     }
+    this.plates.cursor(hoveredPlate < DRAWERS ? hoveredPlate : -1, plateGap);
+    this.actions.cursor(hoveredPlate >= DRAWERS ? hoveredPlate - DRAWERS : -1, plateGap);
     this.tabT += dt;
     const shown = this.slots.filter((s) => s.tab === this.tab);
     for (const s of shown) {

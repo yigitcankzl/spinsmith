@@ -49,7 +49,7 @@ import forgeArenaShell, { FORGE_SHELL_HEIGHT } from '../scene-assets/forge-arena
 import type { ArenaLayout, Theme, Wall } from './layout.js';
 import { rimRadius } from './layout.js';
 import { Arena, RAMP_SIGMA, Top, WELL_SIGMA } from './sim.js';
-import { addSlab, FONT, glass, ORANGE, TEXT } from './ui.js';
+import { addSlab, FONT, glass, ORANGE, slabMaterial, TEXT } from './ui.js';
 import { coreOf, EMBLEM_COLORS, ringOf } from './parts.js';
 import { ARENA_SCALE, TABLE_Y } from './reach.js';
 import { insidePoly } from './room.js';
@@ -1644,7 +1644,8 @@ export class Label {
       new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }),
     );
     this.slab = addSlab(this.mesh, width, (width * 160) / 512);
-    this.slab.material = (this.slab.material as MeshStandardMaterial).clone();
+    // Its own copy: it fades with the card.
+    this.slab.material = slabMaterial();
     (this.slab.material as MeshStandardMaterial).transparent = true;
     // A lit strip along the card's lower edge, like the light bar of a machine's display.
     this.strip = new Mesh(new BoxGeometry(width * 0.5, 0.0016, 0.002), new MeshBasicMaterial({ color: new Color(ORANGE).multiplyScalar(1.6), toneMapped: false, transparent: true }));

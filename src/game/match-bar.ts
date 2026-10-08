@@ -105,7 +105,7 @@ export class MatchBar {
       g.lineWidth = 3;
       g.strokeRect(dir === 1 ? x0 : x0 - barW, barY, barW, 60);
       g.fillStyle = TEXT;
-      g.font = `700 56px ${FONT}`;
+      g.font = `700 66px ${FONT}`;
       g.textAlign = dir === 1 ? 'left' : 'right';
       g.textBaseline = 'middle';
       // Clear of the plate's corner bolts.

@@ -3,13 +3,15 @@
  * rims. Tabs and buttons engraved on metal plates along the near rim, the staggered pop of a
  * drawer's items, and the dial plate on the far rim.
  */
-import { BufferAttribute, BufferGeometry, CanvasTexture, CylinderGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, MeshMatcapMaterial, MeshStandardMaterial, PlaneGeometry, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from '@iwsdk/core';
+import { AdditiveBlending, BufferAttribute, BufferGeometry, CanvasTexture, Color, CylinderGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, MeshMatcapMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, RingGeometry, SphereGeometry, SRGBColorSpace, TorusGeometry, Vector3 } from '@iwsdk/core';
 import { makeMatcap, mergeByMaterial } from './visuals.js';
 import { addSlab, engrave, FONT, metalPlate, ORANGE, STEEL, TEXT, TEXT_DIM } from './ui.js';
 
 /** Where a drawer's i-th item is in its pop-in, 0..1, t seconds after the drawer opened. */
 export function popIn(t: number, i: number): number {
-  return Math.min(1, Math.max(0, (t - i * 0.05) / 0.2));
+  const u = Math.min(1, Math.max(0, (t - i * 0.05) / 0.24));
+  // Eased out with a small overshoot, so a part lands with a little bounce.
+  return 1 + 2.4 * (u - 1) ** 3 + 1.4 * (u - 1) ** 2;
 }
 
 export interface TabSpot {
@@ -44,7 +46,14 @@ export class RimTabs {
   private key = '';
   /** Keys travel: each tab's press depth now (m along its face normal), its normal, and the rest pose. */
   private depth: number[];
+  private speed: number[];
   private normals: Vector3[] = [];
+  private turns: Quaternion[] = [];
+  /** The pinch cursor: a ring on the key pointed at that tightens as the fingers close. */
+  private ring = new Mesh(
+    new RingGeometry(0.0078, 0.0095, 40),
+    new MeshBasicMaterial({ color: new Color(ORANGE).multiplyScalar(1.5), transparent: true, blending: AdditiveBlending, depthWrite: false, toneMapped: false }),
+  );
   private keys!: Mesh;
   private restPlate!: Float32Array;
   private restKeys!: Float32Array;
@@ -60,6 +69,7 @@ export class RimTabs {
   ) {
     const n = labels.length;
     this.depth = labels.map(() => 0);
+    this.speed = labels.map(() => 0);
     this.canvas.width = 256 * n;
     this.canvas.height = Math.round((256 * height) / width);
     this.tex = new CanvasTexture(this.canvas);
@@ -97,12 +107,27 @@ export class RimTabs {
       addSlab(key, width, height, 0.06, 0.006);
       keys.add(key);
       this.normals.push(new Vector3(0, 0, 1).applyMatrix4(m.setPosition(0, 0, 0)).normalize());
+      this.turns.push(new Quaternion().setFromRotationMatrix(m));
     });
     const merged = mergeByMaterial(keys);
     this.keys = merged.children[0] as Mesh;
     this.mesh.add(merged);
+    this.ring.visible = false;
+    this.ring.renderOrder = 4;
+    this.mesh.add(this.ring);
     this.restPlate = (geo.getAttribute('position').array as Float32Array).slice();
     this.restKeys = (this.keys.geometry.getAttribute('position').array as Float32Array).slice();
+  }
+
+  /** Shows the pinch cursor on key i (-1 hides it); gap is the thumb-to-index distance (m). */
+  cursor(i: number, gap: number) {
+    this.ring.visible = i >= 0 && i < this.spots.length;
+    if (!this.ring.visible) return;
+    const close = 1 - Math.min(1, Math.max(0, (gap - 0.012) / 0.05));
+    this.ring.position.copy(this.spots[i].at).addScaledVector(this.normals[i], this.depth[i] + 0.0012);
+    this.ring.quaternion.copy(this.turns[i]);
+    this.ring.scale.setScalar(1 - 0.55 * close);
+    (this.ring.material as MeshBasicMaterial).opacity = 0.35 + 0.65 * close;
   }
 
   /** Moves each key toward its travel: the open drawer sits pressed in, the one pointed at rises to meet the finger. */
@@ -113,9 +138,13 @@ export class RimTabs {
     let moved = false;
     looks.forEach((l, i) => {
       const target = l.on ? -0.0035 : l.hover ? 0.002 : 0;
-      const next = this.depth[i] + (target - this.depth[i]) * Math.min(1, dt * 18);
+      // A damped spring: a key bottoms out and springs back a little past rest.
+      this.speed[i] = (this.speed[i] + (target - this.depth[i]) * 900 * dt) * Math.exp(-dt * 20);
+      const next = this.depth[i] + this.speed[i] * dt;
       if (Math.abs(next - this.depth[i]) > 1e-6) moved = true;
-      this.depth[i] = Math.abs(next - target) < 1e-5 ? target : next;
+      const settled = Math.abs(next - target) < 1e-5 && Math.abs(this.speed[i]) < 1e-4;
+      this.depth[i] = settled ? target : next;
+      if (settled) this.speed[i] = 0;
     });
     if (!moved) return;
     const n = this.labels.length;
@@ -231,7 +260,7 @@ export class DialPlate {
     this.gauges.add(mergeByMaterial(raw));
   }
 
-  draw(title: string, subtitle: string, dials: Dial[], message: string, subtitleColor = '#b4bfd0') {
+  draw(title: string, subtitle: string, dials: Dial[], message: string, subtitleColor = '#c9d3e0') {
     const key = JSON.stringify([title, subtitle, dials, message, subtitleColor]);
     if (key === this.key) return;
     this.key = key;
@@ -244,7 +273,7 @@ export class DialPlate {
     g.textAlign = 'center';
     g.font = `700 64px ${FONT}`;
     engrave(g, title.toUpperCase(), W / 2, 62, TEXT);
-    g.font = `600 46px ${FONT}`;
+    g.font = `600 52px ${FONT}`;
     engrave(g, subtitle, W / 2, 116, subtitleColor);
     const R = 74;
     dials.forEach((d, i) => {
@@ -288,8 +317,8 @@ export class DialPlate {
       g.beginPath();
       g.arc(cx, cy, 9, 0, Math.PI * 2);
       g.fill();
-      g.font = `700 40px ${FONT}`;
-      engrave(g, d.label, cx, cy + R + 36, STEEL);
+      g.font = `700 54px ${FONT}`;
+      engrave(g, d.label, cx, cy + R + 40, STEEL);
     });
     // What just happened, or what to do next.
     let size = 44;

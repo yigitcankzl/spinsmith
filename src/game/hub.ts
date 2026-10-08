@@ -288,7 +288,7 @@ export class Hub {
       const station = it.action.kind === 'play' || it.action.kind === 'forge' || it.action.kind === 'workshop';
       if (it.name) it.name.visible = !this.photoMode && ((!it.quiet && (this.teaching || station)) || on);
       const p = popIn(this.time - this.shownAt, i);
-      const k = (on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1) * Math.max(0.001, p * p * (3 - 2 * p));
+      const k = (on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1) * Math.max(0.001, p);
       it.model.scale.setScalar(k);
       if (it.carry) it.model.position.set(it.home.x, it.home.y + (on ? 0.01 : 0), it.home.z);
     });

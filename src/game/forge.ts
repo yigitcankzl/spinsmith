@@ -31,7 +31,7 @@ import {
 import { playDrawer, playLocked, playMachine, playPick, playPlace, playRemove } from './audio.js';
 import { unlockHint } from './progress.js';
 import type { Progress } from './progress.js';
-import { ORANGE, TEXT_DIM } from './ui.js';
+import { addStem, ORANGE, TEXT_DIM } from './ui.js';
 import { tag } from './builder.js';
 import { DialPlate, popIn, RimTabs, rimSlot, rowSpots } from './rim.js';
 import { TAB_LINE, traySpot, WORK as REACH_WORK } from './reach.js';
@@ -261,7 +261,9 @@ export class Forge {
     this.stats.mesh.name = 'forge-stats';
     this.stats.mesh.position.copy(STATS_AT);
     this.stats.mesh.rotation.set(-0.15, -0.35, 0, 'YXZ');
-    this.stats.mesh.scale.setScalar(0.62);
+    this.stats.mesh.scale.setScalar(0.75);
+    // On a post down to the rim, not floating.
+    addStem(this.stats.mesh, 0.108, (STATS_AT.y - 0.108 * 0.75 * 0.45) / 0.75, -0.15);
     this.root.add(this.anvil, this.tray, this.tabs, this.quench, this.displayHolder, this.stats.mesh);
     this.rebuildDisplay();
     this.root.visible = false;
@@ -380,12 +382,17 @@ export class Forge {
     // Hover: tray parts under a free pointer lift and turn.
     let hovered: Slot | null = null;
     let hoveredTab: Drawer | null = null;
+    let tabGap = 1;
     for (const h of pointers) {
       if (!h.tracked || h === this.heldPart?.hand || h === this.heldTop?.hand) continue;
       const t = this.under(h, false);
       if (t?.kind === 'slot') hovered ??= t.slot;
-      if (t?.kind === 'tab') hoveredTab ??= t.drawer;
+      if (t?.kind === 'tab' && !hoveredTab) {
+        hoveredTab = t.drawer;
+        tabGap = h.gap;
+      }
     }
+    this.tabPlates.cursor(DRAWERS.findIndex(([d]) => d === hoveredTab), tabGap);
     const blink = Math.floor(this.time * 4) % 2 === 0;
     this.tabPlates.draw((i) => {
       const d = DRAWERS[i][0];
