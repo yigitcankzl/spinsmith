@@ -28,7 +28,7 @@ export default async function run({ page, frame, workspaceRoot }) {
     const game = byZ('2');
     if (!room || !game) return 'canvases not found';
     const out = document.createElement('canvas');
-    out.width = 1920;
+    out.width = 2560;
     out.height = Math.round((1920 * room.height) / room.width / 2) * 2;
     const g = out.getContext('2d');
     let on = true;

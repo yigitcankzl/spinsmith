@@ -2535,7 +2535,7 @@ export class MatchSystem extends createSystem({
     }
     const armed = full && this.elapsed - this.fullSince > 0.5;
     // The print sits on the table off the near-right rim (any spot beside the arena works).
-    this.slapMark.visible = armed;
+    this.slapMark.visible = armed && !this.photo;
     if (armed) {
       const a = Math.PI / 3;
       const r = rimRadius(this.arena.layout, a) + 0.05;
