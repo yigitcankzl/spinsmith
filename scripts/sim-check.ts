@@ -198,6 +198,25 @@ TUNING.grace = 0;
   assert.ok(bursts > 0, 'full-power head-on fights must sometimes burst the stamina top');
 }
 
+// Opening grace lets tops crack, but holds them together until the player can make a move.
+{
+  const arena = new Arena();
+  arena.grace = 1;
+  const a = new Top(STAMINA);
+  const b = new Top(ATTACK);
+  const clash = () => {
+    a.launch(-0.012, 0, 0.2, 0, 1, 1);
+    b.launch(0.012, 0, -0.2, 0, 1, -1);
+    a.damage = b.damage = 0.99;
+    return step(arena, a, b);
+  };
+  assert.ok(clash(), 'the grace check needs a hard clash');
+  assert.ok(a.alive && b.alive && a.damage >= 1 && b.damage >= 1, 'grace should prevent an early burst');
+  arena.elapsed = arena.grace;
+  assert.ok(clash(), 'the post-grace check needs a hard clash');
+  assert.ok(a.finish === 'burst' || b.finish === 'burst', 'the same hit should burst after grace');
+}
+
 // 6b. Player shapes: a ramp pushes toward its direction, a well catches and braces, one live
 // shape per owner, and the shaping economy's rules.
 {
@@ -932,4 +951,3 @@ TUNING.grace = 0;
 }
 
 console.log('sim-check: all passed');
-

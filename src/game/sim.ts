@@ -1099,7 +1099,7 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
     a.spin -= flow;
     b.spin += flow;
   }
-  // Hard hits crack the top; enough damage bursts it apart.
+  // Hard hits crack the top; enough damage bursts it apart once the opening grace has passed.
   // A Hammer lands on the first solid clash after it is struck.
   const solid = impulse * 1.6 >= HAMMER_MIN;
   const hitA = solid && b.hammer > 0 ? HAMMER : 1;
@@ -1110,8 +1110,9 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   const dB = (TUNING.burst * impulse * impulse * a.spec.punch * a.spec.chip * hitB) / b.spec.burstResist;
   a.damage += hitA > 1 ? Math.max(HAMMER_FLOOR, dA) : dA;
   b.damage += hitB > 1 ? Math.max(HAMMER_FLOOR, dB) : dB;
-  if (a.damage >= 1) burstApart(a);
-  if (b.damage >= 1) burstApart(b);
+  const burstOpen = !arena || arena.elapsed >= arena.grace;
+  if (burstOpen && a.damage >= 1) burstApart(a);
+  if (burstOpen && b.damage >= 1) burstApart(b);
   return { x: a.x + nx * a.spec.radius, z: a.z + nz * a.spec.radius, strength: Math.min(1, impulse * 1.6), hammer: hitA > 1 || hitB > 1, parry: parryA > 1 || parryB > 1 };
 }
 

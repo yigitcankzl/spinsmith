@@ -108,8 +108,8 @@ const RIVAL_SHAPE_GAP = 3;
 const SLOW_MO_TIME = 0.9;
 /** Seconds the placed arena takes to forge up out of the table. */
 const RISE_TIME = 1.1;
-/** The first match's opening grace (s): no knockout before the ramp hint has shown. */
-const FIRST_GRACE = 6;
+/** Early lesson rounds stay alive long enough for the newly unlocked hand move. */
+const LESSON_GRACE = 6;
 const SLOW_MO = 0.3;
 /** A clash this strong (0..1) is a hard hit: big feedback and a 70-110 ms simulation-only hit stop. */
 const HARD_HIT = 0.6;
@@ -2623,8 +2623,8 @@ export class MatchSystem extends createSystem({
     const aiMin = 0.5 + 0.25 * skill;
     // The very first match is steadier, so its lesson (the ramp) is not lost to a wild rip.
     const first = this.progress.matches === 0 && !this.demo;
-    // The very first match holds both tops in a little longer, so its one lesson (the ramp) has time.
-    this.arena.grace = first ? FIRST_GRACE : TUNING.grace;
+    // The first three matches each teach one hand move; none should end before it can be tried.
+    this.arena.grace = !this.demo && this.progress.matches < 3 ? LESSON_GRACE : TUNING.grace;
     // Stronger rivals sometimes rip white hot too.
     const aiPower = first ? 0.7 + Math.random() * 0.1 : Math.random() < 0.5 * skill ? 1 : aiMin + Math.random() * (0.98 - aiMin);
     this.rivalHeld = 0;
