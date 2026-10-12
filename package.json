@@ -16,7 +16,8 @@
     "check:sim": "node scripts/sim-check.ts",
     "report:arenas": "node scripts/arena-report.ts",
     "report:tops": "node scripts/top-report.ts",
-    "report:shaping": "node scripts/shaping-report.ts"
+    "report:shaping": "node scripts/shaping-report.ts",
+    "capture:gameplay": "scripts/trailer.sh"
   },
   "dependencies": {
     "@iwsdk/core": "1.0.1",

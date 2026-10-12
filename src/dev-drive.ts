@@ -70,6 +70,7 @@ interface Goal {
   t: number;
   dur: number;
   pinch: number;
+  curve: 'natural' | 'linear';
   done: () => void;
 }
 
@@ -115,20 +116,15 @@ export function installDriver() {
     lastAt[side] = now;
     if (g) {
       g.t += dt;
-      const k = g.dur > 0 ? Math.min(1, g.t / g.dur) : 1;
+      const raw = g.dur > 0 ? Math.min(1, g.t / g.dur) : 1;
+      // Reaches ease in and out like a hand; fast physical gestures keep their measured speed.
+      const k = g.curve === 'natural' ? raw * raw * (3 - 2 * raw) : raw;
       aim[side] = { point: g.point, at: new Vector3().lerpVectors(g.from, typeof g.to === 'function' ? g.to() : g.to, k) };
-      if (k >= 1) {
+      if (raw >= 1) {
         goals[side] = null;
         g.done();
       }
     }
-    // What the game saw last frame: each point's offset from the root, per pinch state.
-    for (const pt of ['pinch', 'index', 'low'] as const) {
-      const o = offsets[side][lastPinch[side] > 0.5 ? 1 : 0];
-      measured(side, pt, o[pt] ?? (o[pt] = new Vector3())).sub(lastRoot[side]);
-    }
-    // Keep the steered point on its target (the fingers closing moves it): the offset from the
-    // root to that point, as the game saw it last frame.
     // What the game saw last frame: each point's offset from the root, per pinch state.
     for (const pt of ['pinch', 'index', 'low'] as const) {
       const o = offsets[side][lastPinch[side] > 0.5 ? 1 : 0];
@@ -187,21 +183,38 @@ export function installDriver() {
     await wait(0.2);
   };
 
-  const glide = async (side: Side, point: Point, to: Vector3 | (() => Vector3), dur: number, pinch = pinchNow[side]) => {
+  const glide = async (
+    side: Side,
+    point: Point,
+    to: Vector3 | (() => Vector3),
+    dur: number,
+    pinch = pinchNow[side],
+    curve: Goal['curve'] = 'natural',
+  ) => {
     await prime(side);
     return new Promise<void>((done) => {
       pinchNow[side] = pinch;
       const a = aim[side];
       const from = a && a.point === point ? a.at.clone() : measured(side, point, new Vector3());
-      goals[side] = { point, from, to: typeof to === 'function' ? to : to.clone(), t: 0, dur, pinch, done };
+      goals[side] = { point, from, to: typeof to === 'function' ? to : to.clone(), t: 0, dur, pinch, curve, done };
     });
   };
 
   const wait = (s: number) => new Promise<void>((r) => setTimeout(r, s * 1000));
+  const tweenPinch = async (side: Side, to: number, dur = 0.12) => {
+    const from = pinchNow[side];
+    const started = performance.now();
+    for (;;) {
+      const raw = Math.min(1, (performance.now() - started) / (dur * 1000));
+      const k = raw * raw * (3 - 2 * raw);
+      pinchNow[side] = from + (to - from) * k;
+      if (raw >= 1) return;
+      await wait(1 / 60);
+    }
+  };
   const setPinch = async (side: Side, on: boolean) => {
     await prime(side);
-    pinchNow[side] = on ? 1 : 0;
-    await wait(0.12);
+    await tweenPinch(side, on ? 1 : 0);
   };
 
   /** Arena-local point on the floor (plus `up`, arena units) to world. */
@@ -219,6 +232,12 @@ export function installDriver() {
     return new Vector3(x, y, z);
   };
   const above = (p: Vector3, dy: number) => p.clone().setY(p.y + dy);
+  const idlePoint = (side: Side) => {
+    const g = game();
+    const x = g.arena.radius * (side === 'left' ? -0.9 : 0.9);
+    return local(x, g.arena.radius * 1.25, 0.035);
+  };
+  const park = async (side: Side) => glide(side, 'pinch', idlePoint(side), 0.4, 0);
 
   const api = {
     /** What an agent needs to choose the next move. */
@@ -259,6 +278,7 @@ export function installDriver() {
       await wait(0.15);
       await setPinch(side, false);
       await glide(side, 'pinch', above(p, 0.08), 0.25, 0);
+      await park(side);
     },
 
     /** Pinch a named thing or point, carry it to another (or a world point), let go there. */
@@ -273,6 +293,7 @@ export function installDriver() {
       await glide(side, 'pinch', b, 0.25);
       await setPinch(side, false);
       await glide(side, 'pinch', above(b, 0.1), 0.25, 0);
+      await park(side);
     },
 
     /**
@@ -296,12 +317,13 @@ export function installDriver() {
       await setPinch(side, true);
       await wait(0.2);
       const end = start.clone().add(pull);
-      await glide(side, 'pinch', end, len / speed);
+      await glide(side, 'pinch', end, len / speed, pinchNow[side], 'linear');
       // Let go mid-motion: the release keeps the speed.
       const over = end.clone().add(pull.clone().multiplyScalar(0.15));
       pinchNow[side] = 0;
-      await glide(side, 'pinch', over, (len * 0.15) / speed, 0);
+      await glide(side, 'pinch', over, (len * 0.15) / speed, 0, 'linear');
       await wait(0.2);
+      await park(side);
     },
 
     /**
@@ -331,6 +353,7 @@ export function installDriver() {
       await glide(side, 'pinch', drag, hold);
       await setPinch(side, false);
       await glide(side, 'pinch', above(drag, 0.08), 0.2, 0);
+      await park(side);
     },
 
     /** A cup: a fingertip pressed down into the floor (fast enough to count), then lifted. at: 'rival' | 'mine' | {x, z}. */
@@ -345,9 +368,10 @@ export function installDriver() {
       };
       await glide(side, 'index', spot(0.06), 0.2, 0);
       const down = spot(-0.015)();
-      await glide(side, 'index', down, 0.12, 0);
+      await glide(side, 'index', down, 0.12, 0, 'linear');
       await wait(0.1);
       await glide(side, 'index', above(down, 0.1), 0.25, 0);
+      await park(side);
     },
 
     /** The sling: pinch the top held in your cup, pull back the other way, let go. angle: throw direction (degrees, arena frame); default out through the nearest side. */
@@ -367,6 +391,7 @@ export function installDriver() {
       await glide(side, 'pinch', back, 0.35);
       await setPinch(side, false);
       await glide(side, 'pinch', above(back, 0.08), 0.2, 0);
+      await park(side);
     },
 
     /** The strike: a palm slapped down on the table beside the arena (or, gentle, pressed and held). */
@@ -380,9 +405,10 @@ export function installDriver() {
       const spot = g.root.localToWorld(new Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)).setY(tableY);
       await glide(side, 'low', above(spot, 0.18), 0.35, 0);
       await wait(0.15);
-      await glide(side, 'low', spot, gentle ? 0.6 : 0.12, 0);
+      await glide(side, 'low', spot, gentle ? 0.6 : 0.12, 0, gentle ? 'natural' : 'linear');
       await wait(gentle ? 0.6 : 0.3);
       await glide(side, 'low', above(spot, 0.15), 0.3, 0);
+      await park(side);
     },
 
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */
@@ -390,6 +416,16 @@ export function installDriver() {
       await glide(side, point, new Vector3(...(to as [number, number, number])), dur);
     },
     pinch: setPinch,
+    /** Calibrates the emulated fingers before a recording, so the calibration pose is not filmed. */
+    async prepare() {
+      await Promise.all((['left', 'right'] as const).map((side) => prime(side)));
+      await Promise.all((['left', 'right'] as const).map((side) => park(side)));
+      await wait(0.2);
+    },
+    /** Returns one or both hands to their relaxed table-edge pose. */
+    async park(side?: Side) {
+      await Promise.all((side ? [side] : (['left', 'right'] as const)).map((s) => park(s)));
+    },
     /** Photo mode for store art: cards, buttons and stamps hidden; the hands moved out of view. */
     async photo(on = true) {
       game().photo = on;

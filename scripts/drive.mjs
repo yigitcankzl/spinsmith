@@ -20,6 +20,10 @@ export default async function run({ page, frame, workspaceRoot }) {
   if (!target) throw new Error('window.drive not found: is this a dev build in XR?');
   if (!video) return target.evaluate((s) => window.drive.run(s), steps);
 
+  // Calibrate both emulated hands before recording so the clip opens on a settled natural pose,
+  // not on the driver's one-time open/closed measurements.
+  await target.evaluate(() => window.drive.prepare());
+
   // Records what the player sees: the emulator's room (canvas z 1) with the game drawn over it
   // (canvas z 2), composited each frame; the emulator's gizmos and panels (z 3) are left out.
   const started = await target.evaluate(() => {

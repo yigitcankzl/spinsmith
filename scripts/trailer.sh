@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Records the emulator trailer shots with the hand driver and cuts a rough trailer with title
 # cards (dev server with --allow-browser-automation; see .claude/skills/spinsmith-drive/SKILL.md).
-#   scripts/trailer.sh [out-dir]        record every shot, then cut
+#   scripts/trailer.sh [out-dir]        start a capture server, record every shot, then cut
 #   CUT_ONLY=1 scripts/trailer.sh       cut again from the shots already recorded
+#   CAPTURE_USE_RUNNING=1 ...           reuse an automation-enabled managed server
 # Output: <out-dir>/shots/*.mp4 and <out-dir>/spinsmith-trailer-rough.mp4 (emulator footage, labelled).
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -17,6 +18,14 @@ home() { [ "$(phase)" = '"hub"' ] || { $D '["tap","menu"]' '["wait",0.3]' '["tap
 logs() { $E logs 40; }
 
 if [ -z "${CUT_ONLY:-}" ]; then
+  CAPTURE_OWNS_SERVER=0
+  if [ -z "${CAPTURE_USE_RUNNING:-}" ]; then
+    echo "Starting a headless IWSDK capture server (it will stop when capture finishes)..."
+    npx @iwsdk/cli dev restart --headless --allow-browser-automation --timeout 60000 >/dev/null
+    CAPTURE_OWNS_SERVER=1
+    trap '[ "$CAPTURE_OWNS_SERVER" = 1 ] && npx @iwsdk/cli dev down >/dev/null 2>&1 || true' EXIT
+  fi
+  $E enter
   # 1. The arena rises and the title (a fresh page, the title shows once per session).
   $D '["demo"]' >/dev/null 2>&1; sleep 10
   npx @iwsdk/cli xr enter >/dev/null 2>&1; npx @iwsdk/cli xr set-input-mode --input-json '{"mode":"hand"}' >/dev/null 2>&1; $E front
