@@ -2754,13 +2754,13 @@ export class MatchSystem extends createSystem({
 
   /**
    * One new verb per match in the first session: the ramp in the first, the strike in the second,
-   * the cup and sling in the third; rival tells after that (sooner once a strike has landed).
+   * the cup and sling in the third; rival tells after that.
    */
   private taught(verb: 'strike' | 'cup' | 'tells') {
     const m = this.progress.matches;
     if (verb === 'strike') return m >= 1;
     if (verb === 'cup') return m >= 2;
-    return m >= 3 || (m >= 2 && this.struckOnce);
+    return m >= 3;
   }
 
   /**

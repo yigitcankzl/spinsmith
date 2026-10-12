@@ -89,6 +89,7 @@ export function installDriver() {
   const lastRoot: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
   const lastPinch: Record<Side, number> = { left: 0, right: 0 };
   const offsets: Record<Side, [Partial<Record<Point, Vector3>>, Partial<Record<Point, Vector3>>]> = { left: [{}, {}], right: [{}, {}] };
+  const offsetMix: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
   const lastAt: Record<Side, number> = { left: performance.now(), right: performance.now() };
   const v = new Vector3();
   let hooked = false;
@@ -128,16 +129,17 @@ export function installDriver() {
     // What the game saw last frame: each point's offset from the root, per pinch state.
     for (const pt of ['pinch', 'index', 'low'] as const) {
       const o = offsets[side][lastPinch[side] > 0.5 ? 1 : 0];
-      measured(side, pt, o[pt] ?? (o[pt] = new Vector3())).sub(lastRoot[side]);
+      if (!o[pt]) measured(side, pt, (o[pt] = new Vector3())).sub(lastRoot[side]);
     }
     // Keep the steered point on its target: its offset from the root as the game saw it last frame,
     // kept per pinch state, so closing the fingers does not first move the point (a pinch that
     // drifts reads as a drag, not a tap).
     const a = aim[side];
     if (a) {
-      const was = lastPinch[side] > 0.5 ? 1 : 0;
-      const now = pinchNow[side] > 0.5 ? 1 : 0;
-      root.copy(a.at).sub(offsets[side][now][a.point] ?? offsets[side][was][a.point]!);
+      const open = offsets[side][0][a.point];
+      const closed = offsets[side][1][a.point];
+      const offset = open && closed ? offsetMix[side].lerpVectors(open, closed, pinchNow[side]) : (closed ?? open)!;
+      root.copy(a.at).sub(offset);
     }
     lastPinch[side] = pinchNow[side];
     hand.updatePinchValue(pinchNow[side]);
@@ -334,8 +336,21 @@ export function installDriver() {
     async ramp(opts: { at?: 'rival' | { x: number; z: number }; angle?: number; lead?: number; hold?: number; side?: Side } = {}) {
       const { at = 'rival', lead = 0.03, hold = 0.35, side = 'right' } = opts;
       const g = game();
-      // Where the rival will be when the ramp rises (about 0.4 s on), or a fixed spot.
-      const target = () => (at === 'rival' ? { x: g.theirs.x + g.theirs.vx * 0.4, z: g.theirs.z + g.theirs.vz * 0.4 } : at);
+      // Follow the rival as the hand reaches it, or use a fixed spot.
+      const target = () => {
+        if (at !== 'rival') return at;
+        let x = g.theirs.x;
+        let z = g.theirs.z;
+        // Follow the live top during the reach; an extra velocity lead can land beyond the rim,
+        // where the game correctly rejects shaping.
+        const r = Math.hypot(x, z);
+        const inside = g.arena.radius * 0.8;
+        if (r > inside) {
+          x *= inside / r;
+          z *= inside / r;
+        }
+        return { x, z };
+      };
       const dir = () => {
         const t = target();
         const out = opts.angle !== undefined ? (opts.angle * Math.PI) / 180 : Math.atan2(t.z, t.x);
