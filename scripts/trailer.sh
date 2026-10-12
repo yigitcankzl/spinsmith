@@ -15,6 +15,7 @@ E=scripts/emu.sh
 rec() { DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$S/$1" $D "${@:2}" >/dev/null; }
 phase() { $D '["peek","phase"]' 2>/dev/null; }
 home() { [ "$(phase)" = '"hub"' ] || { $D '["tap","menu"]' '["wait",0.3]' '["tap","menu"]' '["wait",2]' >/dev/null; sleep 1; }; }
+ready() { $D '["key","KeyR"]' '["wait",3.5]' >/dev/null; }
 logs() { $E logs 40; }
 
 if [ -z "${CUT_ONLY:-}" ]; then
@@ -34,25 +35,26 @@ if [ -z "${CUT_ONLY:-}" ]; then
   rec 02-portal.mp4 '["tap","play"]' '["wait",3.5]'
   # 3. Rip, a ramp that knocks the rival out, and its replay (retried until the ramp is the cause).
   for _ in 1 2 3 4 5; do
-    sleep 3; home_or_ready=$(phase); [ "$home_or_ready" = '"hub"' ] && $D '["tap","play"]' '["wait",3.5]' >/dev/null
-    rec 03-rip-ramp-replay.mp4 '["rip",{"power":0.95}]' '["wait",3.2]' '["ramp",{"hold":0.15}]' '["key","KeyK"]' '["wait",9]'
+    sleep 3; ready
+    rec 03-rip-ramp-replay.mp4 '["rip",{"power":0.95}]' '["fightAt",3]' '["ramp",{"hold":0.35}]' '["key","KeyK"]' '["wait",9]'
     logs | grep -q "YOUR RAMP →" && break
   done
   # 4. The strike (a new match so the round is fresh).
-  sleep 3; home; $D '["tap","play"]' '["wait",3.5]' >/dev/null
-  rec 04-strike.mp4 '["rip",{"power":0.8}]' '["wait",2.8]' '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",3.5]'
+  sleep 3; ready
+  rec 04-strike.mp4 '["rip",{"power":0.8}]' '["fightAt",3]' '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",3.5]'
   # 5. Cup and sling.
   for _ in 1 2 3; do
-    sleep 5; [ "$(phase)" = '"hub"' ] && $D '["tap","play"]' '["wait",3.5]' >/dev/null
-    rec 05-cup-sling.mp4 '["rip",{"power":0.7}]' '["wait",3]' '["cup"]' '["wait",0.4]' '["sling"]' '["wait",2.5]'
+    # Reset to the stable Forge Bowl bout; a later rival may end the round while the hand reaches in.
+    sleep 5; $D '["demo"]' >/dev/null 2>&1; sleep 3; $E enter; $D '["wait",8]' >/dev/null; ready
+    rec 05-cup-sling.mp4 '["rip",{"power":0.7}]' '["fightAt",2.6]' '["cup",{"at":"mine"}]' '["wait",0.4]' '["sling"]' '["wait",2.5]'
     logs | grep -q "sling" && break
   done
   # 6. The forge: a part onto the top, then the quench.
   sleep 4; home
   rec 06-forge.mp4 '["tap","forge"]' '["wait",2.5]' '["drag","Saw","top"]' '["wait",1]' '["drag","top","quench"]' '["wait",3]'
   # 7. A won match.
-  sleep 3; home
-  rec 07-match-win.mp4 '["tap","play"]' '["wait",3.5]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",11]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",10]'
+  sleep 3; home; ready
+  rec 07-match-win.mp4 '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",11]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",10]'
 fi
 
 # The cut: title cards between trimmed shots, every shot labelled as emulator footage.

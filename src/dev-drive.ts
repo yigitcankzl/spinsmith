@@ -236,10 +236,12 @@ export function installDriver() {
   const above = (p: Vector3, dy: number) => p.clone().setY(p.y + dy);
   const idlePoint = (side: Side) => {
     const g = game();
-    const x = g.arena.radius * (side === 'left' ? -0.9 : 0.9);
-    return local(x, g.arena.radius * 1.25, 0.035);
+    // Rest below the near table edge, like hands in the player's lap, so clips show only
+    // deliberate reaches instead of two open hands hovering beside the arena.
+    const x = g.arena.radius * (side === 'left' ? -1.3 : 1.3);
+    return g.root.localToWorld(new Vector3(x, -0.11, g.arena.radius * 1.7));
   };
-  const park = async (side: Side) => glide(side, 'pinch', idlePoint(side), 0.4, 0);
+  const park = async (side: Side) => glide(side, 'pinch', idlePoint(side), 0.3, 0);
 
   const api = {
     /** What an agent needs to choose the next move. */
@@ -336,34 +338,22 @@ export function installDriver() {
     async ramp(opts: { at?: 'rival' | { x: number; z: number }; angle?: number; lead?: number; hold?: number; side?: Side } = {}) {
       const { at = 'rival', lead = 0.03, hold = 0.35, side = 'right' } = opts;
       const g = game();
-      // Follow the rival as the hand reaches it, or use a fixed spot.
-      const target = () => {
-        if (at !== 'rival') return at;
-        let x = g.theirs.x;
-        let z = g.theirs.z;
-        // Follow the live top during the reach; an extra velocity lead can land beyond the rim,
-        // where the game correctly rejects shaping.
-        const r = Math.hypot(x, z);
-        const inside = g.arena.radius * 0.8;
-        if (r > inside) {
-          x *= inside / r;
-          z *= inside / r;
-        }
-        return { x, z };
-      };
-      const dir = () => {
-        const t = target();
-        const out = opts.angle !== undefined ? (opts.angle * Math.PI) / 180 : Math.atan2(t.z, t.x);
-        return { t, dx: Math.cos(out), dz: Math.sin(out) };
-      };
-      const spot = (up: number) => () => {
-        const { t, dx, dz } = dir();
-        return local(t.x - dx * lead, t.z - dz * lead, 0.004 + up);
-      };
-      await glide(side, 'pinch', spot(0.05 / ARENA_SCALE), 0.2, 0);
-      await glide(side, 'pinch', spot(0), 0.1, 0);
-      const { t, dx, dz } = dir();
-      const drag = local(t.x - dx * lead + dx * 0.025, t.z - dz * lead + dz * 0.025, 0.004);
+      // Pick one spot before the reach: chasing a moving top makes the filmed hand zig-zag.
+      const target = at === 'rival' ? { x: g.theirs.x, z: g.theirs.z } : { ...at };
+      const r = Math.hypot(target.x, target.z);
+      const inside = g.arena.radius * 0.8;
+      if (r > inside) {
+        target.x *= inside / r;
+        target.z *= inside / r;
+      }
+      const out = opts.angle !== undefined ? (opts.angle * Math.PI) / 180 : Math.atan2(target.z, target.x);
+      const dx = Math.cos(out);
+      const dz = Math.sin(out);
+      const x = target.x - dx * lead;
+      const z = target.z - dz * lead;
+      await glide(side, 'pinch', local(x, z, 0.004 + 0.05 / ARENA_SCALE), 0.2, 0);
+      await glide(side, 'pinch', local(x, z, 0.004), 0.1, 0);
+      const drag = local(x + dx * 0.025, z + dz * 0.025, 0.004);
       await setPinch(side, true);
       await glide(side, 'pinch', drag, hold);
       await setPinch(side, false);
@@ -375,15 +365,12 @@ export function installDriver() {
     async cup(opts: { at?: 'rival' | 'mine' | { x: number; z: number }; side?: Side } = {}) {
       const { at = 'rival', side = 'right' } = opts;
       const g = game();
-      // A moving top is met where it will be as the fingertip lands (about 0.3 s on).
-      const spot = (up: number) => () => {
-        const top = at === 'rival' ? g.theirs : at === 'mine' ? g.mine : null;
-        const t = top ? { x: top.x + top.vx * 0.3, z: top.z + top.vz * 0.3 } : (at as { x: number; z: number });
-        return local(t.x, t.z, up / ARENA_SCALE);
-      };
-      await glide(side, 'index', spot(0.06), 0.2, 0);
-      const down = spot(-0.015)();
-      await glide(side, 'index', down, 0.12, 0, 'linear');
+      // Commit to one anticipated contact point; following the top during the reach looks erratic.
+      const top = at === 'rival' ? g.theirs : at === 'mine' ? g.mine : null;
+      const target = top ? { x: top.x + top.vx * 0.2, z: top.z + top.vz * 0.2 } : (at as { x: number; z: number });
+      await glide(side, 'index', local(target.x, target.z, 0.1 / ARENA_SCALE), 0.2, 0);
+      const down = local(target.x, target.z, -0.025 / ARENA_SCALE);
+      await glide(side, 'index', down, 0.08, 0, 'linear');
       await wait(0.1);
       await glide(side, 'index', above(down, 0.1), 0.25, 0);
       await park(side);
@@ -468,6 +455,10 @@ export function installDriver() {
       }
     },
     wait,
+    /** Waits for the fight clock, which can run slower than wall time while recording. */
+    async fightAt(seconds: number) {
+      while (game().phase === 'fight' && game().elapsed < seconds) await wait(1 / 30);
+    },
     /** Starts over as a prepared level-8 smith (`demo`) or a new player (`fresh`); the page reloads, then enter XR again. */
     async demo() {
       const m = await import('./game/demo-save.js');
