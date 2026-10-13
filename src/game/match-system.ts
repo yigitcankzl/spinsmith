@@ -517,6 +517,24 @@ export class MatchSystem extends createSystem({
   private launchFrom: { x: number; z: number } | null = null;
   /** The open hand currently previewing that launch point. */
   private launchPreviewSide: Side | null = null;
+  /** Floor feedback shared by launch-point, aim and tactical-zone previews. */
+  private launchGuide = new Group();
+  private launchGhost = new Group();
+  private launchGhostMaterial = new MeshBasicMaterial({ color: 0xff9a32, transparent: true, opacity: 0.28, depthWrite: false, blending: NormalBlending });
+  private launchMarkerMaterial = new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.8, depthWrite: false, blending: AdditiveBlending });
+  private launchMarker = new Mesh(new RingGeometry(0.026, 0.032, 40).rotateX(-Math.PI / 2), this.launchMarkerMaterial);
+  private launchAimMaterial = new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.8, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
+  private launchAim = new Group();
+  private launchAimShaft = new Mesh(new PlaneGeometry(0.009, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5), this.launchAimMaterial);
+  private launchAimHead = new Mesh(new ConeGeometry(0.015, 0.035, 3).rotateX(Math.PI / 2), this.launchAimMaterial);
+  private launchSafeZone = new Mesh(
+    new RingGeometry(0.042, 0.047, 48).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0x49d8ff, transparent: true, opacity: 0.18, depthWrite: false, blending: AdditiveBlending }),
+  );
+  private launchDangerZone = new Mesh(
+    new RingGeometry(0.057, 0.062, 48).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0xff3b24, transparent: true, opacity: 0.2, depthWrite: false, blending: AdditiveBlending }),
+  );
   /** The rival's spot this round: an angle around the arena's far half. */
   private rivalAngle = -Math.PI / 2;
   /** The next match's rival, picked at home and shown there with its arena. */
@@ -554,6 +572,10 @@ export class MatchSystem extends createSystem({
     this.label.mesh.scale.setScalar(1.25);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
+    this.launchAim.add(this.launchAimShaft, this.launchAimHead);
+    this.launchGuide.add(this.launchSafeZone, this.launchDangerZone, this.launchMarker, this.launchAim, this.launchGhost);
+    this.launchGuide.visible = false;
+    this.launchMarker.visible = this.launchAim.visible = this.launchGhost.visible = false;
     this.stage.add(
       this.chargeRing,
       this.ghost.root,
@@ -576,6 +598,7 @@ export class MatchSystem extends createSystem({
       this.marks.root,
       this.rivalMarks.root,
       this.launchZone,
+      this.launchGuide,
       this.pips.root,
       this.shock,
     );
@@ -863,7 +886,10 @@ export class MatchSystem extends createSystem({
       this.player.head.getWorldPosition(this.head);
       this.roomLight.update(this.head, this.root.position, this.root.position.y - PEDESTAL, dim, p === 'forge' || p === 'build', dt);
     }
-    this.launchZone.visible = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
+    const launchPhase = this.phase === 'ready' || this.phase === 'pulling';
+    this.launchZone.visible = launchPhase && !this.demo;
+    this.launchGuide.visible = launchPhase && !this.demo;
+    this.launchSafeZone.visible = this.launchDangerZone.visible = this.phase === 'ready' && !this.demo;
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
       this.arenaView.charge = 0;
@@ -1326,8 +1352,21 @@ export class MatchSystem extends createSystem({
       };
       view.root.name = i === 0 ? 'my-top' : 'their-top';
       this.stage.add(view.root, view.shadowMesh, view.debris);
-      if (i === 0) this.myView = view;
-      else this.theirView = view;
+      if (i === 0) {
+        this.myView = view;
+        // The launch preview reuses the player's exact silhouette with one translucent material.
+        this.launchGhost.clear();
+        const ghost = view.root.clone(true);
+        ghost.traverse((o) => {
+          const mesh = o as Mesh;
+          if (!mesh.isMesh) return;
+          const source = mesh.material as MeshBasicMaterial;
+          if (source.transparent && source.opacity < 0.95) mesh.visible = false;
+          mesh.material = this.launchGhostMaterial;
+        });
+        this.launchGhost.add(ghost);
+        this.launchGhost.visible = false;
+      } else this.theirView = view;
     }
   }
 
@@ -2344,8 +2383,11 @@ export class MatchSystem extends createSystem({
     const [rx, rz] = this.rivalSpot();
     this.launchFrom = null;
     this.launchPreviewSide = null;
+    this.launchMarker.visible = this.launchAim.visible = this.launchGhost.visible = false;
     this.mine.launch(0, this.SPAWN, 0, 0, 1, this.mine.hand);
     this.theirs.launch(rx, rz, 0, 0, 1, this.theirs.hand);
+    this.launchSafeZone.position.set(0, this.arena.height(0, 0) + 0.002, 0);
+    this.launchDangerZone.position.set(rx, this.arena.height(rx, rz) + 0.002, rz);
     this.puller = null;
     this.cord.set(null);
     this.label.mesh.position.copy(LABEL_AT);
@@ -2389,7 +2431,8 @@ export class MatchSystem extends createSystem({
     const l = this.toLocal(world);
     const n = normRadius(this.arena.layout, l.x, l.z);
     if (n > 1.05 || Math.abs(l.y - this.arena.height(l.x, l.z)) >= LAUNCH_HOVER) return false;
-    const k = n > LAUNCH_MAX_N ? LAUNCH_MAX_N / n : 1;
+    // The outer band is magnetic: shaky fingertips settle onto one clean tactical launch ring.
+    const k = n > LAUNCH_MAX_N - 0.12 ? LAUNCH_MAX_N / Math.max(1e-6, n) : 1;
     let x = l.x * k;
     let z = l.z * k;
     // Never right on top of the rival.
@@ -2400,12 +2443,19 @@ export class MatchSystem extends createSystem({
       x = this.theirs.x + (d > 1e-6 ? dx / d : 0) * LAUNCH_GAP;
       z = this.theirs.z + (d > 1e-6 ? dz / d : 1) * LAUNCH_GAP;
     }
-    if (this.launchFrom) {
-      this.launchFrom.x = x;
-      this.launchFrom.z = z;
-    } else this.launchFrom = { x, z };
-    this.mine.x = x;
-    this.mine.z = z;
+    if (!this.launchFrom) this.launchFrom = { x: this.mine.x, z: this.mine.z };
+    const smooth = 1 - Math.exp(-this.frameDt * 18);
+    this.launchFrom.x += (x - this.launchFrom.x) * smooth;
+    this.launchFrom.z += (z - this.launchFrom.z) * smooth;
+    const from = this.launchFrom;
+    const y = this.arena.height(from.x, from.z);
+    this.launchGhost.visible = this.launchMarker.visible = true;
+    this.launchGhost.position.set(from.x, y, from.z);
+    this.launchGhost.rotation.y += this.frameDt * 1.8;
+    this.launchMarker.position.set(from.x, y + 0.002, from.z);
+    this.launchMarker.scale.setScalar(1 + 0.08 * Math.sin(this.time * 8));
+    this.launchMarkerMaterial.opacity = 0.8;
+    this.launchMarkerMaterial.color.setHex(d < LAUNCH_GAP * 1.8 ? 0xff3b24 : n > LAUNCH_MAX_N - 0.12 ? 0xffd34d : 0xff8a2a);
     return true;
   }
 
@@ -2443,6 +2493,7 @@ export class MatchSystem extends createSystem({
           }
         }
         if (hover && this.previewLaunch(this.hands[hover].index)) this.launchPreviewSide = hover;
+        else this.launchGhost.visible = this.launchMarker.visible = false;
       }
       return;
     }
@@ -2459,6 +2510,15 @@ export class MatchSystem extends createSystem({
       this.mine.x = 0;
       this.mine.z = this.SPAWN;
     }
+    if (this.launchFrom) {
+      this.mine.x = this.launchFrom.x;
+      this.mine.z = this.launchFrom.z;
+      this.launchGhost.visible = false;
+      this.launchMarkerMaterial.opacity = 1;
+      const y = this.arena.height(this.mine.x, this.mine.z);
+      this.sparks.burst(this.mine.x, y, this.mine.z, 0.22);
+      playTick();
+    } else this.launchMarker.visible = false;
     this.phase = 'pulling';
     this.puller = pick;
     this.pullStart.copy(h.pinch);
@@ -2566,6 +2626,22 @@ export class MatchSystem extends createSystem({
     this.chargeRing.position.set(this.mine.x, y + 0.001, this.mine.z);
     this.chargeRing.scale.setScalar(0.7 + 0.9 * power);
     (this.chargeRing.material as MeshBasicMaterial).opacity = 0.25 + 0.75 * power;
+    // The arrow is the launch result, not the hand motion: it points opposite the pull.
+    const now = this.p.copy(this.toLocal(this.hands[this.puller!].pinch));
+    const start = this.handleWorld.copy(this.toLocal(this.pullStart));
+    const dx = start.x - now.x;
+    const dz = start.z - now.z;
+    const flat = Math.hypot(dx, dz);
+    this.launchAim.visible = flat > 0.004;
+    if (this.launchAim.visible) {
+      const length = 0.035 + 0.1 * power;
+      this.launchAim.position.set(this.mine.x, y + 0.003, this.mine.z);
+      this.launchAim.rotation.y = Math.atan2(dx, dz);
+      this.launchAimShaft.scale.z = length;
+      this.launchAimHead.position.z = length;
+      this.launchAimMaterial.color.setHex(power >= PERFECT ? 0xffffff : power > 0.65 ? 0xffd34d : 0xff8a2a);
+      this.launchAimMaterial.opacity = 0.45 + 0.55 * power;
+    }
   }
 
   /** Launches both tops. aim: radians off straight-at-center for the player's top. */
@@ -3486,10 +3562,16 @@ export class MatchSystem extends createSystem({
       this.ghost.play([[0, from.x, top + 0.04, from.z, 0], [0.5, from.x, top, from.z, 0], [0.75, from.x, top, from.z, 1], [1.8, 0, h + 0.04, 0, 1], [2.1, 0, h + 0.012, 0, 1], [2.3, 0, h + 0.012, 0, 0], [3, 0, h + 0.05, 0, 0]], this.frameDt);
       ghost = true;
     }
-    if (ready) {
-      const x = this.mine.x;
-      const z = this.mine.z;
+    if (ready && !this.launchPreviewSide) {
+      // First launch only: the existing ghost hand now demonstrates choosing a point before ripping.
+      const x = -0.045;
+      const z = this.SPAWN - 0.025;
       const h = this.arena.height(x, z);
+      this.launchGhost.visible = this.launchMarker.visible = true;
+      this.launchGhost.position.set(x, h, z);
+      this.launchGhost.rotation.y += this.frameDt * 1.8;
+      this.launchMarker.position.set(x, h + 0.002, z);
+      this.launchMarkerMaterial.color.setHex(0xff8a2a);
       this.ghost.play([[0, x, h + 0.05, z, 0], [0.5, x, h + 0.015, z, 0], [0.75, x, h + 0.015, z, 1], [1.5, x, h + 0.04, z + 0.09, 1], [1.6, x, h + 0.045, z + 0.1, 0], [2.4, x, h + 0.06, z + 0.11, 0]], this.frameDt);
       ghost = true;
     }
