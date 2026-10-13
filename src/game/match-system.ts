@@ -9,7 +9,7 @@ import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
+import { rivalMove, sealStrike, SEALS, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, Top, TopSpec, TUNING, verdict } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -104,6 +104,15 @@ const NEAR_RIM = 0.17;
 const MOVE_WORD = { charge: 'charges', quake: 'quakes the floor', pull: 'pulls you to the pits' } as const;
 /** The forge bar's color by seal, so the chosen strike shows on the wrist. */
 const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magnet: 0x5ab8ff, tilt: 0x7de07d, hammer: 0xffe066, ward: 0xd9d4ff };
+/** The immediate tactical promise under the ultimate's name. */
+const SEAL_CALL: Record<Seal, string> = {
+  anvil: 'ULTIMATE · RIM SHOCKWAVE',
+  rush: 'ULTIMATE · LOCK-ON CHARGE',
+  magnet: 'ULTIMATE · PULL TO PIT',
+  tilt: 'ULTIMATE · TILT THE ARENA',
+  hammer: 'ULTIMATE · NEXT HIT ×3',
+  ward: 'ULTIMATE · 4 s KNOCKOUT GUARD',
+};
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
 /** A finish your shape caused plays its visuals at SLOW_MO speed for this long (real s). */
@@ -740,6 +749,14 @@ export class MatchSystem extends createSystem({
             const r = rimRadius(this.arena.layout, a);
             this.doStrike(Math.cos(a) * r, Math.sin(a) * r);
           }
+        }
+        // 1-6: choose an ultimate during a dev fight, so every effect can be captured without
+        // rewriting progression or the saved player's forged top.
+        const sealIndex = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'].indexOf(e.code);
+        if (sealIndex >= 0 && this.phase === 'fight') {
+          const seal = SEALS[sealIndex];
+          this.myBuild = { ...this.myBuild, seal };
+          console.log(`[STRIKE] dev ultimate ${seal}`);
         }
         // A: the next arena, locked or not (to look at every arena).
         if (e.code === 'KeyA' && this.phase === 'hub') {
@@ -3421,7 +3438,7 @@ export class MatchSystem extends createSystem({
     this.sealPop.add(sealModel(seal));
     this.sealPop.userData.t = 0;
     this.sealPop.visible = true;
-    this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', 'ULTIMATE', 'mine', 0.95, 1.35);
+    this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', SEAL_CALL[seal], 'mine', 0.95, 1.35);
     if (!cut && this.label.current.startsWith('ULTIMATE READY')) this.label.set('');
     if (import.meta.env.DEV) console.log(`[STRIKE] ${seal} at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
   }
