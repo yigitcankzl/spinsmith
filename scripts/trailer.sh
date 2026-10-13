@@ -12,6 +12,9 @@ S=$OUT/shots
 mkdir -p "$S"
 D=scripts/drive.sh
 E=scripts/emu.sh
+VIDEO_WIDTH=${DRIVE_VIDEO_WIDTH:-2560}
+VIDEO_HEIGHT=${DRIVE_VIDEO_HEIGHT:-1440}
+VIDEO_FPS=${DRIVE_VIDEO_FPS:-60}
 rec() { DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$S/$1" $D "${@:2}" >/dev/null; }
 phase() { $D '["peek","phase"]' 2>/dev/null; }
 home() { [ "$(phase)" = '"hub"' ] || { $D '["tap","menu"]' '["wait",0.3]' '["tap","menu"]' '["wait",2]' >/dev/null; sleep 1; }; }
@@ -61,15 +64,15 @@ fi
 T=$(mktemp -d)
 FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
 card() {
-  ffmpeg -y -loglevel error -f lavfi -i "color=c=0x14161b:s=1920x1080:d=2.2:r=30" -f lavfi -i anullsrc=r=48000:cl=stereo -t 2.2 \
-    -vf "drawtext=fontfile=$FONT:text='$2':fontcolor=0xff8a2a:fontsize=92:x=(w-text_w)/2:y=(h-text_h)/2-30,drawtext=fontfile=$FONT:text='$3':fontcolor=0xd9d4cc:fontsize=40:x=(w-text_w)/2:y=(h/2)+60,fade=t=in:st=0:d=0.3,fade=t=out:st=1.9:d=0.3" \
-    -c:v libx264 -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 -shortest "$T/$1.mp4"
+  ffmpeg -y -loglevel error -f lavfi -i "color=c=0x14161b:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=2.2:r=$VIDEO_FPS" -f lavfi -i anullsrc=r=48000:cl=stereo -t 2.2 \
+    -vf "drawtext=fontfile=$FONT:text='$2':fontcolor=0xff8a2a:fontsize=122:x=(w-text_w)/2:y=(h-text_h)/2-40,drawtext=fontfile=$FONT:text='$3':fontcolor=0xd9d4cc:fontsize=53:x=(w-text_w)/2:y=(h/2)+80,fade=t=in:st=0:d=0.3,fade=t=out:st=1.9:d=0.3" \
+    -c:v libx264 -crf 14 -preset slow -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$T/$1.mp4"
 }
 clip() {
   local end; end=$(echo "$4 - 0.3" | bc)
   ffmpeg -y -loglevel error -ss "$3" -i "$S/$2" -t "$4" \
-    -vf "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=30,drawtext=fontfile=$FONT:text='Captured in the IWER emulator':fontcolor=white@0.55:fontsize=26:x=w-text_w-30:y=h-50,fade=t=in:st=0:d=0.2,fade=t=out:st=$end:d=0.3" \
-    -af "afade=t=in:st=0:d=0.2,afade=t=out:st=$end:d=0.3" -c:v libx264 -crf 20 -pix_fmt yuv420p -c:a aac -ar 48000 -ac 2 "$T/$1.mp4"
+    -vf "scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},fps=${VIDEO_FPS},drawtext=fontfile=$FONT:text='Captured in the IWER emulator':fontcolor=white@0.55:fontsize=35:x=w-text_w-40:y=h-66,fade=t=in:st=0:d=0.2,fade=t=out:st=$end:d=0.3" \
+    -af "afade=t=in:st=0:d=0.2,afade=t=out:st=$end:d=0.3" -c:v libx264 -crf 14 -preset slow -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 -ac 2 "$T/$1.mp4"
 }
 card c0 "SPINSMITH" "A spinning-top battle on your real table"
 clip s1 01-rise-title.mp4 6.5 5
@@ -86,5 +89,5 @@ clip s6 06-forge.mp4 0.5 12
 clip s7 07-match-win.mp4 15 13
 card c6 "SPINSMITH" "Hands only. Seated. Play in the Quest browser, no install."
 for n in c0 s1 c1 s2 c2 s3 c3 s4 c4 s5 c5 s6 s7 c6; do echo "file '$T/$n.mp4'"; done > "$T/list.txt"
-ffmpeg -y -loglevel error -f concat -safe 0 -i "$T/list.txt" -c:v libx264 -crf 20 -pix_fmt yuv420p -c:a aac -b:a 192k "$OUT/spinsmith-trailer-rough.mp4"
+ffmpeg -y -loglevel error -f concat -safe 0 -i "$T/list.txt" -c:v libx264 -crf 14 -preset slow -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -movflags +faststart "$OUT/spinsmith-trailer-rough.mp4"
 echo "$OUT/spinsmith-trailer-rough.mp4 ($(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/spinsmith-trailer-rough.mp4") s)"
