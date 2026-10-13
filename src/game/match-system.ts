@@ -348,7 +348,7 @@ export class MatchSystem extends createSystem({
   /** The strike's seal coin, rising off your top as it lands. */
   private sealPop = Object.assign(new Group(), { visible: false });
   /** A short-lived, arena-sized cause → target cue; unlike the seal coin it never covers the tops. */
-  private ultimateCue = { t: 0, seal: 'anvil' as Seal, tx: 0, tz: 0 };
+  private ultimateCue = { t: 0, age: 0, seal: 'anvil' as Seal, ox: 0, oz: 0, tx: 0, tz: 0 };
   private ultimatePath = Object.assign(
     new Mesh(
       new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5),
@@ -370,6 +370,24 @@ export class MatchSystem extends createSystem({
       { visible: false },
     );
   })();
+  /** Arena-wide ultimate feedback: three floor pulses, eight radial seams, and one vertical field wall. */
+  private ultimateArenaFx = Object.assign(new Group(), { visible: false });
+  private ultimateArenaRings = [0, 1, 2].map(() => new Mesh(
+    new RingGeometry(0.055, 0.062, 64).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
+  ));
+  private ultimateArenaSeams = Array.from({ length: 8 }, (_, i) => {
+    const seam = new Mesh(
+      new PlaneGeometry(0.004, 0.14).rotateX(-Math.PI / 2).translate(0, 0, -0.07),
+      new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
+    );
+    seam.rotation.y = (i / 8) * Math.PI * 2;
+    return seam;
+  });
+  private ultimateArenaWall = new Mesh(
+    new CylinderGeometry(0.15, 0.15, 0.035, 64, 1, true),
+    new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }),
+  );
   /** A rival's tell drawn on the floor: the lane of a charge, the line of a pull toward its pit. */
   private lane = new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }));
   /** Seconds left of a won match's celebration (sparks round the rim). */
@@ -655,6 +673,7 @@ export class MatchSystem extends createSystem({
       ...this.scorches,
       ...this.handMarks,
       this.lane,
+      this.ultimateArenaFx,
       this.ultimatePath,
       this.ultimateTarget,
       this.ultimateArrow,
@@ -675,6 +694,8 @@ export class MatchSystem extends createSystem({
       this.pips.root,
       this.shock,
     );
+    this.ultimateArenaFx.add(...this.ultimateArenaRings, ...this.ultimateArenaSeams, this.ultimateArenaWall);
+    for (const mesh of [...this.ultimateArenaRings, ...this.ultimateArenaSeams, this.ultimateArenaWall]) mesh.renderOrder = 7;
     this.shock.visible = false;
     this.ultimatePath.renderOrder = this.ultimateTarget.renderOrder = this.ultimateArrow.renderOrder = 8;
     {
@@ -3262,7 +3283,8 @@ export class MatchSystem extends createSystem({
       break;
     }
     // The arena's rails warm as the bar fills, and glow when it is full: the tops are what the eyes follow.
-    this.arenaView.charge = full ? 0.7 + 0.3 * Math.sin(this.time * 8) : this.forgeBar.value * 0.5;
+    const ultimateHeat = this.ultimateCue.t > 0 ? (this.ultimateCue.seal === 'hammer' || this.ultimateCue.seal === 'ward' ? 0.75 : Math.max(0, 1 - this.ultimateCue.age / 1.1)) : 0;
+    this.arenaView.charge = Math.max(full ? 0.7 + 0.3 * Math.sin(this.time * 8) : this.forgeBar.value * 0.5, ultimateHeat);
     // The bar: on the back of each tracked hand, lit by how full it is, pulsing when ready.
     const lit = Math.round(this.forgeBar.value * 10);
     this.barSegs.forEach((m, i) => {
@@ -3419,10 +3441,12 @@ export class MatchSystem extends createSystem({
     const cue = this.ultimateCue;
     if (cue.t <= 0 || this.phase !== 'fight') {
       this.ultimatePath.visible = this.ultimateTarget.visible = this.ultimateArrow.visible = false;
+      this.ultimateArenaFx.visible = false;
       return;
     }
     // Persistent ultimates advertise only while their gameplay state is genuinely armed.
     if ((cue.seal === 'hammer' && this.mine.hammer <= 0) || (cue.seal === 'ward' && this.mine.guard <= 0)) cue.t = 0;
+    cue.age += dt;
     cue.t = Math.max(0, cue.t - dt);
     const seal = cue.seal;
     let fx = 0;
@@ -3466,13 +3490,77 @@ export class MatchSystem extends createSystem({
       this.ultimateArrow.scale.setScalar(pulse);
       (this.ultimateArrow.material as MeshBasicMaterial).opacity = 0.95 * fade;
     }
+    this.updateUltimateArenaFx(seal, fade);
+  }
+
+  /**
+   * Makes an ultimate belong to the whole tabletop instead of reading as a sticker on one top.
+   * The geometry is pooled: only transforms, visibility and material opacity change per frame.
+   */
+  private updateUltimateArenaFx(seal: Seal, fade: number) {
+    const cue = this.ultimateCue;
+    const radius = maxRim(this.arena.layout);
+    const burst = Math.max(0, 1 - cue.age / 1.05);
+    const pulse = 0.82 + 0.18 * Math.sin(this.time * (COMFORT.flashes ? 7 : 3));
+    const persistent = seal === 'hammer' || seal === 'ward';
+    const followsMine = seal === 'rush' || seal === 'hammer';
+    const targetX = seal === 'magnet' ? cue.tx : followsMine ? this.mine.x : 0;
+    const targetZ = seal === 'magnet' ? cue.tz : followsMine ? this.mine.z : 0;
+    this.ultimateArenaFx.visible = cue.t > 0;
+
+    for (let i = 0; i < this.ultimateArenaRings.length; i++) {
+      const ring = this.ultimateArenaRings[i];
+      const phase = Math.max(0, Math.min(1, cue.age / (persistent ? 0.7 : 0.9) - i * 0.18));
+      const magnetPhase = (cue.age * 0.75 + i / this.ultimateArenaRings.length) % 1;
+      let ringRadius = radius * (0.2 + 0.95 * phase);
+      let opacity = phase > 0 ? (1 - phase) * 0.75 * fade : 0;
+      if (seal === 'magnet') {
+        ringRadius = radius * (1.05 - magnetPhase * 0.9);
+        opacity = (0.2 + 0.8 * magnetPhase) * 0.8 * fade;
+      } else if (seal === 'ward') {
+        ringRadius = radius * (0.9 + i * 0.055) * (0.98 + 0.025 * pulse);
+        opacity = (0.48 + 0.16 * pulse) * fade;
+      } else if (persistent) {
+        ringRadius = (0.028 + i * 0.012) * (0.9 + 0.12 * Math.sin(this.time * 6 - i));
+        opacity = (0.32 + 0.18 * pulse) * fade;
+      } else if (seal === 'rush') {
+        opacity *= 0.75;
+      }
+      ring.visible = opacity > 0.01;
+      ring.position.set(targetX, this.arena.height(targetX, targetZ) + 0.003 + i * 0.0003, targetZ);
+      ring.scale.set(ringRadius / 0.0585, 1, ringRadius / 0.0585);
+      (ring.material as MeshBasicMaterial).opacity = opacity;
+    }
+
+    const seamsOn = seal === 'anvil' || seal === 'tilt' || seal === 'hammer';
+    for (let i = 0; i < this.ultimateArenaSeams.length; i++) {
+      const seam = this.ultimateArenaSeams[i];
+      seam.visible = seamsOn && (persistent || burst > 0.02);
+      seam.position.set(targetX, this.arena.height(targetX, targetZ) + 0.0025, targetZ);
+      seam.scale.set(1.5 + burst * 2, 1, Math.max(0.05, radius / 0.14) * (persistent ? 0.5 : 0.35 + 0.65 * (1 - burst)));
+      (seam.material as MeshBasicMaterial).opacity = (persistent ? 0.22 + 0.14 * pulse : burst * 0.8) * fade;
+    }
+
+    // Ward turns the complete rim into a shield. Anvil raises it only for the impact beat.
+    const wallOn = seal === 'ward' || (seal === 'anvil' && burst > 0.15);
+    this.ultimateArenaWall.visible = wallOn;
+    if (wallOn) {
+      const shapeX = this.arena.layout.shape === 'square' ? 1.12 : 1;
+      const shapeZ = this.arena.layout.shape === 'oval' ? 0.78 : shapeX;
+      this.ultimateArenaWall.position.set(0, this.arena.floorHeight(0.97) + 0.019, 0);
+      this.ultimateArenaWall.scale.set((radius / 0.15) * shapeX * (1 + 0.025 * pulse), seal === 'ward' ? 2 : 0.75 + burst, (radius / 0.15) * shapeZ * (1 + 0.025 * pulse));
+      (this.ultimateArenaWall.material as MeshBasicMaterial).opacity = (seal === 'ward' ? 0.28 + 0.12 * pulse : burst * 0.45) * fade;
+    }
   }
 
   /** Starts the arena cue before the simulation changes velocity, preserving the intended target. */
   private beginUltimateCue(seal: Seal, ox: number, oz: number) {
     const cue = this.ultimateCue;
     cue.t = seal === 'hammer' ? 5 : seal === 'ward' ? 4 : 1.8;
+    cue.age = 0;
     cue.seal = seal;
+    cue.ox = ox;
+    cue.oz = oz;
     cue.tx = seal === 'tilt' || seal === 'anvil' ? ox : seal === 'hammer' || seal === 'ward' ? this.mine.x : this.theirs.x;
     cue.tz = seal === 'tilt' || seal === 'anvil' ? oz : seal === 'hammer' || seal === 'ward' ? this.mine.z : this.theirs.z;
     if (seal === 'magnet') {
@@ -3493,6 +3581,7 @@ export class MatchSystem extends createSystem({
     (this.ultimatePath.material as MeshBasicMaterial).color.setHex(color);
     (this.ultimateTarget.material as MeshBasicMaterial).color.setHex(color);
     (this.ultimateArrow.material as MeshBasicMaterial).color.setHex(color);
+    for (const mesh of [...this.ultimateArenaRings, ...this.ultimateArenaSeams, this.ultimateArenaWall]) (mesh.material as MeshBasicMaterial).color.setHex(color);
   }
 
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
