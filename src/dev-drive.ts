@@ -48,7 +48,7 @@ interface Game {
   player: { localToWorld(v: Vector3): Vector3; worldToLocal(v: Vector3): Vector3 };
   root: { position: Vector3; localToWorld(v: Vector3): Vector3; worldToLocal(v: Vector3): Vector3 };
   rootK: number;
-  arena: { radius: number; layout: unknown; height(x: number, z: number): number; floorHeight(n: number): number };
+  arena: { radius: number; layout: { name?: string }; height(x: number, z: number): number; floorHeight(n: number): number };
   mine: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
   theirs: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
   myPoints: number;
@@ -60,6 +60,8 @@ interface Game {
   rival: { name: string; move: string };
   hub: { debugPositions(): string };
   forge: { debugPositions(): string };
+  builder: { debugPositions(): string };
+  myBuild: { ring: string; core: string; tip: string; spin: number; color: number; emblem?: number; seal?: string };
   progress: { level: number; matches: number; guide: string };
   launchZoneKind: string;
   launchArenaKind: string;
@@ -276,7 +278,7 @@ export function installDriver() {
   const named = (name: string) => {
     const g = game();
     if (name === 'menu') return g.menuButton.mesh.getWorldPosition(new Vector3());
-    const all = `${g.hub.debugPositions()} ${g.phase === 'forge' ? g.forge.debugPositions() : ''}`;
+    const all = `${g.hub.debugPositions()} ${g.phase === 'forge' ? g.forge.debugPositions() : ''} ${g.phase === 'build' ? g.builder.debugPositions() : ''}`;
     const m = all.split(' ').find((s) => s.split('@')[0].toLowerCase() === name.toLowerCase());
     if (!m) throw new Error(`no "${name}" here; see state().targets`);
     const [x, y, z] = m.split('@')[1].split(',').map(Number);
@@ -298,7 +300,7 @@ export function installDriver() {
       const g = game();
       const top = (t: Game['mine']) => ({ x: +t.x.toFixed(3), z: +t.z.toFixed(3), spin: +t.spin.toFixed(2), alive: t.alive, state: t.state, r: +(Math.hypot(t.x, t.z) / g.arena.radius).toFixed(2) });
       const targets: Record<string, number[]> = {};
-      const all = `${g.phase === 'hub' ? g.hub.debugPositions() : ''} ${g.phase === 'forge' ? g.forge.debugPositions() : ''}`;
+      const all = `${g.phase === 'hub' ? g.hub.debugPositions() : ''} ${g.phase === 'forge' ? g.forge.debugPositions() : ''} ${g.phase === 'build' ? g.builder.debugPositions() : ''}`;
       for (const s of all.split(' ').filter(Boolean)) targets[s.split('@')[0]] = s.split('@')[1].split(',').map(Number);
       if (g.menuButton.mesh.visible) targets.menu = g.menuButton.mesh.getWorldPosition(new Vector3()).toArray().map((n) => +n.toFixed(3));
       return {
@@ -309,6 +311,8 @@ export function installDriver() {
         guide: g.progress.guide,
         rival: g.rival?.name,
         rivalMove: g.rival?.move,
+        arena: g.arena.layout.name ?? '',
+        build: { ...g.myBuild },
         opening: {
           zone: g.launchZoneKind,
           arena: g.launchArenaKind,
@@ -361,6 +365,22 @@ export function installDriver() {
       await glide(side, 'pinch', b, 0.25);
       await setPinch(side, false);
       await glide(side, 'pinch', above(b, 0.1), 0.25, 0);
+      await park(side);
+    },
+
+    /** Workshop rim resize: pinch the rim and keep the hand on the arena plane while pulling. */
+    async arenaResize(opts: { from?: string; to?: string; side?: Side } = {}) {
+      const { from = 'arena_rim_clear', to = 'arena_rim_clear_out', side = 'right' } = opts;
+      const a = named(from);
+      const b = named(to);
+      await glide(side, 'pinch', above(a, 0.06), 0.3, 0);
+      await glide(side, 'pinch', a, 0.18, 0);
+      await setPinch(side, true);
+      await wait(0.12);
+      await glide(side, 'pinch', b, 0.7, pinchNow[side], 'linear');
+      await wait(0.12);
+      await setPinch(side, false);
+      await glide(side, 'pinch', above(b, 0.08), 0.25, 0);
       await park(side);
     },
 

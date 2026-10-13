@@ -466,6 +466,37 @@ export class Builder {
     this.afterFold = null;
   }
 
+  /** Dev: named world positions for repeatable hand-driven workshop recordings. */
+  debugPositions(): string {
+    if (!this.root.visible || !this.draft) return '';
+    this.root.updateWorldMatrix(true, true);
+    const fmt = (v: Vector3) => v.toArray().map((x) => x.toFixed(3)).join(',');
+    const key = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    const world = (x: number, z: number) => {
+      const n = Math.min(1, normRadius(this.draft, x, z));
+      return fmt(this.root.localToWorld(new Vector3(x * this.viewScale, this.hooks.floorHeight(n) * this.viewScale + 0.004, z * this.viewScale)));
+    };
+    const r = this.draft.radius;
+    // Forge Bowl alternates rails and pockets around the cardinal directions.  A point
+    // between them lets the emulator demonstrate rim resizing without grabbing a fixture.
+    const clearAngle = 0.52;
+    const clearRim = rimRadius(this.draft, clearAngle);
+    return [
+      ...this.slots.filter((s) => s.tab === this.tab).map((s) => `${key(pieceName(s.piece))}@${fmt(s.model.getWorldPosition(new Vector3()))}`),
+      ...PLATES.map((label, i) => `${key(label)}@${fmt(this.root.localToWorld([...this.plates.spots, ...this.actions.spots][i].at.clone()))}`),
+      `save@${fmt(this.root.localToWorld(SAVE_AT.clone()))}`,
+      `arena_center@${world(0, 0)}`,
+      `arena_left@${world(-r * 0.45, 0)}`,
+      `arena_right@${world(r * 0.45, 0)}`,
+      `arena_near@${world(0, r * 0.45)}`,
+      `arena_rim_left@${world(-r * 0.9, 0)}`,
+      `arena_rim_right@${world(r * 0.9, 0)}`,
+      `arena_rim_out@${world(r * 1.2, 0)}`,
+      `arena_rim_clear@${world(Math.cos(clearAngle) * clearRim * 0.94, Math.sin(clearAngle) * clearRim * 0.94)}`,
+      `arena_rim_clear_out@${world(Math.cos(clearAngle) * clearRim * 1.2, Math.sin(clearAngle) * clearRim * 1.2)}`,
+    ].join(' ');
+  }
+
   /** Folds the tools away (then runs `then`) or back out. */
   fold(dir: 'in' | 'out', then: (() => void) | null = null) {
     this.folding = dir;
@@ -480,9 +511,7 @@ export class Builder {
     if (import.meta.env.DEV && !this.logged && this.opened >= 1) {
       // Piece and plate positions, for driving the workshop from the emulator CLI.
       this.logged = true;
-      this.root.updateWorldMatrix(true, true);
-      const fmt = (v: Vector3) => v.toArray().map((x) => x.toFixed(3)).join(',');
-      console.log(`[BUILD] ${this.slots.filter((s) => s.tab === this.tab).map((s) => `${pieceName(s.piece)}@${fmt(s.model.getWorldPosition(new Vector3()))}`).join(' ')} ${PLATES.map((l, i) => `${l.toLowerCase()}@${fmt(this.root.localToWorld([...this.plates.spots, ...this.actions.spots][i].at.clone()))}`).join(' ')} save@${fmt(this.root.localToWorld(SAVE_AT.clone()))}`);
+      console.log(`[BUILD] ${this.debugPositions()}`);
     }
     if (this.opened < 1 || this.folding) return;
     if (this.held) {
