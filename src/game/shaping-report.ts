@@ -190,12 +190,12 @@ export function humanStrike(base: Policy, delay = HUMAN.reaction + HUMAN.gesture
     if (at >= 0 && t >= at) {
       at = -1;
       if (bar.spend(t, TUNING.grace)) {
-        // The palm goes down on the near half of the rim, across from the rival; for a Tilt,
-        // beyond the rival (the arena dips toward the palm).
+        // Anvil is struck across from the rival to throw it away from the palm. Every aimed seal
+        // uses the reachable sector toward the intended target: lane, pit, slope, mark or guard.
         // (A seated player reaches the table within about 110 degrees either side of the near rim.)
         const toward = Math.atan2(rival.z, rival.x);
         const reach = Math.PI / 2 + Math.max(-1.92, Math.min(1.92, Math.atan2(Math.sin(toward - Math.PI / 2), Math.cos(toward - Math.PI / 2))));
-        const o = seal === 'tilt' ? { x: Math.cos(reach), z: Math.sin(reach) } : strikeOrigin(arena, Math.atan2(-rival.z, -rival.x));
+        const o = seal === 'anvil' ? strikeOrigin(arena, Math.atan2(-rival.z, -rival.x)) : strikeOrigin(arena, reach);
         sealStrike(arena, me, rival, seal, o.x, o.z);
       }
       return;

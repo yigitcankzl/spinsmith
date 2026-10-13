@@ -24,6 +24,10 @@ trap cleanup EXIT
 phase() { "$DRIVE" '["peek","phase"]' 2>/dev/null; }
 reset_demo() {
   "$DRIVE" '["demo"]' >/dev/null
+  # demo() schedules a reload just after the command returns. Wait for the new app generation
+  # instead of occasionally entering XR on the page that is about to disappear.
+  sleep 1
+  npx @iwsdk/cli runtime wait --timeout 60000 >/dev/null
   "$EMU" enter
   "$DRIVE" '["wait",8]' >/dev/null
   if [ "$(phase)" != '"hub"' ]; then
@@ -34,6 +38,7 @@ reset_demo() {
 
 names=(anvil rush magnet tilt hammer ward)
 keys=(Digit1 Digit2 Digit3 Digit4 Digit5 Digit6)
+aims=(opposite-rival rival rival rival rival rival)
 clips=()
 for i in "${!names[@]}"; do
   reset_demo
@@ -42,19 +47,19 @@ for i in "${!names[@]}"; do
   echo "Recording ${names[$i]}"
   if [ "${names[$i]}" = hammer ]; then
     DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
-      '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' '["key","Digit5"]' \
-      '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",0.6]' \
+      '["key","KeyH"]' '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' '["key","Digit5"]' \
+      '["key","KeyJ"]' '["wait",0.8]' '["slap",{"angle":"rival"}]' '["wait",0.6]' \
       '["key","KeyG"]' '["key","KeyT"]' '["wait",4]' >/dev/null
   elif [ "${names[$i]}" = ward ]; then
     DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
-      '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' '["key","Digit6"]' \
-      '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",0.6]' \
-      '["key","KeyG"]' '["key","KeyT"]' '["wait",4]' >/dev/null
+      '["key","KeyH"]' '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' '["key","Digit6"]' \
+      '["key","KeyJ"]' '["wait",0.8]' '["key","KeyG"]' '["key","KeyT"]' '["wait",0.45]' \
+      '["slap",{"angle":"rival"}]' '["wait",6.5]' >/dev/null
   else
     DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
-      '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' \
+      '["key","KeyH"]' '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' \
       "[\"key\",\"${keys[$i]}\"]" '["wait",0.25]' \
-      '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",4]' >/dev/null
+      '["key","KeyJ"]' '["wait",0.8]' "[\"slap\",{\"angle\":\"${aims[$i]}\"}]" '["wait",4]' >/dev/null
   fi
   test -s "$clip"
   clips+=("$clip")

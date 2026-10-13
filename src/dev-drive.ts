@@ -15,6 +15,7 @@ import { Vector3 } from '@iwsdk/core';
 
 type Side = 'left' | 'right';
 type Point = 'pinch' | 'index' | 'low';
+type SlapAim = number | 'rival' | 'mine' | 'opposite-rival';
 
 interface EmuVec {
   x: number;
@@ -512,17 +513,32 @@ export function installDriver() {
       await park(side);
     },
 
-    /** The strike: a palm slapped down on the table beside the arena (or, gentle, pressed and held). */
-    async slap(opts: { gentle?: boolean; side?: Side } = {}) {
-      const { gentle = false, side = 'right' } = opts;
+    /**
+     * The strike: a palm slapped down beside the arena. `angle` is degrees, or a semantic target
+     * for repeatable ultimate footage. Anvil wants `opposite-rival`; aimed seals want `rival`.
+     */
+    async slap(opts: { gentle?: boolean; side?: Side; angle?: SlapAim } = {}) {
+      const { gentle = false, side = 'right', angle = 60 } = opts;
       const g = game();
       const tableY = g.root.position.y - PEDESTAL * g.rootK;
-      // Beside the near-right rim, where the handprint shows.
-      const a = Math.PI / 3;
-      const r = g.arena.radius * 1.2;
-      const spot = g.root.localToWorld(new Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)).setY(tableY);
+      const aimAngle = () => {
+        if (typeof angle === 'number') return (angle * Math.PI) / 180;
+        const target = angle === 'mine' ? g.mine : g.theirs;
+        return Math.atan2(target.z, target.x) + (angle === 'opposite-rival' ? Math.PI : 0);
+      };
+      // Steer the hand's lowest joint, while gameplay judges the palm midpoint. Keep enough room
+      // outside the rim that either hand pose still leaves that midpoint in the strike band.
+      const r = g.arena.radius * 1.55;
+      const spotAt = (a: number) => g.root.localToWorld(new Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)).setY(tableY);
+      let spot = spotAt(aimAngle());
       await glide(side, 'low', above(spot, 0.18), 0.35, 0);
       await wait(0.15);
+      // Semantic targets orbit during the reach. Re-aim just before the palm drops instead of
+      // guarding where the rival was a second ago.
+      if (typeof angle !== 'number') {
+        spot = spotAt(aimAngle());
+        await glide(side, 'low', above(spot, 0.18), 0.16, 0);
+      }
       await glide(side, 'low', spot, gentle ? 0.6 : 0.12, 0, gentle ? 'natural' : 'linear');
       await wait(gentle ? 0.6 : 0.3);
       await glide(side, 'low', above(spot, 0.15), 0.3, 0);

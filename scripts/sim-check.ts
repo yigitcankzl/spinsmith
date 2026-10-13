@@ -842,8 +842,8 @@ TUNING.grace = 0;
   assert.ok(!run([...hold(0.95, 0.2), ...move(0.95, 0.75, 0.8), ...hold(0.75, 1)]), 'a hand set down to rest is not');
 }
 
-// 26. The newer strikes: a Tilt slides the rival toward the palm (yours holds), a Hammer's next clash shatters three
-// times as hard, a Ward keeps a top in through a hit that would knock it out.
+// 26. Spatial strikes: Tilt separates its shove from native rocking; Rush, Magnet, Hammer and Ward
+// use the palm-authored lane, pit, forge mark and rim sector.
 {
   const flat = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
   flat.elapsed = 5;
@@ -863,32 +863,114 @@ TUNING.grace = 0;
   solo(flat2, own, 0.8);
   assert.ok(Math.abs(own.x) < 0.005, `your own top holds through your tilt (x ${own.x.toFixed(3)})`);
 
-  const clashDamage = (hammer: boolean) => {
+  // Anchoring removes only the seal's added slope on an arena that also rocks naturally.
+  const rocker = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [], tilt: 0.12 });
+  rocker.elapsed = 5;
+  const anchored = new Top(DEFENSE);
+  anchored.launch(0, 0, 0, 0, 1, 1);
+  sealStrike(rocker, anchored, parked, 'tilt', 1, 0);
+  solo(rocker, anchored, 0.8);
+  assert.ok(Math.abs(anchored.x) < 0.008, `your top ignores the added shove on a rocking arena (x ${anchored.x.toFixed(3)})`);
+
+  // Rush follows the palm lane, not an automatic lock-on to the rival.
+  const lane = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
+  const rusher = new Top(ATTACK);
+  const leftRival = new Top(DEFENSE);
+  rusher.launch(0, 0, 0, 0, 1, 1);
+  leftRival.launch(-0.08, 0, 0, 0, 1, -1);
+  sealStrike(lane, rusher, leftRival, 'rush', 0.15, 0);
+  assert.ok(rusher.vx > 1.1 && Math.abs(rusher.vz) < 0.01, 'Rush follows the +x palm-authored lane even with the rival on -x');
+
+  // Magnet chooses the pit nearest the palm sector, not the one nearest the rival.
+  const twoPits = arenaWith({ floor: 'flat', rails: [], pillars: [], pockets: [{ angle: 0, half: 0.2, points: 2 }, { angle: Math.PI, half: 0.2, points: 2 }] });
+  const pulled = new Top(DEFENSE);
+  pulled.launch(0, 0.02, 0, 0, 1, -1);
+  sealStrike(twoPits, parked, pulled, 'magnet', -0.15, 0);
+  assert.ok(pulled.vx < -0.2, `Magnet selects the -x pit from the slap (vx ${pulled.vx.toFixed(3)})`);
+
+  const clashDamage = (hammer: boolean, zone = 0) => {
     const arena = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
     arena.elapsed = 5;
     const a = new Top(ATTACK);
     const b = new Top(DEFENSE);
     a.launch(-0.04, 0, 0.6, 0, 1, 1);
     b.launch(0.04, 0, -0.6, 0, 1, -1);
-    if (hammer) a.hammer = 5;
+    if (hammer) {
+      a.hammer = 5;
+      a.hammerX = zone;
+      a.hammerZ = 0;
+    }
     for (let i = 0; i < 240; i++) if (step(arena, a, b)) break;
-    return b.damage;
+    return { damage: b.damage, armed: a.hammer };
   };
-  const plain = clashDamage(false);
-  const hammered = clashDamage(true);
-  assert.ok(plain > 0 && hammered > 2.5 * plain, `a hammer clash shatters harder (${plain.toFixed(3)} vs ${hammered.toFixed(3)})`);
+  const plain = clashDamage(false).damage;
+  const hammered = clashDamage(true).damage;
+  const missedMark = clashDamage(true, 0.12);
+  assert.ok(plain > 0 && hammered > 2.5 * plain, `a clash inside the forge mark shatters harder (${plain.toFixed(3)} vs ${hammered.toFixed(3)})`);
+  assert.ok(Math.abs(missedMark.damage - plain) < 1e-6 && missedMark.armed > 0, 'an off-mark clash stays normal and leaves Hammer armed');
 
-  const outward = (guard: boolean) => {
+  const outward = (guard: boolean, guardAngle = Math.PI / 2) => {
     const top = new Top(ATTACK);
     top.launch(0, 0.05, 0, 1.2, 1, 1);
-    if (guard) top.guard = 3;
+    if (guard) {
+      top.guard = 3;
+      top.guardAngle = guardAngle;
+    }
     const arena = arenaWith({ wall: 'none', pockets: [], rails: [] });
     arena.elapsed = 5;
     solo(arena, top, 0.6);
     return top.state;
   };
   assert.equal(outward(false), 'out', 'without a ward a hard-driven top goes over the edge');
-  assert.notEqual(outward(true), 'out', 'a ward holds it in');
+  assert.notEqual(outward(true), 'out', 'a Ward holds the top inside its selected +z sector');
+  assert.equal(outward(true, -Math.PI / 2), 'out', 'the opposite, unwarded sector remains dangerous');
+
+  const parry = (guardAngle: number, deliberate = true) => {
+    const arena = arenaWith({ floor: 'flat', wall: 'high', pockets: [], rails: [], pillars: [] });
+    arena.elapsed = 5;
+    const attacker = new Top(ATTACK);
+    const defender = new Top(DEFENSE);
+    attacker.launch(-0.055, 0, 0, 0, 1, 1);
+    defender.launch(0.015, 0, 0, 0, 1, -1);
+    defender.guard = 4;
+    defender.guardAngle = guardAngle;
+    if (deliberate) rivalMove(arena, attacker, defender, 'charge');
+    else {
+      attacker.vx = 1.1;
+      attacker.sinceDash = 0;
+    }
+    for (let i = 0; i < 240; i++) {
+      const clash = step(arena, attacker, defender);
+      if (clash) return clash.parry === true;
+    }
+    return false;
+  };
+  assert.ok(parry(Math.PI), 'a deliberate charge through the guarded sector rebounds');
+  assert.ok(!parry(0), 'a charge from an unguarded sector is not parried');
+  assert.ok(!parry(Math.PI, false), 'an ordinary recent rail dash is not mistaken for a charge');
+
+  // Remember the sector where a charge began even if it crosses the arena center before contact.
+  const crossing = arenaWith({ floor: 'flat', wall: 'high', pockets: [], rails: [], pillars: [] });
+  crossing.elapsed = 5;
+  const charger = new Top(ATTACK);
+  const warded = new Top(DEFENSE);
+  charger.launch(-0.055, 0, 0, 0, 1, 1);
+  warded.launch(0.04, 0, 0, 0, 1, -1);
+  warded.guard = 4;
+  warded.guardAngle = Math.PI;
+  rivalMove(crossing, charger, warded, 'charge');
+  // Put the charger just across x=0: its current angle is now 0, its entry sector was PI.
+  charger.x = 0.025;
+  charger.vx = 1.1;
+  let crossedParry = false;
+  for (let i = 0; i < 60; i++) {
+    const clash = step(crossing, charger, warded);
+    if (clash) {
+      crossedParry = clash.parry === true;
+      break;
+    }
+  }
+  assert.ok(crossedParry, 'Ward remembers a charge entry sector across the arena center');
 }
 
 // 27. Personal bests: the first is just kept; a better one is news; a worse one is not.

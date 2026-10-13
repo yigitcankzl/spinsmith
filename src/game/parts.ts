@@ -227,12 +227,12 @@ export interface TopBuild {
 /** What each seal's strike is called on the cards. */
 export const SEAL_NAMES: Record<Seal, string> = { anvil: 'Anvil Strike', rush: 'Rush', magnet: 'Magnet', tilt: 'Tilt', hammer: 'Hammer', ward: 'Ward' };
 export const SEAL_BLURBS: Record<Seal, string> = {
-  anvil: 'A shockwave from the middle: hot tops near the rim fly',
-  rush: 'Your top charges straight at the rival',
-  magnet: 'The rival is dragged toward the nearest slag pit',
+  anvil: 'A shockwave from your palm: exposed tops across the arena fly',
+  rush: 'Your palm chooses the charge lane: use rails and boost pads',
+  magnet: 'Your palm chooses the slag pit that drags the rival',
   tilt: 'The arena dips toward your palm: the rival slides, your top holds',
-  hammer: 'Your next solid hit lands three times as hard: go for the shatter',
-  ward: 'For 4 s your top cannot be knocked out; a charge into it rebounds on the charger',
+  hammer: 'Stamp a forge mark: your next solid hit inside it lands three times as hard',
+  ward: 'Guard one rim sector for 4 s: a charge through it rebounds on the charger',
 };
 
 /** Emblem glows: the forge's orange first; the rest are earned (levels 15-19, order stamps). Never cyan, the rival's color. */
