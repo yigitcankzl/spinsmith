@@ -861,8 +861,8 @@ export class MatchSystem extends createSystem({
       const me = this.mine;
       this.sealPop.position.set(me.x, this.arena.height(me.x, me.z) + 0.018 + t * 0.012, me.z);
       this.sealPop.rotation.set(1.2, t * 8, 0);
-      this.sealPop.scale.setScalar(1.5 * Math.min(1, t / 0.12) * Math.max(0, 1 - Math.max(0, t - 0.5) / 0.3));
-      if (t > 0.8) this.sealPop.visible = false;
+      this.sealPop.scale.setScalar(2.4 * Math.min(1, t / 0.16) * Math.max(0, 1 - Math.max(0, t - 0.7) / 0.4));
+      if (t > 1.1) this.sealPop.visible = false;
     }
     if (this.celebrate > 0) {
       const before = this.celebrate;
@@ -3157,12 +3157,13 @@ export class MatchSystem extends createSystem({
     if (full && !this.barWasFull) {
       playBarFull();
       this.fullSince = this.elapsed;
+      if (!this.photo) this.stamp.show('ULTIMATE READY', SEAL_NAMES[this.myBuild.seal ?? 'anvil'].toUpperCase(), 'mine', 0.8, 1.15);
     }
     this.barWasFull = full;
     // The hint stays until the first strike lands (the first session's ramp hint goes first).
     if (full && !this.struckOnce && !this.demo && this.progress.guide !== 'bump' && this.labelTimer <= 0) {
       this.strikeTaught = true;
-      this.label.set(`Forge bar full: ${SEAL_NAMES[this.myBuild.seal ?? 'anvil']}!\n${COMFORT.gentle ? 'Press your palm flat beside the arena and hold' : 'Slap your palm down beside the arena'}`);
+      this.label.set(`ULTIMATE READY: ${SEAL_NAMES[this.myBuild.seal ?? 'anvil']}!\n${COMFORT.gentle ? 'Press your palm flat beside the arena and hold' : 'Slap your palm down beside the arena'}`);
     }
     const armed = full && this.elapsed - this.fullSince > 0.5;
     // The print sits on the table off the near-right rim (any spot beside the arena works).
@@ -3376,12 +3377,19 @@ export class MatchSystem extends createSystem({
       this.slings[s] = null;
     }
     this.lastShape = { t: this.elapsed, kind: 'strike' };
+    // Every seal shares one unmistakable activation beat before its own effect: a coloured wave
+    // crosses the arena from the palm. This is presentation only; the six strike mechanics stay
+    // distinct below.
+    this.shockAt.x = ox;
+    this.shockAt.z = oz;
+    this.shockT = 0;
+    (this.shock.material as MeshBasicMaterial).color.setHex(SEAL_COLOR[seal]);
+    this.impacts.shock(ox, this.arena.floorHeight(1), oz, 1, SEAL_COLOR[seal]);
     // Each seal reads its own way: the anvil's shockwave from the middle, the rush's sparks trailing
     // your top, the magnet's rings closing on the rival.
     const me = this.mine;
     const them = this.theirs;
     if (seal === 'anvil') {
-      this.shockT = 0;
       this.impacts.hit(ox, this.arena.floorHeight(1), oz, 1);
       for (const t of [me, them]) if (t.alive) this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
       playStrike();
@@ -3407,14 +3415,14 @@ export class MatchSystem extends createSystem({
     this.roomLight.hit();
     duck(0.3, 0.4);
     // The super freeze: the fight holds for a beat while the seal rises off your top.
-    this.hitStop = 0.25;
+    this.hitStop = 0.4;
     this.accumulator = 0;
     this.sealPop.clear();
     this.sealPop.add(sealModel(seal));
     this.sealPop.userData.t = 0;
     this.sealPop.visible = true;
-    this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', '', 'mine', 0.5);
-    if (!cut && this.label.current.startsWith('Forge bar full')) this.label.set('');
+    this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', 'ULTIMATE', 'mine', 0.95, 1.35);
+    if (!cut && this.label.current.startsWith('ULTIMATE READY')) this.label.set('');
     if (import.meta.env.DEV) console.log(`[STRIKE] ${seal} at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
   }
 

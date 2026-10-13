@@ -96,7 +96,7 @@ export const ROWS: [string, Item[], number][] = [
       { kind: 'spin', value: 1, name: 'Spin', blurb: 'Tap to turn it: left spin steals spin from right spinners' },
       ...TOP_COLORS.map((value, i) => ({ kind: 'color' as const, value, name: PAINT_NAMES[i] ?? 'Paint', blurb: 'Dip your top or tap the pot' })),
       { kind: 'emblem' as const, name: 'Emblem glow', blurb: 'Tap to step through the glows you have earned' },
-      { kind: 'seal' as const, name: 'Strike', blurb: 'Tap to choose your strike: Anvil; Rush, Magnet, Tilt, Hammer and Ward open with levels' },
+      { kind: 'seal' as const, name: 'Ultimate', blurb: 'Tap to choose your ultimate: Anvil, Rush, Magnet, Tilt, Hammer and Ward unlock with levels' },
     ],
     0.05,
   ],
@@ -639,7 +639,7 @@ export class Forge {
       const owned = SEALS.filter((s) => s === 'anvil' || this.progress.isUnlocked(`seal:${s}`));
       const seal = owned[(owned.indexOf(this.build.seal ?? 'anvil') + 1) % owned.length];
       this.build = { ...this.build, seal };
-      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : `Earn more strikes: ${Object.entries(SEAL_UNLOCKS).map(([lv, k]) => `${SEAL_NAMES[k.slice(5) as Seal]} at Lv ${lv}`).join(', ')}`);
+      this.say(owned.length > 1 ? `${SEAL_NAMES[seal]}: ${SEAL_BLURBS[seal]}` : `Earn more ultimates: ${Object.entries(SEAL_UNLOCKS).map(([lv, k]) => `${SEAL_NAMES[k.slice(5) as Seal]} at Lv ${lv}`).join(', ')}`);
       this.showSeal();
     } else if (item.kind === 'emblem') {
       // The next glow you have earned (the forge's orange is always yours).
