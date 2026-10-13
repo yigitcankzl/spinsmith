@@ -660,6 +660,7 @@ export class TopView {
   /** Which part each mesh belongs to, and its resting height, for the exploded view. */
   private kinds: ('ring' | 'core' | 'tip')[] = [];
   private bases: number[] = [];
+  private depths: number[] = [];
   private shadow: Mesh;
   private teamRing: Mesh | null = null;
   private shakeT = 0;
@@ -738,6 +739,7 @@ export class TopView {
     this.parts = [...ringParts, ratchet, bit];
     this.kinds = [...ringParts.map(() => 'ring' as const), 'core', 'tip'];
     this.bases = this.parts.map((p) => p.position.y);
+    this.depths = this.parts.map((p) => p.position.z);
     // A blur halo in the body color at the blade's height, bright while spinning fast.
     this.blur = new Mesh(
       new RingGeometry(ring.radius * 0.5, ring.radius * 1.12, 48).rotateX(-Math.PI / 2),
@@ -820,10 +822,13 @@ export class TopView {
    * Exploded view (k 0..1): the ring lifts off and the bit drops away, so a part brought close
    * shows where it goes; the slot it would replace pulses.
    */
-  explode(k: number, focus: 'ring' | 'core' | 'tip' | null, time: number) {
+  explode(k: number, focus: 'ring' | 'core' | 'tip' | null, time: number, revealDepth = 0) {
     this.parts.forEach((p, i) => {
       const kind = this.kinds[i];
       p.position.y = this.bases[i] + (kind === 'ring' ? 0.012 : kind === 'tip' ? -0.009 : 0) * k;
+      // In the forge, fan the stack toward the player as well as vertically: the face stays
+      // visible while the dark ratchet and the bit no longer hide directly behind the ring.
+      p.position.z = this.depths[i] + (kind === 'ring' ? -0.006 : kind === 'core' ? 0.003 : 0.012) * k * revealDepth;
       p.scale.setScalar(kind === focus ? 1 + 0.08 * k * (0.5 + 0.5 * Math.sin(time * 10)) : 1);
     });
     // The edge glow and the blur disc lift with the ring.

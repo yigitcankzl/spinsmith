@@ -127,6 +127,9 @@ const QUENCH_AT = new Vector3(0.205, -0.006, 0.06);
 const STATS_AT = new Vector3(0.17, 0.12, -0.03);
 /** Your top on the anvil is this much larger than in the arena. */
 const DISPLAY_SCALE = 1.7;
+/** Forge-only inspection pose: lift the top clear of the anvil and expose its three layers. */
+const INSPECTION_LIFT = 0.025;
+const INSPECTION_EXPLODE = 0.75;
 /** The transformation takes this long (s). */
 const OPEN_TIME = 0.8;
 /** A carried part makes the top come apart within this distance, and fits within SNAP (world m). */
@@ -257,7 +260,8 @@ export class Forge {
     this.anvil.rotation.y = -0.45;
     this.displayHolder.position.copy(WORK);
     this.displayHolder.scale.setScalar(DISPLAY_SCALE);
-    this.displayTilt.rotation.x = 0.5;
+    // Steep enough to keep the face readable while revealing the core and tip below it.
+    this.displayTilt.rotation.x = 0.66;
     this.displayHolder.add(this.displayTilt);
     this.stats.mesh.name = 'forge-stats';
     this.stats.mesh.position.copy(STATS_AT);
@@ -446,7 +450,7 @@ export class Forge {
     // The anvil stands on the sunken floor, its plinth under it; it rises out of the floor.
     const rise = ease(k / 0.7);
     this.anvil.position.set(WORK.x, WORK.y - ANVIL_FACE * ANVIL_SCALE - 0.16 * (1 - rise), WORK.z);
-    if (!this.heldTop) this.displayHolder.position.y = WORK.y + 0.004 * Math.sin(this.time * 1.6) - 0.16 * (1 - rise);
+    if (!this.heldTop) this.displayHolder.position.y = WORK.y + INSPECTION_LIFT + 0.004 * Math.sin(this.time * 1.6) - 0.16 * (1 - rise);
     const slide = ease((k - 0.4) / 0.6);
     this.tabs.position.set(0, -0.02 * (1 - slide), -0.03 * (1 - slide));
     this.tabs.visible = slide > 0.01;
@@ -530,8 +534,9 @@ export class Forge {
     const held = this.heldPart;
     this.displayHolder.getWorldPosition(this.topAt);
     if (!held) {
-      this.explode = Math.max(0, this.explode - 0.08);
-      this.display.explode(this.explode, null, this.time);
+      const target = this.heldTop ? 0 : INSPECTION_EXPLODE;
+      this.explode += (target - this.explode) * 0.12;
+      this.display.explode(this.explode, null, this.time, 1);
       return;
     }
     const h = held.hand;
@@ -542,9 +547,10 @@ export class Forge {
     held.model.rotation.y = this.time * 2;
     const d = at.distanceTo(this.topAt);
     const slotKind = held.item.kind === 'ring' || held.item.kind === 'core' || held.item.kind === 'tip' ? held.item.kind : null;
-    const target = slotKind && d < EXPLODE_R ? Math.min(1, (EXPLODE_R - d) / (EXPLODE_R - SNAP)) : 0;
+    const inspection = this.heldTop ? 0 : INSPECTION_EXPLODE;
+    const target = slotKind && d < EXPLODE_R ? Math.max(inspection, Math.min(1, (EXPLODE_R - d) / (EXPLODE_R - SNAP))) : inspection;
     this.explode += (target - this.explode) * 0.25;
-    this.display.explode(this.explode, slotKind, this.time);
+    this.display.explode(this.explode, slotKind, this.time, 1);
     if (this.cardHeld !== held.item) {
       this.cardHeld = held.item;
       this.cardFor = undefined;
