@@ -347,6 +347,29 @@ export class MatchSystem extends createSystem({
   private rise = 1;
   /** The strike's seal coin, rising off your top as it lands. */
   private sealPop = Object.assign(new Group(), { visible: false });
+  /** A short-lived, arena-sized cause → target cue; unlike the seal coin it never covers the tops. */
+  private ultimateCue = { t: 0, seal: 'anvil' as Seal, tx: 0, tz: 0 };
+  private ultimatePath = Object.assign(
+    new Mesh(
+      new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5),
+      new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.7, blending: AdditiveBlending, depthWrite: false }),
+    ),
+    { visible: false },
+  );
+  private ultimateTarget = Object.assign(
+    new Mesh(
+      new RingGeometry(0.04, 0.052, 40).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }),
+    ),
+    { visible: false },
+  );
+  private ultimateArrow = (() => {
+    const shape = new Shape().moveTo(0, 0.034).lineTo(-0.024, -0.018).lineTo(0.024, -0.018).closePath();
+    return Object.assign(
+      new Mesh(new ShapeGeometry(shape).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.9, blending: AdditiveBlending, depthWrite: false })),
+      { visible: false },
+    );
+  })();
   /** A rival's tell drawn on the floor: the lane of a charge, the line of a pull toward its pit. */
   private lane = new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }));
   /** Seconds left of a won match's celebration (sparks round the rim). */
@@ -422,7 +445,7 @@ export class MatchSystem extends createSystem({
   /** What waits for the title to go (the no-table notice). */
   private afterTitle: (() => void) | null = null;
   /** A ring around your top while a Hammer is armed (gold) or a Ward holds (pale violet). */
-  private aura = new Mesh(new TorusGeometry(0.016, 0.0016, 8, 40).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffe066, transparent: true, depthWrite: false, blending: AdditiveBlending }));
+  private aura = new Mesh(new TorusGeometry(0.024, 0.0025, 8, 48).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffe066, transparent: true, depthWrite: false, blending: AdditiveBlending }));
   private label = new Label();
   private round = 0;
   /** Match score in heat: first to MATCH_HEAT wins the match. */
@@ -632,6 +655,9 @@ export class MatchSystem extends createSystem({
       ...this.scorches,
       ...this.handMarks,
       this.lane,
+      this.ultimatePath,
+      this.ultimateTarget,
+      this.ultimateArrow,
       this.sealPop,
       this.reticle,
       this.aura,
@@ -650,6 +676,7 @@ export class MatchSystem extends createSystem({
       this.shock,
     );
     this.shock.visible = false;
+    this.ultimatePath.renderOrder = this.ultimateTarget.renderOrder = this.ultimateArrow.renderOrder = 8;
     {
       const glow = (o: number) => new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: o, depthWrite: false, blending: AdditiveBlending });
       const palm = new MeshBasicMaterial({ color: 0xff8a2a, map: PALM, transparent: true, opacity: 0.9, depthWrite: false, blending: AdditiveBlending });
@@ -757,6 +784,22 @@ export class MatchSystem extends createSystem({
           const seal = SEALS[sealIndex];
           this.myBuild = { ...this.myBuild, seal };
           console.log(`[STRIKE] dev ultimate ${seal}`);
+        }
+        // G: make the current rival's next big move a charge, used to capture Hammer and Ward's
+        // delayed payoff without replacing the stable long-running capture opponent.
+        if (e.code === 'KeyG' && this.phase === 'fight') {
+          this.rival = { ...this.rival, move: 'charge' };
+          console.log('[TELL] dev rival move charge');
+        }
+        // U: keep a capture round alive long enough to perform a real hand gesture. Dev-only; the
+        // normal simulation and its balance tests never receive this grace extension.
+        if (e.code === 'KeyU' && this.phase === 'fight') {
+          this.arena.grace = this.elapsed + 30;
+          for (const top of this.tops) {
+            top.spin = Math.max(top.spin, 1.2);
+            top.damage = 0;
+          }
+          console.log('[MATCH] dev capture grace');
         }
         // A: the next arena, locked or not (to look at every arena).
         if (e.code === 'KeyA' && this.phase === 'hub') {
@@ -878,9 +921,11 @@ export class MatchSystem extends createSystem({
       const me = this.mine;
       this.sealPop.position.set(me.x, this.arena.height(me.x, me.z) + 0.018 + t * 0.012, me.z);
       this.sealPop.rotation.set(1.2, t * 8, 0);
-      this.sealPop.scale.setScalar(2.4 * Math.min(1, t / 0.16) * Math.max(0, 1 - Math.max(0, t - 0.7) / 0.4));
-      if (t > 1.1) this.sealPop.visible = false;
+      // The coin identifies the move, then gets out of the way before the action starts moving.
+      this.sealPop.scale.setScalar(1.8 * Math.min(1, t / 0.12) * Math.max(0, 1 - Math.max(0, t - 0.28) / 0.2));
+      if (t > 0.48) this.sealPop.visible = false;
     }
+    this.updateUltimateCue(Math.min(delta, 0.1));
     if (this.celebrate > 0) {
       const before = this.celebrate;
       this.celebrate -= Math.min(delta, 0.1);
@@ -3234,9 +3279,9 @@ export class MatchSystem extends createSystem({
       g.position.copy(h.wrist).y += 0.05;
       g.lookAt(this.head);
     }
-    // The shockwave runs across the arena from where it started in 0.18 s, fading.
+    // The shockwave crosses slowly enough to read as the cause of the tops being thrown.
     if (this.shockT < 1) {
-      this.shockT = Math.min(1, this.shockT + dt / 0.18);
+      this.shockT = Math.min(1, this.shockT + dt / 0.38);
       const r = Math.max(0.01, this.shockT * maxRim(this.arena.layout) * 2);
       this.shock.scale.setScalar(r);
       this.shock.position.set(this.shockAt.x, this.arena.floorHeight(0.5) + 0.003, this.shockAt.z);
@@ -3365,10 +3410,96 @@ export class MatchSystem extends createSystem({
     (this.lane.material as MeshBasicMaterial).opacity = 0.35 + 0.35 * k;
   }
 
+  /**
+   * Keeps the ultimate's cause and target visible after the title has landed. Rush points from your
+   * top to theirs, Magnet from theirs to the pit, and Tilt from the middle toward the struck side.
+   * Hammer and Ward ring your own top; Anvil leaves its expanding shockwave unobstructed.
+   */
+  private updateUltimateCue(dt: number) {
+    const cue = this.ultimateCue;
+    if (cue.t <= 0 || this.phase !== 'fight') {
+      this.ultimatePath.visible = this.ultimateTarget.visible = this.ultimateArrow.visible = false;
+      return;
+    }
+    // Persistent ultimates advertise only while their gameplay state is genuinely armed.
+    if ((cue.seal === 'hammer' && this.mine.hammer <= 0) || (cue.seal === 'ward' && this.mine.guard <= 0)) cue.t = 0;
+    cue.t = Math.max(0, cue.t - dt);
+    const seal = cue.seal;
+    let fx = 0;
+    let fz = 0;
+    let tx = cue.tx;
+    let tz = cue.tz;
+    let path = false;
+    if (seal === 'rush') {
+      fx = this.mine.x;
+      fz = this.mine.z;
+      tx = this.theirs.x;
+      tz = this.theirs.z;
+      path = this.mine.alive && this.theirs.alive;
+    } else if (seal === 'magnet') {
+      fx = this.theirs.x;
+      fz = this.theirs.z;
+      path = this.theirs.alive;
+    } else if (seal === 'tilt') {
+      path = true;
+    } else if (seal === 'hammer' || seal === 'ward') {
+      tx = this.mine.x;
+      tz = this.mine.z;
+    }
+    const fade = Math.min(1, cue.t / 0.3);
+    const pulse = 1 + 0.18 * Math.sin(this.time * 16);
+    this.ultimateTarget.visible = cue.t > 0;
+    this.ultimateTarget.position.set(tx, this.arena.height(tx, tz) + 0.004, tz);
+    this.ultimateTarget.scale.setScalar((seal === 'hammer' || seal === 'ward' ? 1.35 : 1) * pulse);
+    (this.ultimateTarget.material as MeshBasicMaterial).opacity = 0.85 * fade;
+    this.ultimatePath.visible = path && cue.t > 0;
+    this.ultimateArrow.visible = this.ultimatePath.visible;
+    if (this.ultimatePath.visible) {
+      const len = Math.hypot(tx - fx, tz - fz);
+      const yaw = Math.atan2(-(tx - fx), -(tz - fz));
+      this.ultimatePath.position.set(fx, this.arena.height(fx, fz) + 0.003, fz);
+      this.ultimatePath.rotation.y = yaw;
+      this.ultimatePath.scale.set(0.035 * pulse, 1, Math.max(0.001, len));
+      (this.ultimatePath.material as MeshBasicMaterial).opacity = 0.8 * fade;
+      this.ultimateArrow.position.set(fx + (tx - fx) * 0.65, this.arena.height(fx + (tx - fx) * 0.65, fz + (tz - fz) * 0.65) + 0.004, fz + (tz - fz) * 0.65);
+      this.ultimateArrow.rotation.y = yaw;
+      this.ultimateArrow.scale.setScalar(pulse);
+      (this.ultimateArrow.material as MeshBasicMaterial).opacity = 0.95 * fade;
+    }
+  }
+
+  /** Starts the arena cue before the simulation changes velocity, preserving the intended target. */
+  private beginUltimateCue(seal: Seal, ox: number, oz: number) {
+    const cue = this.ultimateCue;
+    cue.t = seal === 'hammer' ? 5 : seal === 'ward' ? 4 : 1.8;
+    cue.seal = seal;
+    cue.tx = seal === 'tilt' || seal === 'anvil' ? ox : seal === 'hammer' || seal === 'ward' ? this.mine.x : this.theirs.x;
+    cue.tz = seal === 'tilt' || seal === 'anvil' ? oz : seal === 'hammer' || seal === 'ward' ? this.mine.z : this.theirs.z;
+    if (seal === 'magnet') {
+      const a0 = Math.atan2(this.theirs.z, this.theirs.x);
+      let a = a0;
+      let gap = Infinity;
+      for (const p of this.arena.layout.pockets) {
+        const g = Math.abs(Math.atan2(Math.sin(p.angle - a0), Math.cos(p.angle - a0)));
+        if (g < gap) {
+          gap = g;
+          a = p.angle;
+        }
+      }
+      cue.tx = Math.cos(a) * this.arena.radius;
+      cue.tz = Math.sin(a) * this.arena.radius;
+    }
+    const color = SEAL_COLOR[seal];
+    (this.ultimatePath.material as MeshBasicMaterial).color.setHex(color);
+    (this.ultimateTarget.material as MeshBasicMaterial).color.setHex(color);
+    (this.ultimateArrow.material as MeshBasicMaterial).color.setHex(color);
+  }
+
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
   private doStrike(ox = 0, oz = 0) {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
     const seal = this.myBuild.seal ?? 'anvil';
+    this.beginUltimateCue(seal, ox, oz);
     // The Ward is a parry, not an interrupt: the move still comes, and a charge rebounds off it.
     const cut = this.tellAt >= 0 && this.theirs.tell > 0 && seal !== 'ward';
     // Cups and slings let go first, so none is left holding forever.

@@ -40,10 +40,22 @@ for i in "${!names[@]}"; do
   "$DRIVE" '["key","KeyR"]' '["wait",3.5]' >/dev/null
   clip="$SHOTS/$((i + 1))-${names[$i]}.mp4"
   echo "Recording ${names[$i]}"
-  DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
-    '["rip",{"power":0.9,"aim":8}]' '["fightAt",3]' \
-    "[\"key\",\"${keys[$i]}\"]" '["wait",0.25]' \
-    '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",4]' >/dev/null
+  if [ "${names[$i]}" = hammer ]; then
+    DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
+      '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' '["key","Digit5"]' \
+      '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",0.6]' \
+      '["key","KeyG"]' '["key","KeyT"]' '["wait",4]' >/dev/null
+  elif [ "${names[$i]}" = ward ]; then
+    DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
+      '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' '["key","Digit6"]' \
+      '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",0.6]' \
+      '["key","KeyG"]' '["key","KeyT"]' '["wait",4]' >/dev/null
+  else
+    DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
+      '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' \
+      "[\"key\",\"${keys[$i]}\"]" '["wait",0.25]' \
+      '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",4]' >/dev/null
+  fi
   test -s "$clip"
   clips+=("$clip")
 done
