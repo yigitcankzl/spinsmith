@@ -56,6 +56,17 @@ interface Game {
   hub: { debugPositions(): string };
   forge: { debugPositions(): string };
   progress: { level: number; matches: number; guide: string };
+  launchZoneKind: string;
+  launchArenaKind: string;
+  launchTiming: number;
+  launchTwist: number;
+  firstClashPending: boolean;
+  openingOutcome: string;
+  rivalLaunchPower: number;
+  rivalLaunchAim: number;
+  ripBeatAt: number;
+  time: number;
+  devLaunchTwist: number;
   SPAWN: number;
   gazeOff: boolean;
   photo: boolean;
@@ -260,6 +271,17 @@ export function installDriver() {
         guide: g.progress.guide,
         rival: g.rival?.name,
         rivalMove: g.rival?.move,
+        opening: {
+          zone: g.launchZoneKind,
+          arena: g.launchArenaKind,
+          timing: +g.launchTiming.toFixed(2),
+          twist: +g.launchTwist.toFixed(2),
+          pending: g.firstClashPending,
+          outcome: g.openingOutcome,
+          rivalPower: +g.rivalLaunchPower.toFixed(2),
+          rivalAim: +g.rivalLaunchAim.toFixed(2),
+          beatIn: g.ripBeatAt < 0 ? null : +(g.ripBeatAt - g.time).toFixed(2),
+        },
         elapsed: +g.elapsed.toFixed(1),
         heat: [g.myPoints, g.theirPoints],
         charges: g.charges.charges,
@@ -305,10 +327,12 @@ export function installDriver() {
      * power 0..1 (from the pull's length and its speed at release), aim in degrees (+ = to the
      * right), steep 0..1 (pull upward: slower, more spin).
      */
-    async rip(opts: { power?: number; aim?: number; steep?: number; side?: Side } = {}) {
-      const { power = 0.9, aim = 0, steep = 0, side = 'right' } = opts;
+    async rip(opts: { power?: number; aim?: number; steep?: number; twist?: number; at?: { x: number; z: number }; onBeat?: boolean; side?: Side } = {}) {
+      const { power = 0.9, aim = 0, steep = 0, twist = 0, side = 'right' } = opts;
       const g = game();
-      const start = local(g.mine.x, g.mine.z, 0.02);
+      g.devLaunchTwist = Math.max(-1, Math.min(1, twist));
+      const at = opts.at ?? { x: g.mine.x, z: g.mine.z };
+      const start = local(at.x, at.z, 0.02);
       // Toward the player in the arena's frame, turned by the aim: the top goes the other way.
       const toward = g.root.localToWorld(new Vector3(0, 0, 1)).sub(g.root.position).setY(0).normalize();
       toward.applyAxisAngle(new Vector3(0, 1, 0), (-aim * Math.PI) / 180);
@@ -316,6 +340,10 @@ export function installDriver() {
       const speed = Math.max(0.15, Math.min(1.3, (power - 0.4) / 0.6));
       const pull = toward.multiplyScalar(len * Math.cos((steep * Math.PI) / 2));
       pull.y = len * Math.sin((steep * Math.PI) / 2);
+      if (opts.at) {
+        await glide(side, 'index', start, 0.35, 0);
+        await wait(0.15);
+      }
       await glide(side, 'pinch', above(start, 0.05), 0.4, 0);
       await glide(side, 'pinch', start, 0.2, 0);
       await setPinch(side, true);
@@ -324,6 +352,7 @@ export function installDriver() {
       await glide(side, 'pinch', end, len / speed, pinchNow[side], 'linear');
       // Let go mid-motion: the release keeps the speed.
       const over = end.clone().add(pull.clone().multiplyScalar(0.15));
+      if (opts.onBeat) g.ripBeatAt = g.time;
       pinchNow[side] = 0;
       await glide(side, 'pinch', over, (len * 0.15) / speed, 0, 'linear');
       await wait(0.2);
