@@ -11,7 +11,19 @@ C="timeout 90 npx @iwsdk/cli"
 cmd=${1:-}; shift || true
 case "$cmd" in
   enter)
-    $C xr enter >/dev/null 2>&1 || true; sleep 2
+    active=0
+    for _ in 1 2 3; do
+      $C xr enter --input-json '{}' >/dev/null 2>&1 || true
+      sleep 2
+      if $C xr status 2>/dev/null | grep -q '"sessionActive": true'; then
+        active=1
+        break
+      fi
+    done
+    if [ "$active" != 1 ]; then
+      echo "XR session did not become active" >&2
+      exit 1
+    fi
     $C xr set-input-mode --input-json '{"mode":"hand"}' >/dev/null 2>&1
     sleep 1; "$0" front ;;
   front)

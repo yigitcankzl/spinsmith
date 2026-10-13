@@ -10,19 +10,13 @@ export default async function run({ page, frame, workspaceRoot }) {
   const videoFile = join(workspaceRoot, '.drive-video');
   const video = existsSync(videoFile) ? readFileSync(videoFile, 'utf8').trim() : '';
   const capture = {
-    width: Number(process.env.DRIVE_VIDEO_WIDTH ?? 2560),
-    height: Number(process.env.DRIVE_VIDEO_HEIGHT ?? 1440),
+    width: Number(process.env.DRIVE_VIDEO_WIDTH ?? 1920),
+    height: Number(process.env.DRIVE_VIDEO_HEIGHT ?? 1080),
     fps: Number(process.env.DRIVE_VIDEO_FPS ?? 60),
-    bitrate: Number(process.env.DRIVE_VIDEO_BITRATE ?? 48_000_000),
+    bitrate: Number(process.env.DRIVE_VIDEO_BITRATE ?? 24_000_000),
     crf: String(process.env.DRIVE_VIDEO_CRF ?? 12),
     preset: String(process.env.DRIVE_VIDEO_PRESET ?? 'slow'),
   };
-  if (video) {
-    // Give IWER and the WebGL renderer real source pixels. Upscaling only the recorder canvas
-    // produces a large file with the same soft image.
-    await page.setViewportSize({ width: capture.width, height: capture.height });
-    await new Promise((resolve) => setTimeout(resolve, 600));
-  }
   // The game runs in the app frame; find the one with the driver.
   let target = null;
   for (const f of [frame, ...page.frames()].filter(Boolean)) {
@@ -87,10 +81,15 @@ export default async function run({ page, frame, workspaceRoot }) {
     const parts = [];
     rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
     rec.start(500);
-    window.__rec = { rec, parts, stop: () => (on = false) };
-    return 'ok';
+    const source = {
+      room: [room.width, room.height],
+      game: [game.width, game.height],
+      output: [out.width, out.height],
+    };
+    window.__rec = { rec, parts, source, stop: () => (on = false) };
+    return { ok: true, source };
   }, capture);
-  if (started !== 'ok') throw new Error(started);
+  if (!started?.ok) throw new Error(String(started));
   let result;
   try {
     result = await target.evaluate((s) => window.drive.run(s), steps);
@@ -126,5 +125,5 @@ export default async function run({ page, frame, workspaceRoot }) {
     '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', video,
   ]);
   rmSync(webm);
-  return { video, mb: +(b64.length * 0.75 / 1e6).toFixed(1), state: result };
+  return { video, mb: +(b64.length * 0.75 / 1e6).toFixed(1), source: started.source, state: result };
 }

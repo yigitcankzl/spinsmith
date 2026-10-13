@@ -5,15 +5,15 @@
 #   CUT_ONLY=1 scripts/trailer.sh       cut again from the shots already recorded
 #   CAPTURE_USE_RUNNING=1 ...           reuse an automation-enabled managed server
 # Output: <out-dir>/shots/*.mp4 and <out-dir>/spinsmith-trailer-rough.mp4 (emulator footage, labelled).
-set -uo pipefail
+set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=${1:-$HOME/Desktop/spinsmith-videos}
 S=$OUT/shots
 mkdir -p "$S"
 D=scripts/drive.sh
 E=scripts/emu.sh
-VIDEO_WIDTH=${DRIVE_VIDEO_WIDTH:-2560}
-VIDEO_HEIGHT=${DRIVE_VIDEO_HEIGHT:-1440}
+VIDEO_WIDTH=${DRIVE_VIDEO_WIDTH:-1920}
+VIDEO_HEIGHT=${DRIVE_VIDEO_HEIGHT:-1080}
 VIDEO_FPS=${DRIVE_VIDEO_FPS:-60}
 rec() { DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$S/$1" $D "${@:2}" >/dev/null; }
 phase() { $D '["peek","phase"]' 2>/dev/null; }
@@ -24,8 +24,8 @@ logs() { $E logs 40; }
 if [ -z "${CUT_ONLY:-}" ]; then
   CAPTURE_OWNS_SERVER=0
   if [ -z "${CAPTURE_USE_RUNNING:-}" ]; then
-    echo "Starting a headless IWSDK capture server (it will stop when capture finishes)..."
-    npx @iwsdk/cli dev restart --headless --allow-browser-automation --timeout 60000 >/dev/null
+    echo "Starting a visible, hardware-accelerated IWSDK capture browser (it will stop when capture finishes)..."
+    npx @iwsdk/cli dev restart --open --allow-browser-automation --timeout 60000 >/dev/null
     CAPTURE_OWNS_SERVER=1
     trap '[ "$CAPTURE_OWNS_SERVER" = 1 ] && npx @iwsdk/cli dev down >/dev/null 2>&1 || true' EXIT
   fi
@@ -60,18 +60,25 @@ if [ -z "${CUT_ONLY:-}" ]; then
   rec 07-match-win.mp4 '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",11]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",10]'
 fi
 
+for required in 01-rise-title 02-portal 03-rip-ramp-replay 04-strike 05-cup-sling 06-forge 07-match-win; do
+  if [ ! -s "$S/$required.mp4" ]; then
+    echo "Missing capture: $S/$required.mp4" >&2
+    exit 1
+  fi
+done
+
 # The cut: title cards between trimmed shots, every shot labelled as emulator footage.
 T=$(mktemp -d)
 FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
 card() {
   ffmpeg -y -loglevel error -f lavfi -i "color=c=0x14161b:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=2.2:r=$VIDEO_FPS" -f lavfi -i anullsrc=r=48000:cl=stereo -t 2.2 \
-    -vf "drawtext=fontfile=$FONT:text='$2':fontcolor=0xff8a2a:fontsize=122:x=(w-text_w)/2:y=(h-text_h)/2-40,drawtext=fontfile=$FONT:text='$3':fontcolor=0xd9d4cc:fontsize=53:x=(w-text_w)/2:y=(h/2)+80,fade=t=in:st=0:d=0.3,fade=t=out:st=1.9:d=0.3" \
+    -vf "drawtext=fontfile=$FONT:text='$2':fontcolor=0xff8a2a:fontsize=92:x=(w-text_w)/2:y=(h-text_h)/2-30,drawtext=fontfile=$FONT:text='$3':fontcolor=0xd9d4cc:fontsize=40:x=(w-text_w)/2:y=(h/2)+60,fade=t=in:st=0:d=0.3,fade=t=out:st=1.9:d=0.3" \
     -c:v libx264 -crf 14 -preset slow -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$T/$1.mp4"
 }
 clip() {
   local end; end=$(echo "$4 - 0.3" | bc)
   ffmpeg -y -loglevel error -ss "$3" -i "$S/$2" -t "$4" \
-    -vf "scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},fps=${VIDEO_FPS},drawtext=fontfile=$FONT:text='Captured in the IWER emulator':fontcolor=white@0.55:fontsize=35:x=w-text_w-40:y=h-66,fade=t=in:st=0:d=0.2,fade=t=out:st=$end:d=0.3" \
+    -vf "scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},fps=${VIDEO_FPS},drawtext=fontfile=$FONT:text='Captured in the IWER emulator':fontcolor=white@0.55:fontsize=26:x=w-text_w-30:y=h-50,fade=t=in:st=0:d=0.2,fade=t=out:st=$end:d=0.3" \
     -af "afade=t=in:st=0:d=0.2,afade=t=out:st=$end:d=0.3" -c:v libx264 -crf 14 -preset slow -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 -ac 2 "$T/$1.mp4"
 }
 card c0 "SPINSMITH" "A spinning-top battle on your real table"
