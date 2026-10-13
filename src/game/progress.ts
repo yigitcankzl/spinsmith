@@ -122,6 +122,21 @@ export interface Champion {
   build: TopBuild;
   wins: number;
 }
+
+export type OpeningZone = 'center' | 'edge' | 'ambush' | 'neutral';
+export interface OpeningMemory {
+  zone: OpeningZone;
+  streak: number;
+  x: number;
+  z: number;
+  outcome: string;
+}
+
+export interface TopScars {
+  wins: number;
+  shapes: number;
+  orders: number;
+}
 /** How many champions stand at home. */
 export const CHAMPIONS = 3;
 
@@ -224,6 +239,10 @@ export class Progress {
   private orders = new Set<string>();
   /** Marks (MARK bits) per rival name. */
   private marks: Record<string, number> = {};
+  /** What each rival saw in the player's recent openings. */
+  private openings: Record<string, OpeningMemory> = {};
+  /** Visible history carried by a forged top, keyed by its physical build. */
+  private scars: Record<string, TopScars> = {};
   /** Most recent first. */
   champions: Champion[] = [];
   /** Today's order, kept once made so a level-up mid-day does not change it. */
@@ -245,7 +264,7 @@ export class Progress {
     try {
       const raw = storage?.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; champions?: Champion[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[] };
+        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; openings?: Record<string, OpeningMemory>; scars?: Record<string, TopScars>; champions?: Champion[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[] };
         this.matches = s.matches ?? 0;
         // Saves from before the guide existed skip it.
         this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
@@ -257,6 +276,8 @@ export class Progress {
         for (const q of s.quests) this.quests.add(q);
         for (const d of s.orders ?? []) this.orders.add(d);
         this.marks = { ...(s.marks ?? {}) };
+        this.openings = { ...(s.openings ?? {}) };
+        this.scars = { ...(s.scars ?? {}) };
         this.champions = (s.champions ?? []).slice(0, CHAMPIONS).map((c) => ({ ...c, build: migrateBuild(c.build) }));
         this.order = s.order ?? null;
         this.arenaPin = s.arenaPin ?? null;
@@ -392,6 +413,38 @@ export class Progress {
     return fresh;
   }
 
+  openingAgainst(rival: string): OpeningMemory | null {
+    const m = this.openings[rival];
+    return m ? { ...m } : null;
+  }
+
+  /** Remembers a launch. Repeating a zone builds a readable streak; changing it breaks the read. */
+  rememberOpening(rival: string, zone: OpeningZone, x: number, z: number): OpeningMemory {
+    const old = this.openings[rival];
+    const next = { zone, streak: old?.zone === zone ? old.streak + 1 : 1, x, z, outcome: '' };
+    this.openings[rival] = next;
+    this.save();
+    return { ...next };
+  }
+
+  finishOpening(rival: string, outcome: string) {
+    const m = this.openings[rival];
+    if (!m || m.outcome === outcome) return;
+    m.outcome = outcome;
+    this.save();
+  }
+
+  scarsFor(build: TopBuild): TopScars {
+    return { ...(this.scars[buildKey(build)] ?? { wins: 0, shapes: 0, orders: 0 }) };
+  }
+
+  recordScar(build: TopBuild, kind: keyof TopScars) {
+    const key = buildKey(build);
+    const s = this.scars[key] ?? (this.scars[key] = { wins: 0, shapes: 0, orders: 0 });
+    s[kind] = Math.min(12, s[kind] + 1);
+    this.save();
+  }
+
   /** A build won a match: it becomes (or stays) a champion, most recent first. */
   recordChampion(build: TopBuild) {
     const same = (b: TopBuild) => b.ring === build.ring && b.core === build.core && b.tip === build.tip;
@@ -448,6 +501,8 @@ export class Progress {
     this.quests.clear();
     this.orders.clear();
     this.marks = {};
+    this.openings = {};
+    this.scars = {};
     this.champions = [];
     this.order = null;
     this.arenaPin = null;
@@ -470,10 +525,14 @@ export class Progress {
     try {
       this.storage?.setItem(
         KEY,
-        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn] }),
+        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, openings: this.openings, scars: this.scars, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn] }),
       );
     } catch {
       // Storage full or blocked (a private window): progress lives for this session only.
     }
   }
+}
+
+function buildKey(build: TopBuild) {
+  return `${build.ring}|${build.core}|${build.tip}|${build.spin}|${build.color}|${build.emblem ?? 0}|${build.seal ?? 'anvil'}`;
 }

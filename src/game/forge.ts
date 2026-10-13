@@ -701,6 +701,7 @@ export class Forge {
   private rebuildDisplay() {
     this.display?.dispose();
     this.display = new TopView(this.build, this.build.color);
+    this.display.scars(this.progress.scarsFor(this.build));
     this.displayTilt.add(this.display.root);
     this.explode = 0;
     this.cardKey = '';

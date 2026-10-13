@@ -93,6 +93,13 @@ export class HandInput {
 
   private read(frame: XRFrame, ref: XRReferenceSpace, source: XRInputSource, h: HandState, player: Object3D): boolean | null {
     const pressed = source.gamepad?.buttons[0]?.pressed ?? false;
+    // IWER's programmatic pinch closes its logical hand input but, unlike a physical Quest hand,
+    // does not always move the synthetic thumb/index joints. Dev automation still travels through
+    // the real hand-position path; only its explicit pinch value needs this emulator-only bridge.
+    const emulatedValue = import.meta.env.DEV
+      ? (window as unknown as { IWER_DEVICE?: { hands?: Partial<Record<'left' | 'right', { pinchValue?: number }>> } }).IWER_DEVICE?.hands?.[source.handedness as 'left' | 'right']?.pinchValue ?? 0
+      : 0;
+    const emulatedPinch = emulatedValue > 0.5;
     const hand = source.hand;
     if (hand && frame.getJointPose) {
       const thumbJoint = hand.get('thumb-tip');
@@ -118,7 +125,7 @@ export class HandInput {
           const p = pose.transform.position;
           h.low = Math.min(h.low, player.localToWorld(this.v.set(p.x, p.y, p.z)).y - (pose.radius ?? 0.008));
         }
-        return pressed || (h.pinching ? d < PINCH_OFF : d < PINCH_ON);
+        return pressed || emulatedPinch || (h.pinching ? d < PINCH_OFF : d < PINCH_ON);
       }
     }
     if (!source.gripSpace) return null;
@@ -129,7 +136,7 @@ export class HandInput {
     h.index.copy(h.pinch);
     h.wrist.copy(h.pinch);
     h.low = h.pinch.y;
-    return pressed;
+    return pressed || emulatedPinch;
   }
 
   private readRay(frame: XRFrame, ref: XRReferenceSpace, source: XRInputSource, h: HandState, player: Object3D) {

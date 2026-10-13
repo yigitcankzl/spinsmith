@@ -13,6 +13,8 @@ import { rivalMove, sealStrike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, 
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
+import type { OpeningZone } from './progress.js';
+import { rematchAdvice } from './mastery.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
 import { nextArena } from './rotation.js';
 import { SAVE_KEYS } from './demo-save.js';
@@ -326,6 +328,10 @@ export class MatchSystem extends createSystem({
   private sparks = new Sparks();
   /** The ghost hand that shows the first moves. */
   private ghost = new GhostHand();
+  /** The rival's cyan projection: it authors the telegraphed launch and arena moves. */
+  private rivalGhost = new GhostHand(0x9cecff, 0x4fd1ff);
+  private rivalGhostKeys: number[][] = [[0, 0, 0, 0, 0], [1, 0, 0, 0, 0]];
+  private rivalGhostFor = 0;
   /** Big stamped words over the arena: rounds, finishes, the rip. */
   private stamp = new Stamp(0.2);
   /** The arena forging up out of the table after placing (0..1), and the title over it. */
@@ -430,6 +436,9 @@ export class MatchSystem extends createSystem({
    */
   /** Each hand's ramp in the making: where, since when, and the live shape once it is set. */
   private shaping: Record<Side, { x: number; z: number; sx: number; sz: number; t: number; far: boolean; amp: number; dx: number; dz: number; shape: FloorShape | null } | null> = { left: null, right: null };
+  /** Experimental ?rim A/B: the rim is pulled inward and released as a defensive spring. */
+  private rimPulls: Record<Side, { x: number; z: number; sx: number; sz: number } | null> = { left: null, right: null };
+  private readonly rimExperiment = new URLSearchParams(location.search).has('rim');
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
   private pressing: Record<Side, boolean> = { left: false, right: false };
   /** Each hand's fingertip height last frame (arena-local), and when it last set a ramp. */
@@ -455,7 +464,7 @@ export class MatchSystem extends createSystem({
   private marks = new ShapeMarks(0xff8a2a);
   private pips = new ChargePips();
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
-  private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' } | null = null;
+  private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
   private parried = false;
@@ -527,6 +536,12 @@ export class MatchSystem extends createSystem({
   private launchAim = new Group();
   private launchAimShaft = new Mesh(new PlaneGeometry(0.009, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5), this.launchAimMaterial);
   private launchAimHead = new Mesh(new ConeGeometry(0.015, 0.035, 3).rotateX(Math.PI / 2), this.launchAimMaterial);
+  /** The previous attempt stays faint for the next ready phase, so a rematch invites one correction. */
+  private openingEchoMaterial = new MeshBasicMaterial({ color: 0xc47a43, transparent: true, opacity: 0.28, depthWrite: false, side: DoubleSide });
+  private openingEcho = new Group();
+  private openingEchoShaft = new Mesh(new PlaneGeometry(0.007, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5), this.openingEchoMaterial);
+  private openingEchoHead = new Mesh(new ConeGeometry(0.012, 0.028, 3).rotateX(Math.PI / 2), this.openingEchoMaterial);
+  private lastOpeningTrace: { x: number; z: number; angle: number; length: number; zone: OpeningZone; outcome: string; rival: string; arena: string } | null = null;
   /** The rival's opening lane, shown before the rip so launch placement is a readable choice. */
   private rivalIntent = new Group();
   private rivalIntentMaterial = new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.72, depthWrite: false, blending: AdditiveBlending, side: DoubleSide });
@@ -538,6 +553,8 @@ export class MatchSystem extends createSystem({
   private launchTiming = 1;
   private firstClashPending = false;
   private openingOutcome = '';
+  private rivalRead = '';
+  private rematchTip = '';
   private rivalLaunchPower = 0.7;
   private rivalLaunchAim = 0;
   private ripBeatAt = -1;
@@ -591,13 +608,15 @@ export class MatchSystem extends createSystem({
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
     this.launchAim.add(this.launchAimShaft, this.launchAimHead);
+    this.openingEcho.add(this.openingEchoShaft, this.openingEchoHead);
     this.rivalIntent.add(...this.rivalIntentDashes, this.rivalIntentHead);
-    this.launchGuide.add(this.launchSafeZone, this.launchDangerZone, this.launchMarker, this.launchAim, this.launchGhost, this.rivalIntent);
+    this.launchGuide.add(this.launchSafeZone, this.launchDangerZone, this.launchMarker, this.launchAim, this.launchGhost, this.openingEcho, this.rivalIntent);
     this.launchGuide.visible = false;
-    this.launchMarker.visible = this.launchAim.visible = this.launchGhost.visible = this.rivalIntent.visible = false;
+    this.launchMarker.visible = this.launchAim.visible = this.launchGhost.visible = this.openingEcho.visible = this.rivalIntent.visible = false;
     this.stage.add(
       this.chargeRing,
       this.ghost.root,
+      this.rivalGhost.root,
       this.portal,
       this.portalCore,
       ...this.palmPrints,
@@ -906,9 +925,11 @@ export class MatchSystem extends createSystem({
       this.roomLight.update(this.head, this.root.position, this.root.position.y - PEDESTAL, dim, p === 'forge' || p === 'build', dt);
     }
     const launchPhase = this.phase === 'ready' || this.phase === 'pulling';
+    const openingFight = this.phase === 'fight' && this.firstClashPending;
     this.launchZone.visible = launchPhase && !this.demo;
-    this.launchGuide.visible = launchPhase && !this.demo;
+    this.launchGuide.visible = (launchPhase || openingFight) && !this.demo;
     this.launchSafeZone.visible = this.launchDangerZone.visible = this.phase === 'ready' && !this.demo;
+    this.openingEcho.visible = launchPhase && !!this.lastOpeningTrace && this.lastOpeningTrace.rival === this.rival.name && this.lastOpeningTrace.arena === this.arena.layout.name && !this.demo;
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
       this.arenaView.charge = 0;
@@ -1066,6 +1087,7 @@ export class MatchSystem extends createSystem({
     this.trails.update(vdt);
     this.pillar.update(Math.min(delta, 0.1));
     this.updateGuide();
+    this.updateRivalGhost(dt);
     for (const c of this.showcase.children) c.rotation.y += dt * 0.4;
     this.updateRewards(dt);
     this.updateShapes();
@@ -1108,6 +1130,12 @@ export class MatchSystem extends createSystem({
     const min = 0.5 + 0.25 * skill;
     this.rivalLaunchPower = first ? 0.7 + Math.random() * 0.1 : Math.random() < 0.5 * skill ? 1 : min + Math.random() * (0.98 - min);
     this.rivalLaunchAim = first ? (Math.random() - 0.5) * 0.3 : (Math.random() - 0.5) * (1 - 0.6 * skill);
+    const memory = this.progress.openingAgainst(this.rival.name);
+    if (memory && memory.streak >= 2) {
+      // The counter is deterministic and fully telegraphed by the cyan line; no hidden stat bonus.
+      this.rivalLaunchPower = memory.zone === 'center' ? 0.96 : 0.88;
+      this.rivalLaunchAim = memory.zone === 'ambush' ? -Math.sign(memory.x || 1) * 0.24 : memory.zone === 'edge' ? Math.sign(memory.x || 1) * 0.16 : 0;
+    }
     const [x, z] = this.rivalSpot();
     const angle = Math.atan2(-x, -z) + this.rivalLaunchAim + LAUNCH_TILT * this.theirs.hand;
     const length = 0.07 + 0.07 * this.rivalLaunchPower;
@@ -1129,6 +1157,37 @@ export class MatchSystem extends createSystem({
     this.rivalIntentHead.position.set(hx, this.arena.height(hx, hz) + 0.008, hz);
     this.rivalIntentHead.rotation.y = angle;
     this.rivalIntent.visible = !this.demo;
+    // The projection pulls the rival's cord; its trail is the cyan blueprint.
+    this.rivalGhostKeys = [
+      [0, x, this.arena.height(x, z) + 0.055, z, 0],
+      [0.35, x, this.arena.height(x, z) + 0.015, z, 0],
+      [0.55, x, this.arena.height(x, z) + 0.015, z, 1],
+      [1.2, x - vx * 0.085, this.arena.height(x, z) + 0.045, z - vz * 0.085, 1],
+      [1.3, x - vx * 0.095, this.arena.height(x, z) + 0.05, z - vz * 0.095, 0],
+      [2.1, x - vx * 0.1, this.arena.height(x, z) + 0.065, z - vz * 0.1, 0],
+    ];
+  }
+
+  private updateRivalGhost(dt: number) {
+    const opening = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
+    if (opening || this.rivalGhostFor > 0) {
+      this.rivalGhost.play(this.rivalGhostKeys, dt);
+      if (!opening) this.rivalGhostFor = Math.max(0, this.rivalGhostFor - dt);
+    } else this.rivalGhost.hide();
+  }
+
+  /** Shows the rival physically authoring a move instead of explaining it with another card. */
+  private rivalHandMove(x: number, z: number, dx: number, dz: number) {
+    const y = this.arena.height(x, z);
+    this.rivalGhostKeys = [
+      [0, x, y + 0.06, z, 0],
+      [0.25, x, y + 0.008, z, 0],
+      [0.4, x, y + 0.008, z, 1],
+      [0.9, x + dx * 0.045, y + 0.015, z + dz * 0.045, 1],
+      [1.05, x + dx * 0.05, y + 0.045, z + dz * 0.05, 0],
+      [1.35, x + dx * 0.05, y + 0.06, z + dz * 0.05, 0],
+    ];
+    this.rivalGhostFor = 1.35;
   }
 
   /** Player's top this round (alternates so both shapes get played). */
@@ -1385,12 +1444,14 @@ export class MatchSystem extends createSystem({
       [theirs, OPPONENT_COLOR, 1],
     ];
     for (const [build, color, i] of sides) {
-      const key = JSON.stringify([build.ring, build.core, build.tip, color]);
+      const scars = i === 0 ? this.progress.scarsFor(build) : { wins: 0, shapes: 0, orders: 0 };
+      const key = JSON.stringify([build.ring, build.core, build.tip, build.spin, color, scars]);
       if (key === this.viewKeys[i]) continue;
       this.viewKeys[i] = key;
       const old = i === 0 ? this.myView : this.theirView;
       old?.dispose();
       const view = new TopView(build, color);
+      if (i === 0) view.scars(scars);
       view.team(i === 0 ? TEAM_MINE : TEAM_RIVAL, ringOf(build).radius);
       // A top that lands on the desk scorches it.
       view.onLand = (x, y, z) => this.scorch(x, y, z);
@@ -1937,6 +1998,7 @@ export class MatchSystem extends createSystem({
     this.theirPoints = 0;
     this.wasDown = false;
     this.introDone = false;
+    this.rematchTip = '';
     this.matchLog = { rounds: [], rip: 0, xp: 0, won: false, score: '' };
     for (const m of [...this.palmPrints, ...this.scorches]) m.visible = false;
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
@@ -2427,8 +2489,12 @@ export class MatchSystem extends createSystem({
     this.launchZone.geometry.dispose();
     this.launchZone.geometry = new BufferGeometry();
     this.launchZone.geometry.setAttribute('position', new Float32BufferAttribute(zone, 3));
-    // The rival takes a new spot on the far half each round.
-    this.rivalAngle = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
+    // The rival takes a new spot on the far half each round. After two repeated starts it openly
+    // lines up a counter through that side; changing zones breaks the read.
+    const memory = this.progress.openingAgainst(this.rival.name);
+    const read = memory && memory.streak >= 2 && memory.zone !== 'neutral' ? memory : null;
+    this.rivalRead = read ? `${this.rival.name} read your ${read.zone} start` : '';
+    this.rivalAngle = read ? -Math.PI / 2 + Math.max(-0.7, Math.min(0.7, -read.x * 0.9)) : -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
     const [rx, rz] = this.rivalSpot();
     this.launchFrom = null;
     this.launchPreviewSide = null;
@@ -2440,6 +2506,15 @@ export class MatchSystem extends createSystem({
     this.firstClashPending = false;
     this.openingOutcome = '';
     this.launchMarker.visible = this.launchAim.visible = this.launchGhost.visible = false;
+    const echo = this.lastOpeningTrace;
+    this.openingEcho.visible = !!echo && echo.rival === this.rival.name && echo.arena === this.arena.layout.name && !this.demo;
+    if (this.openingEcho.visible && echo) {
+      this.openingEcho.position.set(echo.x, this.arena.height(echo.x, echo.z) + 0.004, echo.z);
+      this.openingEcho.rotation.y = echo.angle;
+      this.openingEchoShaft.scale.z = echo.length;
+      this.openingEchoHead.position.z = echo.length;
+      this.openingEchoMaterial.color.setHex(echo.outcome.includes('COUNTER') ? 0x8b4650 : 0xc47a43);
+    }
     this.mine.launch(0, this.SPAWN, 0, 0, 1, this.mine.hand);
     this.theirs.launch(rx, rz, 0, 0, 1, this.theirs.hand);
     this.planRivalLaunch();
@@ -2462,7 +2537,7 @@ export class MatchSystem extends createSystem({
       this.introDone = true;
       // The first rematch says what the new part changes (the same rival: a clean comparison).
       const watch = this.progress.matches === 1 && this.myBuild.tip === 'spur' ? `Watch your Spur: it turns on ${this.rival.name} sooner` : `"${this.rival.intro}"`;
-      this.label.set(`${this.rival.name}, ${this.rival.title}\n${watch}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
+      this.label.set(`${this.rival.name}, ${this.rival.title}\n${this.rivalRead || watch}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
     }
     else {
       this.label.set('');
@@ -2471,6 +2546,10 @@ export class MatchSystem extends createSystem({
       const word = this.myPoints >= point && this.theirPoints >= point ? 'FINAL ROUND' : this.myPoints >= point || this.theirPoints >= point ? 'MATCH POINT' : `ROUND ${this.round + 1}`;
       this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
       playGong();
+      if (this.rivalRead) {
+        this.label.set(`${this.rivalRead}\nIts cyan line has changed`);
+        this.labelTimer = 2.2;
+      }
     }
     // The countdown to the rip, after the first session's lessons (not over its hints).
     this.count = !this.demo && this.progress.guide === 'done' ? { t: -0.4, beat: 0 } : null;
@@ -2786,6 +2865,7 @@ export class MatchSystem extends createSystem({
     this.rampAt.left = this.rampAt.right = -9;
     this.cups.left = this.cups.right = null;
     this.slings.left = this.slings.right = null;
+    this.rimPulls.left = this.rimPulls.right = null;
     if (perfect && !this.demo) this.perfectInMatch = true;
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
@@ -2837,6 +2917,18 @@ export class MatchSystem extends createSystem({
       const a = aim + LAUNCH_TILT * mh + twist;
       this.mine.launch(sx, sz, Math.sin(a) * mySpeed, -Math.cos(a) * mySpeed, mySpin, mh);
     }
+    // Lock the blueprint to the actual post-bonus velocity, not the raw hand motion.
+    const traceAngle = Math.atan2(this.mine.vx, this.mine.vz);
+    const traceLength = 0.07 + 0.07 * Math.min(1, Math.hypot(this.mine.vx, this.mine.vz) / Math.max(0.001, LAUNCH_SPEED));
+    this.launchAim.visible = true;
+    this.launchAim.position.set(sx, this.arena.height(sx, sz) + 0.003, sz);
+    this.launchAim.rotation.y = traceAngle;
+    this.launchAimShaft.scale.z = traceLength;
+    this.launchAimHead.position.z = traceLength;
+    this.lastOpeningTrace = { x: sx, z: sz, angle: traceAngle, length: traceLength, zone: this.launchZoneKind, outcome: '', rival: this.rival.name, arena: this.arena.layout.name };
+    if (!this.demo && this.progress.guide === 'done' && this.rival.name !== 'Challenger' && this.launchZoneKind !== 'neutral') {
+      this.progress.rememberOpening(this.rival.name, this.launchZoneKind, sx / Math.max(0.001, this.arena.radius), sz / Math.max(0.001, this.arena.radius));
+    }
     this.sparks.burst(sx, this.arena.height(sx, sz), sz, perfect ? 1 : power * 0.6);
     playTouchdown(sx, sz, 0.6 + 0.4 * power);
     // The rival rips harder as you level up.
@@ -2882,9 +2974,10 @@ export class MatchSystem extends createSystem({
     const open = this.elapsed >= TUNING.grace;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      this.updateCup(side);
+      if (!this.rimExperiment) this.updateCup(side);
       if (!h.tracked) {
         this.shaping[side] = null;
+        this.rimPulls[side] = null;
         this.pressing[side] = false;
         this.endSling(side, false);
         // The fingertip's speed starts over when the hand comes back (a hand regained lower is not a press).
@@ -2897,9 +2990,22 @@ export class MatchSystem extends createSystem({
         // Its own vector: toLocal() reuses one, and `l` (the pinch) is still in use below.
         this.tipY[side] = this.root.worldToLocal(this.handAt.copy(h.index)).y;
         this.tipDown[side] = 0;
+        let rim = this.rimPulls[side];
+        if (!rim && this.rimExperiment && h.justPinched && open) {
+          const n = normRadius(this.arena.layout, l.x, l.z);
+          if (n >= 0.82 && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
+            rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z };
+            playTick();
+          }
+        }
+        if (rim) {
+          rim.x = l.x;
+          rim.z = l.z;
+          continue;
+        }
         let d = this.shaping[side];
         // Pinching a cup that holds a top grabs it to sling, before any ramp.
-        if (!d && h.justPinched && open && this.startSling(side, l.x, l.z)) continue;
+        if (!this.rimExperiment && !d && h.justPinched && open && this.startSling(side, l.x, l.z)) continue;
         const sl = this.slings[side];
         if (sl) {
           sl.px = l.x - sl.sx;
@@ -2942,8 +3048,14 @@ export class MatchSystem extends createSystem({
         continue;
       }
       // Let go: the ramp, if set, keeps working on its own; a pulled sling fires.
+      const rim = this.rimPulls[side];
+      if (rim) {
+        this.rimPulls[side] = null;
+        this.doRimSpring(rim.sx, rim.sz, rim.x, rim.z);
+        continue;
+      }
       this.shaping[side] = null;
-      this.endSling(side, true);
+      if (!this.rimExperiment) this.endSling(side, true);
       // A fingertip pressed into the floor makes a well, once per press, if it came down with
       // intent (a hand resting or drifting down does not) and not just as a ramp was let go.
       const tip = this.toLocal(h.index);
@@ -2968,10 +3080,55 @@ export class MatchSystem extends createSystem({
         const slapping = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, palm.x, palm.z) > 1.0;
         if (slapping) {
           if (import.meta.env.DEV) console.log('[SHAPE] well ignored: a slap outside the rim');
-        } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
+        } else if (!this.rimExperiment && down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
         else if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${down.toFixed(2)} m/s down`);
       } else if (depth < 0) this.pressing[side] = false;
     }
+  }
+
+  /**
+   * Experimental ?rim replacement for cup/sling: pull a rim section toward the middle and let go.
+   * It spends one normal shaping charge and nudges nearby tops inward; it never deals damage or
+   * guarantees a knockout, so timing the save is still the player's skill.
+   */
+  private doRimSpring(sx: number, sz: number, x: number, z: number) {
+    if (!this.rimExperiment) return;
+    const r = Math.hypot(sx, sz) || 1;
+    const ix = -sx / r;
+    const iz = -sz / r;
+    const pull = (x - sx) * ix + (z - sz) * iz;
+    const minimum = 0.012 * (this.arena.radius / 0.17);
+    if (pull < minimum) {
+      playLocked();
+      if (import.meta.env.DEV) console.log(`[RIM] ignored: inward pull ${pull.toFixed(3)}`);
+      return;
+    }
+    const f = this.charges.spend(this.elapsed, TUNING.grace);
+    if (!f) {
+      playLocked();
+      return;
+    }
+    if (!this.cuppedOnce && this.label.current.startsWith('New: pinch')) this.label.set('');
+    this.cuppedOnce = true;
+    let hits = 0;
+    for (const top of this.tops) {
+      const tr = Math.hypot(top.x, top.z);
+      if (!top.alive || tr < this.arena.radius * 0.5) continue;
+      const sameSector = (top.x * sx + top.z * sz) / Math.max(1e-5, tr * r);
+      if (sameSector < Math.cos(0.6)) continue;
+      top.vx += ix * (0.13 + Math.min(0.07, pull * 2)) * f;
+      top.vz += iz * (0.13 + Math.min(0.07, pull * 2)) * f;
+      hits++;
+      this.sparks.burst(top.x, this.arena.height(top.x, top.z), top.z, 0.65);
+    }
+    this.arenaView.flashRail(sx, sz);
+    this.impacts.shock(sx, this.arena.height(sx, sz), sz, hits ? 0.75 : 0.35);
+    this.sparks.burst(sx, this.arena.height(sx, sz), sz, hits ? 0.9 : 0.35);
+    this.lastShape = hits ? { t: this.elapsed, kind: 'parry' } : this.lastShape;
+    this.progress.advance('match');
+    this.stamp.show(hits ? 'RIM SPRING!' : 'MISSED SPRING', hits ? `${hits} top${hits === 1 ? '' : 's'} pulled in` : 'no top in that sector', hits ? 'mine' : 'neutral', 0.55);
+    playThock();
+    if (import.meta.env.DEV) console.log(`[RIM] spring at ${sx.toFixed(3)},${sz.toFixed(3)} pull ${pull.toFixed(3)} hits ${hits}`);
   }
 
   /**
@@ -3101,6 +3258,12 @@ export class MatchSystem extends createSystem({
       them.tell = TELL_TIME;
       playTell();
       this.stamp.show(`${this.rival.move.toUpperCase()}!`, `${this.rival.name} winds up`, 'rival', 0.7);
+      {
+        const dx = this.mine.x - them.x;
+        const dz = this.mine.z - them.z;
+        const d = Math.hypot(dx, dz) || 1;
+        this.rivalHandMove(them.x, them.z, dx / d, dz / d);
+      }
       const what = { charge: 'a charge', quake: 'a quake', pull: 'a pull' }[this.rival.move];
       if (!this.tellTaught) {
         this.tellTaught = true;
@@ -3371,7 +3534,10 @@ export class MatchSystem extends createSystem({
     const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
     if (!f) return;
     this.rivalShapeKind = 'RAMP';
-    this.arena.addShape('ramp', me.x - (me.x / r) * 0.012 * (this.arena.radius / 0.17), me.z - (me.z / r) * 0.012 * (this.arena.radius / 0.17), SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r, RIVAL_RAMP_SIGMA);
+    const x = me.x - (me.x / r) * 0.012 * (this.arena.radius / 0.17);
+    const z = me.z - (me.z / r) * 0.012 * (this.arena.radius / 0.17);
+    this.arena.addShape('ramp', x, z, SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r, RIVAL_RAMP_SIGMA);
+    this.rivalHandMove(x, z, me.x / r, me.z / r);
     this.rivalShapeAt = this.elapsed;
     playThock();
     if (import.meta.env.DEV) console.log(`[SHAPE] rival ramp at ${me.x.toFixed(3)},${me.z.toFixed(3)} t ${this.elapsed.toFixed(1)}`);
@@ -3434,8 +3600,8 @@ export class MatchSystem extends createSystem({
     const nz = dz / d;
     const mineToward = mineVx * nx + mineVz * nz;
     const rivalToward = -(rivalVx * nx + rivalVz * nz);
-    let word = 'SIDE HIT';
-    let sub = 'ANGLE WON';
+    let word = 'GLANCING';
+    let sub = 'NO EDGE';
     if (this.launchZoneKind === 'ambush') {
       word = 'AMBUSH';
       const countered = rivalToward > mineToward;
@@ -3448,11 +3614,27 @@ export class MatchSystem extends createSystem({
     } else if (mineToward > 0.08 && rivalToward > 0.08) {
       word = 'HEAD-ON';
       sub = 'POWER TEST';
+    } else if (mineToward > rivalToward + 0.025) {
+      word = 'SIDE HIT';
+      sub = 'ANGLE WON';
+    } else if (rivalToward > mineToward + 0.025) {
+      word = 'SIDE HIT';
+      sub = 'ANGLE LOST';
     }
-    this.stamp.show(word, sub, sub === 'COUNTER-HIT' ? 'rival' : 'mine', 0.65);
-    this.openingOutcome = `${word} · ${sub}`;
+    const outcome = `${word} · ${sub}`;
+    this.stamp.show(word, sub, sub === 'COUNTER-HIT' || sub === 'ANGLE LOST' ? 'rival' : 'mine', 0.65);
+    this.finishOpening(outcome);
     playStamp();
     if (import.meta.env.DEV) console.log(`[OPENING] ${word} ${sub} strength ${clash.strength.toFixed(2)}`);
+  }
+
+  /** Commits the visible opening verdict to both the next-round echo and this rival's memory. */
+  private finishOpening(outcome: string) {
+    this.openingOutcome = outcome;
+    if (this.lastOpeningTrace) this.lastOpeningTrace.outcome = outcome;
+    if (!this.demo && this.progress.guide === 'done' && this.rival.name !== 'Challenger' && this.lastOpeningTrace?.zone !== 'neutral') {
+      this.progress.finishOpening(this.rival.name, outcome);
+    }
   }
 
   private updateFight(dt: number) {
@@ -3480,10 +3662,10 @@ export class MatchSystem extends createSystem({
       if (clash) this.openingClash(clash, mineVx, mineVz, rivalVx, rivalVz, openingDx, openingDz);
       else if (this.firstClashPending && this.elapsed >= 1.4) {
         this.firstClashPending = false;
-        this.openingOutcome = 'CLEAN EVADE · LANE ESCAPED';
-        this.stamp.show('CLEAN EVADE', 'LANE ESCAPED', 'mine', 0.65);
+        this.finishOpening('NO CONTACT · LINES MISSED');
+        this.stamp.show('NO CONTACT', 'LINES MISSED', 'neutral', 0.65);
         playStamp();
-        if (import.meta.env.DEV) console.log('[OPENING] CLEAN EVADE');
+        if (import.meta.env.DEV) console.log('[OPENING] NO CONTACT');
       }
       // A charge rebounding off your Ward: said once per Ward, and it counts as stopping the move.
       if (this.mine.guard <= 0) this.parried = false;
@@ -3692,6 +3874,20 @@ export class MatchSystem extends createSystem({
         }
       } else if (recent && v === -1 && loser.finish !== 'spin' && !(theirs && this.rivalShapeAt > this.lastShape!.t)) text = `YOUR ${recent} BACKFIRED\n${text.split('\n').pop()}`;
       else if (theirs && v === -1 && loser.finish !== 'spin') text = `THEIR ${this.rivalShapeKind} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text.split('\n').pop()}`;
+      if (decided && v === -1) {
+        const rivalMove = theirs && loser.finish !== 'spin' ? this.rivalShapeKind : null;
+        const ownBackfire = recent && loser.finish !== 'spin' && !(theirs && this.rivalShapeAt > this.lastShape!.t) ? recent : null;
+        this.rematchTip = rematchAdvice({
+          openingOutcome: this.openingOutcome,
+          zone: this.lastOpeningTrace?.zone ?? this.launchZoneKind,
+          rip: this.lastRip,
+          finish: loser.finish,
+          ownBackfire,
+          rivalMove,
+          shaped: !!this.lastShape,
+        });
+        text = `You lose the match\nTry: ${this.rematchTip}`;
+      }
     }
     this.label.set(text);
     this.barMessage = text.split('\n')[0].replace(/!.*$/, '!');
@@ -3775,7 +3971,9 @@ export class MatchSystem extends createSystem({
       this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.05, fy + 0.006, z + oz * 0.05, 1], [1.35, x + ox * 0.05, fy + 0.03, z + oz * 0.05, 0], [2.2, x + ox * 0.05, fy + 0.05, z + oz * 0.05, 0]], this.frameDt);
       ghost = true;
     } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.progress.matches === 2 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
-      this.label.set('New: jab a fingertip down into the floor\na cup opens and catches the top that rolls in');
+      this.label.set(this.rimExperiment
+        ? 'New: pinch the glowing rim, pull it inward, release\nits spring can save a top near that edge'
+        : 'New: jab a fingertip down into the floor\na cup opens and catches the top that rolls in');
     } else if (this.bumpHintShown && g !== 'bump') {
       // The first move is made: the hint goes.
       this.bumpHintShown = false;
@@ -3814,6 +4012,16 @@ export class MatchSystem extends createSystem({
    */
   private trackComeBack(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
     const cause = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? this.lastShape.kind : null;
+    let scarChanged = false;
+    if (won && cause) {
+      this.progress.recordScar(this.myBuild, 'shapes');
+      scarChanged = true;
+    }
+    if (matchWon) {
+      this.progress.recordScar(this.myBuild, 'wins');
+      scarChanged = true;
+    }
+    if (scarChanged) this.myView.scars(this.progress.scarsFor(this.myBuild));
     const ko = loser.finish === 'pocket' || loser.finish === 'over' || loser.finish === 'burst';
     const fresh = won ? this.progress.mark(this.rival.name, (matchWon ? MARK.beaten : 0) | (ko ? MARK.knockout : 0) | (cause ? MARK.shape : 0)) : 0;
     // Beating a circuit's champion for the first time clears the circuit: a moment of its own.
@@ -3841,6 +4049,8 @@ export class MatchSystem extends createSystem({
     if (!met) return;
     const before = this.progress.level;
     const a = this.progress.completeOrder(o.date);
+    this.progress.recordScar(this.myBuild, 'orders');
+    this.myView.scars(this.progress.scarsFor(this.myBuild));
     console.log(`[ORDER] done: ${o.text} -> ${this.progress.stamps} stamps${a.unlocked.length ? `, unlocked ${a.unlocked.join(', ')}` : ''}`);
     this.reveals.unshift(`stamp:${this.progress.stamps}`);
     this.reveals.push(...a.unlocked);

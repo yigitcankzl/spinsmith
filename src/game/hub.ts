@@ -227,11 +227,13 @@ export class Hub {
     const onAnvil = progress.guide === 'forge' || progress.guide === 'fit';
     const at = onAnvil ? FORGE_AT : DOCK_AT;
     this.beacon.position.set(at.x, TABLE_Y + DOCK_TOP + 0.003, at.z);
-    const topKey = JSON.stringify(build);
+    const topScars = progress.scarsFor(build);
+    const topKey = JSON.stringify([build, topScars]);
     if (topKey !== this.topKey) {
       this.topKey = topKey;
       this.standTop?.dispose();
       this.standTop = new TopView(build, build.color);
+      this.standTop.scars(topScars);
       this.standTop.root.position.y = DOCK_TOP;
       this.standHolder.add(this.standTop.root);
     }
@@ -556,7 +558,7 @@ export class Hub {
 
   /** Your champions on small stands along the left rim, rebuilt when the list changes. */
   private fillChampions(progress: Progress) {
-    const key = JSON.stringify(progress.champions);
+    const key = JSON.stringify(progress.champions.map((c) => [c, progress.scarsFor(c.build)]));
     if (key === this.championsKey) return;
     this.championsKey = key;
     for (const v of this.championViews) v.dispose();
@@ -570,6 +572,7 @@ export class Hub {
       const stand = standModel();
       stand.scale.setScalar(RIM_SCALE * 0.8);
       const view = new TopView(c.build, c.build.color);
+      view.scars(progress.scarsFor(c.build));
       view.root.scale.setScalar(0.8);
       view.root.position.y = DOCK_TOP * 0.8;
       this.championViews.push(view);

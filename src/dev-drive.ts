@@ -26,7 +26,12 @@ interface EmuHand {
   position: EmuVec;
   poseId: string;
   updatePinchValue(v: number): void;
+  setPinchValueImmediate?(v: number): void;
   onFrameStart(frame: unknown): void;
+}
+interface EmuHandle {
+  position: EmuVec & { clone(): EmuVec; copy(v: unknown): unknown };
+  parent: { worldToLocal(v: EmuVec): unknown } | null;
 }
 interface Hand {
   tracked: boolean;
@@ -62,6 +67,13 @@ interface Game {
   launchTwist: number;
   firstClashPending: boolean;
   openingOutcome: string;
+  sizeSettled: boolean;
+  entrance: unknown | null;
+  /** Readable evidence for the new duel-memory loop; populated by MatchSystem. */
+  lastOpeningTrace?: { zone: string; outcome: string } | null;
+  rivalRead?: string;
+  rematchTip?: string;
+  rimExperiment?: boolean;
   rivalLaunchPower: number;
   rivalLaunchAim: number;
   ripBeatAt: number;
@@ -90,7 +102,7 @@ const PEDESTAL = 0.08;
 const ARENA_SCALE = 2.4;
 
 export function installDriver() {
-  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand> }; __game?: Game; drive?: unknown };
+  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand> }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown };
   const goals: Record<Side, Goal | null> = { left: null, right: null };
   /** Where each held hand's steered point should be now. */
   const aim: Record<Side, { point: Point; at: Vector3 } | null> = { left: null, right: null };
@@ -119,14 +131,14 @@ export function installDriver() {
     return out;
   };
 
-  const frameHook = (side: Side, hand: EmuHand) => {
+  const frameHook = (side: Side, hand: EmuHand, advance = true) => {
     const g = goals[side];
     const root = held[side];
     if (!root || !w.__game) return;
     const now = performance.now();
-    const dt = Math.min(0.1, (now - lastAt[side]) / 1000);
-    lastAt[side] = now;
-    if (g) {
+    const dt = advance ? Math.min(0.1, (now - lastAt[side]) / 1000) : 0;
+    if (advance) lastAt[side] = now;
+    if (g && advance) {
       g.t += dt;
       const raw = g.dur > 0 ? Math.min(1, g.t / g.dur) : 1;
       // Reaches ease in and out like a hand; fast physical gestures keep their measured speed.
@@ -153,25 +165,51 @@ export function installDriver() {
       root.copy(a.at).sub(offset);
     }
     lastPinch[side] = pinchNow[side];
-    hand.updatePinchValue(pinchNow[side]);
+    if (hand.setPinchValueImmediate) hand.setPinchValueImmediate(pinchNow[side]);
+    else hand.updatePinchValue(pinchNow[side]);
     lastRoot[side].copy(root);
     const local = game().player.worldToLocal(v.copy(root));
     hand.position.set(local.x, local.y, local.z);
+    // IWER's visible handle is its pose authority and normally copies back into the input every
+    // frame. Move it too, otherwise the UI can overwrite an automated hand before the game reads it.
+    const handle = w.transformHandles?.get(side);
+    if (handle) {
+      const p = handle.position.clone();
+      p.set(root.x, root.y, root.z);
+      handle.parent?.worldToLocal(p);
+      handle.position.copy(p);
+    }
   };
 
   const hook = () => {
     if (hooked) return;
     const dev = w.IWER_DEVICE;
     if (!dev) throw new Error('no emulator (IWER_DEVICE)');
-    for (const side of ['left', 'right'] as const) {
-      const hand = dev.hands[side];
-      const orig = hand.onFrameStart.bind(hand);
-      hand.onFrameStart = (frame: unknown) => {
-        frameHook(side, hand);
-        orig(frame);
-      };
-    }
     hooked = true;
+    // IWER may replace a hand's onFrameStart callback when an immersive session settles. Drive
+    // the public hand state from the page's frame clock instead; IWER consumes it on its next XR
+    // frame, and a gesture can no longer stall halfway through after that callback is replaced.
+    const ensureHook = (side: Side) => {
+      const hand = dev.hands[side];
+      const current = hand.onFrameStart as EmuHand['onFrameStart'] & { __spinDrive?: boolean };
+      if (current.__spinDrive) return;
+      const original = current.bind(hand);
+      const wrapped = ((frame: unknown) => {
+        frameHook(side, hand, false);
+        original(frame);
+      }) as EmuHand['onFrameStart'] & { __spinDrive?: boolean };
+      wrapped.__spinDrive = true;
+      hand.onFrameStart = wrapped;
+    };
+    const tick = () => {
+      if (!hooked) return;
+      for (const side of ['left', 'right'] as const) {
+        ensureHook(side);
+        frameHook(side, dev.hands[side]);
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   };
 
   /** Takes a hand (it stays where it is) so the driver can steer it. */
@@ -278,6 +316,9 @@ export function installDriver() {
           twist: +g.launchTwist.toFixed(2),
           pending: g.firstClashPending,
           outcome: g.openingOutcome,
+          echo: g.lastOpeningTrace ? { zone: g.lastOpeningTrace.zone, outcome: g.lastOpeningTrace.outcome } : null,
+          rivalRead: g.rivalRead ?? '',
+          rematchTip: g.rematchTip ?? '',
           rivalPower: +g.rivalLaunchPower.toFixed(2),
           rivalAim: +g.rivalLaunchAim.toFixed(2),
           beatIn: g.ripBeatAt < 0 ? null : +(g.ripBeatAt - g.time).toFixed(2),
@@ -285,6 +326,7 @@ export function installDriver() {
         elapsed: +g.elapsed.toFixed(1),
         heat: [g.myPoints, g.theirPoints],
         charges: g.charges.charges,
+        rimExperiment: !!g.rimExperiment,
         bar: +g.forgeBar.value.toFixed(2),
         arenaRadius: g.arena.radius,
         mine: top(g.mine),
@@ -330,32 +372,37 @@ export function installDriver() {
     async rip(opts: { power?: number; aim?: number; steep?: number; twist?: number; at?: { x: number; z: number }; onBeat?: boolean; side?: Side } = {}) {
       const { power = 0.9, aim = 0, steep = 0, twist = 0, side = 'right' } = opts;
       const g = game();
+      // The rival portal and the arena's match-size slide are filmed first. Waiting here keeps the
+      // chosen launch point fixed in world space instead of chasing a moving arena.
+      for (let i = 0; i < 160 && g.phase === 'ready' && (g.entrance || !g.sizeSettled); i++) await wait(0.05);
       g.devLaunchTwist = Math.max(-1, Math.min(1, twist));
       const at = opts.at ?? { x: g.mine.x, z: g.mine.z };
-      const start = local(at.x, at.z, 0.02);
-      // Toward the player in the arena's frame, turned by the aim: the top goes the other way.
-      const toward = g.root.localToWorld(new Vector3(0, 0, 1)).sub(g.root.position).setY(0).normalize();
-      toward.applyAxisAngle(new Vector3(0, 1, 0), (-aim * Math.PI) / 180);
       const len = 0.22 * Math.min(1, Math.max(0.2, power / 0.4));
       const speed = Math.max(0.15, Math.min(1.3, (power - 0.4) / 0.6));
-      const pull = toward.multiplyScalar(len * Math.cos((steep * Math.PI) / 2));
-      pull.y = len * Math.sin((steep * Math.PI) / 2);
-      if (opts.at) {
-        await glide(side, 'index', start, 0.35, 0);
-        await wait(0.15);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        // Recompute world positions: the arena can still be completing its match-size slide during
+        // a rival entrance, and a retry must follow its settled location.
+        const start = local(at.x, at.z, 0.02);
+        const toward = g.root.localToWorld(new Vector3(0, 0, 1)).sub(g.root.position).setY(0).normalize();
+        toward.applyAxisAngle(new Vector3(0, 1, 0), (-aim * Math.PI) / 180);
+        const pull = toward.multiplyScalar(len * Math.cos((steep * Math.PI) / 2));
+        pull.y = len * Math.sin((steep * Math.PI) / 2);
+        await glide(side, 'pinch', start, 0.5, 0);
+        await setPinch(side, true);
+        await wait(0.2);
+        if (g.phase !== 'pulling') {
+          await setPinch(side, false);
+          await wait(0.2);
+          continue;
+        }
+        const end = start.clone().add(pull);
+        await glide(side, 'pinch', end, len / speed, pinchNow[side], 'linear');
+        if (opts.onBeat) g.ripBeatAt = g.time;
+        await tweenPinch(side, 0, 0.12);
+        await wait(0.3);
+        if ((g.phase as string) === 'fight') break;
+        if (attempt === 2) throw new Error('rip did not build enough motion to launch');
       }
-      await glide(side, 'pinch', above(start, 0.05), 0.4, 0);
-      await glide(side, 'pinch', start, 0.2, 0);
-      await setPinch(side, true);
-      await wait(0.2);
-      const end = start.clone().add(pull);
-      await glide(side, 'pinch', end, len / speed, pinchNow[side], 'linear');
-      // Let go mid-motion: the release keeps the speed.
-      const over = end.clone().add(pull.clone().multiplyScalar(0.15));
-      if (opts.onBeat) g.ripBeatAt = g.time;
-      pinchNow[side] = 0;
-      await glide(side, 'pinch', over, (len * 0.15) / speed, 0, 'linear');
-      await wait(0.2);
       await park(side);
     },
 
@@ -387,6 +434,26 @@ export function installDriver() {
       await glide(side, 'pinch', drag, hold);
       await setPinch(side, false);
       await glide(side, 'pinch', above(drag, 0.08), 0.2, 0);
+      await park(side);
+    },
+
+    /** Experimental ?rim move: pinch a rim sector, pull it toward the middle, then release. */
+    async rimSpring(opts: { angle?: number; pull?: number; side?: Side } = {}) {
+      const { angle = 35, pull = 0.04, side = 'right' } = opts;
+      const g = game();
+      if (!g.rimExperiment) throw new Error('rimSpring needs ?rim in the page URL');
+      const a = (angle * Math.PI) / 180;
+      const r = g.arena.radius * 0.94;
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r;
+      const start = local(x, z, 0.004);
+      const end = local(x - Math.cos(a) * pull, z - Math.sin(a) * pull, 0.004);
+      await glide(side, 'pinch', above(start, 0.06), 0.3, 0);
+      await glide(side, 'pinch', start, 0.15, 0);
+      await setPinch(side, true);
+      await glide(side, 'pinch', end, 0.28);
+      await setPinch(side, false);
+      await glide(side, 'pinch', above(end, 0.08), 0.2, 0);
       await park(side);
     },
 

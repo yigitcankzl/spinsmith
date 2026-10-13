@@ -20,6 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { rematchAdvice } from '../src/game/mastery.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -550,12 +551,43 @@ TUNING.grace = 0;
   assert.equal(back.marksOf('Iron Keep'), MARK.beaten | MARK.knockout, 'marks survive a reload');
   assert.deepEqual(back.champions.map((c) => c.build.tip), ['bead', 'pin', 'chisel']);
   assert.equal(back.champions[2].wins, 2, 'a champion keeps its record');
+  // Rivals remember a repeated opening zone without exposing their stored object to mutation.
+  const firstOpening = back.rememberOpening('Iron Keep', 'edge', 0.7, 0.1);
+  firstOpening.streak = 99;
+  assert.equal(back.openingAgainst('Iron Keep')?.streak, 1, 'opening memory returns a copy');
+  back.rememberOpening('Iron Keep', 'edge', 0.65, 0.15);
+  back.finishOpening('Iron Keep', 'SIDE HIT · ANGLE WON');
+  assert.deepEqual(new Progress(st).openingAgainst('Iron Keep'), { zone: 'edge', streak: 2, x: 0.65, z: 0.15, outcome: 'SIDE HIT · ANGLE WON' });
+  assert.equal(back.rememberOpening('Iron Keep', 'center', 0.1, 0).streak, 1, 'changing zones breaks the read');
+  // Scars belong to the exact physical build, persist, and reset with the rest of progression.
+  const scarBuild = PRESETS[0].build;
+  back.recordScar(scarBuild, 'wins');
+  back.recordScar(scarBuild, 'shapes');
+  back.recordScar(scarBuild, 'orders');
+  assert.deepEqual(new Progress(st).scarsFor(scarBuild), { wins: 1, shapes: 1, orders: 1 });
+  const resetStorage = new Map<string, string>();
+  const resetStore = { getItem: (k: string) => resetStorage.get(k) ?? null, setItem: (k: string, v: string) => void resetStorage.set(k, v) };
+  const resetProgress = new Progress(resetStore);
+  resetProgress.rememberOpening('Hookjaw', 'ambush', -0.8, 0.2);
+  resetProgress.recordScar(scarBuild, 'wins');
+  resetProgress.reset();
+  assert.equal(resetProgress.openingAgainst('Hookjaw'), null);
+  assert.deepEqual(resetProgress.scarsFor(scarBuild), { wins: 0, shapes: 0, orders: 0 });
   // Today's order stays the same all day, even after a level-up opens new rivals, and after a reload.
   const first = back.orderFor('2026-10-07', () => dailyOrder('2026-10-07', ctx));
   const later = back.orderFor('2026-10-07', () => dailyOrder('2026-10-07', { ...ctx, rivals: [...ctx.rivals, 'Leech'] }));
   assert.deepEqual(later, first, 'the order is kept for the day');
   assert.deepEqual(new Progress(st).orderFor('2026-10-07', () => dailyOrder('2026-10-07', { ...ctx, rivals: ['Leech'] })), first);
   assert.notDeepEqual(back.orderFor('2026-10-08', () => dailyOrder('2026-10-08', ctx)).date, first.date);
+
+  // A lost match names one evidenced cause, in priority order, and one concrete correction.
+  const evidence = { openingOutcome: '', zone: 'edge' as const, rip: 0.9, finish: 'over' as const, ownBackfire: null, rivalMove: null, shaped: true };
+  assert.match(rematchAdvice({ ...evidence, openingOutcome: 'AMBUSH · COUNTER-HIT' }), /change zones/);
+  assert.match(rematchAdvice({ ...evidence, ownBackfire: 'RAMP' }), /ramp backfired/);
+  assert.match(rematchAdvice({ ...evidence, rivalMove: 'QUAKE' }), /quake decided/);
+  assert.match(rematchAdvice({ ...evidence, rip: 0.4 }), /launch was soft/);
+  assert.match(rematchAdvice({ ...evidence, finish: 'spin' }), /ran dry/);
+  assert.match(rematchAdvice({ ...evidence, shaped: false }), /shape the arena earlier/);
 }
 
 // 13. Original vocabulary and heat scoring: no numbered cores or borrowed tip names; outlasting

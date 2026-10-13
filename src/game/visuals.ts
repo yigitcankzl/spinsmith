@@ -645,6 +645,8 @@ export class TopView {
   /** Burst parts fly in arena space, next to the top rather than inside it. */
   readonly debris = new Group();
   private spinner = new Group();
+  /** Permanent nicks earned by this physical build; they spin with its forged ring. */
+  private scarMarks = new Group();
   private parts: Mesh[] = [];
   private flying: Debris[] = [];
   private debrisAge = 0;
@@ -744,7 +746,7 @@ export class TopView {
     this.blurColor = (this.blur.material as MeshBasicMaterial).color.clone();
     this.blur.position.y = topHeight(ring, base) - 0.002;
     this.body.add(this.blur);
-    this.spinner.add(...this.parts);
+    this.spinner.add(...this.parts, this.scarMarks);
     this.body.add(this.spinner);
     this.root.add(this.body);
     this.shadow = new Mesh(
@@ -758,6 +760,30 @@ export class TopView {
       this.flying.push({ mesh: m, vel: new Vector3(), spin: new Vector3() });
       this.debris.add(m);
     }
+  }
+
+  /** Draws a bounded set of persistent victory, hand-move and Smith Order cuts. */
+  scars(s: { wins: number; shapes: number; orders: number }) {
+    for (const child of [...this.scarMarks.children]) {
+      const mesh = child as Mesh;
+      mesh.geometry.dispose();
+      (mesh.material as Material).dispose();
+      mesh.removeFromParent();
+    }
+    const earned = [
+      { count: Math.min(5, s.wins), color: 0xd9e0e8, angle: -Math.PI / 2 },
+      { count: Math.min(4, s.shapes), color: 0xff7a24, angle: Math.PI / 6 },
+      { count: Math.min(3, s.orders), color: 0xffd36a, angle: (Math.PI * 5) / 6 },
+    ];
+    const y = topHeight(this.ring, this.base) + 0.0007;
+    earned.filter((e) => e.count > 0).forEach(({ count, color, angle }) => {
+      const mark = new Mesh(
+        new RingGeometry(this.ring.radius * 0.78, this.ring.radius * 0.98, Math.max(4, count * 3), 1, angle, count * 0.085).rotateX(-Math.PI / 2),
+        new MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }),
+      );
+      mark.position.y = y;
+      this.scarMarks.add(mark);
+    });
   }
 
   /** A hard hit shakes the top in place for a moment (real time, so it quivers through hit-stop). */
@@ -809,6 +835,11 @@ export class TopView {
 
   /** Frees the GPU buffers when the top is rebuilt with other parts. */
   dispose() {
+    for (const child of [...this.scarMarks.children]) {
+      const mesh = child as Mesh;
+      mesh.geometry.dispose();
+      (mesh.material as Material).dispose();
+    }
     for (const p of [...this.parts, this.shadow, this.blur, ...(this.disc && this.edge ? [this.disc, this.edge] : [])]) {
       p.geometry.dispose();
       // Shared materials and textures (metals, the emblem, the soft shadow) stay.
@@ -2799,13 +2830,19 @@ export function forgeEnvironment(renderer: WebGLRenderer): Texture {
 export class GhostHand {
   readonly root = new Group();
   /** Thumb and index fingertips: they close together as the pinch plays, so it reads as a pinch, not a dot. */
-  private index = new Mesh(new CapsuleGeometry(0.0042, 0.014, 4, 10), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false }));
-  private thumb = new Mesh(new CapsuleGeometry(0.0046, 0.011, 4, 10), new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false }));
-  private ring = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.8, depthWrite: false, side: DoubleSide }));
-  private trail = new Mesh(new SphereGeometry(0.0025, 8, 6), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.4, depthWrite: false }));
+  private index: Mesh;
+  private thumb: Mesh;
+  private ring: Mesh;
+  private trail: Mesh;
   private t = 0;
+  private readonly accent: number;
 
-  constructor() {
+  constructor(hand = 0xffffff, accent = GUIDE) {
+    this.accent = accent;
+    this.index = new Mesh(new CapsuleGeometry(0.0042, 0.014, 4, 10), new MeshBasicMaterial({ color: hand, transparent: true, opacity: 0.85, depthWrite: false }));
+    this.thumb = new Mesh(new CapsuleGeometry(0.0046, 0.011, 4, 10), new MeshBasicMaterial({ color: hand, transparent: true, opacity: 0.85, depthWrite: false }));
+    this.ring = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.8, depthWrite: false, side: DoubleSide }));
+    this.trail = new Mesh(new SphereGeometry(0.0025, 8, 6), new MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.4, depthWrite: false }));
     this.root.add(this.index, this.thumb, this.ring, this.trail);
     this.root.visible = false;
     this.ring.rotation.x = -Math.PI / 2;
@@ -2835,7 +2872,7 @@ export class GhostHand {
     this.thumb.position.set(x, y + 0.002 - gap * 0.2, z + 0.004 + gap * 0.7);
     this.ring.position.set(x, y, z);
     this.ring.scale.setScalar(0.009 + 0.014 * (1 - pinch));
-    (this.ring.material as MeshBasicMaterial).color.setHex(pinch > 0.8 ? 0xffffff : GUIDE);
+    (this.ring.material as MeshBasicMaterial).color.setHex(pinch > 0.8 ? 0xffffff : this.accent);
     // A faint echo a moment behind shows the direction.
     const back = Math.max(0, u - 0.25);
     this.trail.position.set(a[1] + (b[1] - a[1]) * back, a[2] + (b[2] - a[2]) * back, a[3] + (b[3] - a[3]) * back);
