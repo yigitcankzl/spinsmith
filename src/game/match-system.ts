@@ -515,6 +515,8 @@ export class MatchSystem extends createSystem({
   private cordStart = new Vector3();
   /** Where your top launches from this round (arena-local), chosen by where you pinch over the arena. */
   private launchFrom: { x: number; z: number } | null = null;
+  /** The open hand currently previewing that launch point. */
+  private launchPreviewSide: Side | null = null;
   /** The rival's spot this round: an angle around the arena's far half. */
   private rivalAngle = -Math.PI / 2;
   /** The next match's rival, picked at home and shown there with its arena. */
@@ -2340,6 +2342,8 @@ export class MatchSystem extends createSystem({
     // The rival takes a new spot on the far half each round.
     this.rivalAngle = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;
     const [rx, rz] = this.rivalSpot();
+    this.launchFrom = null;
+    this.launchPreviewSide = null;
     this.mine.launch(0, this.SPAWN, 0, 0, 1, this.mine.hand);
     this.theirs.launch(rx, rz, 0, 0, 1, this.theirs.hand);
     this.puller = null;
@@ -2380,6 +2384,31 @@ export class MatchSystem extends createSystem({
     return this.root.worldToLocal(this.local.copy(world));
   }
 
+  /** Moves the waiting top under an open fingertip and remembers the legal launch point. */
+  private previewLaunch(world: Vector3) {
+    const l = this.toLocal(world);
+    const n = normRadius(this.arena.layout, l.x, l.z);
+    if (n > 1.05 || Math.abs(l.y - this.arena.height(l.x, l.z)) >= LAUNCH_HOVER) return false;
+    const k = n > LAUNCH_MAX_N ? LAUNCH_MAX_N / n : 1;
+    let x = l.x * k;
+    let z = l.z * k;
+    // Never right on top of the rival.
+    const dx = x - this.theirs.x;
+    const dz = z - this.theirs.z;
+    const d = Math.hypot(dx, dz);
+    if (d < LAUNCH_GAP) {
+      x = this.theirs.x + (d > 1e-6 ? dx / d : 0) * LAUNCH_GAP;
+      z = this.theirs.z + (d > 1e-6 ? dz / d : 1) * LAUNCH_GAP;
+    }
+    if (this.launchFrom) {
+      this.launchFrom.x = x;
+      this.launchFrom.z = z;
+    } else this.launchFrom = { x, z };
+    this.mine.x = x;
+    this.mine.z = z;
+    return true;
+  }
+
   /**
    * In ready/result: a pinch anywhere starts the pull. No target to hit. If both hands pinch in
    * the same frame (the emulator's click does), the hand closer to the arena wins.
@@ -2400,7 +2429,23 @@ export class MatchSystem extends createSystem({
         pick = side;
       }
     }
-    if (!pick) return;
+    if (!pick) {
+      if (this.phase === 'ready') {
+        this.launchPreviewSide = null;
+        let hover: Side | null = null;
+        let hoverDistance = Infinity;
+        for (const side of ['left', 'right'] as const) {
+          const h = this.hands[side];
+          const d = h.index.distanceTo(this.root.position);
+          if (h.tracked && !h.pinching && d < hoverDistance && d < LAUNCH_REACH) {
+            hover = side;
+            hoverDistance = d;
+          }
+        }
+        if (hover && this.previewLaunch(this.hands[hover].index)) this.launchPreviewSide = hover;
+      }
+      return;
+    }
     const h = this.hands[pick];
     // On the result card a pinch only moves on (to the next round's ready); it never also grabs the
     // rip cord, and while a replay plays it only skips the replay.
@@ -2408,27 +2453,11 @@ export class MatchSystem extends createSystem({
       if (!this.replay) this.toReady();
       return;
     }
-    // Pinched over the arena: your top goes to that spot and launches from there; elsewhere it
-    // launches from its usual spot near you.
-    const l = this.toLocal(h.pinch);
-    const L = this.arena.layout;
-    const n = normRadius(L, l.x, l.z);
-    this.launchFrom = null;
-    if (n <= 1.05 && l.y - this.arena.floorHeight(Math.min(1, n)) < LAUNCH_HOVER) {
-      const k = n > LAUNCH_MAX_N ? LAUNCH_MAX_N / n : 1;
-      let x = l.x * k;
-      let z = l.z * k;
-      // Never right on top of the rival.
-      const dx = x - this.theirs.x;
-      const dz = z - this.theirs.z;
-      const d = Math.hypot(dx, dz);
-      if (d < LAUNCH_GAP) {
-        x = this.theirs.x + ((d > 1e-6 ? dx / d : 0) * LAUNCH_GAP);
-        z = this.theirs.z + ((d > 1e-6 ? dz / d : 1) * LAUNCH_GAP);
-      }
-      this.launchFrom = { x, z };
-      this.mine.x = x;
-      this.mine.z = z;
+    // Lock the point shown before the pinch; if this hand never previewed one, try its index now.
+    if (this.launchPreviewSide !== pick && !this.previewLaunch(h.index)) {
+      this.launchFrom = null;
+      this.mine.x = 0;
+      this.mine.z = this.SPAWN;
     }
     this.phase = 'pulling';
     this.puller = pick;
@@ -3478,7 +3507,7 @@ export class MatchSystem extends createSystem({
         ((c as Mesh).material as MeshBasicMaterial).opacity = Math.sin(k * Math.PI);
       });
       // The rival and arena intro shows first; the rip hint follows.
-      if (this.time - this.readySince > INTRO_TIME) this.label.set('Pinch over the arena where you want to launch\npull back and let go');
+      if (this.time - this.readySince > INTRO_TIME) this.label.set('Point where you want to start\npinch, pull back, let go');
     }
     // Outside the first launch: after the intro, the card says what this bout is about (the arena's
     // rule and how the rival plays), and later rounds say to rip again; it is never blank while waiting.
