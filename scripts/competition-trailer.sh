@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Captures the current build and cuts a 100-second competition reel.
+# Captures the current build and cuts a two-minute competition reel.
 #
 #   CAPTURE=1 scripts/competition-trailer.sh [out-dir]  # recapture every source, then cut
 #   scripts/competition-trailer.sh [out-dir]            # cut again from existing sources
@@ -84,11 +84,15 @@ clip 06-forge "$MAIN/06-forge.mp4" 0.5 10 "FORGE IT BY HAND" "Every fitted part 
 clip 07-builds "$SHOW/03-forge-customization.mp4" 10 8 "BUILD YOUR FIGHTER" "226 legal combinations plus style and combat choices"
 clip 08-workshop "$SHOW/05-arena-workshop.mp4" 16 9 "BUILD THE BATTLEGROUND" "Place hazards boosts and moving machinery"
 
-for i in 1 2 3 4 5 6; do
-  name=("" "ANVIL" "RUSH" "MAGNET" "TILT" "HAMMER" "WARD")
-  lower=("" "anvil" "rush" "magnet" "tilt" "hammer" "ward")
-  clip "$(printf '09-ult-%02d' "$i")" "$ULT/$i-${lower[$i]}.mp4" 7.0 2.1 "${name[$i]} STRIKE" "Six arena changing ultimates"
-done
+# The source shots include their setup and launch. Cut where the palm actually lands—not at the
+# old 7 s point, which showed ordinary combat and made the ultimates impossible to understand.
+# Longer Hammer/Ward clips keep their delayed clash/parry payoff in frame.
+clip 09-ult-01 "$ULT/1-anvil.mp4" 23.5 4.5 "ANVIL STRIKE" "Shockwave leaves two forged ridges"
+clip 09-ult-02 "$ULT/2-rush.mp4" 23.5 4.5 "RUSH STRIKE" "The charge path hardens into a launch ramp"
+clip 09-ult-03 "$ULT/3-magnet.mp4" 22.0 4.5 "MAGNET STRIKE" "A gravity well remains at the chosen rim"
+clip 09-ult-04 "$ULT/4-tilt.mp4" 23.5 4.5 "TILT STRIKE" "The whole dish stays tilted for three seconds"
+clip 09-ult-05 "$ULT/5-hammer.mp4" 23.5 5.5 "HAMMER STRIKE" "The forge mark becomes a holding crater"
+clip 09-ult-06 "$ULT/6-ward.mp4" 23.5 6.5 "WARD STRIKE" "A raised rim sector guards the ring-out"
 
 clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 8 "FIFTEEN ARENAS" "Each one changes the physical rules"
 clip 11-return "$SHOW/01-hub-progression.mp4" 1.4 8 "A REASON TO RETURN" "Daily orders feats champions and personal records"
