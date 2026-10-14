@@ -1,5 +1,14 @@
 # Shaping the arena mid-fight: research and plan
 
+> **Current implementation (Oct 14):** the economy is now three charges with a four-second
+> passive refill. Each hand retains its newest two ramps; shapes stay full for 2.5 seconds and
+> remain readable for roughly eight seconds while relaxing. A rival hitting a player-authored
+> ramp or cup pays an `ARENA COMBO` reward: one charge plus forge-bar heat. The first fight teaches
+> ramp → cup → ultimate as one chain. Every ultimate now changes the simulated arena: Anvil leaves
+> two ridges, Rush a charge ramp, Magnet and Hammer a well/crater, Ward an inward guard ridge, and
+> Tilt moves the whole dish for three seconds. The older measurements below document how the
+> original two-charge version was chosen; rerun `npm run report:shaping` for current balance.
+
 Research notes (Oct 6, 2026) on SpinSmith's most original mechanic, reshaping the arena floor
 by hand during a fight, which has not moved since the prototype. Section 1 is what exists, section
 2 measures it in simulation, section 3 summarizes outside research (sources inline), sections
@@ -125,10 +134,10 @@ Shapes keep affecting both tops (curling's rule of the surface, the doc's rule).
 
 ### 4.2 Economy: charges earned by clashing
 
-- **2 charges**, shown as two small sparks on the near rim. A ramp or well spends one.
-- A **clash** (strength over 0.3) refills one; a slow passive refill (about 6 s) prevents a
+- **3 charges**, shown as three small sparks on the near rim. A ramp or well spends one.
+- A **clash** (strength over 0.3) refills one; a quick passive refill (about 4 s) prevents a
   passive top from being locked out.
-- **One live shape per hand**: a new one dissolves the old.
+- **Two live ramps per hand**: a third dissolves the oldest; cups remain one per hand.
 - **Strain** (pinball tilt): two shapes within about 1 s make the floor flash and the second
   weaker, instead of a hard lockout.
 - The opening grace (2.5 s) also blocks shaping, so the first read happens first.
@@ -172,7 +181,7 @@ shapes are drawn in the rival's cyan.
 
 | Step | What | Check |
 |---|---|---|
-| 1 | Shaping economy (charges, clash refill, one live shape per hand, strain, no shaping in the grace) + its rim display | Shaping experiment: push-out player at 58-63%, rounds 14-20 s |
+| 1 | Shaping economy (charges, clash/combo refill, two live ramps per hand, strain, no shaping in the grace) + its rim display | Shaping experiment: push-out player at 58-63%, rounds 14-20 s |
 | 2 | Ramp with direction (pull vector) and its sim shape; well instead of dent | Experiment: aimed ramps beat plain bumps; wells give a stamina top a measurable edge, own-KO under 10% |
 | 3 | Ghost preview and contour rings; owner tint; stretch / thock / crunch sounds | Emulator review; readable in one glance |
 | 4 | Deflection stubs while pinching | Frame time: predict two tops for 0.4 s at the sim step (~100 steps, cheap) |

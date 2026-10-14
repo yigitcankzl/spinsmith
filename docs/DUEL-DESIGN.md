@@ -15,7 +15,7 @@ opponent. The duel layer adds those decisions without frame-tight timing (hand i
 
 | Fighting games | Why it works | SpinSmith |
 |---|---|---|
-| Super bar (SF Super Art, Tekken Rage Art) | A resource that builds while fighting; a big spend decision | The two shaping charges become a **3-segment forge bar**, filled by hard clashes, ramps that hit and slings. A ramp or cup costs 1; a full bar is the strike. The bar glows on the back of your hand. |
+| Super bar (SF Super Art, Tekken Rage Art) | A resource that builds while fighting; a big spend decision | A separate forge bar is filled by hard clashes and successful arena hits. A ramp or cup costs one of three shaping charges; a full forge bar arms the ultimate. The bar glows on the back of your hand. |
 | The super move | A rare, cinematic, round-turning moment | **Anvil Strike**: with a full bar, press your palm on the table beside the arena (the press-to-place detector). A shockwave runs from your hand through the floor; tops are thrown outward, the hotter the further. |
 | Smash's damage percent | The more you are hit, the further you fly | **Hot metal**: the sim's existing burst `damage` drives a red glow, and knockback (walls, pits, the strike) scales with it. No new state. The name is not "heat": heat is the score. |
 | Reads and tells | Mind games, not reflexes | **Rival tells**: each rival gets one big move, telegraphed by a 1 s glow and sound. You choose: cup your own top to brace, or strike first. A decision, not a reflex. |
@@ -75,9 +75,12 @@ seat; hitstop never makes a head turn feel stuck.
 
 Built and in the repo, measured with `npm run report:shaping` (rows "masher + strike" onward):
 
-- The forge bar is **separate from the shaping charges** (they stay two): sharing one bar made the
+- The forge bar is **separate from the shaping charges** (now three): sharing one bar made the
   strike cost three ramps and it never paid. It fills from solid clashes (0.07 each) and in 30 s
   on its own, three times as fast while your top is below 70% of the rival's spin.
+- Oct 14 arena-dominance pass: a rival touching your authored terrain refunds a charge and adds
+  forge heat; the first fight chains ramp → cup → ultimate; every seal leaves a physical terrain
+  consequence (or, for Tilt, tips the complete dish for three seconds).
 - **Hot metal scales only the strike**, not clashes: scaling clashes too tipped the type loop
   (stamina beat defense only 49%).
 - The strike is felt by `n²` (n = distance to the rim, 0..1): a top in the middle barely moves,
