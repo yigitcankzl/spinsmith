@@ -113,14 +113,6 @@ const SEAL_CALL: Record<Seal, string> = {
   hammer: 'ULTIMATE · FORGE CRATER ×3',
   ward: 'ULTIMATE · GUARD RIDGE',
 };
-const SEAL_AIM: Record<Seal, string> = {
-  anvil: 'Choose where the shockwave starts',
-  rush: 'Choose the charge lane',
-  magnet: 'Choose the target pit',
-  tilt: 'Choose the downhill side',
-  hammer: 'Choose the forge mark',
-  ward: 'Choose the guarded rim sector',
-};
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
 /** A finish your shape caused plays its visuals at SLOW_MO speed for this long (real s). */
@@ -3335,7 +3327,7 @@ export class MatchSystem extends createSystem({
     if (full && !this.struckOnce && !this.demo && this.progress.guide !== 'bump' && this.labelTimer <= 0) {
       this.strikeTaught = true;
       const seal = this.myBuild.seal ?? 'anvil';
-      this.label.set(`ULTIMATE READY: ${SEAL_NAMES[seal]}!\n${SEAL_AIM[seal]} — ${COMFORT.gentle ? 'press and hold' : 'slap the rim'}`);
+      this.label.set(`${SEAL_NAMES[seal].toUpperCase()} READY\n${COMFORT.gentle ? 'PRESS + HOLD THE GLOW' : 'SLAP THE GLOWING RIM'}`);
     }
     const armed = full && this.elapsed - this.fullSince > 0.5;
     // The print follows the tracked palm closest to table height. Both emulated/real hands remain
@@ -3434,7 +3426,7 @@ export class MatchSystem extends createSystem({
       if (this.tellTaught && this.rivalBar.full && this.forgeBar.full && this.rivalHeld < RIVAL_HOLD) {
         if (this.rivalHeld === 0 && !this.holdSaid) {
           this.holdSaid = true;
-          this.label.set(`${this.rival.name} is waiting for your strike\nHold it to answer its move`);
+          this.label.set('RIVAL IS WAITING\nHOLD YOUR ULTIMATE');
           this.labelTimer = 2.5;
         }
         this.rivalHeld += STEP;
@@ -3455,7 +3447,7 @@ export class MatchSystem extends createSystem({
       const what = { charge: 'a charge', quake: 'a quake', pull: 'a pull' }[this.rival.move];
       if (!this.tellTaught) {
         this.tellTaught = true;
-        this.label.set(`${this.rival.name} winds up ${what}!\n${this.forgeBar.full ? ((this.myBuild.seal ?? 'anvil') === 'ward' ? 'Ward up: let it hit you' : 'Strike now to stop it') : 'Brace: cup your own top'}`);
+        this.label.set(`${what.toUpperCase()} INCOMING\n${this.forgeBar.full ? ((this.myBuild.seal ?? 'anvil') === 'ward' ? 'WARD UP' : 'ULTIMATE NOW') : 'CUP YOUR TOP'}`);
         this.labelTimer = 2.5;
       }
       if (import.meta.env.DEV) console.log(`[TELL] ${this.rival.name} ${this.rival.move} at t ${this.elapsed.toFixed(1)}`);
@@ -3830,7 +3822,7 @@ export class MatchSystem extends createSystem({
       this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.7);
       this.hitStop = Math.max(this.hitStop, 0.08);
       this.stamp.show('CUP → CAUGHT', t === this.theirs ? 'RIVAL LOCKED' : 'YOUR TOP LOCKED', t === this.theirs ? 'mine' : 'neutral', 0.5, 1.05);
-      if (!this.slungOnce) this.label.set('Caught! Pinch it, pull back, let go:\nit flies the other way. Aim at a slag pit');
+      if (!this.slungOnce) this.label.set('CUP CAUGHT A TOP\nPINCH + PULL TO SLING');
       if (import.meta.env.DEV) {
         const w = this.root.localToWorld(this.slingFrom.set(t.x, this.arena.height(t.x, t.z), t.z));
         console.log(`[SHAPE] cup caught ${t === this.mine ? 'mine' : 'rival'} at ${w.x.toFixed(3)},${w.y.toFixed(3)},${w.z.toFixed(3)}`);
@@ -4365,13 +4357,13 @@ export class MatchSystem extends createSystem({
         ((c as Mesh).material as MeshBasicMaterial).opacity = Math.sin(k * Math.PI);
       });
       // The rival and arena intro shows first; the rip hint follows.
-      if (this.time - this.readySince > INTRO_TIME) this.label.set('Point where you want to start\npinch, pull back, let go');
+      if (this.time - this.readySince > INTRO_TIME) this.label.set('PINCH A START POINT\nPULL BACK + RELEASE');
     }
     // Outside the first launch: after the intro, the card says what this bout is about (the arena's
     // rule and how the rival plays), and later rounds say to rip again; it is never blank while waiting.
     if (!ready && this.phase === 'ready' && !this.demo && this.time - this.readySince > INTRO_TIME && !this.label.current) {
       const first = this.myPoints === 0 && this.theirPoints === 0;
-      this.label.set(first ? `${this.arena.layout.name}: ${this.arena.layout.rule ?? ''}\n${this.rival.name}: ${this.rival.style}` : `Rip again\n${this.rival.name}: ${this.rival.style}`);
+      this.label.set(first ? `${this.arena.layout.name}: ${this.arena.layout.rule ?? ''}\n${this.rival.name}: ${this.rival.style}` : 'RIP AGAIN');
     }
     // As soon as ramps work (the opening grace), so even a short round shows it.
     const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > TUNING.grace && this.theirs.alive;
@@ -4382,7 +4374,7 @@ export class MatchSystem extends createSystem({
       const z = this.theirs.z - (this.theirs.z / r) * 0.035;
       this.bumpMark.position.set(x, this.arena.height(x, z) + 0.002, z);
       this.bumpMark.scale.setScalar(1 + 0.3 * Math.sin(this.time * 6));
-      this.label.set('Pinch the floor at the ring: a ramp rises at once\ndrag to aim it at the rival');
+      this.label.set('PINCH THE FLOOR\nDRAG TOWARD THE RIVAL');
       this.bumpHintShown = true;
       // The ghost hand: down to the ring, pinch, drag outward past the rival, let go.
       const ox = x / (Math.hypot(x, z) || 1);
@@ -4393,7 +4385,7 @@ export class MatchSystem extends createSystem({
     } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.taught('cup') && ((g === 'match' && this.progress.matches === 0) || this.progress.matches === 2) && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set(this.rimExperiment
         ? 'New: pinch the glowing rim, pull it inward, release\nits spring can save a top near that edge'
-        : 'Now jab a fingertip down into the floor\na cup catches a top — then your ultimate is ready');
+        : 'JAB THE FLOOR → CUP\nCATCH A TOP, THEN SLING');
     } else if (this.bumpHintShown && g !== 'bump') {
       // The first move is made: the hint goes.
       this.bumpHintShown = false;
