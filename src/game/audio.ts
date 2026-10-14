@@ -1002,16 +1002,107 @@ export function playLocked() {
 }
 
 /** A ramp or well set into the floor: a low, solid thock. */
-export function playThock() {
-  vary(0.05, () => {
-    thump(120, 70, 0.22, 0.18);
-    hiss(0.08, 0.06, 900, 400, 1.5);
-  });
+export function playThock(x = 0, z = 0) {
+  at(
+    x,
+    () =>
+      vary(0.05, () => {
+        thump(120, 70, 0.22, 0.18);
+        hiss(0.08, 0.06, 900, 400, 1.5);
+      }),
+    z,
+  );
 }
 
-/** A top runs into a player's shape: a short gritty crunch. */
-export function playCrunch() {
-  vary(0.08, () => hiss(0.12, 0.09, 2200, 900, 2));
+/** A top meets player-made terrain: ramps scrape upward, wells answer with a low metal knock. */
+export function playShapeHit(kind: 'ramp' | 'well', x = 0, z = 0) {
+  at(
+    x,
+    () =>
+      vary(0.05, () => {
+        if (kind === 'ramp') {
+          crack(0.16, 0.004, 2800);
+          hiss(0.14, 0.13, 850, 3600, 3);
+          ring(steel('', 1750), 0.11, 1.08, 0.01, 0.05);
+        } else {
+          thump(150, 62, 0.18, 0.14);
+          ring(steel('', 900), 0.12, 0.78, 0, 0.08);
+        }
+      }),
+    z,
+  );
+}
+
+/** A cup closes around a top: one heavy lock followed by a short confirming chime. */
+export function playCupCatch(x = 0, z = 0) {
+  at(
+    x,
+    () =>
+      vary(0.025, () => {
+        crack(0.22, 0.005, 1900);
+        thump(130, 48, 0.28, 0.22);
+        ring(steel('', 1100), 0.19, 0.82, 0.025, 0.12);
+        tone(660, 0.055, 0.12, 'sine', 0.07, 880);
+      }),
+    z,
+  );
+}
+
+/** A held top is fired from a cup: tension snap first, then a fast directional whip. */
+export function playSling(x = 0, z = 0) {
+  at(
+    x,
+    () =>
+      vary(0.04, () => {
+        crack(0.3, 0.004, 4200);
+        ring(steel('', 2100), 0.13, 1.15, 0, 0.025);
+        hiss(0.38, 0.28, 420, 6200, 4, 0.015);
+        tone(180, 0.05, 0.22, 'sawtooth', 0.015, 720);
+      }),
+    z,
+  );
+}
+
+/**
+ * The six seals have different audio silhouettes, so the arena rule can be recognised without
+ * reading its label. These are deliberately short; the physical arena change is the lasting beat.
+ */
+export function playUltimateSignature(seal: 'anvil' | 'rush' | 'magnet' | 'tilt' | 'hammer' | 'ward', x = 0, z = 0) {
+  at(
+    x,
+    () => {
+      if (seal === 'anvil') {
+        crack(0.5, 0.008, 1200);
+        thump(70, 32, 0.6, 0.8);
+        ring(anvil(), 0.35, 1, 0.005);
+      } else if (seal === 'rush') {
+        crack(0.28, 0.004, 3800);
+        hiss(0.42, 0.42, 350, 6500, 4);
+        tone(120, 0.12, 0.36, 'sawtooth', 0, 1050);
+      } else if (seal === 'magnet') {
+        thump(95, 55, 0.3, 0.35);
+        tone(980, 0.08, 0.42, 'sine', 0, 210);
+        tone(1230, 0.06, 0.36, 'sine', 0.04, 260);
+      } else if (seal === 'tilt') {
+        hiss(0.45, 0.55, 180, 720, 2, 0, 'lowpass');
+        tone(72, 0.18, 0.5, 'sawtooth', 0, 48);
+        crack(0.28, 0.007, 1100, 0.34);
+      } else if (seal === 'hammer') {
+        for (let i = 0; i < 3; i++) {
+          const delay = i * 0.1;
+          crack(0.32 - i * 0.05, 0.006, 1700, delay);
+          thump(105 - i * 12, 42, 0.42 - i * 0.06, 0.28, delay);
+          ring(anvil(), 0.17, 0.82 - i * 0.06, delay, 0.18);
+        }
+      } else {
+        crack(0.3, 0.004, 2600);
+        thump(180, 70, 0.25, 0.25);
+        ring(steel('', 1250), 0.24, 1.15, 0.02);
+        tone(520, 0.06, 0.32, 'sine', 0.04, 1040);
+      }
+    },
+    z,
+  );
 }
 
 /** A top scrapes along the rim: steel dragged on steel, a ringing band over grit. */

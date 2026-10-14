@@ -1,5 +1,5 @@
 import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
-import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCrunch, playLocked, playMachine, playStrike, playPick, playPlace, playThock, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
+import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -3765,26 +3765,20 @@ export class MatchSystem extends createSystem({
     if (seal === 'anvil') {
       this.impacts.hit(ox, this.arena.floorHeight(1), oz, 1);
       for (const t of [me, them]) if (t.alive) this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
-      playStrike();
     } else if (seal === 'rush') {
       this.sparks.burst(me.x, this.arena.height(me.x, me.z), me.z, 1);
       this.myView.flash();
-      playDash(me.x);
-      playStrike();
     } else if (seal === 'tilt') {
       // The arena tips toward the palm (the stage follows the sim's tilt); a thud where the hand hit.
       this.impacts.hit(ox, this.arena.floorHeight(1), oz, 1);
-      playStrike();
-      playMachine();
     } else if (seal === 'hammer' || seal === 'ward') {
       this.sparks.burst(me.x, this.arena.height(me.x, me.z), me.z, 0.7);
       this.myView.flash();
-      playStrike();
     } else {
       this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 1);
       this.theirView.flash();
-      playTell();
     }
+    playUltimateSignature(seal, ox, oz);
     this.roomLight.hit();
     duck(0.3, 0.4);
     // The super freeze: the fight holds for a beat while the seal rises off your top.
@@ -3828,8 +3822,8 @@ export class MatchSystem extends createSystem({
       c.caught = true;
       this.cupCaughtInRound = true;
       c.at = this.elapsed;
-      playThock();
       const t = c.shape.caught;
+      playCupCatch(t.x, t.z);
       this.impacts.shock(t.x, this.arena.height(t.x, t.z), t.z, 0.8, 0xff8a2a);
       this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.7);
       this.hitStop = Math.max(this.hitStop, 0.08);
@@ -3889,7 +3883,7 @@ export class MatchSystem extends createSystem({
     if (!this.slungOnce) this.label.set('');
     this.slungOnce = true;
     this.lastShape = { t: this.elapsed, kind: 'sling' };
-    playDash(t.x);
+    playSling(t.x, t.z);
     // The release has a payoff: a stamp and a trail of sparks off the cup.
     this.stamp.show('SLUNG!', '', 'mine', 0.3);
     this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.8);
@@ -3909,7 +3903,7 @@ export class MatchSystem extends createSystem({
     this.progress.advance('match');
     this.impacts.shock(x, this.arena.height(x, z), z, 0.45, 0xff8a2a);
     this.sparks.embers(x, this.arena.height(x, z) + 0.005, z, 5, 0.35, 0.035, 1);
-    playThock();
+    playThock(x, z);
     return shape;
   }
 
@@ -3991,7 +3985,7 @@ export class MatchSystem extends createSystem({
         if (!hit) this.crunched.set(s, (hit = new Set()));
         if (hit.has(t)) continue;
         hit.add(t);
-        playCrunch();
+        playShapeHit(s.kind, t.x, t.z);
         const authored = s.owner === 'left' || s.owner === 'right' || s.owner === 'left-cup' || s.owner === 'right-cup';
         this.impacts.hit(t.x, this.arena.height(t.x, t.z), t.z, authored ? 0.8 : 0.45);
         this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, authored ? 0.7 : 0.35);
