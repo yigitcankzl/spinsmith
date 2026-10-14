@@ -1,13 +1,12 @@
 /**
- * The arena-shaping economy (docs/ARENA-SHAPING.md, docs/QUESTLESS-PLAN.md): two charges; a solid
- * clash refills one, and a slow passive refill keeps a player from being locked out; no shaping
- * during the opening grace; a second shape within a second comes out weaker (strain) instead of
- * a hard cooldown. Pure, shared by the game and the shaping report.
+ * The arena-shaping economy: three charges make reshaping the main combat rhythm; a solid clash
+ * refills one, and a quick passive refill keeps a player sculpting instead of spectating. A rapid
+ * follow-up comes out a little weaker (strain) instead of hitting a hard cooldown.
  */
 export const SHAPING = {
-  charges: 2,
+  charges: 3,
   /** Seconds for the passive refill of one charge. */
-  refill: 6,
+  refill: 4,
   /** A clash at least this strong (0..1) refills a charge, at most once per clashGap seconds. */
   clashMin: 0.45,
   clashGap: 1,
@@ -58,6 +57,14 @@ export class ShapingCharges {
     this.lastClash = t;
     this.charges++;
     this.passive = 0;
+  }
+
+  /** A successful arena interaction refunds one charge. Returns whether a charge was added. */
+  reward(): boolean {
+    if (this.charges >= SHAPING.charges) return false;
+    this.charges++;
+    this.passive = 0;
+    return true;
   }
 
   /**

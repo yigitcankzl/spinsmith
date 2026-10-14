@@ -15,6 +15,7 @@ import {
 } from './layout.ts';
 import { ARENAS } from './arenas.ts';
 import { PRESETS, specFromBuild } from './parts.ts';
+import { SHAPE_SIZE } from './shaping.ts';
 
 /** Floor dips toward a pocket over this outer band of the radius. */
 const POCKET_BAND = 0.25;
@@ -60,8 +61,10 @@ const ICE_GRIP = 0.45;
 const GRID = 64;
 const EXTENT = MAX_RADIUS + 0.01;
 const CELL = (2 * EXTENT) / (GRID - 1);
-/** Shapes the player makes flatten back with this time constant (~2-3 s to vanish). */
+/** Residual deformation in the sampled floor mesh settles quickly. */
 const RELAX_TAU = 1.0;
+/** Live player/ultimate shapes relax slowly enough that the round remembers what changed it. */
+const SHAPE_RELAX_TAU = 1.5;
 /** Player shapes: a ramp's and a well's width (sigma, m), and how hard a fresh well slows a top (1/s). */
 /** A ramp's footprint (arena-local): about 13 cm across in the world, wide enough to meet a moving top. */
 export const RAMP_SIGMA = 0.052;
@@ -117,7 +120,7 @@ export const TUNING = {
   /** Outward speed (m/s) a top needs to drop into a pocket. */
   pocket: 0.27,
   /** Seconds a player's ramp or well stays at full strength before it starts to relax. */
-  shapeHold: 1.0,
+  shapeHold: 2.5,
   /** Seconds after the launch during which pockets and walls hold every top (no instant finishes). */
   grace: 2.5,
   /** Hot metal: the strike throws a top this much further at full burst damage (docs/DUEL-DESIGN.md). Clashes are not
@@ -294,11 +297,19 @@ export class Arena {
   }
 
   /**
-   * Adds a ramp or well. An owner holds one live shape at a time: its previous one dissolves.
-   * Returns the shape.
+   * Adds a ramp or well. A hand may leave two ramps in the arena, so the battlefield accumulates
+   * a readable history; cups and AI shapes still replace their own previous shape.
    */
   addShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0, sigma?: number): FloorShape {
-    this.shapes = this.shapes.filter((s) => s.owner !== owner);
+    const persistentRamp = kind === 'ramp' && (owner === 'left' || owner === 'right');
+    if (persistentRamp) {
+      const owned = this.shapes.filter((s) => s.owner === owner && s.kind === 'ramp');
+      if (owned.length >= 2) {
+        // Array order is creation order even when two ramps are authored in the same frame.
+        const oldest = owned[0];
+        this.shapes = this.shapes.filter((s) => s !== oldest);
+      }
+    } else this.shapes = this.shapes.filter((s) => s.owner !== owner);
     const len = Math.hypot(dx, dz);
     const shape: FloorShape = { kind, x, z, dx: len > 1e-6 ? dx / len : 0, dz: len > 1e-6 ? dz / len : 0, amp, age: 0, owner };
     if (sigma !== undefined) shape.sigma = sigma;
@@ -317,7 +328,7 @@ export class Arena {
   /** How strong a shape is now: full for a moment after it is made, then fading as it relaxes. */
   static strength(s: FloorShape) {
     if (s.held) return 1;
-    return s.age < TUNING.shapeHold ? 1 : Math.exp(-(s.age - TUNING.shapeHold) / RELAX_TAU);
+    return s.age < TUNING.shapeHold ? 1 : Math.exp(-(s.age - TUNING.shapeHold) / SHAPE_RELAX_TAU);
   }
 
   /** Height of the live shapes at (x, z). */
@@ -840,7 +851,7 @@ export function strike(arena: Arena, mine: Top, rival: Top, ox = 0, oz = 0) {
 export type Seal = 'anvil' | 'rush' | 'magnet' | 'tilt' | 'hammer' | 'ward';
 export const SEALS: Seal[] = ['anvil', 'rush', 'magnet', 'tilt', 'hammer', 'ward'];
 /** Tilt: the arena dips toward the palm by this slope for TILT_TIME s (tops slide that way). */
-export const TILT = { shove: 0.16, time: 1.6 };
+export const TILT = { shove: 0.16, time: 3 };
 /** Hammer: for HAMMER_TIME s, your next solid clash deals HAMMER times the burst damage. */
 export const HAMMER = 3;
 export const HAMMER_TIME = 5;
@@ -860,7 +871,7 @@ const WALL_SCRAPE = 0.25;
 /** Your Magnet pulls a little softer than a rival's pull: it lands more often. */
 const MAGNET_SPEED = 0.45;
 /** Your Rush hits harder than a rival's charge: it is your one strike. */
-const RUSH_SPEED = 1.2;
+const RUSH_SPEED = 1.15;
 
 function angleGap(a: number, b: number) {
   return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -894,8 +905,41 @@ export function sealTarget(arena: Arena, mine: Top, rival: Top, seal: Seal, ox =
   return { x: ox, z: oz };
 }
 
+/**
+ * The lasting physical consequence of an ultimate. It uses ordinary live shapes so rendering,
+ * collisions and headless balance reports all read the exact same changed battlefield.
+ */
+function leaveUltimateTerrain(arena: Arena, mine: Top, rival: Top, seal: Seal, ox: number, oz: number) {
+  const target = sealTarget(arena, mine, rival, seal, ox, oz);
+  const od = Math.hypot(ox, oz) || 1;
+  const tx = target.x;
+  const tz = target.z;
+  if (seal === 'anvil') {
+    // The slap buckles two broad ridges inward from that side of the rim.
+    for (let i = 0; i < 2; i++) {
+      const across = (i * 2 - 1) * 0.035;
+      arena.addShape('ramp', ox * (0.68 - i * 0.14) - (oz / od) * across, oz * (0.68 - i * 0.14) + (ox / od) * across, SHAPE_SIZE.ramp * 0.55, `ultimate-anvil-${i}`, -ox, -oz, 0.064);
+    }
+  } else if (seal === 'rush') {
+    const dx = tx - mine.x;
+    const dz = tz - mine.z;
+    arena.addShape('ramp', mine.x + dx * 0.55, mine.z + dz * 0.55, SHAPE_SIZE.ramp * 0.5, 'ultimate-rush', dx, dz, 0.048);
+  } else if (seal === 'magnet') {
+    arena.addShape('well', tx * 0.88, tz * 0.88, SHAPE_SIZE.well * 0.8, 'ultimate-magnet', 0, 0, 0.05);
+  } else if (seal === 'hammer') {
+    arena.addShape('well', tx, tz, SHAPE_SIZE.well * 0.7, 'ultimate-hammer', 0, 0, 0.046);
+  } else if (seal === 'ward') {
+    arena.addShape('ramp', tx * 0.82, tz * 0.82, SHAPE_SIZE.ramp * 0.58, 'ultimate-ward', -tx, -tz, 0.07);
+  }
+  // Tilt already changes the whole physical dish; a local mound would muddy the downhill read.
+}
+
 export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox = 0, oz = 0) {
-  if (seal === 'anvil') return strike(arena, mine, rival, ox, oz);
+  if (seal === 'anvil') {
+    strike(arena, mine, rival, ox, oz);
+    leaveUltimateTerrain(arena, mine, rival, seal, ox, oz);
+    return;
+  }
   const target = sealTarget(arena, mine, rival, seal, ox, oz);
   if (seal === 'magnet') {
     const dx = target.x - rival.x;
@@ -925,6 +969,7 @@ export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox =
     mine.guard = WARD_TIME;
     mine.guardAngle = Math.atan2(target.z, target.x);
     arena.lastStrike = arena.elapsed;
+    leaveUltimateTerrain(arena, mine, rival, seal, ox, oz);
     return;
   }
   else {
@@ -939,6 +984,7 @@ export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox =
     mine.kick = Math.min(1, mine.kick + 0.4);
     mine.sinceDash = 0;
   }
+  leaveUltimateTerrain(arena, mine, rival, seal, ox, oz);
   arena.lastStrike = arena.elapsed;
   rival.tell = 0;
 }

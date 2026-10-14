@@ -218,8 +218,8 @@ TUNING.grace = 0;
   assert.ok(a.finish === 'burst' || b.finish === 'burst', 'the same hit should burst after grace');
 }
 
-// 6b. Player shapes: a ramp pushes toward its direction, a well catches and braces, one live
-// shape per owner, and the shaping economy's rules.
+// 6b. Player shapes: a ramp pushes toward its direction, a well catches and braces, player hands
+// retain two ramps each, and the shaping economy's rules.
 {
   const flat = arenaWith({ floor: 'flat', pockets: [], rails: [] });
   const t = new Top(DEFENSE);
@@ -237,18 +237,30 @@ TUNING.grace = 0;
   assert.equal(flat.shapes.length, 1, 'an owner keeps one live shape');
   flat.addShape('well', -0.05, 0, 0.02, 'rival');
   assert.equal(flat.shapes.length, 2);
-  for (let i = 0; i < 600; i++) flat.update(STEP, t, idle);
-  assert.equal(flat.shapes.length, 0, 'shapes relax away within a few seconds');
+  for (let i = 0; i < 1000; i++) flat.update(STEP, t, idle);
+  assert.equal(flat.shapes.length, 0, 'shapes leave a readable trace, then relax away');
 
   const c = new ShapingCharges();
   assert.equal(c.spend(1, 2.5), 0, 'no shaping during the opening grace');
   assert.equal(c.spend(3, 2.5), 1);
   assert.equal(c.spend(3.5, 2.5), SHAPING.strainFactor, 'a second shape within a second is weaker');
-  assert.equal(c.spend(6, 2.5), 0, 'two charges, then none');
+  assert.equal(c.spend(6, 2.5), 1, 'the third charge remains available');
+  assert.equal(c.spend(7, 2.5), 0, 'three charges, then none');
   c.clash(0.9, 6);
   assert.equal(c.charges, 1, 'a solid clash refills a charge');
   c.update(SHAPING.refill + 0.01);
-  assert.equal(c.charges, 2, 'the slow passive refill');
+  assert.equal(c.charges, 2, 'the passive refill restores another charge');
+  assert.equal(c.reward(), true, 'an arena combo refunds the last charge');
+  assert.equal(c.reward(), false, 'arena combos cannot exceed the charge cap');
+
+  const memory = arenaWith({ floor: 'flat', pockets: [], rails: [] });
+  memory.addShape('ramp', -0.04, 0, 0.04, 'left', 1, 0);
+  memory.addShape('ramp', 0, 0, 0.04, 'left', 1, 0);
+  memory.addShape('ramp', 0.04, 0, 0.04, 'left', 1, 0);
+  assert.equal(memory.shapes.length, 2, 'a hand retains its newest two ramps');
+  assert.ok(memory.shapes.every((s) => s.x >= 0), 'the oldest same-hand ramp dissolves first');
+  memory.addShape('ramp', 0, 0.04, 0.04, 'right', 0, -1);
+  assert.equal(memory.shapes.length, 3, 'the other hand adds its own terrain history');
 }
 
 TUNING.grace = GRACE;
@@ -855,6 +867,7 @@ TUNING.grace = 0;
   const parked = new Top(DEFENSE);
   parked.state = 'toppled';
   sealStrike(flat, parked, t, 'tilt', 1, 0);
+  assert.ok(flat.shove && flat.shapes.length === 0, 'Tilt changes the complete dish instead of adding a misleading local mound');
   solo(flat, t, 0.8);
   assert.ok(t.x > 0.01, `a tilt toward +x slides the rival that way (x ${t.x.toFixed(3)})`);
   // The striker's own top digs in.
@@ -883,6 +896,7 @@ TUNING.grace = 0;
   leftRival.launch(-0.08, 0, 0, 0, 1, -1);
   sealStrike(lane, rusher, leftRival, 'rush', 0.15, 0);
   assert.ok(rusher.vx > 1.1 && Math.abs(rusher.vz) < 0.01, 'Rush follows the +x palm-authored lane even with the rival on -x');
+  assert.ok(lane.shapes.some((s) => s.owner === 'ultimate-rush' && s.kind === 'ramp'), 'Rush leaves a physical charge ramp');
 
   // Magnet chooses the pit nearest the palm sector, not the one nearest the rival.
   const twoPits = arenaWith({ floor: 'flat', rails: [], pillars: [], pockets: [{ angle: 0, half: 0.2, points: 2 }, { angle: Math.PI, half: 0.2, points: 2 }] });
@@ -890,6 +904,23 @@ TUNING.grace = 0;
   pulled.launch(0, 0.02, 0, 0, 1, -1);
   sealStrike(twoPits, parked, pulled, 'magnet', -0.15, 0);
   assert.ok(pulled.vx < -0.2, `Magnet selects the -x pit from the slap (vx ${pulled.vx.toFixed(3)})`);
+  assert.ok(twoPits.shapes.some((s) => s.owner === 'ultimate-magnet' && s.kind === 'well'), 'Magnet leaves its selected gravity well in the arena');
+
+  const ridged = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
+  const anvilMine = new Top(DEFENSE);
+  const anvilRival = new Top(ATTACK);
+  anvilMine.launch(0, 0.05, 0, 0, 1, 1);
+  anvilRival.launch(0, -0.05, 0, 0, 1, -1);
+  sealStrike(ridged, anvilMine, anvilRival, 'anvil', 0.15, 0);
+  assert.equal(ridged.shapes.filter((s) => s.owner.startsWith('ultimate-anvil')).length, 2, 'Anvil leaves two forged ridges');
+
+  const cratered = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
+  sealStrike(cratered, anvilMine, anvilRival, 'hammer', 0.15, 0);
+  assert.ok(cratered.shapes.some((s) => s.owner === 'ultimate-hammer' && s.kind === 'well'), 'Hammer leaves a holding crater under its mark');
+
+  const guarded = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
+  sealStrike(guarded, anvilMine, anvilRival, 'ward', 0.15, 0);
+  assert.ok(guarded.shapes.some((s) => s.owner === 'ultimate-ward' && s.kind === 'ramp'), 'Ward raises a physical inward guard ridge');
 
   const clashDamage = (hammer: boolean, zone = 0) => {
     const arena = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });

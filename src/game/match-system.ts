@@ -32,7 +32,7 @@ import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
 import { BRASS } from './materials.js';
 import type { ShapeMarkSpec } from './visuals.js';
-import { behindOn, SHAPE_SIZE, ShapingCharges, StrikeBar } from './shaping.js';
+import { behindOn, SHAPE_SIZE, SHAPING, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
 import { TUNE } from './tuning.js';
 import type { Point } from './placement.js';
@@ -106,12 +106,12 @@ const MOVE_WORD = { charge: 'charges', quake: 'quakes the floor', pull: 'pulls y
 const SEAL_COLOR: Record<Seal, number> = { anvil: 0xff8a2a, rush: 0xff4a3a, magnet: 0xc85cff, tilt: 0x7de07d, hammer: 0xffe066, ward: 0xd9d4ff };
 /** The immediate tactical promise under the ultimate's name. */
 const SEAL_CALL: Record<Seal, string> = {
-  anvil: 'ULTIMATE · RIM SHOCKWAVE',
-  rush: 'ULTIMATE · PALM-AIMED CHARGE',
-  magnet: 'ULTIMATE · CHOSEN PIT PULL',
+  anvil: 'ULTIMATE · SHOCKWAVE + FORGED RIDGE',
+  rush: 'ULTIMATE · FORGED CHARGE LANE',
+  magnet: 'ULTIMATE · CHOSEN GRAVITY WELL',
   tilt: 'ULTIMATE · TILT THE ARENA',
-  hammer: 'ULTIMATE · FORGE MARK ×3',
-  ward: 'ULTIMATE · 4 s RING-OUT GUARD',
+  hammer: 'ULTIMATE · FORGE CRATER ×3',
+  ward: 'ULTIMATE · GUARD RIDGE',
 };
 const SEAL_AIM: Record<Seal, string> = {
   anvil: 'Choose where the shockwave starts',
@@ -544,11 +544,11 @@ export class MatchSystem extends createSystem({
   /** The quiet forge loop: up at home and in the workshops, ducked under a fight. */
   private loop = new ForgeLoop();
   private rivalShapeAt = -9;
-  private rivalMarks = new ShapeMarks(0x4fd1ff);
+  private rivalMarks = new ShapeMarks(0x4fd1ff, 6);
   /** After a finish your shape caused, the visuals play slowly for a moment (real seconds left). */
   private slowMo = 0;
-  private marks = new ShapeMarks(0xff8a2a);
-  private pips = new ChargePips();
+  private marks = new ShapeMarks(0xff8a2a, 10);
+  private pips = new ChargePips(SHAPING.charges);
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
   private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
@@ -598,6 +598,8 @@ export class MatchSystem extends createSystem({
   private slungOnce = false;
   /** Which tops already ran into which shape (one crunch each). */
   private crunched = new WeakMap<FloorShape, Set<Top>>();
+  /** Which player-authored shapes already paid their one arena-combo reward. */
+  private rewardedShapes = new WeakSet<FloorShape>();
   /** Dev: the time B was pressed (a ramp at the gaze grows while it is held). */
   private devRampSince = -1;
   private devWellHeld = false;
@@ -3298,14 +3300,12 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) console.log(`[RIM] spring at ${sx.toFixed(3)},${sz.toFixed(3)} pull ${pull.toFixed(3)} hits ${hits}`);
   }
 
-  /**
-   * One new verb per match in the first session: the ramp in the first, the strike in the second,
-   * the cup and sling in the third; rival tells after that.
-   */
+  /** The first fight chains its three arena verbs: ramp, cup/sling, then ultimate. */
   private taught(verb: 'strike' | 'cup' | 'tells') {
     const m = this.progress.matches;
-    if (verb === 'strike') return m >= 1;
-    if (verb === 'cup') return m >= 2;
+    const shapedFirstFight = GUIDE_ORDER.indexOf(this.progress.guide) >= GUIDE_ORDER.indexOf('match');
+    if (verb === 'strike') return m >= 1 || (shapedFirstFight && this.cuppedOnce);
+    if (verb === 'cup') return m >= 2 || shapedFirstFight;
     return m >= 3;
   }
 
@@ -3800,6 +3800,9 @@ export class MatchSystem extends createSystem({
     if (!shape) return;
     if (!this.cuppedOnce && this.label.current.startsWith('New: jab')) this.label.set('');
     this.cuppedOnce = true;
+    // First-fight teaching is one causal chain: shape the arena, make a cup, then immediately earn
+    // the spectacular arena-changing spend. Later fights keep the normal clash/passive economy.
+    if (this.progress.matches === 0 && this.progress.guide === 'match') this.forgeBar.value = 1;
     shape.trap = shape.held = true;
     this.cups[side] = { shape, at: this.elapsed, caught: false };
   }
@@ -3881,7 +3884,7 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) console.log(`[SHAPE] sling ${t === this.mine ? 'mine' : 'rival'} angle ${a.toFixed(2)}${gap < SLING_SNAP ? ' to a pit' : ''}`);
   }
 
-  /** Spends a charge and sets a shape (one live shape per hand); without a charge, a dull clunk. */
+  /** Spends a charge and sets a shape (up to two live ramps per hand); without one, a dull clunk. */
   private makeShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0, sigma?: number): FloorShape | null {
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (import.meta.env.DEV) console.log(`[SHAPE] ${kind} at ${x.toFixed(3)},${z.toFixed(3)} amp ${amp.toFixed(3)} factor ${f} charges ${this.charges.charges} t ${this.elapsed.toFixed(1)}`);
@@ -3975,6 +3978,13 @@ export class MatchSystem extends createSystem({
         if (hit.has(t)) continue;
         hit.add(t);
         playCrunch();
+        const authored = s.owner === 'left' || s.owner === 'right' || s.owner === 'left-cup' || s.owner === 'right-cup';
+        if (authored && t === this.theirs && !this.rewardedShapes.has(s)) {
+          this.rewardedShapes.add(s);
+          const charge = this.charges.reward();
+          this.forgeBar.value = Math.min(1, this.forgeBar.value + 0.12);
+          this.stamp.show('ARENA COMBO!', `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`, 'mine', 0.45, 1.05);
+        }
       }
     }
   }
@@ -4362,10 +4372,10 @@ export class MatchSystem extends createSystem({
       const fy = this.arena.height(x, z);
       this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.05, fy + 0.006, z + oz * 0.05, 1], [1.35, x + ox * 0.05, fy + 0.03, z + oz * 0.05, 0], [2.2, x + ox * 0.05, fy + 0.05, z + oz * 0.05, 0]], this.frameDt);
       ghost = true;
-    } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.progress.matches === 2 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
+    } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && ((g === 'match' && this.progress.matches === 0) || this.progress.matches === 2) && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set(this.rimExperiment
         ? 'New: pinch the glowing rim, pull it inward, release\nits spring can save a top near that edge'
-        : 'New: jab a fingertip down into the floor\na cup opens and catches the top that rolls in');
+        : 'Now jab a fingertip down into the floor\na cup catches a top — then your ultimate is ready');
     } else if (this.bumpHintShown && g !== 'bump') {
       // The first move is made: the hint goes.
       this.bumpHintShown = false;
