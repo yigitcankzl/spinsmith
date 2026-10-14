@@ -37,6 +37,10 @@ trap cleanup EXIT
 
 reset_demo() {
   "$DRIVE" '["demo"]' >/dev/null
+  # demo() reloads just after the command returns. Wait for that new page generation before
+  # entering XR; otherwise fast machines occasionally enter the page that is about to disappear.
+  sleep 1
+  npx @iwsdk/cli runtime wait --timeout 60000 >/dev/null
   "$EMU" enter
   "$DRIVE" '["wait",8]' >/dev/null
   if [ "$(phase)" != '"hub"' ]; then
