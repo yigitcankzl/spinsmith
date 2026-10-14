@@ -889,7 +889,7 @@ export class Forge {
     return [
       `top@${at(this.displayHolder)}`,
       ...DRAWERS.map(([d], i) => `tab_${d}@${fmt(this.root.localToWorld(this.tabPlates.spots[i].at.clone()))}`),
-      ...this.slots.filter((s) => s.drawer === this.drawer).map((s) => `${s.item.name.replace(/ /g, '_')}${s.item.kind === 'color' ? this.slots.indexOf(s) : ''}@${fmt(this.root.localToWorld(s.home.clone()))}`),
+      ...this.slots.filter((s) => s.drawer === this.drawer).map((s) => `${s.item.name.replace(/ /g, '_')}@${fmt(this.root.localToWorld(s.home.clone()))}`),
       `quench@${at(this.quench)}`,
     ].join(' ');
   }

@@ -72,7 +72,7 @@ rec 03-forge-customization.mp4 \
   '["drag","Anvil","top"]' '["wait",1]' \
   '["tap","tab_core"]' '["wait",1]' '["drag","Stub","top"]' '["wait",1]' \
   '["tap","tab_tip"]' '["wait",1]' '["drag","Dome","top"]' '["wait",1]' \
-  '["tap","tab_look"]' '["wait",1]' '["tap","Rust23"]' '["wait",1]' \
+  '["tap","tab_look"]' '["wait",1]' '["tap","Rust"]' '["wait",1]' \
   '["tap","Emblem_glow"]' '["wait",1]' \
   '["tap","tab_combat"]' '["wait",1]' '["tap","Spin"]' '["wait",1]' '["tap","Ultimate"]' '["wait",1]' \
   '["drag","top","quench"]' '["wait",4]'
