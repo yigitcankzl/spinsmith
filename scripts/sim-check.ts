@@ -923,6 +923,13 @@ TUNING.grace = 0;
   sealStrike(guarded, anvilMine, anvilRival, 'ward', 0.15, 0);
   assert.ok(guarded.shapes.some((s) => s.owner === 'ultimate-ward' && s.kind === 'ramp'), 'Ward raises a physical inward guard ridge');
 
+  // The activation flash is brief, but its battlefield rule stays readable long enough to play around.
+  for (const changed of [lane, twoPits, ridged, cratered, guarded]) {
+    const shape = changed.shapes.find((s) => s.owner.startsWith('ultimate-'))!;
+    for (let elapsed = 0; elapsed < 3; elapsed += STEP) changed.update(STEP, parked, parked);
+    assert.ok(Arena.strength(shape) > 0.65, `${shape.owner} terrain should still be strong after three seconds`);
+  }
+
   const clashDamage = (hammer: boolean, zone = 0) => {
     const arena = arenaWith({ floor: 'flat', pockets: [], rails: [], pillars: [] });
     arena.elapsed = 5;

@@ -9,7 +9,7 @@ import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { rivalMove, sealStrike, sealTarget, SEALS, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, Top, TopSpec, TUNING, verdict, WARD_HALF } from './sim.js';
+import { rivalMove, sealStrike, sealTarget, SEALS, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -112,6 +112,15 @@ const SEAL_CALL: Record<Seal, string> = {
   tilt: 'ULTIMATE · TILT THE ARENA',
   hammer: 'ULTIMATE · FORGE CRATER ×3',
   ward: 'ULTIMATE · GUARD RIDGE',
+};
+/** The temporary arena rule that remains after the activation burst. */
+const SEAL_STATE: Record<Seal, string> = {
+  anvil: 'FORGED RIDGES ACTIVE',
+  rush: 'CHARGE LANE ACTIVE',
+  magnet: 'GRAVITY WELL ACTIVE',
+  tilt: 'ARENA TILTED',
+  hammer: 'CRATER + NEXT HIT ARMED',
+  ward: 'GUARDED SECTOR ACTIVE',
 };
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
@@ -3694,7 +3703,7 @@ export class MatchSystem extends createSystem({
   /** Starts the arena cue before the simulation changes velocity, preserving the intended target. */
   private beginUltimateCue(seal: Seal, ox: number, oz: number) {
     const cue = this.ultimateCue;
-    cue.t = seal === 'hammer' ? 5 : seal === 'ward' ? 4 : 1.8;
+    cue.t = seal === 'hammer' ? HAMMER_TIME : seal === 'ward' ? WARD_TIME : seal === 'tilt' ? TILT.time : 3.5;
     cue.age = 0;
     cue.seal = seal;
     cue.ox = ox;
@@ -3786,7 +3795,10 @@ export class MatchSystem extends createSystem({
     this.sealPop.userData.t = 0;
     this.sealPop.visible = true;
     this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', SEAL_CALL[seal], 'mine', 0.95, 1.35);
-    if (!cut && this.label.current.startsWith('ULTIMATE READY')) this.label.set('');
+    if (!cut) {
+      this.label.set(`ARENA CHANGED\n${SEAL_STATE[seal]}`);
+      this.labelTimer = 2.2;
+    }
     if (import.meta.env.DEV) console.log(`[STRIKE] ${seal} at t ${this.elapsed.toFixed(1)}: rival heat ${this.theirs.damage.toFixed(2)}, yours ${this.mine.damage.toFixed(2)}`);
   }
 
