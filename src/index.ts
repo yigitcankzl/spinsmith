@@ -47,27 +47,68 @@ loadFonts()
     // The landing page (index.html): Enter starts the session; the page hides while in XR.
     const landing = document.getElementById('landing');
     const enter = document.getElementById('enter') as HTMLButtonElement | null;
+    const launchStatus = document.getElementById('launch-status');
+    let reloadRequired = false;
+
+    const showLaunchStatus = (message: string, error = false) => {
+      if (!launchStatus) return;
+      launchStatus.textContent = message;
+      launchStatus.classList.toggle('error', error);
+    };
+    const failLaunch = (message: string, error?: unknown) => {
+      if (error !== undefined) console.error('[XR] launch failed', error);
+      showLaunchStatus(message, true);
+      if (enter) {
+        enter.disabled = false;
+        enter.textContent = reloadRequired ? 'RELOAD SPINSMITH' : 'TRY AGAIN';
+      }
+    };
+    const launchXR = async () => {
+      if (reloadRequired) {
+        location.reload();
+        return;
+      }
+      if (enter) {
+        enter.disabled = true;
+        enter.textContent = 'ENTERING…';
+      }
+      showLaunchStatus('');
+      try {
+        const ar = await navigator.xr?.isSessionSupported('immersive-ar').catch(() => false);
+        if (!ar) {
+          failLaunch('Open this page in the Meta Quest Browser to enter mixed reality.');
+          return;
+        }
+        // The click is the browser-approved gesture for WebAudio; do this before XR takes focus.
+        await unlockAudio();
+        await Promise.resolve(world.launchXR());
+      } catch (error) {
+        failLaunch('Mixed reality could not start. Check browser permission, then try again.', error);
+      }
+    };
     // Ready: the button wakes up (it waits while the fonts and the world load).
     if (enter) {
       enter.disabled = false;
       enter.textContent = preparedDemo ? 'ENTER SHOWCASE' : 'ENTER';
     }
-    enter?.addEventListener('click', async () => {
-      // Without immersive AR (a desktop browser) the launch fails silently: say where the game runs.
-      const ar = await navigator.xr?.isSessionSupported('immersive-ar').catch(() => false);
-      if (ar) {
-        // The click is the browser-approved gesture for WebAudio; do this before XR takes focus.
-        await unlockAudio();
-        world.launchXR();
-      }
-      else if (enter) enter.textContent = 'Open this page on a Meta Quest';
-    });
+    enter?.addEventListener('click', () => void launchXR());
     world.visibilityState.subscribe((v) => landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive));
     // Installed from the store (a standalone PWA): straight into the game, no 2D page (Meta's PWA
     // rule; opening the app's icon counts as the user's gesture). In a browser tab, ENTER as usual.
     if (matchMedia('(display-mode: standalone)').matches) {
-      void navigator.xr?.isSessionSupported('immersive-ar').then((ar) => ar && world.launchXR()).catch(() => undefined);
+      void launchXR();
     }
+    // A lost WebGL context otherwise looks like a frozen game. Recovery varies by browser, so make
+    // the safe action explicit instead of leaving the player staring at a dead frame.
+    world.renderer.domElement.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      reloadRequired = true;
+      landing?.classList.remove('hidden');
+      failLaunch('The graphics session stopped. Reload SpinSmith to restore it.');
+    });
+    window.addEventListener('offline', () => showLaunchStatus('Offline mode: using the saved build.'));
+    window.addEventListener('online', () => showLaunchStatus(''));
+    if (!navigator.onLine) showLaunchStatus('Offline mode: using the saved build.');
     // Emulator helper: move one hand at a time with the mouse (dev builds only).
     if (import.meta.env.DEV) void import('./dev-hands.js').then((m) => m.installDevHands());
     // A hand driver for agents and demo shots: window.drive (dev builds only, see src/dev-drive.ts).
@@ -76,6 +117,17 @@ loadFonts()
   .catch((e: unknown) => {
     // A start that fails says so on the landing page instead of hanging on its loading line.
     console.error('[START] failed', e);
-    const enter = document.getElementById('enter');
-    if (enter) enter.textContent = 'The forge would not light: reload the page';
+    const enter = document.getElementById('enter') as HTMLButtonElement | null;
+    const status = document.getElementById('launch-status');
+    if (enter) {
+      enter.disabled = false;
+      enter.textContent = 'RELOAD SPINSMITH';
+      enter.addEventListener('click', () => location.reload());
+    }
+    if (status) {
+      status.classList.add('error');
+      status.textContent = navigator.onLine
+        ? 'The forge would not light. Reload the page to try again.'
+        : 'The saved build is incomplete. Connect once, reload, then it will work offline.';
+    }
   });

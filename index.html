@@ -48,6 +48,8 @@
       #enter:hover { background: #ffb347; }
       #showcase:hover { border-color: #ffb347; color: #ffb347; }
       #enter:disabled { background: #3a3f48; color: #aab0ba; cursor: wait; letter-spacing: 2px; font-size: 22px; }
+      #launch-status { min-height: 24px; max-width: 620px; font-size: 17px !important; color: #9eabbc !important; }
+      #launch-status.error { color: #ffb078 !important; }
       @media (max-height: 720px) {
         #landing { justify-content: flex-start; gap: 14px; padding-top: 18px; }
         #landing img { width: 72px; height: 72px; border-radius: 14px; }
@@ -71,6 +73,7 @@
         <button id="enter" type="button" disabled>HEATING THE FORGE…</button>
         <a id="showcase" href="?demo">EXPLORE FULL FORGE</a>
       </div>
+      <p id="launch-status" role="status" aria-live="polite"></p>
       <ol class="how">
         <li>Pinch your top in its dock and drop it in the arena.</li>
         <li>Pinch near it, pull back and let go to rip it.</li>
