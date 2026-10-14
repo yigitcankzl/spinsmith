@@ -86,6 +86,7 @@ interface Game {
   gazeOff: boolean;
   photo: boolean;
   menuButton: { mesh: { visible: boolean; getWorldPosition(v: Vector3): Vector3 } };
+  rematchButton: { mesh: { visible: boolean; getWorldPosition(v: Vector3): Vector3 } };
 }
 
 interface Goal {
@@ -279,6 +280,7 @@ export function installDriver() {
   const named = (name: string) => {
     const g = game();
     if (name === 'menu') return g.menuButton.mesh.getWorldPosition(new Vector3());
+    if (name === 'rematch') return g.rematchButton.mesh.getWorldPosition(new Vector3());
     const all = `${g.hub.debugPositions()} ${g.phase === 'forge' ? g.forge.debugPositions() : ''} ${g.phase === 'build' ? g.builder.debugPositions() : ''}`;
     const m = all.split(' ').find((s) => s.split('@')[0].toLowerCase() === name.toLowerCase());
     if (!m) throw new Error(`no "${name}" here; see state().targets`);
@@ -304,6 +306,7 @@ export function installDriver() {
       const all = `${g.phase === 'hub' ? g.hub.debugPositions() : ''} ${g.phase === 'forge' ? g.forge.debugPositions() : ''} ${g.phase === 'build' ? g.builder.debugPositions() : ''}`;
       for (const s of all.split(' ').filter(Boolean)) targets[s.split('@')[0]] = s.split('@')[1].split(',').map(Number);
       if (g.menuButton.mesh.visible) targets.menu = g.menuButton.mesh.getWorldPosition(new Vector3()).toArray().map((n) => +n.toFixed(3));
+      if (g.rematchButton.mesh.visible) targets.rematch = g.rematchButton.mesh.getWorldPosition(new Vector3()).toArray().map((n) => +n.toFixed(3));
       return {
         phase: g.phase,
         label: g.label.current,

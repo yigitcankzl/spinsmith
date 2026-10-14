@@ -488,7 +488,7 @@ TUNING.grace = 0;
   // Orders: deterministic per date, playable with what the player has, different over days.
   const builtIn = ARENAS.slice(0, 3);
   const mine = { ...cloneLayout(ARENAS[0]), name: 'My Arena 1' };
-  const ctx = { rivals: ['Rim Raider', 'Iron Keep', 'Drifter'], arenas: builtIn, built: [mine] };
+  const ctx = { rivals: ['Rim Raider', 'Iron Keep', 'Drifter'], arenas: builtIn, built: [mine], cup: true };
   const goals = new Set<string>();
   const start = new Date(2026, 9, 1);
   for (let i = 0; i < 120; i++) {
@@ -521,11 +521,14 @@ TUNING.grace = 0;
   assert.ok(ARENAS.some((a) => reportArena(a, 3).burst > 0), 'bursts should happen for burst orders');
   // Goals are measured from what a round or match reports.
   const o = dailyOrder('2026-10-07', ctx);
-  const base: OrderEvent = { rival: o.rival, arena: o.arena, wonRound: true, finish: 'pocket', cause: 'ramp', wellInRound: false, matchWon: false, shutout: false, role: 'attack', perfectInMatch: false };
+  const base: OrderEvent = { rival: o.rival, arena: o.arena, wonRound: true, finish: 'pocket', cause: 'ramp', cupCaughtInRound: false, matchWon: false, shutout: false, role: 'attack', perfectInMatch: false };
   assert.equal(orderMet({ ...o, goal: 'rampKO' }, base), true);
   assert.equal(orderMet({ ...o, goal: 'rampKO' }, { ...base, cause: null }), false, 'a knockout without your ramp does not count');
   assert.equal(orderMet({ ...o, goal: 'rampKO' }, { ...base, rival: 'Nobody' }), false, 'only against the order rival');
-  assert.equal(orderMet({ ...o, goal: 'wellSpin' }, { ...base, finish: 'spin', wellInRound: true }), true);
+  assert.equal(orderMet({ ...o, goal: 'wellSpin' }, { ...base, finish: 'spin', cupCaughtInRound: false }), false, 'placing an empty cup is not enough');
+  assert.equal(orderMet({ ...o, goal: 'wellSpin' }, { ...base, finish: 'spin', cupCaughtInRound: true }), true);
+  const earlyGoals = new Set(Array.from({ length: 120 }, (_, i) => dailyOrder(localDate(new Date(2026, 9, 1 + i)), { ...ctx, cup: false }).goal));
+  assert.ok(!earlyGoals.has('wellSpin'), 'orders must not ask for a cup before cups are taught');
   assert.equal(orderMet({ ...o, goal: 'sweep' }, { ...base, matchWon: true, shutout: true }), true);
   // Stamps: once per date, with XP; glows at 5 stamps; a fresh progress has none.
   const storage = new Map<string, string>();

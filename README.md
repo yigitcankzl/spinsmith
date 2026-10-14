@@ -97,7 +97,7 @@ an arena. First to 3 heat wins a match.
   the opponent's cool teal; each rival keeps its build and spin for the whole match (see Smith levels).
 - **Forge, by hand** (`src/game/forge.ts`, `docs/FORGE-STADIUM.md`): pinch the small anvil and
   the arena turns into the forge: its floor sinks, an anvil rises at the near third of the bowl
-  with your top on it, four drawer tabs slide out of the near rim (Ring, Core, Tip, Style) and a
+  with your top on it, five drawer tabs slide out of the near rim (Ring, Core, Tip, Look, Combat) and a
   stats plate rises on the far rim. Everything you touch is within a seated arm's reach. The open
   drawer's parts (at most six) lie on a half circle around the anvil. Pinch a part and bring it
   to your top: the top comes apart to show where the part goes and that slot pulses; let go to
@@ -193,7 +193,7 @@ an arena. First to 3 heat wins a match.
   starts each round a fifth full (a white hot rip adds a quarter), fills on its own in 24 s and from solid clashes, three times
   as fast while your top is behind on spin. Full, press
   your palm on the table beside the arena: your strike. The seal you engrave in the forge's
-  Style drawer picks it: the Anvil Strike (a shockwave from the middle that throws tops near the
+  Combat drawer picks it: the Anvil Strike (a shockwave from the middle that throws tops near the
   rim, hot ones further; your own top is braced), the Tilt (Lv 3: the arena dips toward your
   palm; the rival slides, your top holds), the Rush (Lv 4: your top charges the rival), the Ward
   (Lv 5: for 4 s your top cannot be knocked out, and a charge into it rebounds: "PARRIED!"), the

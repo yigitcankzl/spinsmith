@@ -200,6 +200,19 @@ function audio(): AudioContext | null {
   return ctx;
 }
 
+/** Call from the landing-page click so Quest grants sound before the immersive session starts. */
+export async function unlockAudio(): Promise<boolean> {
+  pausedAudio = false;
+  const a = audio();
+  if (!a) return false;
+  try {
+    await a.resume();
+  } catch {
+    return false;
+  }
+  return a.state === 'running';
+}
+
 /** A stereo reverb impulse: independent noise per channel, decaying, low-passed as it goes. */
 function impulse(a: AudioContext, seconds: number): AudioBuffer {
   const n = Math.floor(a.sampleRate * seconds);

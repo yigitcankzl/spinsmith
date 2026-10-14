@@ -268,7 +268,13 @@ const TRAY: [string, Piece[]][] = [
 const WALLS: Wall[] = ['low', 'standard', 'high', 'none'];
 const THEMES: Theme[] = ['forge', 'stone', 'clockwork', 'ice', 'lava', 'void'];
 /** Pieces that land somewhere on the arena; the others change the whole arena, so a tap on the rail applies them. */
-const PLACED = new Set(['pocket', 'rail', 'pillar', 'bumper', 'pad']);
+const PLACED = new Set<Piece['kind']>(['pocket', 'rail', 'pillar', 'bumper', 'pad']);
+
+/** The workshop has two verbs: fixtures land where they are dropped; every other tool applies globally. */
+function pieceVerb(piece: Piece): 'PLACE' | 'APPLY' | 'PLAY' {
+  if (piece.kind === 'arena') return 'PLAY';
+  return PLACED.has(piece.kind) ? 'PLACE' : 'APPLY';
+}
 /** Arena-local layout of the drafting table (the arena center is the origin, +Z toward the player). */
 /** The drawer tabs in a row on the near rim (as in the forge), and the actions on the side rims. */
 const PLATES = [...TRAY.map(([label]) => label.toUpperCase()), 'ARENAS', 'BACK', 'TRY', 'SAVE'];
@@ -447,7 +453,7 @@ export class Builder {
     this.opened = 0;
     this.fold('out');
     playMachine();
-    this.say('Pinch a piece and drop it on the arena');
+    this.say('PLACE fixtures where they land · APPLY floors, forms and extras');
     // The drawers open where they were left, the arenas at their first page.
     this.arenaPage = 0;
     this.showTab(this.tab, false);
@@ -605,7 +611,13 @@ export class Builder {
     // The rail lifts away while a piece is carried, so the near rim stays in view.
     this.tools.visible = false;
     playPick();
-    this.say(piece.kind === 'arena' ? `${this.nameOf(piece)}: let go to play it${this.hooks.arenas()[piece.index]?.own ? ', or drop it off the arena to throw it away' : ''}` : `${pieceName(piece)}: drop it on the arena${from === 'arena' ? ', or off it to remove' : ''}`);
+    if (piece.kind === 'arena') {
+      this.say(`${this.nameOf(piece)}: let go to play it${this.hooks.arenas()[piece.index]?.own ? ', or drop it off the arena to throw it away' : ''}`);
+    } else if (PLACED.has(piece.kind)) {
+      this.say(`PLACE ${pieceName(piece)} where you drop it${from === 'arena' ? ', or off the arena to remove it' : ''}`);
+    } else {
+      this.say(`APPLY ${pieceName(piece)} to the whole arena · tap or drop anywhere`);
+    }
   }
 
   /** While holding: the piece follows the pointer over the arena; letting go drops it. */
@@ -1066,7 +1078,7 @@ export class Builder {
     setType(g, 'body', pxPerM(W, RAIL_W * ARENA_SCALE), 0.5);
     const room = ITEM_GAP * k * 0.94;
     for (const s of shown) {
-      const name = this.nameOf(s.piece).toUpperCase();
+      const name = `${pieceVerb(s.piece)} · ${this.nameOf(s.piece)}`.toUpperCase();
       // The end names stay on the strip.
       const half = Math.min(room, g.measureText(name).width) / 2 + 16;
       engrave(g, name, Math.max(half, Math.min(W - half, W / 2 + s.home.x * k)), H / 2 + 2, UI_STEEL, room);

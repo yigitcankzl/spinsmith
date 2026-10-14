@@ -61,7 +61,7 @@ rec 01-hub-progression.mp4 \
 reset_demo
 rec 02-top-lineup.mp4 '["key","KeyV"]' '["wait",8]' '["key","KeyV"]' '["wait",1]'
 
-# 03. A real forge pass: compare unlocked rings, then fit a low core/steady tip and change style.
+# 03. A real forge pass: compare unlocked rings, then fit a low core/steady tip, look and combat choices.
 reset_demo
 rec 03-forge-customization.mp4 \
   '["tap","forge"]' '["wait",2.5]' \
@@ -72,9 +72,9 @@ rec 03-forge-customization.mp4 \
   '["drag","Anvil","top"]' '["wait",1]' \
   '["tap","tab_core"]' '["wait",1]' '["drag","Stub","top"]' '["wait",1]' \
   '["tap","tab_tip"]' '["wait",1]' '["drag","Dome","top"]' '["wait",1]' \
-  '["tap","tab_style"]' '["wait",1]' \
-  '["tap","Spin"]' '["wait",1]' '["tap","Rust23"]' '["wait",1]' \
-  '["tap","Emblem_glow"]' '["wait",1]' '["tap","Strike"]' '["wait",1]' \
+  '["tap","tab_look"]' '["wait",1]' '["tap","Rust23"]' '["wait",1]' \
+  '["tap","Emblem_glow"]' '["wait",1]' \
+  '["tap","tab_combat"]' '["wait",1]' '["tap","Spin"]' '["wait",1]' '["tap","Ultimate"]' '["wait",1]' \
   '["drag","top","quench"]' '["wait",4]'
 
 # 04. The forged Anvil/Stub/Dome build in the fast Ember Ring.

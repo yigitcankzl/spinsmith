@@ -27,6 +27,8 @@ export interface OrderContext {
   arenas: ArenaLayout[];
   /** Arenas the player built and saved. */
   built: ArenaLayout[];
+  /** The player has reached the match that teaches cups. */
+  cup?: boolean;
 }
 
 /** What a finished round or match tells the order. */
@@ -38,8 +40,8 @@ export interface OrderEvent {
   finish: 'pocket' | 'over' | 'burst' | 'spin' | null;
   /** The player's shape that caused the finish (within the cause window), if any. */
   cause: 'ramp' | 'well' | 'sling' | 'strike' | 'parry' | null;
-  /** The player set a well during this round (a spin finish comes too late for the cause window). */
-  wellInRound: boolean;
+  /** A cup actually caught a top during this round (a spin finish comes too late for the cause window). */
+  cupCaughtInRound: boolean;
   /** The match ended with this round, won by the player, and the rival scored nothing. */
   matchWon: boolean;
   shutout: boolean;
@@ -81,7 +83,8 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
   };
   const pick = <T>(list: T[]): T => list[Math.floor(next() * list.length)];
   const rival = pick(ctx.rivals);
-  const goals: Goal[] = ['rampKO', 'burst', 'wellSpin', 'role', 'perfect', 'sweep'];
+  const goals: Goal[] = ['rampKO', 'burst', 'role', 'perfect', 'sweep'];
+  if (ctx.cup) goals.push('wellSpin');
   if (ctx.built.length > 0) goals.push('ownArena');
   const goal = pick(goals);
   // The arena: your own for 'ownArena'; one where a knockout is possible for 'rampKO'.
@@ -110,7 +113,7 @@ export function orderMet(o: Order, e: OrderEvent): boolean {
     case 'burst':
       return e.wonRound && e.finish === 'burst';
     case 'wellSpin':
-      return e.wonRound && e.finish === 'spin' && e.wellInRound;
+      return e.wonRound && e.finish === 'spin' && e.cupCaughtInRound;
     case 'role':
       return e.matchWon && e.role === o.role;
     case 'perfect':

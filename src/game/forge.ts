@@ -2,8 +2,8 @@
  * The forge is the arena, transformed: its floor sinks, an anvil rises at the near third of the
  * bowl with your top on it, drawers slide out of the near rim and the stats rise over the right rim.
  * Everything is within a seated arm's reach and used the same way: pinch, carry, drop.
- * - Four drawer tabs on the near rim (Ring, Core, Tip, Style) choose which parts lie on the tray,
- *   a half circle around the anvil's near side. One kind at a time, at most six parts.
+ * - Five drawer tabs on the near rim (Ring, Core, Tip, Look, Combat) choose which parts lie on the
+ *   tray, a half circle around the anvil's near side. Cosmetics and fight choices are not mixed.
  * - Pinch a part and bring it to your top: the top comes apart to show where it goes and that
  *   slot pulses; let go to fit it with a clack. A tap fits it too. Builds over the weight limit
  *   are refused.
@@ -83,22 +83,21 @@ export type Item =
   | { kind: 'seal'; name: string; blurb: string }
   | { kind: 'preset'; build: TopBuild; name: string; blurb: string };
 
-export type Drawer = 'ring' | 'core' | 'tip' | 'style';
+export type Drawer = 'ring' | 'core' | 'tip' | 'look' | 'combat';
 
 /** Every part on offer by kind: label, items, spacing (also used to show unlocks). */
 export const ROWS: [string, Item[], number][] = [
   ['TIPS', TIPS.map((t) => ({ kind: 'tip' as const, id: t.id, name: t.name, blurb: t.blurb })), 0.05],
   ['CORES', CORES.map((c) => ({ kind: 'core' as const, id: c.id, name: c.name, blurb: c.blurb })), 0.06],
   ['RINGS', RINGS.map((r) => ({ kind: 'ring' as const, id: r.id, name: r.name, blurb: r.blurb })), 0.058],
+  ['LOOK', [...TOP_COLORS.map((value, i) => ({ kind: 'color' as const, value, name: PAINT_NAMES[i] ?? 'Paint', blurb: 'Dip your top or tap the pot' })), { kind: 'emblem' as const, name: 'Emblem glow', blurb: 'Tap to step through the glows you have earned' }], 0.05],
   [
-    'STYLE',
+    'COMBAT',
     [
       { kind: 'spin', value: 1, name: 'Spin', blurb: 'Tap to turn it: left spin steals spin from right spinners' },
-      ...TOP_COLORS.map((value, i) => ({ kind: 'color' as const, value, name: PAINT_NAMES[i] ?? 'Paint', blurb: 'Dip your top or tap the pot' })),
-      { kind: 'emblem' as const, name: 'Emblem glow', blurb: 'Tap to step through the glows you have earned' },
       { kind: 'seal' as const, name: 'Ultimate', blurb: 'Tap to choose your ultimate: Anvil, Rush, Magnet, Tilt, Hammer and Ward unlock with levels' },
     ],
-    0.05,
+    0.06,
   ],
 ];
 /** The drawers, left to right on the near rim, and which shelf row each opens. */
@@ -106,8 +105,17 @@ const DRAWERS: [Drawer, string, number][] = [
   ['ring', 'RING', 2],
   ['core', 'CORE', 1],
   ['tip', 'TIP', 0],
-  ['style', 'STYLE', 3],
+  ['look', 'LOOK', 3],
+  ['combat', 'COMBAT', 4],
 ];
+
+const DRAWER_HINTS: Record<Drawer, string> = {
+  ring: 'RING · contact shape and mass',
+  core: 'CORE · height and weight',
+  tip: 'TIP · movement and endurance',
+  look: 'LOOK · paint and earned emblem glow',
+  combat: 'COMBAT · spin direction and ultimate',
+};
 /** Arena-local layout (the arena center is the origin, +Z toward the player, the world is half as large); the touch layout is in reach.ts. */
 /** Your top stands here on the anvil: the near third of the bowl, about 0.5 m from the eyes. */
 const WORK = new Vector3(REACH_WORK.x, REACH_WORK.y, REACH_WORK.z);
@@ -345,7 +353,10 @@ export class Forge {
       this.pads.setMatrixAt(s.pad, this.m.makeScale(s.drawer === d ? 1 : 0, 1, s.drawer === d ? 1 : 0).setPosition(s.home.x, s.home.y - 0.016, s.home.z));
     }
     this.pads.instanceMatrix.needsUpdate = true;
-    if (sound) playDrawer();
+    if (sound) {
+      playDrawer();
+      this.say(DRAWER_HINTS[d]);
+    }
     this.logPending = true;
   }
 

@@ -6,10 +6,12 @@ import { MatchSystem } from './game/match-system.js';
 import { loadFonts } from './game/ui.js';
 import { forgeEnvironment } from './game/visuals.js';
 import { demoSave, freshSave } from './game/demo-save.js';
+import { unlockAudio } from './game/audio.js';
 
 // For shared headsets: ?fresh starts as a new player (the first session again), ?demo as a prepared
 // level-8 smith. The flag is then dropped from the address, so a reload keeps the progress made.
 const params = new URLSearchParams(location.search);
+const preparedDemo = params.has('demo');
 // ?vs=CODE: the next match is against a friend's top (src/game/challenge.ts).
 if (params.has('vs')) {
   sessionStorage.setItem('spinsmith.vs', params.get('vs') ?? '');
@@ -48,12 +50,16 @@ loadFonts()
     // Ready: the button wakes up (it waits while the fonts and the world load).
     if (enter) {
       enter.disabled = false;
-      enter.textContent = 'ENTER';
+      enter.textContent = preparedDemo ? 'ENTER SHOWCASE' : 'ENTER';
     }
     enter?.addEventListener('click', async () => {
       // Without immersive AR (a desktop browser) the launch fails silently: say where the game runs.
       const ar = await navigator.xr?.isSessionSupported('immersive-ar').catch(() => false);
-      if (ar) world.launchXR();
+      if (ar) {
+        // The click is the browser-approved gesture for WebAudio; do this before XR takes focus.
+        await unlockAudio();
+        world.launchXR();
+      }
       else if (enter) enter.textContent = 'Open this page on a Meta Quest';
     });
     world.visibilityState.subscribe((v) => landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive));

@@ -273,7 +273,7 @@ export class MatchSystem extends createSystem({
   /** Today's Smith Order, whether this match plays it, and what the order needs to know. */
   private order: Order | null = null;
   private orderMatch = false;
-  private wellInRound = false;
+  private cupCaughtInRound = false;
   private perfectInMatch = false;
   private levelUpText = '';
   private perfTimer = 0;
@@ -304,6 +304,7 @@ export class MatchSystem extends createSystem({
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
   private hub = new Hub();
   private menuButton = new Button('menu', 0.07, 0.026);
+  private rematchButton = new Button('rematch', 0.105, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
   /** Dev: the hand driver holds the hands, so the gaze is not a pointer. */
@@ -767,7 +768,7 @@ export class MatchSystem extends createSystem({
     // Low over the arena's middle, in front of the far card and the match bar.
     this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.root.add(this.stamp.mesh);
-    this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh);
+    this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh, this.rematchButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
@@ -776,6 +777,10 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.menuButton.set('MENU');
     this.menuButton.mesh.visible = false;
+    this.rematchButton.mesh.position.set(0.2, MENU_Y, 0.14);
+    this.rematchButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
+    this.rematchButton.set('REMATCH', true, true);
+    this.rematchButton.mesh.visible = false;
     this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];
     if (import.meta.env.DEV) {
       // A crosshair in the middle of the view shows where the gaze pointer aims.
@@ -973,7 +978,7 @@ export class MatchSystem extends createSystem({
     this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
-      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
+      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
       this.hub.photo();
     }
     this.guardFrameRate(delta);
@@ -1058,6 +1063,7 @@ export class MatchSystem extends createSystem({
     this.launchGuide.visible = (launchPhase || openingFight) && !this.demo;
     this.launchSafeZone.visible = this.launchDangerZone.visible = this.phase === 'ready' && !this.demo;
     this.openingEcho.visible = launchPhase && !!this.lastOpeningTrace && this.lastOpeningTrace.rival === this.rival.name && this.lastOpeningTrace.arena === this.arena.layout.name && !this.demo;
+    this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo;
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
       this.arenaView.charge = 0;
@@ -1101,21 +1107,29 @@ export class MatchSystem extends createSystem({
         if (this.phase === 'result') {
           this.resultTimer -= dt;
           if (this.resultTimer <= 0) {
-            if (this.demo) this.endDemo();
-            else if (this.matchOver) {
-              const report = this.matchReport();
-              this.toHub();
-              // Home after a match: what happened in it, for a few seconds.
-              this.label.set(report);
-              this.labelTimer = 9;
+            if (this.demo) {
+              this.endDemo();
+              break;
             }
-            else this.toReady();
-            break;
+            else if (this.matchOver) {
+              // A match result is a decision screen, not a toast. Stay here while the player reads
+              // unlocks and chooses REMATCH or MENU; otherwise the new button can expire mid-reach.
+              this.resultTimer = 0;
+            }
+            else {
+              this.toReady();
+              break;
+            }
           }
           if (this.demo) break;
         }
         // Leaving a match takes two pinches on Menu within 3 s (a stray pinch never ends it).
-        if (this.pickButton([this.menuButton]) === 'menu') {
+        const resultAction = this.pickButton(this.matchOver ? [this.menuButton, this.rematchButton] : [this.menuButton]);
+        if (resultAction === 'rematch') {
+          this.startMatch(this.rival);
+          break;
+        }
+        if (resultAction === 'menu') {
           if (this.time - this.menuArmed < 3) {
             this.menuArmed = -10;
             this.menuButton.set('MENU', undefined, false);
@@ -1257,6 +1271,24 @@ export class MatchSystem extends createSystem({
     const min = 0.5 + 0.25 * skill;
     this.rivalLaunchPower = first ? 0.7 + Math.random() * 0.1 : Math.random() < 0.5 * skill ? 1 : min + Math.random() * (0.98 - min);
     this.rivalLaunchAim = first ? (Math.random() - 0.5) * 0.3 : (Math.random() - 0.5) * (1 - 0.6 * skill);
+    // Normal launches express the same character as the rival's named move. Their parts already
+    // change the physics; this changes the decision you can read before the rip as well.
+    if (!first) {
+      if (this.rival.move === 'charge') {
+        // Rim fighters commit hard to a visible side lane instead of always firing at the middle.
+        const side = this.rivalAngle < -Math.PI / 2 ? -1 : 1;
+        this.rivalLaunchPower = Math.min(1, this.rivalLaunchPower + 0.1);
+        this.rivalLaunchAim = Math.max(-MAX_AIM, Math.min(MAX_AIM, this.rivalLaunchAim * 0.55 + side * 0.16));
+      } else if (this.rival.move === 'quake') {
+        // Anchors take the shortest, strongest route to the middle.
+        this.rivalLaunchPower = Math.max(0.84, this.rivalLaunchPower);
+        this.rivalLaunchAim *= 0.22;
+      } else {
+        // Long-spinners avoid an all-in opening and settle before the first collision.
+        this.rivalLaunchPower = Math.max(0.68, Math.min(0.84, this.rivalLaunchPower));
+        this.rivalLaunchAim *= 0.45;
+      }
+    }
     const memory = this.progress.openingAgainst(this.rival.name);
     if (memory && memory.streak >= 2) {
       // The counter is deterministic and fully telegraphed by the cyan line; no hidden stat bonus.
@@ -1398,6 +1430,7 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(0, -this.SPAWN, 0, 0, 1, this.theirBuild.spin);
     this.cord.set(null);
     this.menuButton.mesh.visible = false;
+    this.rematchButton.mesh.visible = false;
     // Your top waits on its stand, not in the arena.
     this.mine.state = 'out';
     // Today's order, from the local date and what the player can meet and play now.
@@ -1408,6 +1441,7 @@ export class MatchSystem extends createSystem({
       rivals: RIVALS.filter((r) => r.level <= this.progress.level).map((r) => r.name),
       arenas: ARENAS.filter((a) => this.progress.isUnlocked(`arena:${a.name}`)),
       built: this.arenas.filter((a) => !ARENAS.includes(a)),
+      cup: this.taught('cup'),
     };
     this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
     // A teaser of tomorrow's order once today's is done (as things stand now).
@@ -1431,7 +1465,10 @@ export class MatchSystem extends createSystem({
   private guideNote() {
     const guide = this.progress.guide;
     if (guide === 'launch') return 'Your top waits in its dock\nPut it in the arena to play';
-    if (guide === 'bump' || guide === 'match') return 'Finish your first match\nPut your top in the arena';
+    if (guide === 'bump') return this.progress.matches > 0
+      ? 'One lesson remains: raise a ramp\nPut your top in the arena and shape the floor'
+      : 'Finish your first match\nPut your top in the arena';
+    if (guide === 'match') return 'Finish your first match\nPut your top in the arena';
     if (guide === 'forge' || guide === 'fit') return 'New part: Spur tip!\nPinch the small anvil to forge';
     if (guide === 'rematch') return 'Your top is ready\nPut it in the arena for a rematch';
     return '';
@@ -1921,20 +1958,20 @@ export class MatchSystem extends createSystem({
     }
   }
 
-  /**
-   * A frame-rate guard: if the headset averages under 62 fps for 3 s, the game lightens itself
-   * once (stronger foveation, no room dimming shell, which covers the whole view), and says so in
-   * the log. Hands, the fight and the visuals that matter stay.
-   */
+  /** Lightens once when the active headset misses its own refresh target for three seconds. */
   private guardFrameRate(dt: number) {
     // Not in the emulator (a desktop browser's frame rate says nothing about the headset).
     if (this.lite || dt <= 0 || dt > 0.25 || 'IWER_DEVICE' in window) return;
     this.fpsAvg += (dt - this.fpsAvg) * 0.02;
-    this.slowFor = this.fpsAvg > 1 / 62 ? this.slowFor + dt : 0;
+    const session = this.world.renderer.xr.getSession() as (XRSession & { frameRate?: number }) | null;
+    const target = session?.frameRate ?? 72;
+    // Allow brief compositor jitter, but catch 72 fps content drifting into the low sixties and
+    // 90 Hz devices drifting below about 80. A fixed 62 fps threshold hid the latter entirely.
+    this.slowFor = this.fpsAvg > 1 / (target * 0.89) ? this.slowFor + dt : 0;
     if (this.slowFor < 3) return;
     this.lite = true;
     this.world.renderer.xr.setFoveation?.(1);
-    console.warn(`[PERF] averaging ${(1 / this.fpsAvg).toFixed(0)} fps: lighter rendering (foveation 1, no room dimming)`);
+    console.warn(`[PERF] averaging ${(1 / this.fpsAvg).toFixed(0)} / ${target.toFixed(0)} fps: lighter rendering (foveation 1, no room dimming)`);
   }
 
   /** A puff of steam off the forge's quench slot (pale sparks rising). */
@@ -2297,6 +2334,7 @@ export class MatchSystem extends createSystem({
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
+    this.rematchButton.mesh.position.set(0.2, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
   }
 
@@ -2597,6 +2635,7 @@ export class MatchSystem extends createSystem({
     this.cordTone.update(null);
     this.chargeRing.visible = false;
     this.menuButton.mesh.visible = true;
+    this.rematchButton.mesh.visible = false;
     this.arena.reset();
     this.arenaDirty = true;
     // Both tops wait upright at their spawn points.
@@ -2897,10 +2936,11 @@ export class MatchSystem extends createSystem({
     return ripPower(this.maxPull, this.peakSpeed, MIN_PULL, FULL_PULL, FULL_SPEED);
   }
 
-  /** Why a gesture did nothing, on the card for 2 s (once the first session is over, so its own hints stay). */
+  /** Why a gesture did nothing, on the card for 2 s; the active lesson resumes afterwards. */
   private failSay(text: string) {
-    // Not over a match's opening card (the rival's intro), and not in the first session.
-    if (this.progress.guide !== 'done' || this.demo || this.myPoints + this.theirPoints === 0) return;
+    // During normal play, preserve the first-round rival intro. During the first lesson the failed
+    // rip is more important: silence makes the top resetting look broken to a new player.
+    if (this.demo || (this.progress.guide === 'done' && this.myPoints + this.theirPoints === 0)) return;
     this.label.set(text);
     this.labelTimer = 2;
   }
@@ -2988,7 +3028,7 @@ export class MatchSystem extends createSystem({
     this.rivalCharges.reset();
     this.rivalShapeAt = -9;
     this.lastShape = null;
-    this.wellInRound = false;
+    this.cupCaughtInRound = false;
     this.rampAt.left = this.rampAt.right = -9;
     this.cups.left = this.cups.right = null;
     this.slings.left = this.slings.right = null;
@@ -3775,6 +3815,7 @@ export class MatchSystem extends createSystem({
     if (c.shape.caught && !c.caught) {
       // The hold clock restarts at the catch: sling it soon or it rolls on.
       c.caught = true;
+      this.cupCaughtInRound = true;
       c.at = this.elapsed;
       playThock();
       if (!this.slungOnce) this.label.set('Caught! Pinch it, pull back, let go:\nit flies the other way. Aim at a slag pit');
@@ -3850,33 +3891,48 @@ export class MatchSystem extends createSystem({
     }
     const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz, sigma);
     this.lastShape = { t: this.elapsed, kind };
-    if (kind === 'well') this.wellInRound = true;
     this.progress.advance('match');
     playThock();
     return shape;
   }
 
-  /**
-   * Rivals from level 6 use the arena too, as a player would but slower: when your top is out in
-   * the outer band, a ramp just inside it pushing it outward, at most every RIVAL_SHAPE_GAP, under
-   * the same charges. Seeing it done teaches the move.
-   */
+  /** Rivals from level 6 shape the floor too; each move family uses its normal tactic, not one AI. */
   private rivalShaping() {
     if (this.demo || this.rival.level < 6) return;
     this.rivalCharges.update(STEP);
     const me = this.mine;
     const r = Math.hypot(me.x, me.z);
-    if (!me.alive || normRadius(this.arena.layout, me.x, me.z) < 0.6 || r < 1e-3 || this.elapsed - this.rivalShapeAt < RIVAL_SHAPE_GAP) return;
+    const nr = normRadius(this.arena.layout, me.x, me.z);
+    const activeBand = this.rival.move === 'quake' ? 0.32 : this.rival.move === 'pull' ? 0.45 : 0.6;
+    if (!me.alive || nr < activeBand || r < 1e-3 || this.elapsed - this.rivalShapeAt < RIVAL_SHAPE_GAP) return;
     const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
     if (!f) return;
-    this.rivalShapeKind = 'RAMP';
-    const x = me.x - (me.x / r) * 0.012 * (this.arena.radius / 0.17);
-    const z = me.z - (me.z / r) * 0.012 * (this.arena.radius / 0.17);
-    this.arena.addShape('ramp', x, z, SHAPE_SIZE.ramp * f * 0.85, 'rival', me.x / r, me.z / r, RIVAL_RAMP_SIGMA);
-    this.rivalHandMove(x, z, me.x / r, me.z / r);
+    let dx = me.x / r;
+    let dz = me.z / r;
+    this.rivalShapeKind = this.rival.move === 'charge' ? 'RIM RAMP' : this.rival.move === 'quake' ? 'CENTER GUARD' : 'PIT FEED';
+    if (this.rival.move === 'pull' && this.arena.layout.pockets.length) {
+      // Feed the player's path toward the nearest slag pit, matching the pull rival's threat.
+      let best = Infinity;
+      for (const pocket of this.arena.layout.pockets) {
+        const pr = rimRadius(this.arena.layout, pocket.angle);
+        const px = Math.cos(pocket.angle) * pr;
+        const pz = Math.sin(pocket.angle) * pr;
+        const gap = (px - me.x) ** 2 + (pz - me.z) ** 2;
+        if (gap >= best) continue;
+        best = gap;
+        const d = Math.sqrt(gap) || 1;
+        dx = (px - me.x) / d;
+        dz = (pz - me.z) / d;
+      }
+    }
+    const offset = 0.012 * (this.arena.radius / 0.17);
+    const x = me.x - dx * offset;
+    const z = me.z - dz * offset;
+    this.arena.addShape('ramp', x, z, SHAPE_SIZE.ramp * f * 0.85, 'rival', dx, dz, RIVAL_RAMP_SIGMA);
+    this.rivalHandMove(x, z, dx, dz);
     this.rivalShapeAt = this.elapsed;
     playThock();
-    if (import.meta.env.DEV) console.log(`[SHAPE] rival ramp at ${me.x.toFixed(3)},${me.z.toFixed(3)} t ${this.elapsed.toFixed(1)}`);
+    if (import.meta.env.DEV) console.log(`[SHAPE] rival ${this.rivalShapeKind.toLowerCase()} at ${me.x.toFixed(3)},${me.z.toFixed(3)} t ${this.elapsed.toFixed(1)}`);
   }
 
   /** Marks for live shapes and ghosts, the charge embers, and a crunch when a top runs into a shape. */
@@ -4338,8 +4394,9 @@ export class MatchSystem extends createSystem({
     // The first session's own part goes first: the forge calls for it next.
     this.reveals.sort((a, b) => Number(b === 'tip:spur') - Number(a === 'tip:spur'));
     if (!this.demo) this.trackComeBack(won, loser, matchOver, matchWon);
-    // The first match is over: the anvil appears and calls for the new part.
-    if (matchOver && GUIDE_ORDER.indexOf(this.progress.guide) < GUIDE_ORDER.indexOf('forge')) this.progress.advance('forge');
+    // The forge is earned only after the player has actually raised a ramp. Finishing a match
+    // without the hero verb repeats that one lesson instead of silently graduating it.
+    if (matchOver && this.progress.guide === 'match') this.progress.advance('forge');
   }
 
   /**
@@ -4376,7 +4433,7 @@ export class MatchSystem extends createSystem({
       wonRound: won,
       finish: loser.finish,
       cause,
-      wellInRound: this.wellInRound,
+      cupCaughtInRound: this.cupCaughtInRound,
       matchWon,
       shutout: matchWon && this.theirPoints === 0,
       role: roleOf(specFromBuild(this.myBuild)),
@@ -4520,10 +4577,10 @@ function unlockBlurb(key: string): string {
   if (kind === 'ring') return RINGS.find((r) => r.id === id)?.blurb ?? '';
   if (kind === 'core') return CORES.find((c) => c.id === id)?.blurb ?? '';
   if (kind === 'tip') return TIPS.find((t) => t.id === id)?.blurb ?? '';
-  if (kind === 'seal') return `${SEAL_BLURBS[id as Seal]} · set it in the forge's Style drawer`;
+  if (kind === 'seal') return `${SEAL_BLURBS[id as Seal]} · set it in the forge's Combat drawer`;
   if (kind === 'arena') return ARENAS.find((a) => a.name === id)?.rule ?? 'A new arena in the rotation';
   if (kind === 'paint') return 'Try it in the forge';
-  if (kind === 'emblem') return 'Pick it in the forge, Style drawer';
+  if (kind === 'emblem') return 'Pick it in the forge, Look drawer';
   return '';
 }
 

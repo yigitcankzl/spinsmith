@@ -27,7 +27,7 @@
         position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
         justify-content: center; gap: 22px; padding: 24px; box-sizing: border-box; text-align: center;
         color: #eef3fa; font-family: Rajdhani, system-ui, sans-serif;
-        background: radial-gradient(circle at 50% 38%, #2c3139 0%, #16191e 70%);
+        background: radial-gradient(circle at 50% 38%, #2c3139 0%, #16191e 70%); overflow-y: auto;
       }
       #landing.hidden { display: none; }
       #landing img { width: 112px; height: 112px; border-radius: 22px; }
@@ -36,15 +36,25 @@
       #landing p { margin: 0; max-width: 560px; font-size: 22px; font-weight: 600; color: #c9d3e0; }
       #landing ul { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin: 0; padding: 0; list-style: none; }
       #landing li { padding: 10px 16px; border: 1px solid #4a5566; border-radius: 6px; background: #23272e; font-size: 19px; font-weight: 600; }
-      #enter {
+      .launches { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+      #enter, #showcase {
         margin-top: 8px; padding: 14px 54px; border: 0; border-radius: 6px; background: #ff8a2a; color: #16191e;
-        font-family: inherit; font-size: 28px; font-weight: 700; letter-spacing: 4px; cursor: pointer;
+        font-family: inherit; font-size: 28px; font-weight: 700; letter-spacing: 4px; cursor: pointer; text-decoration: none;
       }
+      #showcase { padding: 13px 30px; border: 1px solid #687587; background: #23272e; color: #eef3fa; font-size: 20px; letter-spacing: 2px; }
       .how { text-align: left; margin: 26px auto 0; max-width: 520px; color: #c9cdd4; font-size: 17px; line-height: 1.6; }
       .foot { margin-top: 18px; font-size: 13px; color: #8a909a; }
       .foot a { color: #ffb347; }
       #enter:hover { background: #ffb347; }
+      #showcase:hover { border-color: #ffb347; color: #ffb347; }
       #enter:disabled { background: #3a3f48; color: #aab0ba; cursor: wait; letter-spacing: 2px; font-size: 22px; }
+      @media (max-height: 720px) {
+        #landing { justify-content: flex-start; gap: 14px; padding-top: 18px; }
+        #landing img { width: 72px; height: 72px; border-radius: 14px; }
+        #landing h1 { font-size: 42px; letter-spacing: 9px; }
+        #landing p { font-size: 19px; }
+        .how { margin-top: 12px; }
+      }
     </style>
   </head>
   <body>
@@ -57,13 +67,16 @@
         <li>Hands only, no controllers</li>
         <li>Allow spatial data for your table</li>
       </ul>
-      <button id="enter" type="button" disabled>HEATING THE FORGE…</button>
+      <div class="launches">
+        <button id="enter" type="button" disabled>HEATING THE FORGE…</button>
+        <a id="showcase" href="?demo">EXPLORE FULL FORGE</a>
+      </div>
       <ol class="how">
         <li>Pinch your top in its dock and drop it in the arena.</li>
         <li>Pinch near it, pull back and let go to rip it.</li>
         <li>Pinch the floor by the rival: a ramp throws it. Each match teaches one more move.</li>
       </ol>
-      <p class="foot">New player on a shared headset? Add <code>?fresh</code> to the address. · <a href="./privacy.html">Privacy</a> · Font: Rajdhani (SIL OFL)</p>
+      <p class="foot">Showcase prepares every unlocked part, rival and arena; normal Enter keeps your own progress. · <a href="./privacy.html">Privacy</a> · Font: Rajdhani (SIL OFL)</p>
     </div>
     <div id="scene-container"></div>
     <script type="module" src="/src/index.ts"></script>
