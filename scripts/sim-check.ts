@@ -617,6 +617,7 @@ TUNING.grace = 0;
   for (const [finish, heat] of [['spin', 1], ['over', 2], ['pocket', 2], ['burst', 2]] as const) {
     t.finish = finish;
     assert.equal(finishPoints(t), heat, `${finish} should score ${heat} heat`);
+    assert.equal(finishPoints(t, true), 1, `${finish} should score one tutorial heat`);
   }
   for (const a of ARENAS) for (const p of a.pockets) assert.equal(p.points, 2, `${a.name}: every pit is worth 2`);
 }

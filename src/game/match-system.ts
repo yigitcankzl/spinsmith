@@ -268,6 +268,8 @@ export class MatchSystem extends createSystem({
   private rival: Rival = RIVALS[0];
   /** Points the match bar shows (kept after a match is decided), XP just earned, the last rip. */
   private barPoints: [number, number] = [0, 0];
+  /** First-match lesson: one new arena verb per round (ramp, cup/sling, ultimate). */
+  private tutorialRound = 0;
   private xpGained = 0;
   private lastPerfect = false;
   /** Today's Smith Order, whether this match plays it, and what the order needs to know. */
@@ -2162,6 +2164,7 @@ export class MatchSystem extends createSystem({
     this.perfectInMatch = false;
     this.myPoints = 0;
     this.theirPoints = 0;
+    this.tutorialRound = 0;
     this.wasDown = false;
     this.introDone = false;
     this.rematchTip = '';
@@ -3022,8 +3025,9 @@ export class MatchSystem extends createSystem({
     this.lastPerfect = perfect;
     this.charges.reset();
     this.forgeBar.reset();
-    // The strike's first match: later rounds start nearly full, so it shows in the first few minutes.
-    if (this.progress.matches === 1 && this.myPoints + this.theirPoints > 0 && !this.demo) this.forgeBar.value = 0.8;
+    if (this.progress.matches === 0 && !this.demo) this.tutorialRound++;
+    // Round three teaches the ultimate; start it nearly full so the lesson arrives before the fight ends.
+    if (this.progress.matches === 0 && this.tutorialRound >= 3 && !this.demo) this.forgeBar.value = 0.8;
     this.barWasFull = false;
     this.rivalBar.reset();
     this.tellAt = -1;
@@ -3300,12 +3304,11 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) console.log(`[RIM] spring at ${sx.toFixed(3)},${sz.toFixed(3)} pull ${pull.toFixed(3)} hits ${hits}`);
   }
 
-  /** The first fight chains its three arena verbs: ramp, cup/sling, then ultimate. */
+  /** The first fight teaches one arena verb per round: ramp, cup/sling, then ultimate. */
   private taught(verb: 'strike' | 'cup' | 'tells') {
     const m = this.progress.matches;
-    const shapedFirstFight = GUIDE_ORDER.indexOf(this.progress.guide) >= GUIDE_ORDER.indexOf('match');
-    if (verb === 'strike') return m >= 1 || (shapedFirstFight && this.cuppedOnce);
-    if (verb === 'cup') return m >= 2 || shapedFirstFight;
+    if (verb === 'strike') return m >= 1 || (m === 0 && this.tutorialRound >= 3);
+    if (verb === 'cup') return m >= 2 || (m === 0 && this.tutorialRound >= 2);
     return m >= 3;
   }
 
@@ -4207,7 +4210,8 @@ export class MatchSystem extends createSystem({
       text = 'Draw\nReplay the round';
     } else {
       const loser = v === 1 ? this.theirs : this.mine;
-      const points = finishPoints(loser);
+      // The opening match always lasts at least three rounds, so each hand verb gets its own turn.
+      const points = finishPoints(loser, this.progress.matches === 0);
       if (v === 1) this.myPoints += points;
       else this.theirPoints += points;
       // Match point down: a win from here is a comeback.
@@ -4372,7 +4376,7 @@ export class MatchSystem extends createSystem({
       const fy = this.arena.height(x, z);
       this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.05, fy + 0.006, z + oz * 0.05, 1], [1.35, x + ox * 0.05, fy + 0.03, z + oz * 0.05, 0], [2.2, x + ox * 0.05, fy + 0.05, z + oz * 0.05, 0]], this.frameDt);
       ghost = true;
-    } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && ((g === 'match' && this.progress.matches === 0) || this.progress.matches === 2) && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
+    } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.taught('cup') && ((g === 'match' && this.progress.matches === 0) || this.progress.matches === 2) && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set(this.rimExperiment
         ? 'New: pinch the glowing rim, pull it inward, release\nits spring can save a top near that edge'
         : 'Now jab a fingertip down into the floor\na cup catches a top — then your ultimate is ready');

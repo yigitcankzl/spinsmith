@@ -35,18 +35,17 @@ Draft (Oct 8, 2026); final text before the deadline. In English, as the rules re
 2. The rival is introduced. Pinch over the arena where you want to launch (inside the dashed
    ring), pull back and let go: the top rips
    in. A white-hot pull adds spin.
-3. After the opening seconds a ring marks a spot beside the rival: pinch the floor there and a
-   ramp rises at once; drag to aim it. Your ramp throws the rival toward the rim. The first
-   match teaches only this; each later match adds one move (steps 4 and 5).
-4. Second match: a glowing ring on the back of your hand is the forge bar: it fills over the
-   round and as the tops clash. When it is full, slap your palm on the table beside the arena
-   (a glowing handprint shows where): the Anvil Strike throws the tops near the rim (red-hot ones
-   furthest).
-5. Third match: press a fingertip into the floor ahead of a top and a cup opens: it catches the
+3. Round one: a ring marks a spot beside the rival. Pinch the floor there and a ramp rises at once;
+   drag to aim it. Your ramp throws the rival toward the rim.
+4. Round two: press a fingertip into the floor ahead of a top and a cup opens: it catches the
    first top to roll in. Pinch the caught top, pull back and let go: it flies the other way
    (aimed near a slag pit, it goes straight in). An empty or unused cup lets go after 2 seconds.
-   After that, a rival flashes and whines for a second before its big move: strike first to cut
-   it short. `?demo` has all of this open at once.
+5. Round three: the glowing ring on the back of your hand is the forge bar. It begins nearly full;
+   when ready, slap your palm on the table beside the arena (a glowing handprint shows where): the
+   Anvil Strike raises two ridges and throws the tops near the rim. In this opening lesson every
+   finish scores one heat, so all three hand moves get their own round. Later knockouts score two.
+   After the lesson, rivals flash and whine before their big moves: strike first to cut one short.
+   `?demo` has all of this open at once.
 6. First to 3 heat wins: outlasting the rival scores 1, a knockout (into a slag pit, over the
    wall, or shattering it) scores 2. A finish your ramp or sling caused says so: YOUR RAMP → SLAG.
 7. After the first match the small anvil calls: pinch it and the arena turns into the forge. The Tip

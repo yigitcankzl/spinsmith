@@ -41,9 +41,10 @@ across; daily Smith Orders, twelve feats, personal bests, and an arena workshop 
 balance dials. Levels open options, never power. Share your top as a challenge code and a friend
 fights it.
 
-**Learn by doing.** The first match teaches one move, the rip and the ramp, with a ghost hand
-showing it; each match after adds one more. A comfort dial turns off sound or flashes, makes the
-strike a gentle press, or slows fights to 80%.
+**Learn by doing.** The opening match gives each hand verb its own round: rip and ramp, then catch
+and sling, then an arena-changing ultimate. A ghost hand shows the first ramp, and every knockout
+in this lesson scores one heat so no step gets skipped. A comfort dial turns off sound or flashes,
+makes the strike a gentle press, or slows fights to 80%.
 
 Built with the Immersive Web SDK, SpinSmith runs in the Quest browser with no install and works
 offline once loaded. A deterministic simulation drives the fight and the balance: every part,

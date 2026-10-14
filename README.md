@@ -112,9 +112,9 @@ an arena. First to 3 heat wins a match.
   finished the home is just your top in its dock (a breathing ring calls you to it) and the
   arena; the anvil and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
-  the rival where lifting would push it, until your first ramp. One new move per match: the
-  first match is the rip and the ramp only, the second adds the strike (its later rounds start
-  with the bar nearly full), the third the cup and sling; rival tells come after that. Finishing the first match, won or
+  the rival where lifting would push it, until your first ramp. The first match lasts at least
+  three rounds and adds one move per round: ramp, then cup and sling, then the ultimate (its third
+  round starts with the bar nearly full); rival tells come after that. Finishing the first match, won or
   lost, earns the Spur tip: the anvil appears and calls for it, the forge highlights only that
   part, and after saving the dock calls you back for the rematch.
 - **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
@@ -180,7 +180,8 @@ an arena. First to 3 heat wins a match.
   to aim which way it throws a top. Press a fingertip into the floor to open a cup that catches
   the first top to roll in; pinch it, pull back and let go to sling it the other way (snapped
   into a slag pit within 20°). A cup with nothing in it, or a catch not slung, lets go after 2 s. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
-  shape affects both tops. Two charges, shown as sparks on the near rim: a shape spends one, a
+  shape affects both tops. In the opening match every finish scores one heat so all three lessons
+  get a round. Afterwards knockouts score two as normal. Three charges, shown as sparks on the near rim: a shape spends one, a
   strong clash or about 6 s refills one, a hand keeps one live shape, and nothing can be shaped
   in the first 2.5 s. A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on

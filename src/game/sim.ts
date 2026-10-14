@@ -1260,8 +1260,8 @@ export const MATCH_HEAT = 3;
  * Heat the winner scores: 1 for outlasting the other top, 2 for any knockout (into a slag pit,
  * thrown over the wall, or shattered). Every pit is worth the same.
  */
-export function finishPoints(loser: Top): number {
-  return loser.finish === 'spin' || loser.finish === null ? 1 : 2;
+export function finishPoints(loser: Top, tutorial = false): number {
+  return tutorial || loser.finish === 'spin' || loser.finish === null ? 1 : 2;
 }
 
 /**
