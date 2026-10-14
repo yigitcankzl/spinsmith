@@ -1881,10 +1881,11 @@ export class MatchSystem extends createSystem({
       const k = 1 - up / 0.12;
       m.scale.setScalar(0.05 + 0.04 * (1 - k));
       const mat = m.material as MeshBasicMaterial;
-      if (hot) {
+      const shaping = this.phase === 'fight' && (h.pinching || !!this.shaping[side] || !!this.slings[side] || this.pressing[side]);
+      if (hot || shaping) {
         mat.color.setHex(0xff8a2a);
         mat.blending = AdditiveBlending;
-        mat.opacity = 0.5 + 0.5 * k;
+        mat.opacity = (hot ? 0.5 : 0.25) + (hot ? 0.5 : 0.45) * k;
       } else {
         mat.color.setHex(0x000000);
         mat.blending = NormalBlending;
@@ -3824,9 +3825,13 @@ export class MatchSystem extends createSystem({
       this.cupCaughtInRound = true;
       c.at = this.elapsed;
       playThock();
+      const t = c.shape.caught;
+      this.impacts.shock(t.x, this.arena.height(t.x, t.z), t.z, 0.8, 0xff8a2a);
+      this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.7);
+      this.hitStop = Math.max(this.hitStop, 0.08);
+      this.stamp.show('CUP → CAUGHT', t === this.theirs ? 'RIVAL LOCKED' : 'YOUR TOP LOCKED', t === this.theirs ? 'mine' : 'neutral', 0.5, 1.05);
       if (!this.slungOnce) this.label.set('Caught! Pinch it, pull back, let go:\nit flies the other way. Aim at a slag pit');
       if (import.meta.env.DEV) {
-        const t = c.shape.caught;
         const w = this.root.localToWorld(this.slingFrom.set(t.x, this.arena.height(t.x, t.z), t.z));
         console.log(`[SHAPE] cup caught ${t === this.mine ? 'mine' : 'rival'} at ${w.x.toFixed(3)},${w.y.toFixed(3)},${w.z.toFixed(3)}`);
       }
@@ -3898,6 +3903,8 @@ export class MatchSystem extends createSystem({
     const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz, sigma);
     this.lastShape = { t: this.elapsed, kind };
     this.progress.advance('match');
+    this.impacts.shock(x, this.arena.height(x, z), z, 0.45, 0xff8a2a);
+    this.sparks.embers(x, this.arena.height(x, z) + 0.005, z, 5, 0.35, 0.035, 1);
     playThock();
     return shape;
   }
@@ -3982,11 +3989,16 @@ export class MatchSystem extends createSystem({
         hit.add(t);
         playCrunch();
         const authored = s.owner === 'left' || s.owner === 'right' || s.owner === 'left-cup' || s.owner === 'right-cup';
+        this.impacts.hit(t.x, this.arena.height(t.x, t.z), t.z, authored ? 0.8 : 0.45);
+        this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, authored ? 0.7 : 0.35);
         if (authored && t === this.theirs && !this.rewardedShapes.has(s)) {
           this.rewardedShapes.add(s);
+          this.lastShape = { t: this.elapsed, kind: s.kind };
+          this.hitStop = Math.max(this.hitStop, 0.08);
+          this.accumulator = 0;
           const charge = this.charges.reward();
           this.forgeBar.value = Math.min(1, this.forgeBar.value + 0.12);
-          this.stamp.show('ARENA COMBO!', `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`, 'mine', 0.45, 1.05);
+          this.stamp.show(`${s.kind === 'well' ? 'CUP' : 'RAMP'} → IMPACT`, `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`, 'mine', 0.5, 1.05);
         }
       }
     }
@@ -4250,7 +4262,9 @@ export class MatchSystem extends createSystem({
         text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points} heat\n${why ? `${why} · ` : ''}${score}`;
       }
       // A finish within 1.5 s of the player's shape names it as the cause.
-      const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind).toUpperCase() : null;
+      const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW
+        ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind === 'well' ? 'CUP' : this.lastShape.kind).toUpperCase()
+        : null;
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
       if (!this.demo && this.progress.guide === 'done' && v === 1 && loser.finish !== 'spin' && this.progress.best('fastestKo', Math.round(this.elapsed * 10) / 10)) this.stamp.later('NEW BEST!', `Fastest knockout: ${this.elapsed.toFixed(1)} s`, 'mine', 1);
       if (v === 1 && loser.finish !== 'spin' && recent && this.lastShape) {
