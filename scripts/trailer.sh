@@ -44,7 +44,7 @@ if [ -z "${CUT_ONLY:-}" ]; then
   done
   # 4. The strike (a new match so the round is fresh).
   sleep 3; ready
-  rec 04-strike.mp4 '["rip",{"power":0.8}]' '["fightAt",3]' '["key","KeyJ"]' '["wait",0.8]' '["slap"]' '["wait",3.5]'
+  rec 04-strike.mp4 '["rip",{"power":0.8}]' '["fightAt",3]' '["key","KeyJ"]' '["wait",0.8]' '["slap",{"fallback":true}]' '["wait",3.5]'
   # 5. Cup and sling.
   for _ in 1 2 3; do
     # Reset to the stable Forge Bowl bout; a later rival may end the round while the hand reaches in.

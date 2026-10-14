@@ -48,18 +48,18 @@ for i in "${!names[@]}"; do
   if [ "${names[$i]}" = hammer ]; then
     DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
       '["key","KeyH"]' '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' '["key","Digit5"]' \
-      '["key","KeyJ"]' '["wait",0.8]' '["slap",{"angle":"rival"}]' '["wait",0.6]' \
+      '["key","KeyJ"]' '["wait",0.8]' '["slap",{"angle":"rival","fallback":true}]' '["wait",0.6]' \
       '["key","KeyG"]' '["key","KeyT"]' '["wait",4]' >/dev/null
   elif [ "${names[$i]}" = ward ]; then
     DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
       '["key","KeyH"]' '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' '["key","Digit6"]' \
       '["key","KeyJ"]' '["wait",0.8]' '["key","KeyG"]' '["key","KeyT"]' '["wait",0.45]' \
-      '["slap",{"angle":"rival"}]' '["wait",6.5]' >/dev/null
+      '["slap",{"angle":"rival","fallback":true}]' '["wait",6.5]' >/dev/null
   else
     DRIVE_TIMEOUT=100000 DRIVE_VIDEO="$clip" "$DRIVE" \
       '["key","KeyH"]' '["rip",{"power":0.9,"aim":8}]' '["key","KeyU"]' '["fightAt",3]' \
       "[\"key\",\"${keys[$i]}\"]" '["wait",0.25]' \
-      '["key","KeyJ"]' '["wait",0.8]' "[\"slap\",{\"angle\":\"${aims[$i]}\"}]" '["wait",4]' >/dev/null
+      '["key","KeyJ"]' '["wait",0.8]' "[\"slap\",{\"angle\":\"${aims[$i]}\",\"fallback\":true}]" '["wait",4]' >/dev/null
   fi
   test -s "$clip"
   clips+=("$clip")

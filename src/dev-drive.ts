@@ -520,10 +520,11 @@ export function installDriver() {
      * The strike: a palm slapped down beside the arena. `angle` is degrees, or a semantic target
      * for repeatable ultimate footage. Anvil wants `opposite-rival`; aimed seals want `rival`.
      */
-    async slap(opts: { gentle?: boolean; side?: Side; angle?: SlapAim } = {}) {
-      const { gentle = false, side = 'right', angle = 60 } = opts;
+    async slap(opts: { gentle?: boolean; side?: Side; angle?: SlapAim; fallback?: boolean } = {}) {
+      const { gentle = false, side = 'right', angle = 60, fallback = false } = opts;
       const g = game();
       const tableY = g.root.position.y - PEDESTAL * g.rootK;
+      const armedAtStart = g.phase === 'fight' && g.forgeBar.value >= 0.999;
       const aimAngle = () => {
         if (typeof angle === 'number') return (angle * Math.PI) / 180;
         const target = angle === 'mine' ? g.mine : g.theirs;
@@ -531,21 +532,39 @@ export function installDriver() {
       };
       // Steer the hand's lowest joint, while gameplay judges the palm midpoint. Keep enough room
       // outside the rim that either hand pose still leaves that midpoint in the strike band.
-      const r = g.arena.radius * 1.55;
-      const spotAt = (a: number) => g.root.localToWorld(new Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)).setY(tableY);
-      let spot = spotAt(aimAngle());
-      await glide(side, 'low', above(spot, 0.18), 0.35, 0);
-      await wait(0.15);
-      // Semantic targets orbit during the reach. Re-aim just before the palm drops instead of
-      // guarding where the rival was a second ago.
-      if (typeof angle !== 'number') {
-        spot = spotAt(aimAngle());
-        await glide(side, 'low', above(spot, 0.18), 0.16, 0);
+      // A capture is allowed one retry: under heavy video encoding IWER can skip the two frames
+      // that establish the downward velocity. Never silently save footage in which the bar stayed
+      // full and the advertised ultimate did not happen.
+      const attempts = armedAtStart ? 2 : 1;
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        const r = g.arena.radius * (attempt === 0 ? 1.55 : 1.35);
+        const spotAt = (a: number) => g.root.localToWorld(new Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)).setY(tableY);
+        let spot = spotAt(aimAngle());
+        await glide(side, 'low', above(spot, 0.18), 0.35, 0);
+        await wait(0.15);
+        // Semantic targets orbit during the reach. Re-aim just before the palm drops instead of
+        // guarding where the rival was a second ago.
+        if (typeof angle !== 'number') {
+          spot = spotAt(aimAngle());
+          await glide(side, 'low', above(spot, 0.18), 0.16, 0);
+        }
+        await glide(side, 'low', spot, gentle ? 0.6 : 0.1, 0, gentle ? 'natural' : 'linear');
+        await wait(gentle ? 0.6 : 0.35);
+        await glide(side, 'low', above(spot, 0.15), 0.3, 0);
+        if (!armedAtStart || g.forgeBar.value < 0.999) break;
+        await wait(0.15);
       }
-      await glide(side, 'low', spot, gentle ? 0.6 : 0.12, 0, gentle ? 'natural' : 'linear');
-      await wait(gentle ? 0.6 : 0.3);
-      await glide(side, 'low', above(spot, 0.15), 0.3, 0);
       await park(side);
+      // Recording-only safety net. The footage still contains the complete natural reach/drop,
+      // but a heavily loaded emulator must not silently save a clip with no advertised effect.
+      // Interactive QA leaves this false so a missed gesture remains a real test failure.
+      if (armedAtStart && g.forgeBar.value >= 0.999 && fallback) {
+        console.warn('[DRIVE] recorded slap missed under load; firing the dev-only capture fallback');
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ', key: 'j', shiftKey: true }));
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ', key: 'j', shiftKey: true }));
+        await wait(0.2);
+      }
+      if (armedAtStart && g.forgeBar.value >= 0.999) throw new Error('slap did not spend the armed ultimate');
     },
 
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */

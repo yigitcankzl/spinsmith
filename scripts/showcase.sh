@@ -112,7 +112,7 @@ fi
 # 06. Fight in the arena just authored above.
 rec 06-custom-arena-fight.mp4 \
   '["rip",{"power":0.9,"aim":-10}]' '["fightAt",3]' \
-  '["ramp",{"hold":0.4}]' '["wait",2]' '["key","KeyJ"]' '["slap"]' '["wait",3]' \
+  '["ramp",{"hold":0.4}]' '["wait",2]' '["key","KeyJ"]' '["slap",{"fallback":true}]' '["wait",3]' \
   '["key","KeyO"]' '["wait",8]'
 
 # 07. Every built-in arena, in order. The labelled version is made below.
@@ -150,7 +150,7 @@ reset_demo
 arena_to 5
 rec 09-sumo-square-fight.mp4 \
   '["key","KeyR"]' '["wait",3.5]' '["rip",{"power":0.98,"aim":14}]' \
-  '["fightAt",3]' '["key","KeyJ"]' '["slap"]' '["wait",3]' '["key","KeyO"]' '["wait",8]'
+  '["fightAt",3]' '["key","KeyJ"]' '["slap",{"fallback":true}]' '["wait",3]' '["key","KeyO"]' '["wait",8]'
 
 reset_demo
 arena_to 10
@@ -163,7 +163,7 @@ reset_demo
 rec 11-hookjaw-rival-move.mp4 \
   '["key","KeyH"]' '["wait",3.5]' '["rip",{"power":0.88}]' '["fightAt",3]' \
   '["key","KeyT"]' '["wait",2]' '["cup",{"at":"mine"}]' '["wait",2]' \
-  '["key","KeyJ"]' '["slap"]' '["wait",3]' '["key","KeyK"]' '["wait",8]'
+  '["key","KeyJ"]' '["slap",{"fallback":true}]' '["wait",3]' '["key","KeyK"]' '["wait",8]'
 
 required=(
   01-hub-progression 02-top-lineup 03-forge-customization 04-custom-top-ember-fight
