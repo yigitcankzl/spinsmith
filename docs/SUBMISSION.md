@@ -1,7 +1,7 @@
 # SpinSmith: submission texts
 
-Meta VR Start Developer Competition 2026 · Gaming – New Experience. Drafts to paste into the
-submission form; the hosted link, cover image and video come later.
+Meta VR Start Developer Competition 2026 · Gaming – New Experience. Final copy and local assets
+for the submission form; only the public game URL and public video upload are still external.
 
 ## Tagline (140 characters max)
 
@@ -73,41 +73,46 @@ arena and strike is measured over thousands of rounds.
 - **Forgiving by design:** tracking loss shorter than a tenth of a second is ignored, and a lost
   hand cancels a half-made shape instead of committing it.
 
-## Video storyboard (under three minutes)
+## Competition video (1:42)
 
 The one sentence the video must show: *Forge it by hand, rip it into your real table, then
 reshape the arena to win.*
 
-| Time | Shot | On screen |
+| Time | Shot | Point proved |
 |---|---|---|
-| 0:00-0:08 | Cold open on a real wooden table: a ramp throws the rival over the wall; it keeps spinning across the desk and drops off the table's edge (slow motion) | OFF THE DESK! |
-| 0:08-0:13 | The arena forges up out of the table, SPINSMITH rises over it | Title |
-| 0:13-0:20 | A portal burns open on the wall; the rival arcs out and slams into the arena | VS HOOKJAW |
-| 0:20-0:30 | Pinch and pull back; the top rips in. The first ramp throws the rival into a slag pit, then the replay turns the arena | "Reshape the arena to win" · SLAG! · REPLAY |
-| 0:30-0:42 | The forge bar fills on the back of the hand; a palm slaps the real desk: shockwave, a molten handprint left on the wood | ANVIL STRIKE! |
-| 0:42-0:52 | The cup catches the rival; pinch, pull, let go: slung into a pit | SLUNG! |
-| 0:52-1:05 | The forge: a part flies to the hand and clicks on; quench, the room turns cold blue | FORGED! |
-| 1:05-1:20 | Rivals and circuits: the champion comes through huge; a won match sends a wave of light across the room | CINDER CIRCUIT CLEARED! |
-| 1:20-1:40 | Quick cuts: six strikes (Tilt dips the arena, Hammer cracks, Ward holds), arenas (embers, the tipping dish, Colossus) | Six strikes · fifteen arenas |
-| 1:40-2:00 | Home: the board, feats, a challenge code a friend types in | Come back every day |
-| 2:00-2:15 | A full round from the pull to a shatter, in one take | |
-| 2:15-2:25 | End card: logo, "Play in the Quest browser, no install", the link | |
+| 0:00-0:07 | Title, arena rises on the table | Seated tabletop scale |
+| 0:07-0:11 | Rival portal entrance | The room is the stage |
+| 0:11-0:22 | Rip, ramp knockout and replay | Core new experience: reshape a live fight |
+| 0:22-0:34 | Table strike, cup and sling | Hands are the combat verbs |
+| 0:34-0:52 | Fit/quench, then change ring, core, tip, look and combat | Physical build expression |
+| 0:52-1:01 | Arena workshop | Player-authored battlegrounds |
+| 1:01-1:14 | Six fast ultimate cuts | Arena-changing tactical escalation |
+| 1:14-1:30 | Arena variety, daily board and champions | Breadth and reason to return |
+| 1:30-1:39 | Match finish | The “one more match” loop |
+| 1:39-1:42 | End card | Hands only · seated · Quest Browser |
 
-Footage: label each shot with where it was captured. `scripts/trailer.sh` records the emulator
-version of the main shots and cuts a rough 80 s trailer from them. On a Quest: passthrough, daylight, a real
-wooden table near its edge (for the off-the-desk shot), a wall behind it (the portal), in-headset
-audio, two takes each. In the emulator, every shot can be staged and recorded with the hand
-driver (`DRIVE_VIDEO=... scripts/drive.sh ...`, see `.claude/skills/spinsmith-drive/SKILL.md`):
-for example the replay shot is `["rip",{"power":0.9}]`, `["wait",3.2]`, `["ramp",{"hold":0.15}]`,
-`["key","KeyK"]`, `["wait",9]`; the strike is `["key","KeyJ"]`, `["wait",0.7]`, `["slap"]`.
+Final video: `~/Desktop/spinsmith-videos/competition-final/spinsmith-competition-1080p60.mp4`
+(102.329 s, H.264, 1920×1080 at 60 fps, stereo AAC). Every gameplay shot is visibly labelled
+`IWER EMULATOR CAPTURE · QUEST BUILD`: IWER is IWSDK's browser-based XR emulator. This is honest
+prototype footage and does not claim to demonstrate physical-headset passthrough or tracking.
+`CAPTURE=1 scripts/competition-trailer.sh` recreates every source clip and the final cut from the
+current build; running it without `CAPTURE` re-cuts the existing sources.
 
-Capture: on a Quest in passthrough, daylight, a real wooden table, in-headset audio; two takes
-per shot; use `?demo` for the progression shots and dev key `H` (dev build) or a level-6 save for
-Hookjaw.
+## Submission assets
 
-## Still to do
+- Landscape cover: `~/Desktop/spinsmith-videos/store/cover-landscape-2560x1440.png`
+- Square cover: `~/Desktop/spinsmith-videos/store/cover-square-1440.png`
+- Portrait cover: `~/Desktop/spinsmith-videos/store/cover-portrait-1008x1440.png`
+- Hero: `~/Desktop/spinsmith-videos/store/hero-3000x900.png`
+- Transparent logo: `~/Desktop/spinsmith-videos/store/logo-transparent.png`
+- Six gameplay stills: `~/Desktop/spinsmith-videos/store/01-portal.png` through `06-home.png`
+- Technical check: clean production build, clean-profile `?fresh` and `?demo`, service-worker
+  controlled reload, offline second open, save/reload after the first match, and no browser errors.
 
-- Cover image and logo.
-- Hosted production build, a cold-start test from a clean browser, and the link checked in a
-  private tab and from another network.
-- Capture the video on a Quest.
+## External steps still to do
+
+- Deploy the production build to a fixed HTTPS origin, then repeat the cold-start and offline test
+  against that public URL from a private tab and another network.
+- Upload the competition MP4 to the video host accepted by Devpost and paste the public link.
+- A physical Quest is unavailable, so 72/90 fps, true hand tracking, passthrough, table placement,
+  depth occlusion and store packaging remain unverified. Do not describe them as device-tested.
