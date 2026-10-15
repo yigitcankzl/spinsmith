@@ -11,7 +11,9 @@ Current direction: [docs/GAMEPLAY-DIRECTION.md](docs/GAMEPLAY-DIRECTION.md); the
 ## Try it (judges)
 
 1. Sit at a table on a Meta Quest 3 or 3S, hands free (no controllers), and open the hosted URL in the Quest Browser.
-2. Press **ENTER** and allow spatial data: the arena stands on your table (without a table it floats in front of you, and says so).
+2. Press **ENTER** and allow spatial data. Look at the table and pinch, or press your palm on it:
+   the arena rises there. On later visits the anchored smithy returns to its saved place; without
+   a usable surface it falls back to a floating tray and says so.
 3. Pinch your top in its dock and drop it in the arena, then pinch near it, pull back and let go to rip it.
 4. In the fight, pinch the floor beside the rival: a ramp rises and throws it. Each new match teaches one more move: the palm-slap strike in the second, the cup and sling in the third.
 5. Add `?fresh` to start as a new player, or `?demo` for a level-8 smith with more unlocked. The brass dial on the near rim sets sound, flashes and a gentle press-and-hold strike.
@@ -28,9 +30,10 @@ an arena. First to 3 heat wins a match.
   prepared level-8 smith. In the headset, hold your level plate for 2 s, then pinch it again, to
   start over.
 - **Move the arena:** at home, pinch the brass handle on the pedestal's near face and carry it.
-  Leaving and re-entering, or recentering the headset, places it in front of you again.
+  Its new pose is saved; when persistent WebXR anchors are available, the room remembers it.
 - **Known limits:** nothing has been measured on a headset yet; table detection relies on the
-  room's Space Setup labelling a table or desk.
+  room's Space Setup labelling a table or desk. Depth occlusion, persistent-anchor stability and
+  gaze input have only been exercised in IWSDK's browser emulator (IWER).
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
   slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; and Assist (fights at

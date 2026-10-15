@@ -14,15 +14,15 @@ Draft (Oct 8, 2026); final text before the deadline. In English, as the rules re
    is a pinch, a pull or a fingertip press.
 3. **Allow spatial data** when the browser asks. The arena then stands on your real table;
    without it, or with no table nearby, it floats on a tray in front of you and plays the same.
-4. Open the link and press **Enter**. A ring glows on your table: lay your palm on the table
-   there and the arena rises where you pressed, at your table's real height. A pinch on the ring
-   also places it, and after 8 seconds it places itself.
+4. Open the link and press **Enter**. Look at the table and pinch, or lay your palm on the glowing
+   ring: the arena rises there at the table's real height. After 8 seconds it places itself. On a
+   later visit, a persistent spatial anchor restores the smithy where you left it when supported.
 
 ## If something is off
 
-- **The arena is in the wrong place:** hold the Meta button to recenter, or, at home, pinch the
-  brass handle on the front of the pedestal and carry the arena where you want it. Leaving and
-  re-entering also places it in front of you again.
+- **The arena is in the wrong place:** at home, pinch the brass handle on the front of the pedestal
+  and carry the arena where you want it; the new pose is saved. Recenter only if the entire room
+  coordinate system is wrong.
 - **Someone played before you on this headset:** add `?fresh` to the address to start as a new
   smith, or hold your level plate (the small plate in front of the arena) for 2 seconds and pinch
   it again.
@@ -59,7 +59,8 @@ Draft (Oct 8, 2026); final text before the deadline. In English, as the rules re
   spinning across your real desk and can drop off its real edge (OFF THE DESK!). With a wall
   detected behind the arena, the rival's portal opens on it at the start of a match.
 - **Strike the desk.** With the forge bar full, slap your palm beside the arena: the shockwave,
-  and a molten print of your hand on the desk that cools to a scorch.
+  and a molten print of your hand on the desk that cools to a scorch. Each seal also leaves its
+  own persistent table mark, and the newest eight return with the workshop.
 - **Replay.** When your own move decides a round, the arena replays it slowly and turns to show
   it from the rival's side (a pinch skips it).
 - **Quench.** Save a top in the forge's quench slot: the room turns cold blue for a breath.

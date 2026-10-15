@@ -24,27 +24,27 @@ throw your own top out. When your move decides a round, the arena says so, and p
 **Strike the table.** A forge bar glows on the back of your hand. Full, slap your palm on the real
 table beside the arena: a shockwave runs through the floor, and your palm leaves a molten print on
 your desk. Six strikes to choose from: Anvil, Rush, Magnet, Tilt (the arena dips toward your
-palm), Hammer and Ward. Rivals wind up big moves of their own; strike first and cut them short.
+palm), Hammer and Ward. Each leaves its own persistent scar on the table, so the room keeps a
+visible history of recent fights. Rivals wind up big moves of their own; strike first and cut
+them short.
 
 **Your room is the stage.** A rival arrives through a portal and slams into the arena. A top
 thrown over the wall keeps spinning across your real desk and can drop off its real edge. Your
-hands cast shadows on the arena, a win sends a wave of light across your room, and every sound
-comes from where it happens.
+hands and furniture correctly cover the depth-aware arena, a persistent anchor returns the smithy
+to its saved place, a win sends a wave of light across your room, and every sound comes from where
+it happens.
 
 **Forge.** Pinch the small anvil and the arena becomes a forge. Build your top from 226 legal
 combinations of ring, core and tip; each changes the physics, not just a number. Quench it to
 save, and the room turns cold blue for a breath.
 
-**Climb.** Seven rivals with their own lines and moves, climbed as circuits with a champion each;
-fifteen arenas, from a balanced bowl to a ring of closing embers to a stadium over a metre
-across; daily Smith Orders, twelve feats, personal bests, and an arena workshop with live
-balance dials. Levels open options, never power. Share your top as a challenge code and a friend
-fights it.
+**Climb.** Seven rivals and fifteen arenas form champion circuits, alongside daily Smith Orders,
+twelve feats, personal bests and an arena workshop. Levels open options, never power. Share your
+top as a challenge code and a friend fights it.
 
-**Learn by doing.** The opening match gives each hand verb its own round: rip and ramp, then catch
-and sling, then an arena-changing ultimate. A ghost hand shows the first ramp, and every knockout
-in this lesson scores one heat so no step gets skipped. A comfort dial turns off sound or flashes,
-makes the strike a gentle press, or slows fights to 80%.
+**Learn by doing.** The opening match gives each hand verb its own round: rip and ramp, catch and
+sling, then an ultimate. A ghost hand demonstrates the first ramp; lesson scoring prevents skipped
+steps. A comfort dial disables sound or flashes, makes strikes gentle, or slows fights to 80%.
 
 Built with the Immersive Web SDK, SpinSmith runs in the Quest browser with no install and works
 offline once loaded. A deterministic simulation drives the fight and the balance: every part,
@@ -85,7 +85,7 @@ reshape the arena to win.*
 | 0:03-0:08 | Arena rise and rival portal | Seated tabletop scale; the room is the stage |
 | 0:08-0:20 | Ramp, cup/sling and table strike | Hands actively reshape a live fight |
 | 0:20-0:32 | Forge and arena workshop | Physical build expression and authored battlegrounds |
-| 0:32-0:40 | Anvil, Tilt and Ward | Three distinct ultimates leave persistent arena rules |
+| 0:32-0:40 | Anvil, Tilt and Ward | Distinct ultimates change the arena and scar the real table |
 | 0:40-0:49 | Arena variety, progression and match finish | Breadth, return loop and instant rematch |
 | 0:49-0:50 | End card | Hands only · seated · Quest Browser |
 
@@ -112,5 +112,6 @@ current build; running it without `CAPTURE` re-cuts the existing sources.
 - Deploy the production build to a fixed HTTPS origin, then repeat the cold-start and offline test
   against that public URL from a private tab and another network.
 - Upload the competition MP4 to the video host accepted by Devpost and paste the public link.
-- A physical Quest is unavailable, so 72/90 fps, true hand tracking, passthrough, table placement,
-  depth occlusion and store packaging remain unverified. Do not describe them as device-tested.
+- A physical Quest is unavailable, so 72/90 fps, true hand tracking, passthrough, real-table
+  placement, depth-edge quality, anchor drift, gaze input and store packaging remain unverified.
+  The systems and fallbacks pass IWER tests; do not describe them as device-tested.
