@@ -3629,8 +3629,15 @@ export class MatchSystem extends createSystem({
     }
 
     this.overforgeSeal.visible = !this.photo;
-    const y = this.arena.height(this.mine.x, this.mine.z) + 0.046 + 0.004 * Math.sin(this.time * 5);
-    this.overforgeSeal.position.set(this.mine.x, y, this.mine.z);
+    // The coin rises from the moving top, then settles into a stable near-rim dock. Requiring the
+    // player to catch a token that keeps orbiting at top speed turned a clear ritual into a chase.
+    const dockX = 0;
+    const dockZ = this.arena.radius * 0.72;
+    const settle = Math.min(1, Math.max(0, (this.elapsed - this.fullSince - 0.5) / 0.28));
+    const x = this.mine.x + (dockX - this.mine.x) * settle;
+    const z = this.mine.z + (dockZ - this.mine.z) * settle;
+    const y = this.arena.height(x, z) + 0.046 + 0.004 * Math.sin(this.time * 5);
+    this.overforgeSeal.position.set(x, y, z);
     this.overforgeSeal.rotation.y += dt * 1.6;
     this.overforgeSeal.scale.setScalar(1 + 0.08 * Math.sin(this.time * 6));
     this.overforgeMode = 'ready';
