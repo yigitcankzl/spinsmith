@@ -14,7 +14,18 @@
       "offer": "always",
       "features": {
         "handTracking": true,
-        "planeDetection": true
+        "planeDetection": true,
+        "meshDetection": true,
+        "anchors": true,
+        "gazeTracking": true,
+        "hitTest": {
+          "required": true
+        },
+        "depthSensing": {
+          "required": true,
+          "usage": "gpu-optimized",
+          "format": "float32"
+        }
       }
     },
     "input": {
@@ -36,7 +47,7 @@
       "grabbing": false,
       "physics": false,
       "sceneUnderstanding": true,
-      "environmentRaycast": false,
+      "environmentRaycast": true,
       "spatialUI": false
     }
   },

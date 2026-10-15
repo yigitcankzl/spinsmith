@@ -1,4 +1,5 @@
-import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DoubleSide, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, PlaneGeometry, Quaternion, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
+import type { Entity } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
@@ -35,7 +36,8 @@ import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, SHAPING, ShapingCharges, StrikeBar } from './shaping.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
 import { TUNE } from './tuning.js';
-import type { Point } from './placement.js';
+import type { Placement, Point } from './placement.js';
+import { applySpatialPose, loadSpatialPose, saveSpatialPose } from './spatial-state.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
@@ -214,10 +216,18 @@ export class MatchSystem extends createSystem({
   private dragging: { hand: HandState; from: Vector3; start: Vector3 } | null = null;
   private hands = new HandInput();
   private root = new Group();
+  private rootEntity?: Entity;
   private arena = new Arena();
   private arenaView = new ArenaView(PEDESTAL / ARENA_SCALE);
   /** Everything that tilts with a rocking dish: the arena and what is on it. */
   private stage = new Group();
+  private stageEntity?: Entity;
+  /** A viewer hit-test probe. IWSDK moves it to the real surface under the player's gaze. */
+  private placementProbe = Object.assign(new Group(), { visible: false });
+  private placementUp = new Vector3();
+  private placementQ = new Quaternion();
+  private anchorPoseApplied = false;
+  private spatialDirty = false;
   /** Arenas in rotation (built-ins plus the player's own) and the one in play. */
   private arenas: ArenaLayout[] = [...ARENAS, ...loadArenas()];
   private arenaIndex = 0;
@@ -788,7 +798,9 @@ export class MatchSystem extends createSystem({
     this.rematchButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.rematchButton.set('REMATCH', true, true);
     this.rematchButton.mesh.visible = false;
-    this.pointers = import.meta.env.DEV ? [this.gazePointer, this.hands.right, this.hands.left] : [this.hands.right, this.hands.left];
+    // The gaze pointer stays dormant on Quest unless the runtime exposes a gaze input source. On
+    // Meta VR Glasses it combines that gaze ray with either hand's pinch; the hand path is unchanged.
+    this.pointers = [this.gazePointer, this.hands.right, this.hands.left];
     if (import.meta.env.DEV) {
       // A crosshair in the middle of the view shows where the gaze pointer aims.
       const crosshair = new Mesh(new RingGeometry(0.003, 0.0055, 24), new MeshBasicMaterial({ color: 0xff6a1a, depthTest: false, transparent: true }));
@@ -797,7 +809,18 @@ export class MatchSystem extends createSystem({
       this.player.head.add(crosshair);
     }
     this.setArena(this.arenas[this.arenaIndex]);
-    this.world.createTransformEntity(this.root);
+    this.rootEntity = this.world.createTransformEntity(this.root);
+    this.rootEntity.addComponent(XRAnchor);
+    // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
+    this.stage.name = 'arena-depth-layer';
+    this.stageEntity = this.world.createTransformEntity(this.stage, this.rootEntity);
+    this.stageEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
+    this.placementProbe.name = 'table-hit-probe';
+    const placementProbeEntity = this.world.createTransformEntity(this.placementProbe);
+    placementProbeEntity.addComponent(EnvironmentRaycastTarget, {
+      space: RaycastSpace.Viewer,
+      maxDistance: 2,
+    });
     // The cord spans from the launcher to the hand in world space, so it is not parented to the arena.
     this.world.createTransformEntity(this.cord.line);
     for (const m of this.pinchRings) this.world.createTransformEntity(m);
@@ -1022,6 +1045,7 @@ export class MatchSystem extends createSystem({
     }
     // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
     if (session !== this.xrSession) {
+      this.anchorPoseApplied = false;
       // Back at home, the print asks for a press again; mid-match, the arena just comes along.
       if (this.xrSession && this.phase === 'hub') {
         this.phase = 'placing';
@@ -1036,13 +1060,14 @@ export class MatchSystem extends createSystem({
     this.time += dt;
     this.hands.update(frame, ref, session, this.player);
     this.handOccluder.update(frame, ref, session, this.player);
+    this.updateGazePointer(frame, ref, session);
     if (import.meta.env.DEV) {
       // In the emulator the gaze crosshair is the only far pointer: the hands' own rays would aim
       // somewhere else at the same time. Hands still work by touch. On a headset, hands do both.
       this.hands.left.hasRay = false;
       this.hands.right.hasRay = false;
-      this.updateGazePointer();
     }
+    this.updateSpatialAnchor();
 
     if (this.needPlace && this.phase !== 'placing') {
       this.needPlace = false;
@@ -1649,6 +1674,7 @@ export class MatchSystem extends createSystem({
         this.launchGhost.visible = false;
       } else this.theirView = view;
     }
+    this.refreshDepthOcclusion();
   }
 
   /** An opponent: a classic top half the time, otherwise any legal build; either spin. */
@@ -2105,23 +2131,87 @@ export class MatchSystem extends createSystem({
   }
 
   /**
-   * Dev builds add the head's gaze as a pointer that pinches whenever a hand pinches: in the
-   * emulator's mouse-look mode the hands hang below the view, so you aim with the view instead.
+   * Meta VR Glasses expose gaze as a target ray and either hand supplies the pinch. In desktop
+   * IWER the head ray is the equivalent; on a Quest without gaze tracking this pointer sleeps.
    */
-  private updateGazePointer() {
+  private updateGazePointer(frame: XRFrame, ref: XRReferenceSpace, session: XRSession) {
     const g = this.gazePointer;
-    const head = this.player.head;
-    head.getWorldPosition(g.rayOrigin);
-    head.getWorldDirection(g.rayDir).negate();
-    head.getWorldQuaternion(g.rayQuat);
+    const source = Array.from(session.inputSources).find((input) => input.targetRayMode === 'gaze');
+    const pose = source ? frame.getPose(source.targetRaySpace, ref) : null;
+    if (pose) {
+      g.rayOrigin.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+      g.rayQuat.set(pose.transform.orientation.x, pose.transform.orientation.y, pose.transform.orientation.z, pose.transform.orientation.w);
+      g.rayDir.set(0, 0, -1).applyQuaternion(g.rayQuat);
+    } else {
+      const head = this.player.head;
+      head.getWorldPosition(g.rayOrigin);
+      head.getWorldDirection(g.rayDir).negate();
+      head.getWorldQuaternion(g.rayQuat);
+    }
     g.hasRay = true;
     // Off while the hand driver (src/dev-drive.ts) steers the hands: it pinches where it means to.
-    g.tracked = !this.gazeOff;
+    g.tracked = !this.gazeOff && (!!pose || import.meta.env.DEV);
     g.pinch.set(0, -100, 0);
     const was = g.pinching;
     g.pinching = this.hands.left.pinching || this.hands.right.pinching;
     g.justPinched = g.pinching && !was;
     g.justReleased = !g.pinching && was;
+  }
+
+  /** A persistent anchor owns the smithy's local pose; unsupported runtimes keep normal placement. */
+  private updateSpatialAnchor() {
+    const entity = this.rootEntity;
+    if (!entity?.active || !entity.getValue(XRAnchor, 'attached')) return;
+    if (!this.anchorPoseApplied) {
+      this.anchorPoseApplied = true;
+      const saved = loadSpatialPose();
+      if (saved && this.phase === 'placing') {
+        applySpatialPose(this.root, saved);
+        this.root.scale.setScalar(ARENA_SCALE);
+        this.root.visible = true;
+        this.onTable = saved.onTable;
+        this.tableY = null;
+        this.pushed = 0;
+        this.lowered = 0;
+        this.rise = 1;
+        this.placedAt = this.time;
+        this.root.updateWorldMatrix(true, true);
+        this.setRoom();
+        this.toHub();
+        this.stamp.show('SMITHY RESTORED', 'BACK ON YOUR TABLE', 'mine', 1.1, 1.2);
+        console.log('[SPATIAL] restored persistent smithy pose');
+      }
+    }
+    if (this.spatialDirty && this.phase === 'hub' && this.sizeSettled && !this.dragging && this.pushed < 1e-4) {
+      saveSpatialPose(this.root, this.onTable);
+      this.spatialDirty = false;
+      console.log('[SPATIAL] saved smithy pose');
+    }
+  }
+
+  /** Writes a comfortable horizontal viewer hit into an existing placement object. */
+  private useRaycastPlacement(at: Placement): boolean {
+    if (!this.placementProbe.visible) return false;
+    this.placementProbe.getWorldPosition(this.p);
+    this.placementProbe.getWorldQuaternion(this.placementQ);
+    this.placementUp.set(0, 1, 0).applyQuaternion(this.placementQ);
+    const horizontal = Math.abs(this.placementUp.y) > 0.75;
+    const distance = Math.hypot(this.p.x - this.head.x, this.p.z - this.head.z);
+    if (!horizontal || distance < 0.25 || distance > 1.25 || this.p.y < TABLE_MIN_H || this.p.y > TABLE_MAX_H || this.head.y - this.p.y > 0.8) return false;
+    at.x = this.p.x;
+    at.y = this.p.y + PEDESTAL;
+    at.z = this.p.z;
+    at.yaw = Math.atan2(this.head.x - at.x, this.head.z - at.z);
+    at.onTable = true;
+    return true;
+  }
+
+  /** Re-runs depth material discovery after a forged top replaced its meshes. */
+  private refreshDepthOcclusion() {
+    const entity = this.stageEntity;
+    if (!entity?.active || !entity.hasComponent(DepthOccludable)) return;
+    entity.removeComponent(DepthOccludable);
+    entity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
   }
 
   /** Where a hand points at the arena (near pinch first, else its ray), including just past the rim. */
@@ -2205,6 +2295,7 @@ export class MatchSystem extends createSystem({
     this.player.head.getWorldDirection(this.fwd).negate();
     const table = pickTable(this.head, this.tables());
     const at = placeArena(this.head, this.fwd.x, this.fwd.z, this.tables(), TUNE.reach);
+    const raycastTable = this.useRaycastPlacement(at);
     const y = at.y - PEDESTAL;
     this.print.visible = true;
     this.print.position.set(at.x, y + 0.002, at.z);
@@ -2213,19 +2304,21 @@ export class MatchSystem extends createSystem({
     const left = Math.max(0, 1 - this.settle / PRESS_WAIT);
     this.printWait.geometry.setDrawRange(0, Math.ceil(left * 64) * 6);
     // With a known table, a press counts within 4 cm of it; without, anywhere a desk could be.
-    const lo = table !== null ? table - 0.04 : TABLE_MIN_H;
-    const hi = table !== null ? table + 0.04 : Math.min(TABLE_MAX_H, this.head.y - 0.25);
+    const surfaceY = raycastTable ? y : table;
+    const lo = surfaceY !== null ? surfaceY - 0.04 : TABLE_MIN_H;
+    const hi = surfaceY !== null ? surfaceY + 0.04 : Math.min(TABLE_MAX_H, this.head.y - 0.25);
     if (import.meta.env.DEV && Math.floor(this.settle) !== Math.floor(this.settle - dt)) console.log(`[PRESS] band ${lo.toFixed(3)}..${hi.toFixed(3)} print ${at.x.toFixed(2)},${y.toFixed(3)},${at.z.toFixed(2)} low ${this.hands.right.low.toFixed(3)} at ${this.hands.right.index.x.toFixed(2)},${this.hands.right.index.z.toFixed(2)}`);
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      if (h.justPinched && Math.hypot(h.pinch.x - at.x, h.pinch.z - at.z) < 0.1) {
-        console.log('[MATCH] placed by a pinch on the print');
-        this.place();
+      if (h.justPinched && (raycastTable || Math.hypot(h.pinch.x - at.x, h.pinch.z - at.z) < 0.1)) {
+        console.log(`[MATCH] placed by ${raycastTable ? 'gaze + pinch' : 'a pinch on the print'}`);
+        this.placeRoot(at);
+        this.toHub();
         return true;
       }
       const hit = this.touches[side].update(h.tracked ? h.low : null, dt, lo, hi);
       if (hit === null) continue;
-      this.placeRoot();
+      this.placeRoot(raycastTable ? at : undefined);
       // Toward the hand a little, standing on the height the palm found.
       const p = this.root.position;
       const dx = h.index.x - p.x;
@@ -2240,6 +2333,7 @@ export class MatchSystem extends createSystem({
       }
       this.root.rotation.y = Math.atan2(this.head.x - p.x, this.head.z - p.z);
       this.onTable = true;
+      this.spatialDirty = true;
       this.setRoom();
       playPlace();
       for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
@@ -2369,13 +2463,14 @@ export class MatchSystem extends createSystem({
   }
 
   /** Puts the arena a comfortable reach ahead, on a table if there is one, facing the head. */
-  private placeRoot() {
+  private placeRoot(forced?: Placement) {
     const head = this.player.head;
     head.getWorldPosition(this.head);
     head.getWorldDirection(this.fwd);
     // getWorldDirection returns +Z of the object; the camera looks down -Z.
     this.fwd.negate();
-    const at = placeArena(this.head, this.fwd.x, this.fwd.z, this.tables(), TUNE.reach);
+    const at = forced ?? placeArena(this.head, this.fwd.x, this.fwd.z, this.tables(), TUNE.reach);
+    if (!forced) this.useRaycastPlacement(at);
     // On a table, its rim stays on the wood: moved in from the edge if it would hang over.
     if (at.onTable) {
       const table = this.tableShape();
@@ -2403,6 +2498,7 @@ export class MatchSystem extends createSystem({
     this.root.rotation.set(0, at.yaw, 0);
     this.root.visible = true;
     this.onTable = at.onTable;
+    this.spatialDirty = true;
     this.tableY = null;
     this.placedAt = this.time;
     this.setRoom();
@@ -2619,12 +2715,14 @@ export class MatchSystem extends createSystem({
     if (h.pinching && h.tracked) {
       p.set(d.start.x + h.pinch.x - d.from.x, d.start.y + Math.max(-HANDLE_LIFT, Math.min(HANDLE_LIFT, h.pinch.y - d.from.y)), d.start.z + h.pinch.z - d.from.z);
       for (const t of this.tables()) if (Math.abs(p.y - (t.y + PEDESTAL)) < 0.03) p.y = t.y + PEDESTAL;
+      this.spatialDirty = true;
       return true;
     }
     this.dragging = null;
     this.player.head.getWorldPosition(this.head);
     this.root.rotation.set(0, Math.atan2(this.head.x - p.x, this.head.z - p.z), 0);
     this.onTable = this.tables().some((t) => Math.abs(p.y - (t.y + PEDESTAL)) < 1e-3);
+    this.spatialDirty = true;
     this.placedAt = this.time;
     this.setRoom();
     playPlace();

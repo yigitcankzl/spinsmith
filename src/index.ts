@@ -1,6 +1,6 @@
 // First: exempts unlit materials (UI, labels, glows) from tone mapping before any are made.
 import './game/materials.js';
-import { NeutralToneMapping, VisibilityState, World } from '@iwsdk/core';
+import { DepthSensingSystem, NeutralToneMapping, VisibilityState, World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { MatchSystem } from './game/match-system.js';
 import { loadFonts } from './game/ui.js';
@@ -43,6 +43,16 @@ loadFonts()
     world.renderer.toneMappingExposure = 1;
     world.scene.environment = forgeEnvironment(world.renderer);
     world.renderer.xr.setFoveation?.(0.5);
+    // Quest depth makes real hands, furniture and the table correctly cover the virtual smithy.
+    // The arena's UI remains ordinary world geometry so instructions never disappear behind noise.
+    world.registerSystem(DepthSensingSystem, {
+      configData: {
+        enableDepthTexture: true,
+        enableOcclusion: true,
+        useFloat32: true,
+        blurRadius: 20,
+      },
+    });
     world.registerSystem(MatchSystem);
     // The landing page (index.html): Enter starts the session; the page hides while in XR.
     const landing = document.getElementById('landing');
