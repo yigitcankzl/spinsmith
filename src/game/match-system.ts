@@ -577,7 +577,9 @@ export class MatchSystem extends createSystem({
   private barRings: Record<Side, Group> = { left: new Group(), right: new Group() };
   private barSegs: MeshBasicMaterial[] = [];
   /** The shockwave ring running out from the middle (arena-local), and how far it has gone (0..1, 1 = done). */
-  private shock = new Mesh(new RingGeometry(0.93, 1, 64).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }));
+  // A thin activation front leaves the changed terrain readable instead of washing the whole
+  // arena in the same orange disc for every seal.
+  private shock = new Mesh(new RingGeometry(0.965, 1, 64).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }));
   private shockT = 1;
   /** Where to slap: a glowing print on the table beside the near rim, while the strike is armed. */
   private slapMark = new Group();
@@ -3750,14 +3752,14 @@ export class MatchSystem extends createSystem({
       this.slings[s] = null;
     }
     this.lastShape = { t: this.elapsed, kind: 'strike' };
-    // Every seal shares one unmistakable activation beat before its own effect: a coloured wave
-    // crosses the arena from the palm. This is presentation only; the six strike mechanics stay
-    // distinct below.
+    // Anvil owns the arena-wide shock front. The other seals start directly with their distinctive
+    // chevrons, funnel, downhill seams, hammer arcs or ward sector; a shared orange wash made six
+    // different mechanics look like recolours of one ultimate.
     this.shockAt.x = ox;
     this.shockAt.z = oz;
-    this.shockT = 0;
+    this.shockT = seal === 'anvil' ? 0 : 1;
     (this.shock.material as MeshBasicMaterial).color.setHex(SEAL_COLOR[seal]);
-    this.impacts.shock(ox, this.arena.floorHeight(1), oz, 1, SEAL_COLOR[seal]);
+    if (seal === 'anvil') this.impacts.shock(ox, this.arena.floorHeight(1), oz, 1, SEAL_COLOR[seal]);
     // Each seal reads its own way: the anvil's shockwave from the middle, the rush's sparks trailing
     // your top, the magnet's rings closing on the rival.
     const me = this.mine;

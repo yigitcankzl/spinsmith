@@ -530,7 +530,9 @@ function topHeight(ring: Ring, base: number) {
 }
 
 /** Fighting tops are drawn this much larger than their simulated size (presentation only). */
-const HERO_SCALE = 1.25;
+// Combat reads from farther away than the forge. Keep the simulation radius unchanged, but let the
+// forged contact profile survive at seated distance and in a 16:9 capture.
+const HERO_SCALE = 1.32;
 /** The drawn spin turns this many times faster than the simulation's angle (which tops out near 4.5 rev/s). */
 const SPIN_DRAW = 5;
 
@@ -1480,7 +1482,7 @@ export class ArenaView {
     // The key light: one warm, shadowless spot above the arena, a little toward the player, so the
     // bowl and the tops stand in a pool of light (it lights lit materials only). Always on: hiding
     // a light would recompile every lit material.
-    const key = new SpotLight(0xffd2a0, 1, 0, 0.75, 0.6, 2);
+    const key = new SpotLight(0xffd2a0, 0.86, 0, 0.75, 0.6, 2);
     key.position.set(-0.04, 0.26, 0.08);
     this.root.add(floor, this.features, key, key.target);
   }

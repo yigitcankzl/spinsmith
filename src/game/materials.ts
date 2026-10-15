@@ -156,7 +156,7 @@ const BRUSHED_NORMAL = brushedLines();
 BRUSHED_NORMAL.repeat.set(4, 1);
 
 /** Hero metal, polished: walls, pillars, the anvil's face and the hammer. */
-export const STEEL = new MeshStandardMaterial({ color: 0xc8ccd6, metalness: 1, roughness: 0.26, normalMap: BRUSHED_NORMAL, normalScale: new Vector2(0.35, 0.35) });
+export const STEEL = new MeshStandardMaterial({ color: 0xb9bec8, metalness: 1, roughness: 0.32, normalMap: BRUSHED_NORMAL, normalScale: new Vector2(0.35, 0.35) });
 /** Hero metal, hammered: the anvil's body. */
 export const FORGED = new MeshStandardMaterial({ color: 0x9298a2, metalness: 0.9, roughness: 0.75, normalMap: HAMMERED.normal, roughnessMap: HAMMERED.rough });
 /** Machine body, matte: plinths, stands, the shell. Above #2a2c32 so passthrough never shows a hole. */
@@ -168,7 +168,7 @@ GRAPHITE_AO.vertexColors = true;
 /** Machine body, machined: ratchets, coins, the shell's clamps. */
 export const GUNMETAL = new MeshStandardMaterial({ color: BODY, metalness: 0.85, roughness: 0.42 });
 /** Trim. */
-export const BRASS = new MeshStandardMaterial({ color: 0xd9a85a, metalness: 1, roughness: 0.35 });
+export const BRASS = new MeshStandardMaterial({ color: 0xc99a50, metalness: 1, roughness: 0.4 });
 
 const metals = new Map<number, MeshStandardMaterial>();
 const plastics = new Map<number, MeshStandardMaterial>();

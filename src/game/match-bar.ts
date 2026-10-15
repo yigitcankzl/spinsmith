@@ -103,6 +103,34 @@ export class MatchBar {
     Object.assign(k, { ready: true, my: myPoints, their: theirPoints, toWin, n0: names[0], n1: names[1], msg: message, show: xp.show, level: xp.level, fraction, gained: xp.gained });
     const g = this.canvas.getContext('2d')!;
     glass(g, CW, CH);
+    // The scoreboard belongs to the same forged machine as the arena: a hot top seam, brass
+    // corner fasteners and a stamped centre datum replace the anonymous floating-glass rectangle.
+    const seam = g.createLinearGradient(80, 0, CW - 80, 0);
+    seam.addColorStop(0, 'rgba(255,122,42,0)');
+    seam.addColorStop(0.16, '#ff7a2a');
+    seam.addColorStop(0.84, '#d7a457');
+    seam.addColorStop(1, 'rgba(215,164,87,0)');
+    g.fillStyle = seam;
+    g.fillRect(80, 13, CW - 160, 8);
+    for (const x of [34, CW - 34]) {
+      for (const y of [34, CH - 34]) {
+        g.beginPath();
+        g.arc(x, y, 10, 0, Math.PI * 2);
+        g.fillStyle = '#c99a50';
+        g.fill();
+        g.beginPath();
+        g.arc(x - 2, y - 2, 3.2, 0, Math.PI * 2);
+        g.fillStyle = 'rgba(255,255,255,0.62)';
+        g.fill();
+      }
+    }
+    g.save();
+    g.translate(CW / 2, 211);
+    g.rotate(Math.PI / 4);
+    g.strokeStyle = 'rgba(201,154,80,0.55)';
+    g.lineWidth = 4;
+    g.strokeRect(-13, -13, 26, 26);
+    g.restore();
     g.textBaseline = 'middle';
     const nameY = 62;
     setType(g, 'title', this.k, DIST);
@@ -115,6 +143,10 @@ export class MatchBar {
       g.strokeStyle = 'rgba(200, 220, 245, 0.35)';
       g.lineWidth = 2;
       g.strokeRect(dir === 1 ? x0 : x0 - BAR_W, BAR_Y, BAR_W, BAR_H);
+      setType(g, 'caption', this.k, DIST);
+      g.fillStyle = 'rgba(210,220,232,0.7)';
+      g.textAlign = dir === 1 ? 'left' : 'right';
+      g.fillText('SPIN', dir === 1 ? x0 : x0, BAR_Y + BAR_H + 29);
       setType(g, 'title', this.k, DIST);
       g.fillStyle = TEXT;
       g.textAlign = dir === 1 ? 'left' : 'right';
