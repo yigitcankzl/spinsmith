@@ -31,7 +31,7 @@ import { playDrawer, playMachine, playPick, playPlace, playRemove } from './audi
 import type { HandState } from './hands.js';
 import { angleGap, ArenaLayout, cloneLayout, Floor, MAX_RADIUS, MIN_RADIUS, normRadius, rimRadius, Shape, Theme, validate, Wall } from './layout.js';
 import { Arena } from './sim.js';
-import { BRASS, GRAPHITE, metal, plastic, STEEL } from './materials.js';
+import { BRASS, GRAPHITE, GUNMETAL, metal, plastic, STEEL } from './materials.js';
 
 /**
  * The arena workshop. Instead of a menu, a tray of little 3D pieces sits beside the arena, within
@@ -159,9 +159,18 @@ const MINI: ArenaLayout = {
 /** The little 3D model for a piece (about 2.5 cm). */
 function pieceModel(p: Piece): Group {
   const g = new Group();
+  // Every tool is a small forged die, not a loose primitive: the common octagonal foot and brass
+  // collar make the drawer read as one manufactured kit while the raised icon carries the rule.
+  const icon = new Group();
+  icon.position.y = 0.0045;
+  const foot = new Mesh(new CylinderGeometry(0.016, 0.0175, 0.005, 8).rotateY(Math.PI / 8), GUNMETAL);
+  foot.position.y = 0.0025;
+  const collar = new Mesh(new TorusGeometry(0.0147, 0.0011, 6, 8).rotateX(Math.PI / 2).rotateY(Math.PI / 8), BRASS);
+  collar.position.y = 0.0052;
+  g.add(foot, collar, icon);
   const m = (geo: BufferGeometry, mat: Material) => {
     const mesh = new Mesh(geo, mat);
-    g.add(mesh);
+    icon.add(mesh);
     return mesh;
   };
   const steel = STEEL;

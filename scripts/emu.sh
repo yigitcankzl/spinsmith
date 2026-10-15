@@ -27,7 +27,9 @@ case "$cmd" in
     $C xr set-input-mode --input-json '{"mode":"hand"}' >/dev/null 2>&1
     sleep 1; "$0" front ;;
   front)
-    $C xr set-transform --input-json '{"device":"headset","position":{"x":0,"y":1.6,"z":0},"orientation":{"pitch":-28,"yaw":0,"roll":0}}' >/dev/null 2>&1 ;;
+    # A seated, slightly pulled-back capture pose: the whole machine and its near-rim stations fit
+    # inside 16:9 instead of being cropped at both sides by a headset-close hero framing.
+    $C xr set-transform --input-json '{"device":"headset","position":{"x":0,"y":1.63,"z":0.12},"orientation":{"pitch":-26,"yaw":0,"roll":0}}' >/dev/null 2>&1 ;;
   look)
     $C xr look-at --input-json "{\"device\":\"headset\",\"target\":{\"x\":$1,\"y\":$2,\"z\":$3}}" >/dev/null 2>&1 ;;
   shot)
