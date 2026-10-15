@@ -553,6 +553,18 @@ export class MatchSystem extends createSystem({
   private maxPull = 0;
   private peakSpeed = 0;
   private lastPull = 0;
+  /** The free hand may hold the launcher steady while the other hand rips. */
+  private bracedLaunch = false;
+  private launcherBrace = (() => {
+    const g = new Group();
+    const metal = new MeshBasicMaterial({ color: 0xffa23f, transparent: true, opacity: 0.72, blending: AdditiveBlending, depthWrite: false });
+    const cradle = new Mesh(new TorusGeometry(0.032, 0.003, 7, 32).rotateX(Math.PI / 2), metal);
+    const body = new Mesh(new CylinderGeometry(0.019, 0.024, 0.035, 12), metal);
+    body.position.y = 0.016;
+    g.add(cradle, body);
+    g.visible = false;
+    return g;
+  })();
   /** Per-hand bump being held: arena-local anchor and the pinch height when grabbed. */
   /**
    * A ramp being made by each hand: locked start point, pinch height and position at the start,
@@ -767,6 +779,7 @@ export class MatchSystem extends createSystem({
       this.overforgeSeal,
       ...this.palmBraceWalls,
       ...this.rimSpringGuides,
+      this.launcherBrace,
       this.reticle,
       this.aura,
       this.arenaView.root,
@@ -797,6 +810,7 @@ export class MatchSystem extends createSystem({
     this.overforgeRing.renderOrder = 9;
     for (const wall of this.palmBraceWalls) wall.renderOrder = 8;
     for (const guide of this.rimSpringGuides) guide.renderOrder = 8;
+    this.launcherBrace.traverse((o) => { if ((o as Mesh).isMesh) (o as Mesh).renderOrder = 8; });
     this.setOverforgeModel(this.myBuild.seal ?? 'anvil');
     for (const mesh of [...this.ultimateArenaRings, ...this.ultimateArenaSeams, this.ultimateArenaWall, ...this.ultimateRushChevrons, ...this.ultimateHammerArcs, this.ultimateWardSector]) mesh.renderOrder = 7;
     this.shock.visible = false;
@@ -1135,6 +1149,10 @@ export class MatchSystem extends createSystem({
       this.roomLight.update(this.head, this.root.position, this.root.position.y - PEDESTAL, dim, p === 'forge' || p === 'build', dt);
     }
     const launchPhase = this.phase === 'ready' || this.phase === 'pulling';
+    if (this.phase !== 'pulling') {
+      this.bracedLaunch = false;
+      this.launcherBrace.visible = false;
+    }
     const openingFight = this.phase === 'fight' && this.firstClashPending;
     this.launchZone.visible = launchPhase && !this.demo;
     this.launchGuide.visible = (launchPhase || openingFight) && !this.demo;
@@ -3023,8 +3041,27 @@ export class MatchSystem extends createSystem({
    * stops before letting go loses power. A sideways rip aims like a slingshot, otherwise the launch
    * goes where the hand points on the floor.
    */
+  private updateLaunchBrace() {
+    if (this.puller === null) {
+      this.bracedLaunch = false;
+      this.launcherBrace.visible = false;
+      return;
+    }
+    const supportSide: Side = this.puller === 'left' ? 'right' : 'left';
+    const h = this.hands[supportSide];
+    this.root.localToWorld(this.p.set(this.mine.x, this.arena.height(this.mine.x, this.mine.z) + 0.025, this.mine.z));
+    const palm = this.handAt.copy(h.wrist).lerp(h.index, 0.5);
+    this.bracedLaunch = h.tracked && !h.pinching && palm.distanceTo(this.p) <= 0.115;
+    this.launcherBrace.visible = this.bracedLaunch && !this.photo;
+    if (!this.bracedLaunch) return;
+    this.launcherBrace.position.set(this.mine.x, this.arena.height(this.mine.x, this.mine.z) + 0.004, this.mine.z);
+    this.launcherBrace.rotation.y = this.time * 0.8;
+    this.launcherBrace.scale.setScalar(1 + 0.08 * Math.sin(this.time * 9));
+  }
+
   private updatePull(dt: number) {
     const h = this.hands[this.puller!];
+    this.updateLaunchBrace();
     // Measure only while the pinch holds: opening the fingers moves the pinch point and would fake a pull.
     if (h.pinching && h.tracked) {
       const dist = h.pinch.distanceTo(this.pullStart);
@@ -3040,7 +3077,8 @@ export class MatchSystem extends createSystem({
       // In 5% steps, so the card is not redrawn every frame of the pull.
       const pct = Math.round(power * 20) * 5;
       const curve = Math.abs(this.launchTwist) > 0.2 ? ` · CURVE ${this.launchTwist > 0 ? 'RIGHT' : 'LEFT'}` : '';
-      this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%${curve}` : power > 0 ? `${pct}%${curve}` : 'Pull back and let go');
+      const brace = this.bracedLaunch ? ' · BRACED' : '';
+      this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%${curve}${brace}` : power > 0 ? `${pct}%${curve}${brace}` : `Pull back and let go${brace}`);
       this.lostFor = 0;
       if (dist < MAX_PULL) return;
     } else if (h.tracked && (this.openFor += dt) < RIP_RELEASE) {
@@ -3173,10 +3211,12 @@ export class MatchSystem extends createSystem({
    */
   private launch(power: number, aim: number, from: { x: number; z: number } | null = null, dir: { x: number; z: number } | null = null, steep = 0) {
     if (this.phase === 'result') this.toReady();
+    const braced = this.bracedLaunch;
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
     const perfect = power >= PERFECT;
     const beatError = this.ripBeatAt < 0 ? Infinity : Math.abs(this.time - this.ripBeatAt);
-    this.launchTiming = beatError <= 0.12 ? 1.08 : beatError <= 0.28 ? 1.04 : 1;
+    const timingHelp = braced ? 1.25 : 1;
+    this.launchTiming = beatError <= 0.12 * timingHelp ? 1.08 : beatError <= 0.28 * timingHelp ? 1.04 : 1;
     this.lastPerfect = perfect;
     this.charges.reset();
     this.forgeBar.reset();
@@ -3198,7 +3238,7 @@ export class MatchSystem extends createSystem({
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
     this.count = null;
-    this.stamp.show(perfect ? 'WHITE HOT!' : this.launchTiming > 1.04 ? 'PERFECT RIP!' : this.launchTiming > 1 ? 'ON BEAT!' : 'RIP!', '', 'mine', 0.35);
+    this.stamp.show(perfect ? 'WHITE HOT!' : braced ? 'BRACED RIP!' : this.launchTiming > 1.04 ? 'PERFECT RIP!' : this.launchTiming > 1 ? 'ON BEAT!' : 'RIP!', braced ? 'two hands · stable launch' : '', 'mine', 0.35);
     if (perfect) this.featDone('whiteHot');
     this.matchLog.rip = Math.max(this.matchLog.rip, power);
     this.lastRip = power;
@@ -3213,6 +3253,10 @@ export class MatchSystem extends createSystem({
     // The launch angles into each top's own orbit direction (mirrored for left spin); aim stays as pulled.
     let speedBonus = this.launchTiming;
     let spinBonus = this.launchTiming;
+    if (braced) {
+      speedBonus *= 1.03;
+      spinBonus *= 1.04;
+    }
     if (this.launchZoneKind === 'center') {
       speedBonus *= 0.88;
       spinBonus *= 1.1;
@@ -3288,7 +3332,9 @@ export class MatchSystem extends createSystem({
     this.labelTimer = perfect || opening ? 1.5 : 0;
     this.launchFrom = null;
     this.devLaunchTwist = 0;
-    console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''} from ${sx.toFixed(3)},${sz.toFixed(3)} ${this.launchZoneKind}/${this.launchArenaKind} timing ${this.launchTiming.toFixed(2)} twist ${this.launchTwist.toFixed(2)} steep ${steep.toFixed(2)} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)} from ${rx.toFixed(3)},${rz.toFixed(3)}`);
+    this.bracedLaunch = false;
+    this.launcherBrace.visible = false;
+    console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''}${braced ? ' BRACED' : ''} from ${sx.toFixed(3)},${sz.toFixed(3)} ${this.launchZoneKind}/${this.launchArenaKind} timing ${this.launchTiming.toFixed(2)} twist ${this.launchTwist.toFixed(2)} steep ${steep.toFixed(2)} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)} from ${rx.toFixed(3)},${rz.toFixed(3)}`);
   }
 
   /** Pinch near the floor and lift to raise a bump; press a fingertip into the floor to dent it. */

@@ -403,9 +403,10 @@ export function installDriver() {
      * power 0..1 (from the pull's length and its speed at release), aim in degrees (+ = to the
      * right), steep 0..1 (pull upward: slower, more spin).
      */
-    async rip(opts: { power?: number; aim?: number; steep?: number; twist?: number; at?: { x: number; z: number }; onBeat?: boolean; side?: Side } = {}) {
-      const { power = 0.9, aim = 0, steep = 0, twist = 0, side = 'right' } = opts;
+    async rip(opts: { power?: number; aim?: number; steep?: number; twist?: number; at?: { x: number; z: number }; onBeat?: boolean; brace?: boolean; side?: Side } = {}) {
+      const { power = 0.9, aim = 0, steep = 0, twist = 0, brace = false, side = 'right' } = opts;
       const g = game();
+      const support: Side = side === 'left' ? 'right' : 'left';
       // The rival portal and the arena's match-size slide are filmed first. Waiting here keeps the
       // chosen launch point fixed in world space instead of chasing a moving arena.
       for (let i = 0; i < 160 && g.phase === 'ready' && (g.entrance || !g.sizeSettled); i++) await wait(0.05);
@@ -417,6 +418,7 @@ export function installDriver() {
         // Recompute world positions: the arena can still be completing its match-size slide during
         // a rival entrance, and a retry must follow its settled location.
         const start = local(at.x, at.z, 0.02);
+        if (brace) await glide(support, 'pinch', local(at.x, at.z, 0.045), 0.35, 0);
         const toward = g.root.localToWorld(new Vector3(0, 0, 1)).sub(g.root.position).setY(0).normalize();
         toward.applyAxisAngle(new Vector3(0, 1, 0), (-aim * Math.PI) / 180);
         const pull = toward.multiplyScalar(len * Math.cos((steep * Math.PI) / 2));
@@ -437,7 +439,12 @@ export function installDriver() {
         if ((g.phase as string) === 'fight') break;
         if (attempt === 2) throw new Error('rip did not build enough motion to launch');
       }
-      await park(side);
+      await Promise.all(brace ? [park(side), park(support)] : [park(side)]);
+    },
+
+    /** The hero launch: one open hand braces the launcher while the other pulls the ripcord. */
+    async dualRip(opts: { power?: number; aim?: number; steep?: number; twist?: number; at?: { x: number; z: number }; onBeat?: boolean; side?: Side } = {}) {
+      await api.rip({ ...opts, brace: true });
     },
 
     /**
