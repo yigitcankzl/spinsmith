@@ -38,6 +38,7 @@ import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './pla
 import { TUNE } from './tuning.js';
 import type { Placement, Point } from './placement.js';
 import { applySpatialPose, loadSpatialPose, saveSpatialPose } from './spatial-state.js';
+import { RoomImprints } from './room-imprints.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
@@ -228,6 +229,8 @@ export class MatchSystem extends createSystem({
   private placementQ = new Quaternion();
   private anchorPoseApplied = false;
   private spatialDirty = false;
+  /** Ultimates leave a compact, persistent history on the player's real table. */
+  private roomImprints = new RoomImprints((-PEDESTAL + 0.003) / ARENA_SCALE);
   /** Arenas in rotation (built-ins plus the player's own) and the one in play. */
   private arenas: ArenaLayout[] = [...ARENAS, ...loadArenas()];
   private arenaIndex = 0;
@@ -815,6 +818,8 @@ export class MatchSystem extends createSystem({
     this.stage.name = 'arena-depth-layer';
     this.stageEntity = this.world.createTransformEntity(this.stage, this.rootEntity);
     this.stageEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
+    const imprintsEntity = this.world.createTransformEntity(this.roomImprints.root, this.rootEntity);
+    imprintsEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
     this.placementProbe.name = 'table-hit-probe';
     const placementProbeEntity = this.world.createTransformEntity(this.placementProbe);
     placementProbeEntity.addComponent(EnvironmentRaycastTarget, {
@@ -3825,6 +3830,7 @@ export class MatchSystem extends createSystem({
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
     const seal = this.myBuild.seal ?? 'anvil';
     this.beginUltimateCue(seal, ox, oz);
+    this.roomImprints.record(seal, Math.atan2(oz, ox));
     // The Ward is a parry, not an interrupt: the move still comes, and a charge rebounds off it.
     const cut = this.tellAt >= 0 && this.theirs.tell > 0 && seal !== 'ward';
     // Cups and slings let go first, so none is left holding forever.
