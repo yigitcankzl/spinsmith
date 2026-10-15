@@ -60,5 +60,5 @@ Emulator art (photo mode, no UI) is in `~/Desktop/spinsmith-videos/store/`:
 `icon-512-opaque.png`, and gameplay frames. For the store, re-shoot the gameplay on a Quest in
 passthrough on a real table: screenshots must be real first-person gameplay with no added text.
 The dev hand driver has a photo mode (`["photo"]` hides cards, buttons and hands) for clean
-frames. `scripts/competition-trailer.sh` recreates the labelled 102 s competition reel; the label
+frames. `scripts/competition-trailer.sh` recreates the labelled 50 s competition reel; the label
 makes clear that it is IWER emulator capture, not physical-headset passthrough footage.

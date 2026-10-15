@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Captures the current build and cuts an approximately 80-second competition reel.
+# Captures the current build and cuts a 45-55 second competition reel.
 #
 #   CAPTURE=1 scripts/competition-trailer.sh [out-dir]  # recapture every source, then cut
 #   scripts/competition-trailer.sh [out-dir]            # cut again from existing sources
@@ -16,7 +16,7 @@ ULT=$OUT/ultimates/shots
 WIDTH=${DRIVE_VIDEO_WIDTH:-1920}
 HEIGHT=${DRIVE_VIDEO_HEIGHT:-1080}
 FPS=${DRIVE_VIDEO_FPS:-60}
-FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+FONT=$(realpath public/fonts/Rajdhani-Bold.woff2)
 mkdir -p "$OUT"
 
 CAPTURE_OWNS_SERVER=0
@@ -58,45 +58,42 @@ card() {
   ffmpeg -y -loglevel error \
     -f lavfi -i "color=c=0x111419:s=${WIDTH}x${HEIGHT}:d=${duration}:r=${FPS}" \
     -f lavfi -i anullsrc=r=48000:cl=stereo -t "$duration" \
-    -vf "drawtext=fontfile=$FONT:text='$title':fontcolor=0xff8a2a:fontsize=96:x=(w-text_w)/2:y=(h-text_h)/2-55,drawtext=fontfile=$FONT:text='$sub':fontcolor=0xe7edf4:fontsize=38:x=(w-text_w)/2:y=(h/2)+65,fade=t=in:st=0:d=0.25,fade=t=out:st=$(awk -v d="$duration" 'BEGIN {print d-0.3}'):d=0.3" \
+    -vf "drawtext=fontfile=$FONT:text='$title':fontcolor=0xff8a2a:fontsize=104:x=(w-text_w)/2:y=(h-text_h)/2-55,drawtext=fontfile=$FONT:text='$sub':fontcolor=0xe7edf4:fontsize=42:x=(w-text_w)/2:y=(h/2)+65" \
     -c:v libx264 -crf 13 -preset slow -tune animation -pix_fmt yuv420p \
     -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/$file.mp4"
 }
 
 clip() {
   local file=$1 source=$2 start=$3 duration=$4 title=$5 sub=$6
-  local fade_at
-  fade_at=$(awk -v d="$duration" 'BEGIN {print d-0.25}')
   ffmpeg -y -loglevel error -ss "$start" -i "$source" -t "$duration" \
-    -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${WIDTH}:${HEIGHT},fps=${FPS},drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=52:x=46:y=42:box=1:boxcolor=0x111419@0.72:boxborderw=16:enable='lt(t,2.4)',drawtext=fontfile=$FONT:text='$sub':fontcolor=white:fontsize=29:x=49:y=118:box=1:boxcolor=0x111419@0.62:boxborderw=10:enable='lt(t,2.4)',drawtext=fontfile=$FONT:text='IWER EMULATOR CAPTURE  -  QUEST BUILD':fontcolor=white@0.56:fontsize=24:x=w-text_w-30:y=h-45,fade=t=in:st=0:d=0.18,fade=t=out:st=$fade_at:d=0.25" \
-    -af "afade=t=in:st=0:d=0.15,afade=t=out:st=$fade_at:d=0.25" \
+    -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${WIDTH}:${HEIGHT},fps=${FPS},eq=contrast=1.06:saturation=1.13:brightness=-0.015,drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=58:x=46:y=38:box=1:boxcolor=0x111419@0.74:boxborderw=15:enable='lt(t,1.8)',drawtext=fontfile=$FONT:text='$sub':fontcolor=white:fontsize=31:x=49:y=119:box=1:boxcolor=0x111419@0.62:boxborderw=9:enable='lt(t,1.8)',drawtext=fontfile=$FONT:text='IWER EMULATOR CAPTURE  -  QUEST BUILD':fontcolor=white@0.52:fontsize=22:x=w-text_w-28:y=h-42" \
     -c:v libx264 -crf 13 -preset slow -tune animation -pix_fmt yuv420p \
     -c:a aac -b:a 256k -ar 48000 -ac 2 "$TMP/$file.mp4"
 }
 
-card 00-title "SPINSMITH" "Forge it  Rip it  Reshape the arena" 2
-clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 4 "YOUR TABLE BECOMES THE ARENA" "Seated mixed reality built for hands"
-clip 02-portal "$MAIN/02-portal.mp4" 0.5 3 "RIVALS ENTER YOUR ROOM" "Seven fighters with different tactics"
-clip 03-ramp "$MAIN/03-rip-ramp-replay.mp4" 0.5 9 "RESHAPE THE FIGHT" "Rip  read the motion  raise a ramp"
-clip 04-cup "$MAIN/05-cup-sling.mp4" 1.8 6 "CATCH AND SLING" "Press the floor  catch a top  fire it back"
-clip 05-strike "$MAIN/04-strike.mp4" 2.8 5.5 "STRIKE THE TABLE" "A palm-powered ultimate changes the arena"
-clip 06-forge "$MAIN/06-forge.mp4" 0.5 8 "FORGE IT BY HAND" "Every fitted part changes the physics"
-clip 07-builds "$SHOW/03-forge-customization.mp4" 10 5 "BUILD YOUR FIGHTER" "226 legal combinations with real tradeoffs"
-clip 08-workshop "$SHOW/05-arena-workshop.mp4" 16 6.5 "BUILD THE BATTLEGROUND" "Place hazards boosts and moving machinery"
+clip 00-hook "$MAIN/03-rip-ramp-replay.mp4" 1.5 3.2 "SPINSMITH" "Pinch  pull  rip  reshape the fight"
+clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 2.6 "YOUR TABLE IS THE ARENA" "Seated mixed reality built for hands"
+clip 02-portal "$MAIN/02-portal.mp4" 0.5 2.2 "RIVALS ENTER YOUR ROOM" "Seven fighters  seven tactics"
+clip 03-ramp "$MAIN/03-rip-ramp-replay.mp4" 4.3 4.4 "RAISE A RAMP" "Read the motion and change its path"
+clip 04-cup "$MAIN/05-cup-sling.mp4" 2.2 3.8 "CATCH AND SLING" "Press the floor  catch  fire it back"
+clip 05-strike "$MAIN/04-strike.mp4" 3.0 3.6 "STRIKE THE TABLE" "Your palm permanently changes the arena"
+clip 06-forge "$MAIN/06-forge.mp4" 1.2 4.5 "FORGE IT BY HAND" "Every fitted part changes the physics"
+clip 07-builds "$SHOW/03-forge-customization.mp4" 10.5 3 "BUILD YOUR FIGHTER" "226 legal combinations  real tradeoffs"
+clip 08-workshop "$SHOW/05-arena-workshop.mp4" 16.5 4 "BUILD THE BATTLEGROUND" "Place hazards  boosts  moving machinery"
 
 # The source shots include their setup and launch. Cut where the palm actually lands, then keep
 # three visually distinct persistent rules instead of turning the submission into an ability list.
-clip 09-ult-anvil "$ULT/1-anvil.mp4" 23.5 3.4 "FORGED RIDGES" "The arena keeps the mark of your Anvil Strike"
-clip 09-ult-tilt "$ULT/4-tilt.mp4" 23.5 3.4 "ARENA TILTED" "The whole dish becomes the rule"
-clip 09-ult-ward "$ULT/6-ward.mp4" 23.5 3.8 "GUARDED SECTOR" "A raised rim changes the next exchange"
+clip 09-ult-anvil "$ULT/1-anvil.mp4" 8.5 2.6 "FORGED RIDGES" "Anvil cracks stay in the battlefield"
+clip 09-ult-tilt "$ULT/4-tilt.mp4" 8.5 2.6 "ARENA TILTED" "The whole dish becomes the rule"
+clip 09-ult-ward "$ULT/6-ward.mp4" 8.5 2.6 "GUARDED SECTOR" "A raised rim changes the exchange"
 
-clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 4.5 "FIFTEEN ARENAS" "Each one changes the physical rules"
-clip 11-return "$SHOW/01-hub-progression.mp4" 1.4 6 "A REASON TO RETURN" "Daily orders  rivals  champions  personal records"
-clip 12-win "$MAIN/07-match-win.mp4" 14 7 "ONE MORE MATCH" "Fast rounds  direct rematches  new tactical layers"
-card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 2.5
+clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.8 "FIFTEEN ARENAS" "Each one changes the physical rules"
+clip 11-return "$SHOW/01-hub-progression.mp4" 1.8 2.8 "COME BACK STRONGER" "Daily orders  rivals  champions  records"
+clip 12-win "$MAIN/07-match-win.mp4" 15 4 "ONE MORE MATCH" "Fast rounds  instant rematch  new tactics"
+card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.6
 
 segments=(
-  00-title 01-rise 02-portal 03-ramp 04-cup 05-strike 06-forge 07-builds 08-workshop
+  00-hook 01-rise 02-portal 03-ramp 04-cup 05-strike 06-forge 07-builds 08-workshop
   09-ult-anvil 09-ult-tilt 09-ult-ward
   10-arenas 11-return 12-win 13-end
 )

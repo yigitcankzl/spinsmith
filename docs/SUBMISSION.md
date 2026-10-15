@@ -74,26 +74,23 @@ arena and strike is measured over thousands of rounds.
 - **Forgiving by design:** tracking loss shorter than a tenth of a second is ignored, and a lost
   hand cancels a half-made shape instead of committing it.
 
-## Competition video (1:16)
+## Competition video (0:50)
 
 The one sentence the video must show: *Forge it by hand, rip it into your real table, then
 reshape the arena to win.*
 
 | Time | Shot | Point proved |
 |---|---|---|
-| 0:00-0:06 | Title, arena rises on the table | Seated tabletop scale |
-| 0:06-0:09 | Rival portal entrance | The room is the stage |
-| 0:09-0:18 | Rip, ramp impact and result | Core new experience: reshape a live fight |
-| 0:18-0:30 | Cup and sling, then table strike | Hands are the combat verbs |
-| 0:30-0:43 | Fit/quench and compare builds | Physical build expression |
-| 0:43-0:49 | Arena workshop | Player-authored battlegrounds |
-| 0:49-1:00 | Anvil, Tilt and Ward | Ultimates leave persistent arena rules |
-| 1:00-1:10 | Arena variety, daily board and champions | Breadth and reason to return |
-| 1:10-1:13 | Match finish | The “one more match” loop |
-| 1:13-1:16 | End card | Hands only · seated · Quest Browser |
+| 0:00-0:03 | Rip and live ramp cold open | The core new experience is visible immediately |
+| 0:03-0:08 | Arena rise and rival portal | Seated tabletop scale; the room is the stage |
+| 0:08-0:20 | Ramp, cup/sling and table strike | Hands actively reshape a live fight |
+| 0:20-0:32 | Forge and arena workshop | Physical build expression and authored battlegrounds |
+| 0:32-0:40 | Anvil, Tilt and Ward | Three distinct ultimates leave persistent arena rules |
+| 0:40-0:49 | Arena variety, progression and match finish | Breadth, return loop and instant rematch |
+| 0:49-0:50 | End card | Hands only · seated · Quest Browser |
 
-Final video: `~/Desktop/spinsmith-videos/competition-polish-final/spinsmith-competition-1080p60.mp4`
-(75.889 s, H.264, 1920×1080 at 60 fps, stereo AAC). Every gameplay shot is visibly labelled
+Final video: `~/Desktop/spinsmith-videos/submission-package/spinsmith-competition-1080p60.mp4`
+(50.333 s, H.264, 1920×1080 at 60 fps, stereo AAC). Every gameplay shot is visibly labelled
 `IWER EMULATOR CAPTURE · QUEST BUILD`: IWER is IWSDK's browser-based XR emulator. This is honest
 prototype footage and does not claim to demonstrate physical-headset passthrough or tracking.
 `CAPTURE=1 scripts/competition-trailer.sh` recreates every source clip and the final cut from the
