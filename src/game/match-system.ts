@@ -10,7 +10,7 @@ import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, rivalMove, sealStrike, sealTarget, SEALS, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -388,6 +388,14 @@ export class MatchSystem extends createSystem({
   private overforgeControl: { side: Side; seal: Seal; t: number } | null = null;
   /** Public dev evidence: idle, ready, held, or the seal currently being steered. */
   private overforgeMode = 'idle';
+  /** Open hands at the rim become short, physical parry walls. */
+  private palmBraceAngles: Record<Side, number | null> = { left: null, right: null };
+  private palmBraceActive = false;
+  private palmBraceHitAt = -9;
+  private palmBraceWalls = (['left', 'right'] as const).map((_, i) => {
+    const material = new MeshBasicMaterial({ color: i === 0 ? 0xff9a32 : 0xffb24d, transparent: true, opacity: 0.45, blending: AdditiveBlending, depthWrite: false, side: DoubleSide });
+    return Object.assign(new Mesh(new CylinderGeometry(0.15, 0.15, 0.045, 36, 1, true, -0.42, 0.84), material), { visible: false });
+  });
   /** A short-lived, arena-sized cause → target cue; unlike the seal coin it never covers the tops. */
   private ultimateCue = { t: 0, age: 0, seal: 'anvil' as Seal, ox: 0, oz: 0, fx: 0, fz: 0, tx: 0, tz: 0 };
   private ultimatePath = Object.assign(
@@ -749,6 +757,7 @@ export class MatchSystem extends createSystem({
       this.ultimateArrow,
       this.sealPop,
       this.overforgeSeal,
+      ...this.palmBraceWalls,
       this.reticle,
       this.aura,
       this.arenaView.root,
@@ -777,6 +786,7 @@ export class MatchSystem extends createSystem({
     this.overforgeSeal.add(this.overforgeRing);
     this.overforgeRing.position.y = -0.003;
     this.overforgeRing.renderOrder = 9;
+    for (const wall of this.palmBraceWalls) wall.renderOrder = 8;
     this.setOverforgeModel(this.myBuild.seal ?? 'anvil');
     for (const mesh of [...this.ultimateArenaRings, ...this.ultimateArenaSeams, this.ultimateArenaWall, ...this.ultimateRushChevrons, ...this.ultimateHammerArcs, this.ultimateWardSector]) mesh.renderOrder = 7;
     this.shock.visible = false;
@@ -1021,6 +1031,7 @@ export class MatchSystem extends createSystem({
     if (paused) {
       // The system menu is up: nothing stays stuck to where the hands were.
       this.barRings.left.visible = this.barRings.right.visible = this.reticle.visible = this.slapMark.visible = false;
+      for (const wall of this.palmBraceWalls) wall.visible = false;
       this.cord.set(null);
       for (const m of this.pinchRings) m.visible = false;
       return;
@@ -1126,6 +1137,9 @@ export class MatchSystem extends createSystem({
       this.overforgeHeld = null;
       this.overforgeControl = null;
       this.overforgeMode = 'idle';
+      this.palmBraceActive = false;
+      this.palmBraceAngles.left = this.palmBraceAngles.right = null;
+      for (const wall of this.palmBraceWalls) wall.visible = false;
       this.arenaView.charge = 0;
     }
     switch (this.phase) {
@@ -1216,6 +1230,7 @@ export class MatchSystem extends createSystem({
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
         this.updateStrike(dt);
         this.updateShaping();
+        this.updatePalmBrace();
         this.updateFight(dt);
         break;
     }
@@ -3455,6 +3470,36 @@ export class MatchSystem extends createSystem({
     (this.overforgeRing.material as MeshBasicMaterial).color.setHex(SEAL_COLOR[seal]);
   }
 
+  /** Open hands near the rim become forgiving wall sectors; the hand chooses where tops rebound. */
+  private updatePalmBrace() {
+    this.palmBraceActive = false;
+    const radius = maxRim(this.arena.layout);
+    for (let i = 0; i < 2; i++) {
+      const side = (i === 0 ? 'left' : 'right') as Side;
+      const h = this.hands[side];
+      const wall = this.palmBraceWalls[i];
+      wall.visible = false;
+      this.palmBraceAngles[side] = null;
+      if (!h.tracked || h.pinching || this.overforgeControl?.side === side || this.overforgeHeld === side) continue;
+      const wrist = this.handAt.copy(this.toLocal(h.wrist));
+      const palm = wrist.lerp(this.toLocal(h.index), 0.45);
+      const n = normRadius(this.arena.layout, palm.x, palm.z);
+      const floor = this.arena.height(palm.x, palm.z);
+      if (n < 0.78 || n > 1.22 || palm.y < floor - 0.025 || palm.y > floor + 0.13) continue;
+      const angle = Math.atan2(palm.z, palm.x);
+      this.palmBraceAngles[side] = angle;
+      this.palmBraceActive = true;
+      wall.visible = !this.photo;
+      wall.position.set(0, this.arena.floorHeight(1) + 0.025, 0);
+      wall.rotation.y = Math.PI / 2 - angle;
+      const shapeX = this.arena.layout.shape === 'square' ? 1.12 : 1;
+      const shapeZ = this.arena.layout.shape === 'oval' ? 0.78 : shapeX;
+      wall.scale.set((radius / 0.15) * shapeX, 1, (radius / 0.15) * shapeZ);
+      const material = wall.material as MeshBasicMaterial;
+      material.opacity = 0.35 + 0.16 * (0.5 + 0.5 * Math.sin(this.time * 9));
+    }
+  }
+
   /**
    * A ready ultimate is a physical forge seal: pinch it off the top, press it into the battlefield,
    * then keep the pinch held to steer Tilt, Magnet, or Ward for a short overforge window. The old
@@ -4307,6 +4352,23 @@ export class MatchSystem extends createSystem({
       const rivalVz = this.theirs.vz;
       const openingDx = this.theirs.x - this.mine.x;
       const openingDz = this.theirs.z - this.mine.z;
+      let braced = false;
+      for (const side of ['left', 'right'] as const) {
+        const angle = this.palmBraceAngles[side];
+        if (angle === null) continue;
+        braced = palmBrace(this.arena, this.mine, angle) || braced;
+        braced = palmBrace(this.arena, this.theirs, angle) || braced;
+      }
+      if (braced && this.elapsed - this.palmBraceHitAt > 0.22) {
+        this.palmBraceHitAt = this.elapsed;
+        this.lastShape = { t: this.elapsed, kind: 'parry' };
+        const top = this.mine.sinceWall === 0 ? this.mine : this.theirs;
+        const y = this.arena.height(top.x, top.z);
+        this.impacts.shock(top.x, y, top.z, 0.72, 0xffa142);
+        this.sparks.burst(top.x, y, top.z, 0.7);
+        this.stamp.show('PALM PARRY!', 'your hand became the wall', 'mine', 0.5);
+        playThock();
+      }
       const clash = step(this.arena, this.mine, this.theirs);
       this.record(clash);
       if (clash) this.openingClash(clash, mineVx, mineVz, rivalVx, rivalVz, openingDx, openingDz);

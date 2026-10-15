@@ -604,6 +604,20 @@ export function installDriver() {
       if (g.forgeBar.value >= 0.999) throw new Error('seal stamp did not spend the armed ultimate');
     },
 
+    /** Hold an open hand at one rim sector so it becomes the physical Palm Brace wall. */
+    async palmBrace(opts: { angle?: number; hold?: number; side?: Side } = {}) {
+      const { angle = 60, hold = 1.2, side = 'left' } = opts;
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('Palm Brace only exists during a fight');
+      const a = (angle * Math.PI) / 180;
+      const r = g.arena.radius * 0.98;
+      const at = local(Math.cos(a) * r, Math.sin(a) * r, 0.055);
+      await glide(side, 'pinch', above(at, 0.08), 0.3, 0);
+      await glide(side, 'pinch', at, 0.22, 0);
+      await wait(hold);
+      await park(side);
+    },
+
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */
     async move(side: Side, to: number[], dur = 0.3, point: Point = 'pinch') {
       await glide(side, point, new Vector3(...(to as [number, number, number])), dur);
