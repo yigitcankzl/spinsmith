@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Captures the current build and cuts a two-minute competition reel.
+# Captures the current build and cuts an approximately 80-second competition reel.
 #
 #   CAPTURE=1 scripts/competition-trailer.sh [out-dir]  # recapture every source, then cut
 #   scripts/competition-trailer.sh [out-dir]            # cut again from existing sources
@@ -74,34 +74,30 @@ clip() {
     -c:a aac -b:a 256k -ar 48000 -ac 2 "$TMP/$file.mp4"
 }
 
-card 00-title "SPINSMITH" "Forge it  Rip it  Reshape the arena" 2.5
-clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 4.5 "YOUR TABLE BECOMES THE ARENA" "Seated mixed reality built for hands"
-clip 02-portal "$MAIN/02-portal.mp4" 0.5 3.7 "RIVALS ENTER YOUR ROOM" "Seven fighters with different tactics"
-clip 03-ramp "$MAIN/03-rip-ramp-replay.mp4" 0.5 11 "RESHAPE THE FIGHT" "Raise a ramp under a moving top"
-clip 04-strike "$MAIN/04-strike.mp4" 2.8 6 "STRIKE THE TABLE" "A hand powered ultimate changes the arena"
-clip 05-cup "$MAIN/05-cup-sling.mp4" 1.8 6 "CATCH AND SLING" "The floor becomes your weapon"
-clip 06-forge "$MAIN/06-forge.mp4" 0.5 10 "FORGE IT BY HAND" "Every fitted part changes the physics"
-clip 07-builds "$SHOW/03-forge-customization.mp4" 10 8 "BUILD YOUR FIGHTER" "226 legal combinations plus style and combat choices"
-clip 08-workshop "$SHOW/05-arena-workshop.mp4" 16 9 "BUILD THE BATTLEGROUND" "Place hazards boosts and moving machinery"
+card 00-title "SPINSMITH" "Forge it  Rip it  Reshape the arena" 2
+clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 4 "YOUR TABLE BECOMES THE ARENA" "Seated mixed reality built for hands"
+clip 02-portal "$MAIN/02-portal.mp4" 0.5 3 "RIVALS ENTER YOUR ROOM" "Seven fighters with different tactics"
+clip 03-ramp "$MAIN/03-rip-ramp-replay.mp4" 0.5 9 "RESHAPE THE FIGHT" "Rip  read the motion  raise a ramp"
+clip 04-cup "$MAIN/05-cup-sling.mp4" 1.8 6 "CATCH AND SLING" "Press the floor  catch a top  fire it back"
+clip 05-strike "$MAIN/04-strike.mp4" 2.8 5.5 "STRIKE THE TABLE" "A palm-powered ultimate changes the arena"
+clip 06-forge "$MAIN/06-forge.mp4" 0.5 8 "FORGE IT BY HAND" "Every fitted part changes the physics"
+clip 07-builds "$SHOW/03-forge-customization.mp4" 10 5 "BUILD YOUR FIGHTER" "226 legal combinations with real tradeoffs"
+clip 08-workshop "$SHOW/05-arena-workshop.mp4" 16 6.5 "BUILD THE BATTLEGROUND" "Place hazards boosts and moving machinery"
 
-# The source shots include their setup and launch. Cut where the palm actually lands—not at the
-# old 7 s point, which showed ordinary combat and made the ultimates impossible to understand.
-# Longer Hammer/Ward clips keep their delayed clash/parry payoff in frame.
-clip 09-ult-01 "$ULT/1-anvil.mp4" 23.5 4.5 "ANVIL STRIKE" "Shockwave leaves two forged ridges"
-clip 09-ult-02 "$ULT/2-rush.mp4" 23.5 4.5 "RUSH STRIKE" "The charge path hardens into a launch ramp"
-clip 09-ult-03 "$ULT/3-magnet.mp4" 22.0 4.5 "MAGNET STRIKE" "A gravity well remains at the chosen rim"
-clip 09-ult-04 "$ULT/4-tilt.mp4" 23.5 4.5 "TILT STRIKE" "The whole dish stays tilted for three seconds"
-clip 09-ult-05 "$ULT/5-hammer.mp4" 23.5 5.5 "HAMMER STRIKE" "The forge mark becomes a holding crater"
-clip 09-ult-06 "$ULT/6-ward.mp4" 23.5 6.5 "WARD STRIKE" "A raised rim sector guards the ring-out"
+# The source shots include their setup and launch. Cut where the palm actually lands, then keep
+# three visually distinct persistent rules instead of turning the submission into an ability list.
+clip 09-ult-anvil "$ULT/1-anvil.mp4" 23.5 3.4 "FORGED RIDGES" "The arena keeps the mark of your Anvil Strike"
+clip 09-ult-tilt "$ULT/4-tilt.mp4" 23.5 3.4 "ARENA TILTED" "The whole dish becomes the rule"
+clip 09-ult-ward "$ULT/6-ward.mp4" 23.5 3.8 "GUARDED SECTOR" "A raised rim changes the next exchange"
 
-clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 8 "FIFTEEN ARENAS" "Each one changes the physical rules"
-clip 11-return "$SHOW/01-hub-progression.mp4" 1.4 8 "A REASON TO RETURN" "Daily orders feats champions and personal records"
-clip 12-win "$MAIN/07-match-win.mp4" 14 10 "ONE MORE MATCH" "Fast rounds  direct rematches  new tactical layers"
-card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 3
+clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 4.5 "FIFTEEN ARENAS" "Each one changes the physical rules"
+clip 11-return "$SHOW/01-hub-progression.mp4" 1.4 6 "A REASON TO RETURN" "Daily orders  rivals  champions  personal records"
+clip 12-win "$MAIN/07-match-win.mp4" 14 7 "ONE MORE MATCH" "Fast rounds  direct rematches  new tactical layers"
+card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 2.5
 
 segments=(
-  00-title 01-rise 02-portal 03-ramp 04-strike 05-cup 06-forge 07-builds 08-workshop
-  09-ult-01 09-ult-02 09-ult-03 09-ult-04 09-ult-05 09-ult-06
+  00-title 01-rise 02-portal 03-ramp 04-cup 05-strike 06-forge 07-builds 08-workshop
+  09-ult-anvil 09-ult-tilt 09-ult-ward
   10-arenas 11-return 12-win 13-end
 )
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
