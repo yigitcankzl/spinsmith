@@ -138,6 +138,8 @@ const DISPLAY_SCALE = 1.7;
 /** Forge-only inspection pose: lift the top clear of the anvil and expose its three layers. */
 const INSPECTION_LIFT = 0.025;
 const INSPECTION_EXPLODE = 0.75;
+/** A top carried in one hand stays slightly open so the other hand can read and replace its parts. */
+const PALM_EXPLODE = 0.28;
 /** The transformation takes this long (s). */
 const OPEN_TIME = 0.8;
 /** A carried part makes the top come apart within this distance, and fits within SNAP (world m). */
@@ -233,6 +235,22 @@ export class Forge {
   private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
   private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion; lost: number } | null = null;
+  /** A glowing three-jaw cradle makes the held hand read as a mobile workbench. */
+  private palmCradle = (() => {
+    const g = new Group();
+    const glow = new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.62, blending: AdditiveBlending, depthWrite: false });
+    const ring = new Mesh(new TorusGeometry(0.038, 0.0024, 7, 36).rotateX(Math.PI / 2), glow);
+    g.add(ring);
+    for (let i = 0; i < 3; i++) {
+      const jaw = new Mesh(new ConeGeometry(0.004, 0.014, 4), BRASS);
+      const a = (i / 3) * Math.PI * 2;
+      jaw.position.set(Math.cos(a) * 0.032, 0.008, Math.sin(a) * 0.032);
+      jaw.rotation.z = -a;
+      g.add(jaw);
+    }
+    g.visible = false;
+    return g;
+  })();
   private explode = 0;
   private readonly padColor = new Color();
   /** The part the first session asks the player to fit, if any. */
@@ -277,9 +295,14 @@ export class Forge {
     this.stats.mesh.scale.setScalar(0.75);
     // On a post down to the rim, not floating.
     addStem(this.stats.mesh, 0.108, (STATS_AT.y - 0.108 * 0.75 * 0.45) / 0.75, -0.15);
-    this.root.add(this.anvil, this.tray, this.tabs, this.quench, this.displayHolder, this.stats.mesh);
+    this.root.add(this.anvil, this.tray, this.tabs, this.quench, this.displayHolder, this.palmCradle, this.stats.mesh);
     this.rebuildDisplay();
     this.root.visible = false;
+  }
+
+  /** Observable for trailer automation and QA; no forge state is exposed for mutation. */
+  get palmActive() {
+    return this.heldTop !== null;
   }
 
   /** A build with any part you have not unlocked swapped for a starter (old saves, fresh progress). */
@@ -340,6 +363,7 @@ export class Forge {
     if (this.heldPart) this.root.remove(this.heldPart.model);
     this.heldPart = null;
     this.heldTop = null;
+    this.palmCradle.visible = false;
     this.displayHolder.position.copy(WORK);
     this.displayHolder.quaternion.identity();
   }
@@ -482,7 +506,7 @@ export class Forge {
       if (this.heldTop) return;
       this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone(), lost: 0 };
       playPick();
-      this.say('Turn it to look. Drop it in the quench slot to save');
+      this.say('PALM FORGE · hold the top here, fit a part with your other hand');
       return;
     }
     if (this.heldPart) return;
@@ -506,6 +530,7 @@ export class Forge {
   private updateTop(dt: number) {
     const held = this.heldTop;
     if (!held) {
+      this.palmCradle.visible = false;
       this.q.set(WORK.x, this.displayHolder.position.y, WORK.z);
       this.displayHolder.position.lerp(this.q, Math.min(1, dt * 10));
       this.displayHolder.quaternion.slerp(this.quat.identity(), Math.min(1, dt * 8));
@@ -518,6 +543,10 @@ export class Forge {
     // Turn with the hand: the hand's rotation since the pickup, applied to the top.
     this.quat.copy(h.rayQuat).multiply(this.q2.copy(held.handQuat).invert());
     this.displayHolder.quaternion.copy(this.quat).multiply(held.topQuat);
+    this.palmCradle.visible = true;
+    this.palmCradle.position.copy(this.displayHolder.position).y -= 0.026;
+    this.palmCradle.quaternion.copy(this.displayHolder.quaternion);
+    this.palmCradle.scale.setScalar(1 + 0.08 * Math.sin(this.time * 7));
     // Dipped into a paint pot: painted once per dip.
     const pot = this.slots.find((s) => s.item.kind === 'color' && s.model.visible && !this.locked(s) && s.model.getWorldPosition(this.p).distanceTo(at) < DIP) ?? null;
     if (pot && pot !== this.dippedIn) this.fit(pot.item);
@@ -545,7 +574,7 @@ export class Forge {
     const held = this.heldPart;
     this.displayHolder.getWorldPosition(this.topAt);
     if (!held) {
-      const target = this.heldTop ? 0 : INSPECTION_EXPLODE;
+      const target = this.heldTop ? PALM_EXPLODE : INSPECTION_EXPLODE;
       this.explode += (target - this.explode) * 0.12;
       this.display.explode(this.explode, null, this.time, 1);
       return;
@@ -558,7 +587,7 @@ export class Forge {
     held.model.rotation.y = this.time * 2;
     const d = at.distanceTo(this.topAt);
     const slotKind = held.item.kind === 'ring' || held.item.kind === 'core' || held.item.kind === 'tip' ? held.item.kind : null;
-    const inspection = this.heldTop ? 0 : INSPECTION_EXPLODE;
+    const inspection = this.heldTop ? PALM_EXPLODE : INSPECTION_EXPLODE;
     const target = slotKind && d < EXPLODE_R ? Math.max(inspection, Math.min(1, (EXPLODE_R - d) / (EXPLODE_R - SNAP))) : inspection;
     this.explode += (target - this.explode) * 0.25;
     this.display.explode(this.explode, slotKind, this.time, 1);

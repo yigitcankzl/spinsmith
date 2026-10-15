@@ -276,6 +276,8 @@ export class MatchSystem extends createSystem({
       this.label.set(this.forgeNext ? `${text}\n${this.forgeNext}` : text);
     },
   }, this.progress);
+  /** Read-only dev evidence mirrored from Forge's held-top state. */
+  private palmForgeActive = false;
   /** A demo round from the workshop's Try it: AI launches, no score, then back to the workshop. */
   private demo = false;
   private hubLogPending = false;
@@ -1149,6 +1151,7 @@ export class MatchSystem extends createSystem({
       this.roomLight.update(this.head, this.root.position, this.root.position.y - PEDESTAL, dim, p === 'forge' || p === 'build', dt);
     }
     const launchPhase = this.phase === 'ready' || this.phase === 'pulling';
+    if (this.phase !== 'forge') this.palmForgeActive = false;
     if (this.phase !== 'pulling') {
       this.bracedLaunch = false;
       this.launcherBrace.visible = false;
@@ -1201,6 +1204,7 @@ export class MatchSystem extends createSystem({
           break;
         }
         this.forge.update(this.pointers, dt);
+        this.palmForgeActive = this.forge.palmActive;
         // The arena floor sinks as the forge rises out of it.
         this.stage.position.y = -FORGE_SINK * this.forge.opened;
         break;

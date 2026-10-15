@@ -382,6 +382,29 @@ export function installDriver() {
       await park(side);
     },
 
+    /** Hold the top in one hand and fit a visible drawer part with the other. */
+    async palmForge(part: string, topSide: Side = 'left') {
+      const g = game();
+      if (g.phase !== 'forge') throw new Error('Palm Forge only exists in the forge');
+      const partSide: Side = topSide === 'left' ? 'right' : 'left';
+      const top = named('top');
+      const piece = named(part);
+      const palm = g.root.localToWorld(new Vector3(topSide === 'left' ? -0.065 : 0.065, 0.09, 0.105));
+      await glide(topSide, 'pinch', above(top, 0.06), 0.3, 0);
+      await glide(topSide, 'pinch', top, 0.16, 0);
+      await setPinch(topSide, true);
+      await glide(topSide, 'pinch', palm, 0.4);
+      await glide(partSide, 'pinch', above(piece, 0.05), 0.3, 0);
+      await glide(partSide, 'pinch', piece, 0.15, 0);
+      await setPinch(partSide, true);
+      await glide(partSide, 'pinch', above(palm, 0.04), 0.4);
+      await glide(partSide, 'pinch', palm, 0.2);
+      await setPinch(partSide, false);
+      await wait(0.3);
+      await setPinch(topSide, false);
+      await Promise.all([park(topSide), park(partSide)]);
+    },
+
     /** Workshop rim resize: pinch the rim and keep the hand on the arena plane while pulling. */
     async arenaResize(opts: { from?: string; to?: string; side?: Side } = {}) {
       const { from = 'arena_rim_clear', to = 'arena_rim_clear_out', side = 'right' } = opts;
