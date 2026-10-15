@@ -907,6 +907,29 @@ export function palmBrace(arena: Arena, top: Top, angle: number, half = 0.42) {
   return true;
 }
 
+/** Pulling a rim spring sends an inward impulse through the selected sector. */
+export function springRim(arena: Arena, tops: readonly Top[], sx: number, sz: number, x: number, z: number, strength = 1) {
+  const r = Math.hypot(sx, sz) || 1;
+  const ix = -sx / r;
+  const iz = -sz / r;
+  const pull = (x - sx) * ix + (z - sz) * iz;
+  let hits = 0;
+  for (const top of tops) {
+    const tr = Math.hypot(top.x, top.z);
+    if (!top.alive || tr < arena.radius * 0.5) continue;
+    const sameSector = (top.x * sx + top.z * sz) / Math.max(1e-5, tr * r);
+    if (sameSector < Math.cos(0.6)) continue;
+    const impulse = (0.13 + Math.min(0.07, pull * 2)) * strength;
+    top.vx += ix * impulse;
+    top.vz += iz * impulse;
+    top.kick = Math.min(1, top.kick + impulse * 1.5);
+    top.kickX = ix;
+    top.kickZ = iz;
+    hits++;
+  }
+  return hits;
+}
+
 /** The palm-authored spatial target shared by simulation and presentation. */
 export function sealTarget(arena: Arena, mine: Top, rival: Top, seal: Seal, ox = 0, oz = 0) {
   const palmAngle = Math.atan2(oz, ox);

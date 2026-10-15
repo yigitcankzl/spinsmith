@@ -10,7 +10,7 @@ import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -560,9 +560,17 @@ export class MatchSystem extends createSystem({
    */
   /** Each hand's ramp in the making: where, since when, and the live shape once it is set. */
   private shaping: Record<Side, { x: number; z: number; sx: number; sz: number; t: number; far: boolean; amp: number; dx: number; dz: number; shape: FloorShape | null } | null> = { left: null, right: null };
-  /** Experimental ?rim A/B: the rim is pulled inward and released as a defensive spring. */
+  /** The rim is pulled inward and released as a defensive spring rail. */
   private rimPulls: Record<Side, { x: number; z: number; sx: number; sz: number } | null> = { left: null, right: null };
-  private readonly rimExperiment = new URLSearchParams(location.search).has('rim');
+  /** Kept public for old capture scripts; the Spring Rail is now a normal arena verb. */
+  private readonly rimExperiment = true;
+  private rimSpringGuides = (['left', 'right'] as const).map(() => Object.assign(
+    new Mesh(
+      new PlaneGeometry(0.058, 0.014).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: 0xff9a32, transparent: true, opacity: 0.8, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }),
+    ),
+    { visible: false },
+  ));
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
   private pressing: Record<Side, boolean> = { left: false, right: false };
   /** Each hand's fingertip height last frame (arena-local), and when it last set a ramp. */
@@ -758,6 +766,7 @@ export class MatchSystem extends createSystem({
       this.sealPop,
       this.overforgeSeal,
       ...this.palmBraceWalls,
+      ...this.rimSpringGuides,
       this.reticle,
       this.aura,
       this.arenaView.root,
@@ -787,6 +796,7 @@ export class MatchSystem extends createSystem({
     this.overforgeRing.position.y = -0.003;
     this.overforgeRing.renderOrder = 9;
     for (const wall of this.palmBraceWalls) wall.renderOrder = 8;
+    for (const guide of this.rimSpringGuides) guide.renderOrder = 8;
     this.setOverforgeModel(this.myBuild.seal ?? 'anvil');
     for (const mesh of [...this.ultimateArenaRings, ...this.ultimateArenaSeams, this.ultimateArenaWall, ...this.ultimateRushChevrons, ...this.ultimateHammerArcs, this.ultimateWardSector]) mesh.renderOrder = 7;
     this.shock.visible = false;
@@ -3292,9 +3302,11 @@ export class MatchSystem extends createSystem({
     const open = this.elapsed >= TUNING.grace;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
+      const rimGuide = this.rimSpringGuides[side === 'left' ? 0 : 1];
+      rimGuide.visible = false;
       // A pinching hand that owns the forge seal must not also author a ramp underneath it.
       if (this.overforgeHeld === side || this.overforgeControl?.side === side) continue;
-      if (!this.rimExperiment) this.updateCup(side);
+      this.updateCup(side);
       if (!h.tracked) {
         this.shaping[side] = null;
         this.rimPulls[side] = null;
@@ -3310,22 +3322,9 @@ export class MatchSystem extends createSystem({
         // Its own vector: toLocal() reuses one, and `l` (the pinch) is still in use below.
         this.tipY[side] = this.root.worldToLocal(this.handAt.copy(h.index)).y;
         this.tipDown[side] = 0;
-        let rim = this.rimPulls[side];
-        if (!rim && this.rimExperiment && h.justPinched && open) {
-          const n = normRadius(this.arena.layout, l.x, l.z);
-          if (n >= 0.82 && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
-            rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z };
-            playTick();
-          }
-        }
-        if (rim) {
-          rim.x = l.x;
-          rim.z = l.z;
-          continue;
-        }
         let d = this.shaping[side];
-        // Pinching a cup that holds a top grabs it to sling, before any ramp.
-        if (!this.rimExperiment && !d && h.justPinched && open && this.startSling(side, l.x, l.z)) continue;
+        // A caught top is the most specific target and wins over the rail under it.
+        if (!d && h.justPinched && open && this.startSling(side, l.x, l.z)) continue;
         const sl = this.slings[side];
         if (sl) {
           sl.px = l.x - sl.sx;
@@ -3336,6 +3335,25 @@ export class MatchSystem extends createSystem({
             this.root.localToWorld(this.slingFrom.set(t.x, this.arena.height(t.x, t.z) + 0.03, t.z));
             this.cord.set(this.slingFrom, h.pinch, Math.min(1, Math.hypot(sl.px, sl.pz) / SLING_FULL), this.frameDt);
           }
+          continue;
+        }
+        let rim = this.rimPulls[side];
+        if (!rim && h.justPinched && open) {
+          const n = normRadius(this.arena.layout, l.x, l.z);
+          if (n >= 0.82 && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
+            rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z };
+            playTick();
+          }
+        }
+        if (rim) {
+          rim.x = l.x;
+          rim.z = l.z;
+          const mx = (rim.sx + rim.x) * 0.5;
+          const mz = (rim.sz + rim.z) * 0.5;
+          rimGuide.visible = !this.photo;
+          rimGuide.position.set(mx, this.arena.height(mx, mz) + 0.004, mz);
+          rimGuide.rotation.y = Math.PI / 2 - Math.atan2(rim.sz, rim.sx);
+          rimGuide.scale.set(1 + Math.min(1, Math.hypot(rim.x - rim.sx, rim.z - rim.sz) / 0.04) * 0.35, 1, 1);
           continue;
         }
         if (!d && h.justPinched && open) {
@@ -3375,7 +3393,7 @@ export class MatchSystem extends createSystem({
         continue;
       }
       this.shaping[side] = null;
-      if (!this.rimExperiment) this.endSling(side, true);
+      this.endSling(side, true);
       // A fingertip pressed into the floor makes a well, once per press, if it came down with
       // intent (a hand resting or drifting down does not) and not just as a ramp was let go.
       const tip = this.toLocal(h.index);
@@ -3400,19 +3418,18 @@ export class MatchSystem extends createSystem({
         const slapping = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, palm.x, palm.z) > 1.0;
         if (slapping) {
           if (import.meta.env.DEV) console.log('[SHAPE] well ignored: a slap outside the rim');
-        } else if (!this.rimExperiment && down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
+        } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
         else if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${down.toFixed(2)} m/s down`);
       } else if (depth < 0) this.pressing[side] = false;
     }
   }
 
   /**
-   * Experimental ?rim replacement for cup/sling: pull a rim section toward the middle and let go.
-   * It spends one normal shaping charge and nudges nearby tops inward; it never deals damage or
-   * guarantees a knockout, so timing the save is still the player's skill.
+   * Pull a rim section toward the middle and let go. It spends one normal shaping charge and
+   * nudges nearby tops inward; it never deals damage or guarantees a knockout, so timing the save
+   * is still the player's skill.
    */
   private doRimSpring(sx: number, sz: number, x: number, z: number) {
-    if (!this.rimExperiment) return;
     const r = Math.hypot(sx, sz) || 1;
     const ix = -sx / r;
     const iz = -sz / r;
@@ -3430,17 +3447,7 @@ export class MatchSystem extends createSystem({
     }
     if (!this.cuppedOnce && this.label.current.startsWith('New: pinch')) this.label.set('');
     this.cuppedOnce = true;
-    let hits = 0;
-    for (const top of this.tops) {
-      const tr = Math.hypot(top.x, top.z);
-      if (!top.alive || tr < this.arena.radius * 0.5) continue;
-      const sameSector = (top.x * sx + top.z * sz) / Math.max(1e-5, tr * r);
-      if (sameSector < Math.cos(0.6)) continue;
-      top.vx += ix * (0.13 + Math.min(0.07, pull * 2)) * f;
-      top.vz += iz * (0.13 + Math.min(0.07, pull * 2)) * f;
-      hits++;
-      this.sparks.burst(top.x, this.arena.height(top.x, top.z), top.z, 0.65);
-    }
+    const hits = springRim(this.arena, this.tops, sx, sz, x, z, f);
     this.arenaView.flashRail(sx, sz);
     this.impacts.shock(sx, this.arena.height(sx, sz), sz, hits ? 0.75 : 0.35);
     this.sparks.burst(sx, this.arena.height(sx, sz), sz, hits ? 0.9 : 0.35);

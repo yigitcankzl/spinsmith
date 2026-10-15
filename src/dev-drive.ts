@@ -471,11 +471,10 @@ export function installDriver() {
       await park(side);
     },
 
-    /** Experimental ?rim move: pinch a rim sector, pull it toward the middle, then release. */
+    /** Pinch a rim sector, pull its spring rail toward the middle, then release. */
     async rimSpring(opts: { angle?: number; pull?: number; side?: Side } = {}) {
       const { angle = 35, pull = 0.04, side = 'right' } = opts;
       const g = game();
-      if (!g.rimExperiment) throw new Error('rimSpring needs ?rim in the page URL');
       const a = (angle * Math.PI) / 180;
       const r = g.arena.radius * 0.94;
       const x = Math.cos(a) * r;
