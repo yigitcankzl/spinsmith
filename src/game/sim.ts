@@ -989,6 +989,38 @@ export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox =
   rival.tell = 0;
 }
 
+/**
+ * Keeps the arena-authored part of a seal under the player's hand after it is stamped. The
+ * activation still comes from `sealStrike`; this only steers effects whose fantasy is continuous
+ * (a held tilt, a dragged gravity well, or a moving guard sector). Keeping this in the pure
+ * simulation means emulator drives and headless checks see the same forces as the presentation.
+ */
+export function controlSeal(arena: Arena, mine: Top, rival: Top, seal: Seal, ox: number, oz: number, dt: number) {
+  const d = Math.hypot(ox, oz) || 1;
+  if (seal === 'tilt') {
+    arena.shove = { x: ox / d, z: oz / d, t: Math.max(0.18, dt * 2) };
+    mine.anchor = Math.max(mine.anchor, 0.3);
+    return;
+  }
+  if (seal === 'ward') {
+    mine.guard = Math.max(mine.guard, 0.25);
+    mine.guardAngle = Math.atan2(oz, ox);
+    return;
+  }
+  if (seal !== 'magnet' || !rival.alive) return;
+  const target = sealTarget(arena, mine, rival, seal, ox, oz);
+  const dx = target.x - rival.x;
+  const dz = target.z - rival.z;
+  const gap = Math.hypot(dx, dz) || 1;
+  const exposure = 0.65 + 0.35 * Math.min(1, normRadius(arena.layout, rival.x, rival.z));
+  const resistance = rival.anchor > 0 ? 0.55 : 1;
+  // Same peak pull as the stamped impulse, integrated while the player drags the field.
+  const pull = MAGNET_SPEED * exposure * resistance * Math.min(0.05, Math.max(0, dt)) * 2.2;
+  rival.vx += (dx / gap) * pull;
+  rival.vz += (dz / gap) * pull;
+  rival.lifted = Math.max(rival.lifted, LIFT_TIME * 0.35);
+}
+
 /** A rival's one big move, by its style (docs/DUEL-DESIGN.md); shown TELL_TIME ahead by a glow and a sound. */
 export type RivalMove = 'charge' | 'quake' | 'pull';
 export const TELL_TIME = 1.3;

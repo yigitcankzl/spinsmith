@@ -10,7 +10,7 @@ import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
 import type { ArenaLayout } from './layout.js';
-import { rivalMove, sealStrike, sealTarget, SEALS, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, rivalMove, sealStrike, sealTarget, SEALS, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -164,6 +164,9 @@ const SLING_FULL = 0.05;
 const SLING_SNAP = (20 * Math.PI) / 180;
 /** A drag shorter than this (arena-local, about 1.2 cm in the world) does not turn the ramp. */
 const RAMP_AIM_DEADZONE = 0.005;
+/** How close a pinch must be to the floating seal, and how low it must be pressed to stamp. */
+const SEAL_GRAB = 0.065;
+const SEAL_STAMP_H = 0.026;
 
 
 type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build' | 'forge';
@@ -374,6 +377,17 @@ export class MatchSystem extends createSystem({
   private sealPop = Object.assign(new Group(), { visible: false });
   /** Seal coins are built once; an activation only reparents one cached model. */
   private sealPopModels = Object.fromEntries(SEALS.map((seal) => [seal, sealModel(seal)])) as Record<Seal, Object3D>;
+  /** A full forge bar lifts a physical seal that can be pinched and stamped onto the arena. */
+  private overforgeSeal = Object.assign(new Group(), { visible: false });
+  private overforgeModels = Object.fromEntries(SEALS.map((seal) => [seal, sealModel(seal)])) as Record<Seal, Object3D>;
+  private overforgeRing = new Mesh(
+    new RingGeometry(0.023, 0.03, 40).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.82, blending: AdditiveBlending, depthWrite: false }),
+  );
+  private overforgeHeld: Side | null = null;
+  private overforgeControl: { side: Side; seal: Seal; t: number } | null = null;
+  /** Public dev evidence: idle, ready, held, or the seal currently being steered. */
+  private overforgeMode = 'idle';
   /** A short-lived, arena-sized cause → target cue; unlike the seal coin it never covers the tops. */
   private ultimateCue = { t: 0, age: 0, seal: 'anvil' as Seal, ox: 0, oz: 0, fx: 0, fz: 0, tx: 0, tz: 0 };
   private ultimatePath = Object.assign(
@@ -734,6 +748,7 @@ export class MatchSystem extends createSystem({
       this.ultimateTarget,
       this.ultimateArrow,
       this.sealPop,
+      this.overforgeSeal,
       this.reticle,
       this.aura,
       this.arenaView.root,
@@ -759,6 +774,10 @@ export class MatchSystem extends createSystem({
       this.ultimateWardSector,
       this.ultimateWardCage,
     );
+    this.overforgeSeal.add(this.overforgeRing);
+    this.overforgeRing.position.y = -0.003;
+    this.overforgeRing.renderOrder = 9;
+    this.setOverforgeModel(this.myBuild.seal ?? 'anvil');
     for (const mesh of [...this.ultimateArenaRings, ...this.ultimateArenaSeams, this.ultimateArenaWall, ...this.ultimateRushChevrons, ...this.ultimateHammerArcs, this.ultimateWardSector]) mesh.renderOrder = 7;
     this.shock.visible = false;
     this.ultimatePath.renderOrder = this.ultimateTarget.renderOrder = this.ultimateArrow.renderOrder = 8;
@@ -1103,6 +1122,10 @@ export class MatchSystem extends createSystem({
     this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo;
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
+      this.overforgeSeal.visible = false;
+      this.overforgeHeld = null;
+      this.overforgeControl = null;
+      this.overforgeMode = 'idle';
       this.arenaView.charge = 0;
     }
     switch (this.phase) {
@@ -1191,8 +1214,8 @@ export class MatchSystem extends createSystem({
         break;
       case 'fight':
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
-        this.updateShaping();
         this.updateStrike(dt);
+        this.updateShaping();
         this.updateFight(dt);
         break;
     }
@@ -3254,6 +3277,8 @@ export class MatchSystem extends createSystem({
     const open = this.elapsed >= TUNING.grace;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
+      // A pinching hand that owns the forge seal must not also author a ramp underneath it.
+      if (this.overforgeHeld === side || this.overforgeControl?.side === side) continue;
       if (!this.rimExperiment) this.updateCup(side);
       if (!h.tracked) {
         this.shaping[side] = null;
@@ -3419,6 +3444,107 @@ export class MatchSystem extends createSystem({
     return m >= 3;
   }
 
+  private setOverforgeModel(seal: Seal) {
+    if (this.overforgeSeal.userData.seal === seal) return;
+    for (const model of Object.values(this.overforgeModels)) model.removeFromParent();
+    const model = this.overforgeModels[seal];
+    model.rotation.x = 0.78;
+    model.scale.setScalar(1.3);
+    this.overforgeSeal.add(model);
+    this.overforgeSeal.userData.seal = seal;
+    (this.overforgeRing.material as MeshBasicMaterial).color.setHex(SEAL_COLOR[seal]);
+  }
+
+  /**
+   * A ready ultimate is a physical forge seal: pinch it off the top, press it into the battlefield,
+   * then keep the pinch held to steer Tilt, Magnet, or Ward for a short overforge window. The old
+   * table slap stays as the one-handed/Gentle fallback.
+   */
+  private updateOverforge(armed: boolean, dt: number) {
+    const active = this.overforgeControl;
+    if (active) {
+      const h = this.hands[active.side];
+      active.t -= dt;
+      if (!h.tracked || !h.pinching || active.t <= 0 || this.phase !== 'fight') {
+        this.overforgeControl = null;
+        this.overforgeHeld = null;
+        this.overforgeMode = 'idle';
+        return;
+      }
+      const l = this.toLocal(h.pinch);
+      const r = Math.hypot(l.x, l.z);
+      if (r > this.arena.radius * 1.2) {
+        l.x *= (this.arena.radius * 1.2) / r;
+        l.z *= (this.arena.radius * 1.2) / r;
+      }
+      controlSeal(this.arena, this.mine, this.theirs, active.seal, l.x, l.z, dt);
+      const target = sealTarget(this.arena, this.mine, this.theirs, active.seal, l.x, l.z);
+      this.ultimateCue.ox = l.x;
+      this.ultimateCue.oz = l.z;
+      this.ultimateCue.tx = target.x;
+      this.ultimateCue.tz = target.z;
+      this.ultimateCue.t = Math.max(this.ultimateCue.t, 0.25);
+      this.overforgeMode = active.seal;
+      return;
+    }
+
+    if (!armed || this.demo) {
+      this.overforgeSeal.visible = false;
+      this.overforgeHeld = null;
+      this.overforgeMode = 'idle';
+      return;
+    }
+    const seal = this.myBuild.seal ?? 'anvil';
+    this.setOverforgeModel(seal);
+    const heldSide = this.overforgeHeld;
+    if (heldSide) {
+      const h = this.hands[heldSide];
+      if (!h.tracked || !h.pinching) {
+        this.overforgeHeld = null;
+        this.overforgeMode = 'ready';
+        return;
+      }
+      const l = this.toLocal(h.pinch);
+      this.overforgeSeal.position.copy(l);
+      this.overforgeSeal.rotation.y += dt * 3;
+      this.overforgeMode = 'held';
+      const n = normRadius(this.arena.layout, l.x, l.z);
+      const floor = this.arena.height(l.x, l.z);
+      if (n <= 1.02 && l.y <= floor + SEAL_STAMP_H && l.y >= floor - 0.04) {
+        const side = heldSide;
+        this.doStrike(l.x, l.z);
+        this.overforgeSeal.visible = false;
+        this.overforgeHeld = null;
+        if (seal === 'tilt' || seal === 'magnet' || seal === 'ward') {
+          this.overforgeControl = { side, seal, t: 2.8 };
+          this.overforgeMode = seal;
+          this.label.set(`${SEAL_NAMES[seal].toUpperCase()} OVERFORGE\nKEEP PINCHING · MOVE YOUR HAND`);
+          this.labelTimer = 1.6;
+        } else this.overforgeMode = 'idle';
+        playStamp();
+      }
+      return;
+    }
+
+    this.overforgeSeal.visible = !this.photo;
+    const y = this.arena.height(this.mine.x, this.mine.z) + 0.046 + 0.004 * Math.sin(this.time * 5);
+    this.overforgeSeal.position.set(this.mine.x, y, this.mine.z);
+    this.overforgeSeal.rotation.y += dt * 1.6;
+    this.overforgeSeal.scale.setScalar(1 + 0.08 * Math.sin(this.time * 6));
+    this.overforgeMode = 'ready';
+    this.overforgeSeal.getWorldPosition(this.p);
+    for (const side of ['left', 'right'] as const) {
+      const h = this.hands[side];
+      if (!h.tracked || !h.justPinched || h.pinch.distanceTo(this.p) > SEAL_GRAB) continue;
+      this.overforgeHeld = side;
+      this.overforgeMode = 'held';
+      playPick();
+      this.label.set(`STAMP ${SEAL_NAMES[seal].toUpperCase()}\nPRESS THE SEAL INTO THE ARENA`);
+      this.labelTimer = 1.6;
+      break;
+    }
+  }
+
   /**
    * The Anvil Strike: with the forge bar full, a palm pressed on the table (or the tray's level)
    * outside the arena's rim. Also keeps the bar on the back of each hand and the shockwave going.
@@ -3441,13 +3567,15 @@ export class MatchSystem extends createSystem({
     if (full && !this.struckOnce && !this.demo && this.progress.guide !== 'bump' && this.labelTimer <= 0) {
       this.strikeTaught = true;
       const seal = this.myBuild.seal ?? 'anvil';
-      this.label.set(`${SEAL_NAMES[seal].toUpperCase()} READY\n${COMFORT.gentle ? 'PRESS + HOLD THE GLOW' : 'SLAP THE GLOWING RIM'}`);
+      this.label.set(`${SEAL_NAMES[seal].toUpperCase()} READY\nPINCH THE SEAL · STAMP THE ARENA`);
     }
     const armed = full && this.elapsed - this.fullSince > 0.5;
+    this.updateOverforge(armed, dt);
     // The print follows the tracked palm closest to table height. Both emulated/real hands remain
     // tracked, so taking the first one made a parked hand steal the aiming hint.
-    this.slapMark.visible = armed && !this.photo;
-    if (armed) {
+    const slapFallback = armed && (COMFORT.gentle || this.elapsed - this.fullSince > 4);
+    this.slapMark.visible = slapFallback && !this.photo;
+    if (slapFallback) {
       let a = Math.PI / 3;
       let best = Infinity;
       const tableLocalY = -PEDESTAL / ARENA_SCALE;
@@ -3828,6 +3956,7 @@ export class MatchSystem extends createSystem({
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
   private doStrike(ox = 0, oz = 0) {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
+    this.overforgeSeal.visible = false;
     const seal = this.myBuild.seal ?? 'anvil';
     this.beginUltimateCue(seal, ox, oz);
     this.roomImprints.record(seal, Math.atan2(oz, ox));

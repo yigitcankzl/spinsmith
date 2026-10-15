@@ -77,6 +77,12 @@ interface Game {
   rivalRead?: string;
   rematchTip?: string;
   rimExperiment?: boolean;
+  /** Hand-first combat state exposed for deterministic emulator captures. */
+  overforgeMode?: string;
+  palmBraceActive?: boolean;
+  bracedLaunch?: boolean;
+  palmForgeActive?: boolean;
+  overforgeSeal: { visible: boolean; getWorldPosition(v: Vector3): Vector3 };
   rivalLaunchPower: number;
   rivalLaunchAim: number;
   ripBeatAt: number;
@@ -335,6 +341,10 @@ export function installDriver() {
         heat: [g.myPoints, g.theirPoints],
         charges: g.charges.charges,
         rimExperiment: !!g.rimExperiment,
+        overforge: g.overforgeMode ?? 'idle',
+        palmBrace: !!g.palmBraceActive,
+        bracedLaunch: !!g.bracedLaunch,
+        palmForge: !!g.palmForgeActive,
         bar: +g.forgeBar.value.toFixed(2),
         arenaRadius: g.arena.radius,
         mine: top(g.mine),
@@ -565,6 +575,33 @@ export function installDriver() {
         await wait(0.2);
       }
       if (armedAtStart && g.forgeBar.value >= 0.999) throw new Error('slap did not spend the armed ultimate');
+    },
+
+    /** Pinch the raised forge seal, stamp it into the arena, and optionally steer its live field. */
+    async stampUltimate(opts: { at?: 'rival' | 'mine' | { x: number; z: number }; steerAngle?: number; hold?: number; side?: Side } = {}) {
+      const { at = 'rival', steerAngle, hold = 0.8, side = 'right' } = opts;
+      const g = game();
+      if (g.phase !== 'fight' || g.forgeBar.value < 0.999) throw new Error('ultimate is not ready');
+      for (let i = 0; i < 80 && !g.overforgeSeal.visible; i++) await wait(0.025);
+      if (!g.overforgeSeal.visible) throw new Error('forge seal did not rise');
+      const from = g.overforgeSeal.getWorldPosition(new Vector3());
+      const top = at === 'rival' ? g.theirs : at === 'mine' ? g.mine : null;
+      const target = top ? { x: top.x, z: top.z } : { ...(at as { x: number; z: number }) };
+      await glide(side, 'pinch', above(from, 0.06), 0.25, 0);
+      await glide(side, 'pinch', from, 0.14, 0);
+      await setPinch(side, true);
+      await glide(side, 'pinch', above(local(target.x, target.z, 0), 0.07), 0.35);
+      await glide(side, 'pinch', local(target.x, target.z, -0.008), 0.16, pinchNow[side], 'linear');
+      await wait(0.12);
+      if (steerAngle !== undefined && g.forgeBar.value < 0.999) {
+        const a = (steerAngle * Math.PI) / 180;
+        const r = g.arena.radius * 0.95;
+        await glide(side, 'pinch', local(Math.cos(a) * r, Math.sin(a) * r, 0.06), Math.max(0.2, hold));
+      } else await wait(hold);
+      await setPinch(side, false);
+      await glide(side, 'pinch', above(local(target.x, target.z, 0), 0.1), 0.2, 0);
+      await park(side);
+      if (g.forgeBar.value >= 0.999) throw new Error('seal stamp did not spend the armed ultimate');
     },
 
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */
