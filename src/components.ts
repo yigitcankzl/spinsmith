@@ -9,6 +9,10 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   interventions: { type: Types.Int8, default: 0 },
   failedGestures: { type: Types.Int16, default: 0 },
   lowestFps: { type: Types.Float32, default: 0 },
+  /** 0 none, 1 squeeze, 2 stretch, 3 twist, 4 tilt. */
+  lastArenaForge: { type: Types.Int8, default: 0 },
+  /** Signed immediate momentum swing: positive means the player's top benefited. */
+  arenaForgeSwing: { type: Types.Float32, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);

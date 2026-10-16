@@ -15,13 +15,20 @@ export default async function run({ page, frame }) {
   return target.evaluate(async (check) => {
     const drive = window.drive;
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    // Every probe begins from the current XR hand rig. This also makes the script repeatable after
+    // a session exit/re-entry, when IWER has rebuilt the joints behind the same window.drive object.
+    drive.rest();
     if (check === 'palm-forge' && drive.state().phase === 'hub') {
       // The normal anvil remains the production path. Opening directly here keeps this probe
       // independent from tutorial locks and tests only the two-hand assembly interaction.
       window.__game.openForge();
       await sleep(500);
     }
-    if (check === 'outer-ring' || check === 'arena-morph') {
+    if (check === 'dual-rip' && drive.state().phase !== 'ready') {
+      window.__game.startMatch();
+      for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
+    }
+    if (check === 'outer-ring' || check.startsWith('arena-morph')) {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
@@ -30,8 +37,9 @@ export default async function run({ page, frame }) {
     }
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
     // not spend most of its timeout waiting for the opening clock to reach the normal 2.5 s gate.
-    if (check === 'arena-morph' && drive.state().phase === 'fight') {
+    if (check.startsWith('arena-morph') && drive.state().phase === 'fight') {
       window.__game.elapsed = Math.max(window.__game.elapsed, 2.7);
+      window.__game.charges.charges = 3;
       drive.key('KeyU');
     }
     const before = drive.state();
@@ -64,10 +72,17 @@ export default async function run({ page, frame }) {
       if (before.phase !== 'fight') throw new Error('outer-ring check requires a fight');
       stateKey = 'outerRing';
       action = drive.outerRingReturn('right');
-    } else if (check === 'arena-morph') {
+    } else if (check.startsWith('arena-morph')) {
       if (before.phase !== 'fight') throw new Error('arena-morph check requires a fight');
       stateKey = 'morph';
-      action = drive.arenaForge({ squeeze: 0.028, twist: 12, tilt: 0.03, hold: 0.45 });
+      const variant = check.split('-').at(-1);
+      const moves = {
+        squeeze: { squeeze: 0.04, twist: 0, tilt: 0, hold: 0.35 },
+        stretch: { squeeze: -0.04, twist: 0, tilt: 0, hold: 0.35 },
+        twist: { squeeze: 0, twist: 28, tilt: 0, hold: 0.35 },
+        tilt: { squeeze: 0, twist: 0, tilt: 0.07, hold: 0.35 },
+      };
+      action = drive.arenaForge(moves[variant] ?? moves.squeeze);
     } else {
       throw new Error(`unknown HAND_CHECK ${check}`);
     }
@@ -82,11 +97,19 @@ export default async function run({ page, frame }) {
       const current = drive.state();
       if (stateKey === 'outerRing') sawTransient ||= current.outerRing?.state === 'rail' || current.outerRing?.state === 'returned';
       else if (stateKey === 'morph') sawTransient ||= !!current.morph && (Math.abs(current.morph.scaleX - 1) > 0.015 || Math.abs(current.morph.scaleZ - 1) > 0.015 || Math.abs(current.morph.tilt) > 0.01);
+      else if (check === 'dual-rip') sawTransient ||= current.phase === 'fight';
       else if (stateKey && current[stateKey]) sawTransient = true;
       peakCharges = Math.min(peakCharges, current.charges);
       await sleep(16);
     }
-    while (!finished) await sleep(16);
+    // A very slow headless IWER may finish the launch but never advance the cosmetic hand-parking
+    // tween. The gameplay transition is the proof; do not leave the browser command queued forever.
+    if (!finished && check === 'dual-rip' && drive.state().phase === 'fight') {
+      drive.rest();
+      finished = true;
+    }
+    for (let sample = 0; sample < 200 && !finished; sample++) await sleep(16);
+    if (!finished) throw new Error(`${check} action did not settle`);
     if (failure) throw new Error(failure);
     if ((stateKey === 'outerRing' || stateKey === 'morph') && !sawTransient) throw new Error(`${stateKey} never became visibly active`);
 
@@ -95,7 +118,7 @@ export default async function run({ page, frame }) {
       check,
       before: { phase: before.phase, charges: before.charges },
       observed: stateKey ? { stateKey, sawTransient } : { chargeSpent: peakCharges < before.charges },
-      after: { phase: after.phase, charges: after.charges, build: after.build },
+      after: { phase: after.phase, charges: after.charges, build: after.build, morph: after.morph, diagnostics: after.diagnostics },
     };
   }, mode);
 }

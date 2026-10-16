@@ -89,6 +89,8 @@ interface Game {
   outerRingGoal?: Vector3;
   anchorState?: 'unsupported' | 'restoring' | 'anchored';
   arenaMorph?: { scaleX: number; scaleZ: number; tilt: number };
+  arenaForgeAction?: 'none' | 'squeeze' | 'stretch' | 'twist' | 'tilt';
+  arenaForgeSwing?: number;
   gazeAssist?: { active: boolean; target: string };
   overforgeSeal: { visible: boolean; getWorldPosition(v: Vector3): Vector3 };
   rivalLaunchPower: number;
@@ -361,7 +363,13 @@ export function installDriver() {
           goal: g.outerRingGoal?.toArray().map((n) => +n.toFixed(3)) ?? null,
         },
         anchor: g.anchorState ?? 'unsupported',
-        morph: g.arenaMorph ? { scaleX: +g.arenaMorph.scaleX.toFixed(3), scaleZ: +g.arenaMorph.scaleZ.toFixed(3), tilt: +g.arenaMorph.tilt.toFixed(3) } : null,
+        morph: g.arenaMorph ? {
+          scaleX: +g.arenaMorph.scaleX.toFixed(3),
+          scaleZ: +g.arenaMorph.scaleZ.toFixed(3),
+          tilt: +g.arenaMorph.tilt.toFixed(3),
+          action: g.arenaForgeAction ?? 'none',
+          swing: +(g.arenaForgeSwing ?? 0).toFixed(3),
+        } : null,
         gazeAssist: g.gazeAssist ? { ...g.gazeAssist } : null,
         bar: +g.forgeBar.value.toFixed(2),
         arenaRadius: g.arena.radius,
@@ -787,6 +795,11 @@ export function installDriver() {
         goals[s] = null;
         aim[s] = null;
         pinchNow[s] = 0;
+        lastPinch[s] = 0;
+        // A later XR session may rebuild the emulated hand skeleton. Recalibrate its open/closed
+        // fingertip offsets on the next take instead of steering with measurements from that old rig.
+        offsets[s][0] = {};
+        offsets[s][1] = {};
         w.IWER_DEVICE?.hands[s].updatePinchValue(0);
       }
       if (!held.left && !held.right && w.__game) w.__game.gazeOff = false;

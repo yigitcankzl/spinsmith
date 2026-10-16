@@ -134,6 +134,20 @@ const SLOW_MO_TIME = 0.9;
 const RISE_TIME = 1.1;
 /** Early lesson rounds stay alive long enough for the newly unlocked hand move. */
 const LESSON_GRACE = 6;
+type ArenaForgeAction = 'squeeze' | 'stretch' | 'twist' | 'tilt';
+const ARENA_FORGE_CODE: Record<ArenaForgeAction, number> = { squeeze: 1, stretch: 2, twist: 3, tilt: 4 };
+const ARENA_FORGE_TITLE: Record<ArenaForgeAction, string> = {
+  squeeze: 'SQUEEZE!',
+  stretch: 'STRETCH!',
+  twist: 'TWIST!',
+  tilt: 'TILT!',
+};
+const ARENA_FORGE_EFFECT: Record<ArenaForgeAction, string> = {
+  squeeze: 'FORCE A CLASH',
+  stretch: 'RING-OUT PRESSURE',
+  twist: 'SHIFT BOTH ORBITS',
+  tilt: 'SEND TOPS DOWNHILL',
+};
 const SLOW_MO = 0.3;
 /** A clash this strong (0..1) is a hard hit: big feedback and a 70-110 ms simulation-only hit stop. */
 const HARD_HIT = 0.6;
@@ -231,6 +245,8 @@ export class MatchSystem extends createSystem({
   private firstFiveStep = 0;
   private interventionCount = 0;
   private failedGestures = 0;
+  private arenaForgeAction: ArenaForgeAction | 'none' = 'none';
+  private arenaForgeSwing = 0;
   private lowestFps = 0;
   private fpsWindowTime = 0;
   private fpsWindowFrames = 0;
@@ -935,6 +951,8 @@ export class MatchSystem extends createSystem({
       firstFiveStep: this.firstFiveStep,
       interventions: this.interventionCount,
       failedGestures: this.failedGestures,
+      arenaForgeAction: this.arenaForgeAction,
+      arenaForgeSwing: Math.round(this.arenaForgeSwing * 100) / 100,
       lowestFps: Math.round(this.lowestFps),
       liteMode: this.lite,
       matches: this.progress.matches,
@@ -3299,6 +3317,14 @@ export class MatchSystem extends createSystem({
     this.markFirstFive(4);
   }
 
+  /** Records which whole-arena hand move fired and whether it improved the player's rim safety. */
+  private recordArenaForge(action: ArenaForgeAction, swing: number) {
+    this.arenaForgeAction = action;
+    this.arenaForgeSwing = swing;
+    this.rootEntity?.setValue(FirstFiveState, 'lastArenaForge', ARENA_FORGE_CODE[action]);
+    this.rootEntity?.setValue(FirstFiveState, 'arenaForgeSwing', swing);
+  }
+
   /** One-second samples are stable enough for a remote headset tester to report honestly. */
   private updateFirstFiveFps(dt: number) {
     if (dt <= 0 || dt > 0.25) return;
@@ -3557,32 +3583,69 @@ export class MatchSystem extends createSystem({
       this.rimSpringGuides[0].visible = false;
       this.rimSpringGuides[1].visible = false;
 
-      const axisX = Math.cos(this.arenaMorphStart.angle);
-      const axisZ = Math.sin(this.arenaMorphStart.angle);
+      const pullScore = Math.abs(this.arenaMorphPull) / 0.045;
+      const twistScore = Math.abs(this.arenaMorphTwist) / 0.12;
+      const tiltScore = Math.abs(this.arenaMorph.tilt) / 0.025;
+      const action: ArenaForgeAction = tiltScore > twistScore && tiltScore > pullScore
+        ? 'tilt'
+        : twistScore > pullScore
+          ? 'twist'
+          : this.arenaMorphPull < 0 ? 'squeeze' : 'stretch';
+      const danger = (top: Top) => {
+        const r = Math.hypot(top.x, top.z) || 1e-3;
+        const outward = (top.vx * top.x + top.vz * top.z) / r;
+        return r / Math.max(0.01, this.arena.radius) + Math.max(0, outward) * 0.8;
+      };
+      const before = danger(this.theirs) - danger(this.mine);
+      const direction = this.arenaMorphTwist >= 0 ? 1 : -1;
+      const impulse = action === 'twist'
+        ? Math.min(0.32, 0.12 + Math.abs(this.arenaMorphTwist) * 0.58)
+        : action === 'tilt'
+          ? Math.min(0.24, 0.11 + Math.abs(this.arenaMorph.tilt) * 1.1)
+          : Math.min(0.3, 0.13 + Math.abs(this.arenaMorphPull) * 0.75);
       for (const top of this.tops) {
         if (!top.alive) continue;
-        const radial = (top.x * axisX + top.z * axisZ) >= 0 ? 1 : -1;
-        top.vx += axisX * radial * this.arenaMorphPull * 1.2 - top.z * this.arenaMorphTwist * 2.5;
-        top.vz += axisZ * radial * this.arenaMorphPull * 1.2 + top.x * this.arenaMorphTwist * 2.5;
+        const r = Math.hypot(top.x, top.z) || 1;
+        const nx = top.x / r;
+        const nz = top.z / r;
+        let ix = 0;
+        let iz = 0;
+        if (action === 'squeeze' || action === 'stretch') {
+          const outward = action === 'stretch' ? 1 : -1;
+          ix = nx * impulse * outward;
+          iz = nz * impulse * outward;
+        } else if (action === 'twist') {
+          ix = -nz * impulse * direction;
+          iz = nx * impulse * direction;
+        } else {
+          ix = this.arenaMorphShove.x * impulse;
+          iz = this.arenaMorphShove.z * impulse;
+        }
+        top.vx += ix;
+        top.vz += iz;
+        top.kick = Math.max(top.kick, 0.55);
+        top.kickX = ix;
+        top.kickZ = iz;
       }
+      if (action === 'tilt') {
+        this.arenaMorphShove.t = 1.35;
+        this.arena.shove = this.arenaMorphShove;
+      }
+      const swing = danger(this.theirs) - danger(this.mine) - before;
       this.lastShape = { t: this.elapsed, kind: 'parry' };
       this.morphedOnce = true;
       this.arenaMorphHold = 1.1;
       this.recordIntervention();
-      const action = Math.abs(this.arenaMorphTwist) > 0.12
-        ? 'TWIST RELEASE'
-        : Math.abs(this.arenaMorph.tilt) > 0.025
-          ? 'ARENA TILTED'
-          : this.arenaMorphPull < -0.025 ? 'SQUEEZED' : 'STRETCHED';
-      this.stamp.show('ARENA FORGED!', action, 'mine', 0.8);
-      this.label.set('YOUR HANDS CHANGED THE FIGHT');
-      this.labelTimer = 1.4;
+      this.recordArenaForge(action, swing);
+      this.stamp.show(ARENA_FORGE_TITLE[action], ARENA_FORGE_EFFECT[action], 'mine', 1.05, 1.15);
+      this.label.set(`${ARENA_FORGE_TITLE[action]} ${ARENA_FORGE_EFFECT[action]}\nWATCH THE TOPS REACT`);
+      this.labelTimer = 1.65;
       this.sparks.burst(0, this.arena.height(0, 0), 0, 0.9);
       this.impacts.shock(0, this.arena.height(0, 0), 0, 0.75);
       this.hitStop = Math.max(this.hitStop, 0.12);
       this.roomLight.hit();
       playThock();
-      if (import.meta.env.DEV) console.log(`[MORPH] release pull ${this.arenaMorphPull.toFixed(3)} twist ${this.arenaMorphTwist.toFixed(3)} tilt ${this.arenaMorph.tilt.toFixed(3)}`);
+      if (import.meta.env.DEV) console.log(`[MORPH] ${action} swing ${swing.toFixed(3)} pull ${this.arenaMorphPull.toFixed(3)} twist ${this.arenaMorphTwist.toFixed(3)} tilt ${this.arenaMorph.tilt.toFixed(3)}`);
       return true;
     }
 
