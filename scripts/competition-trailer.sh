@@ -36,7 +36,8 @@ fi
 
 required=(
   "$MAIN/01-rise-title.mp4" "$MAIN/02-portal.mp4" "$MAIN/03-rip-ramp-replay.mp4"
-  "$MAIN/04-strike.mp4" "$MAIN/05-cup-sling.mp4" "$MAIN/06-forge.mp4"
+  "$MAIN/04-strike.mp4" "$MAIN/04a-arena-forge.mp4" "$MAIN/04b-outer-ring.mp4"
+  "$MAIN/05-cup-sling.mp4" "$MAIN/06-forge.mp4"
   "$MAIN/07-match-win.mp4" "$SHOW/01-hub-progression.mp4"
   "$SHOW/03-forge-customization.mp4" "$SHOW/05-arena-workshop.mp4"
   "$SHOW/07-all-arenas-labelled.mp4" "$ULT/1-anvil.mp4" "$ULT/2-rush.mp4"
@@ -71,29 +72,29 @@ clip() {
     -c:a aac -b:a 256k -ar 48000 -ac 2 "$TMP/$file.mp4"
 }
 
-clip 00-hook "$MAIN/03-rip-ramp-replay.mp4" 1.5 3.2 "SPINSMITH" "Pinch  pull  rip  reshape the fight"
+clip 00-hook "$MAIN/04a-arena-forge.mp4" 4.2 3.4 "SPINSMITH" "Grab the live arena  reshape the fight"
 clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 2.6 "YOUR TABLE IS THE ARENA" "Seated mixed reality built for hands"
-clip 02-portal "$MAIN/02-portal.mp4" 0.5 2.2 "RIVALS ENTER YOUR ROOM" "Seven fighters  seven tactics"
-clip 03-ramp "$MAIN/03-rip-ramp-replay.mp4" 4.3 4.4 "RAISE A RAMP" "Read the motion and change its path"
-clip 04-cup "$MAIN/05-cup-sling.mp4" 2.2 3.8 "CATCH AND SLING" "Press the floor  catch  fire it back"
-clip 05-strike "$MAIN/04-strike.mp4" 3.0 3.6 "STRIKE THE TABLE" "Your palm permanently changes the arena"
+clip 02-rip "$MAIN/03-rip-ramp-replay.mp4" 0.7 3.6 "PINCH  PULL  RIP" "Hands only  no controllers"
+clip 03-morph "$MAIN/04a-arena-forge.mp4" 4.2 4.2 "SQUEEZE  TILT  TWIST" "Your hands change the live physics"
+clip 04-outer "$MAIN/04b-outer-ring.mp4" 0.1 4.2 "FORGE BEYOND THE BOWL" "Catch a ring-out on your real table"
+clip 05-strike "$MAIN/04-strike.mp4" 3.0 3.4 "STAMP AN ULTIMATE" "The arena keeps the consequence"
 clip 06-forge "$MAIN/06-forge.mp4" 1.2 4.5 "FORGE IT BY HAND" "Every fitted part changes the physics"
 clip 07-builds "$SHOW/03-forge-customization.mp4" 10.5 3 "BUILD YOUR FIGHTER" "226 legal combinations  real tradeoffs"
-clip 08-workshop "$SHOW/05-arena-workshop.mp4" 16.5 4 "BUILD THE BATTLEGROUND" "Place hazards  boosts  moving machinery"
+clip 08-workshop "$SHOW/05-arena-workshop.mp4" 16.5 3.2 "BUILD THE BATTLEGROUND" "Place hazards  boosts  moving machinery"
 
 # The source shots include their setup and launch. Cut where the palm actually lands, then keep
 # three visually distinct persistent rules instead of turning the submission into an ability list.
-clip 09-ult-anvil "$ULT/1-anvil.mp4" 8.5 2.6 "FORGED RIDGES" "Anvil cracks stay in the battlefield"
-clip 09-ult-tilt "$ULT/4-tilt.mp4" 8.5 2.6 "ARENA TILTED" "The whole dish becomes the rule"
-clip 09-ult-ward "$ULT/6-ward.mp4" 8.5 2.6 "GUARDED SECTOR" "A raised rim changes the exchange"
+clip 09-ult-anvil "$ULT/1-anvil.mp4" 8.5 2.3 "FORGED RIDGES" "Anvil cracks stay in the battlefield"
+clip 09-ult-tilt "$ULT/4-tilt.mp4" 8.5 2.3 "ARENA TILTED" "The whole dish becomes the rule"
+clip 09-ult-ward "$ULT/6-ward.mp4" 8.5 2.3 "GUARDED SECTOR" "A raised rim changes the exchange"
 
-clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.8 "FIFTEEN ARENAS" "Each one changes the physical rules"
+clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.5 "FIFTEEN ARENAS" "Each one changes the physical rules"
 clip 11-return "$SHOW/01-hub-progression.mp4" 1.8 2.8 "COME BACK STRONGER" "Daily orders  rivals  champions  records"
-clip 12-win "$MAIN/07-match-win.mp4" 15 4 "ONE MORE MATCH" "Fast rounds  instant rematch  new tactics"
+clip 12-win "$MAIN/07-match-win.mp4" 15 3.4 "ONE MORE MATCH" "Fast rounds  instant rematch  new tactics"
 card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.6
 
 segments=(
-  00-hook 01-rise 02-portal 03-ramp 04-cup 05-strike 06-forge 07-builds 08-workshop
+  00-hook 01-rise 02-rip 03-morph 04-outer 05-strike 06-forge 07-builds 08-workshop
   09-ult-anvil 09-ult-tilt 09-ult-ward
   10-arenas 11-return 12-win 13-end
 )

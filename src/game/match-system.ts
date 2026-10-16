@@ -3518,6 +3518,7 @@ export class MatchSystem extends createSystem({
     if (!this.arenaMorphing) {
       if (this.arenaMorphHold > 0) {
         this.arenaMorphHold = Math.max(0, this.arenaMorphHold - dt);
+        this.arenaView.charge = Math.max(this.arenaView.charge, 0.9);
         return false;
       }
       const ease = 1 - Math.exp(-dt * 8);
@@ -3545,6 +3546,7 @@ export class MatchSystem extends createSystem({
       this.arenaMorphStart.angle = Math.atan2(dz, dx);
       this.arenaMorphPull = this.arenaMorphTwist = 0;
       this.arenaMorphing = true;
+      this.arenaView.charge = 1;
       this.stamp.show('TWO-HAND FORGE', 'SQUEEZE · TILT · TWIST', 'mine', 0.7);
       playTick();
     }
@@ -3560,12 +3562,12 @@ export class MatchSystem extends createSystem({
       for (const top of this.tops) {
         if (!top.alive) continue;
         const radial = (top.x * axisX + top.z * axisZ) >= 0 ? 1 : -1;
-        top.vx += axisX * radial * this.arenaMorphPull * 0.7 - top.z * this.arenaMorphTwist * 1.8;
-        top.vz += axisZ * radial * this.arenaMorphPull * 0.7 + top.x * this.arenaMorphTwist * 1.8;
+        top.vx += axisX * radial * this.arenaMorphPull * 1.2 - top.z * this.arenaMorphTwist * 2.5;
+        top.vz += axisZ * radial * this.arenaMorphPull * 1.2 + top.x * this.arenaMorphTwist * 2.5;
       }
       this.lastShape = { t: this.elapsed, kind: 'parry' };
       this.morphedOnce = true;
-      this.arenaMorphHold = 0.7;
+      this.arenaMorphHold = 1.1;
       this.recordIntervention();
       const action = Math.abs(this.arenaMorphTwist) > 0.12
         ? 'TWIST RELEASE'
@@ -3577,6 +3579,8 @@ export class MatchSystem extends createSystem({
       this.labelTimer = 1.4;
       this.sparks.burst(0, this.arena.height(0, 0), 0, 0.9);
       this.impacts.shock(0, this.arena.height(0, 0), 0, 0.75);
+      this.hitStop = Math.max(this.hitStop, 0.12);
+      this.roomLight.hit();
       playThock();
       if (import.meta.env.DEV) console.log(`[MORPH] release pull ${this.arenaMorphPull.toFixed(3)} twist ${this.arenaMorphTwist.toFixed(3)} tilt ${this.arenaMorph.tilt.toFixed(3)}`);
       return true;
@@ -3587,7 +3591,7 @@ export class MatchSystem extends createSystem({
     const dx = this.arenaMorphB.x - this.arenaMorphA.x;
     const dz = this.arenaMorphB.z - this.arenaMorphA.z;
     const distance = Math.hypot(dx, dz);
-    this.arenaMorphPull = Math.max(-0.16, Math.min(0.16, distance / this.arenaMorphStart.distance - 1));
+    this.arenaMorphPull = Math.max(-0.26, Math.min(0.26, distance / this.arenaMorphStart.distance - 1));
     let twist = Math.atan2(dz, dx) - this.arenaMorphStart.angle;
     if (twist > Math.PI) twist -= Math.PI * 2;
     else if (twist < -Math.PI) twist += Math.PI * 2;
@@ -3595,9 +3599,10 @@ export class MatchSystem extends createSystem({
 
     const c = Math.cos(this.arenaMorphStart.angle);
     const s = Math.sin(this.arenaMorphStart.angle);
-    this.arenaMorph.scaleX = 1 + this.arenaMorphPull * (0.9 * c * c - 0.3 * s * s);
-    this.arenaMorph.scaleZ = 1 + this.arenaMorphPull * (0.9 * s * s - 0.3 * c * c);
-    this.arenaMorph.tilt = Math.max(-0.08, Math.min(0.08, this.arenaMorphB.y - this.arenaMorphA.y));
+    this.arenaMorph.scaleX = 1 + this.arenaMorphPull * (1.1 * c * c - 0.4 * s * s);
+    this.arenaMorph.scaleZ = 1 + this.arenaMorphPull * (1.1 * s * s - 0.4 * c * c);
+    this.arenaMorph.tilt = Math.max(-0.1, Math.min(0.1, this.arenaMorphB.y - this.arenaMorphA.y));
+    this.arenaView.charge = 1;
     if (Math.abs(this.arenaMorph.tilt) > 0.012) {
       const lowIsLeft = this.arenaMorphA.y < this.arenaMorphB.y;
       const low = lowIsLeft ? this.arenaMorphA : this.arenaMorphB;

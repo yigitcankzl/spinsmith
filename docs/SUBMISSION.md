@@ -18,8 +18,10 @@ the more spin. A white-hot pull earns extra.
 
 **Reshape.** During the fight, pinch the arena floor and a ramp rises at once; drag to aim it, and
 throw your rival into a slag pit or over the wall. Press a fingertip in to open a cup that catches
-a top; pinch it, pull back and let go to sling it. Shapes affect both tops, so a careless ramp can
-throw your own top out. When your move decides a round, the arena says so, and plays it again.
+a top; pinch it, pull back and let go to sling it. Or grab opposite rim sectors with both hands:
+squeeze, tilt or twist the entire live bowl, then release its stored impulse into both tops. Shapes
+affect both sides, so a careless intervention can throw your own top out. When your move decides a
+round, the arena says so, and plays it again.
 
 **Strike the table.** A forge bar glows on the back of your hand. Full, slap your palm on the real
 table beside the arena: a shockwave runs through the floor, and your palm leaves a molten print on
@@ -29,7 +31,8 @@ visible history of recent fights. Rivals wind up big moves of their own; strike 
 them short.
 
 **Your room is the stage.** A rival arrives through a portal and slams into the arena. A top
-thrown over the wall keeps spinning across your real desk and can drop off its real edge. Your
+thrown over the wall keeps spinning across your real desk; catch it once and draw a molten return
+rail back to the rim. It can still drop off the desk's real edge if you miss. Your
 hands and furniture correctly cover the depth-aware arena, a persistent anchor returns the smithy
 to its saved place, a win sends a wave of light across your room, and every sound comes from where
 it happens.
@@ -42,9 +45,11 @@ save, and the room turns cold blue for a breath.
 twelve feats, personal bests and an arena workshop. Levels open options, never power. Share your
 top as a challenge code and a friend fights it.
 
-**Learn by doing.** The opening match gives each hand verb its own round: rip and ramp, catch and
-sling, then an ultimate. A ghost hand demonstrates the first ramp; lesson scoring prevents skipped
-steps. A comfort dial disables sound or flashes, makes strikes gentle, or slows fights to 80%.
+**Learn by doing.** The opening match gives the three signature beats their own rounds: rip and
+ramp, grab and forge the whole arena with two hands, then stamp an ultimate. Cup and sling arrive
+on the first rematch, after the player already understands the core loop. A ghost hand demonstrates
+the first ramp; lesson scoring prevents skipped steps. A comfort dial disables sound or flashes,
+makes strikes gentle, or slows fights to 80%.
 
 Built with the Immersive Web SDK, SpinSmith runs in the Quest browser with no install and works
 offline once loaded. A deterministic simulation drives the fight and the balance: every part,
@@ -61,6 +66,11 @@ arena and strike is measured over thousands of rounds.
 - **Pinch to ramp, drag to aim:** the ramp rises the moment the pinch holds (about a tenth of a
   second), so it meets a moving top; dragging turns it, and a small dead zone keeps tracking
   jitter from swinging it. Far ramps use the hand ray the same way.
+- **Two-hand arena forge:** pinch opposite glowing rim sectors, then squeeze, tilt or twist. The
+  arena visibly deforms, holds for a readable beat, and throws the stored impulse into the fight
+  when released.
+- **Outer Ring rescue:** one ring-out per round can stay alive on a detected real table. Pinch the
+  moving top and draw it back to the rim to forge a temporary return rail across the room surface.
 - **Press for a cup, pull to sling:** a fingertip pressed into the arena floor opens a cup; a pinch on the caught top, pulled back and released, slings it.
 - **Press the table to place, and to strike:** a palm pressed on the real table raises the arena
   at the table's true height, and during a fight, with the forge bar full, the same press beside
@@ -74,23 +84,24 @@ arena and strike is measured over thousands of rounds.
 - **Forgiving by design:** tracking loss shorter than a tenth of a second is ignored, and a lost
   hand cancels a half-made shape instead of committing it.
 
-## Competition video (0:50)
+## Competition video (0:49)
 
 The one sentence the video must show: *Forge it by hand, rip it into your real table, then
 reshape the arena to win.*
 
 | Time | Shot | Point proved |
 |---|---|---|
-| 0:00-0:03 | Rip and live ramp cold open | The core new experience is visible immediately |
-| 0:03-0:08 | Arena rise and rival portal | Seated tabletop scale; the room is the stage |
-| 0:08-0:20 | Ramp, cup/sling and table strike | Hands actively reshape a live fight |
-| 0:20-0:32 | Forge and arena workshop | Physical build expression and authored battlegrounds |
-| 0:32-0:40 | Anvil, Tilt and Ward | Distinct ultimates change the arena and scar the real table |
-| 0:40-0:49 | Arena variety, progression and match finish | Breadth, return loop and instant rematch |
-| 0:49-0:50 | End card | Hands only · seated · Quest Browser |
+| 0:00-0:03 | Two-hand arena forge cold open | The core new experience is visible immediately |
+| 0:03-0:10 | Arena rise and physical rip | Seated tabletop scale; hands only, no controllers |
+| 0:10-0:18 | Squeeze, tilt and twist the live bowl | Hands visibly change the active fight |
+| 0:18-0:22 | Outer Ring rescue | The real table becomes playable space |
+| 0:22-0:29 | Ultimate and hand forge | Arena consequence and physical build expression |
+| 0:29-0:41 | Workshop and three arena-changing ultimates | Authored battlegrounds and tactical variety |
+| 0:41-0:48 | Arena variety, progression and match finish | Breadth, return loop and instant rematch |
+| 0:48-0:49 | End card | Hands only · seated · Quest Browser |
 
 Final video: `~/Desktop/spinsmith-videos/submission-package/spinsmith-competition-1080p60.mp4`
-(50.333 s, H.264, 1920×1080 at 60 fps, stereo AAC). Every gameplay shot is visibly labelled
+(49.333 s, H.264, 1920×1080 at 60 fps, stereo AAC). Every gameplay shot is visibly labelled
 `IWER EMULATOR CAPTURE · QUEST BUILD`: IWER is IWSDK's browser-based XR emulator. This is honest
 prototype footage and does not claim to demonstrate physical-headset passthrough or tracking.
 `CAPTURE=1 scripts/competition-trailer.sh` recreates every source clip and the final cut from the

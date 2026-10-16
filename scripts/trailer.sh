@@ -45,6 +45,12 @@ if [ -z "${CUT_ONLY:-}" ]; then
   # 4. The strike (a new match so the round is fresh).
   sleep 3; ready
   rec 04-strike.mp4 '["rip",{"power":0.8}]' '["fightAt",3]' '["key","KeyJ"]' '["wait",0.8]' '["slap",{"fallback":true}]' '["wait",3.5]'
+  # 4a. The signature move: grab opposite rims and physically forge the live arena.
+  sleep 5; $D '["demo"]' >/dev/null 2>&1; sleep 3; $E enter; $D '["wait",8]' >/dev/null; ready
+  rec 04a-arena-forge.mp4 '["dualRip",{"power":0.88,"onBeat":true}]' '["fightAt",2.7]' '["key","KeyU"]' '["arenaForge",{"squeeze":0.03,"twist":14,"tilt":0.03,"hold":0.7}]' '["wait",2]'
+  # 4b. The room-scale payoff without room-scale movement: catch a ring-out on the real table and
+  # draw a molten return rail back into the bowl.
+  rec 04b-outer-ring.mp4 '["outerRingReturn","right"]' '["wait",2]'
   # 5. Cup and sling.
   for _ in 1 2 3; do
     # Reset to the stable Forge Bowl bout; a later rival may end the round while the hand reaches in.
@@ -60,7 +66,7 @@ if [ -z "${CUT_ONLY:-}" ]; then
   rec 07-match-win.mp4 '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",11]' '["rip",{"power":0.9}]' '["wait",3]' '["key","KeyK"]' '["wait",10]'
 fi
 
-for required in 01-rise-title 02-portal 03-rip-ramp-replay 04-strike 05-cup-sling 06-forge 07-match-win; do
+for required in 01-rise-title 02-portal 03-rip-ramp-replay 04-strike 04a-arena-forge 04b-outer-ring 05-cup-sling 06-forge 07-match-win; do
   if [ ! -s "$S/$required.mp4" ]; then
     echo "Missing capture: $S/$required.mp4" >&2
     exit 1
@@ -87,6 +93,10 @@ card c1 "THEY COME FOR YOU" "Seven rivals, each with a move of its own"
 clip s2 02-portal.mp4 0.6 4
 card c2 "RESHAPE THE ARENA" "Pinch the floor and a ramp throws your rival out"
 clip s3 03-rip-ramp-replay.mp4 0.5 14
+card c2a "GRAB THE LIVE ARENA" "Two hands squeeze, tilt and twist the fight"
+clip s3a 04a-arena-forge.mp4 4.2 6
+card c2b "YOUR TABLE IS IN PLAY" "Catch a ring-out and forge its road home"
+clip s3b 04b-outer-ring.mp4 0 5
 card c3 "STRIKE THE TABLE" "Slap your real desk and a shockwave runs through the arena"
 clip s4 04-strike.mp4 2 8
 card c4 "CATCH AND SLING" "Press a cup into the floor, then let it fly"
@@ -95,6 +105,6 @@ card c5 "FORGE IT BY HAND" "226 builds, every part changes the physics"
 clip s6 06-forge.mp4 0.5 12
 clip s7 07-match-win.mp4 15 13
 card c6 "SPINSMITH" "Hands only. Seated. Play in the Quest browser, no install."
-for n in c0 s1 c1 s2 c2 s3 c3 s4 c4 s5 c5 s6 s7 c6; do echo "file '$T/$n.mp4'"; done > "$T/list.txt"
+for n in c0 s1 c1 s2 c2 s3 c2a s3a c2b s3b c3 s4 c4 s5 c5 s6 s7 c6; do echo "file '$T/$n.mp4'"; done > "$T/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$T/list.txt" -c:v libx264 -crf 14 -preset slow -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -movflags +faststart "$OUT/spinsmith-trailer-rough.mp4"
 echo "$OUT/spinsmith-trailer-rough.mp4 ($(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/spinsmith-trailer-rough.mp4") s)"
