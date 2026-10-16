@@ -3568,6 +3568,9 @@ export class MatchSystem extends createSystem({
       const h = this.hands[active.side];
       active.t -= dt;
       if (!h.tracked || !h.pinching || active.t <= 0 || this.phase !== 'fight') {
+        this.rampAt[active.side] = this.elapsed;
+        this.tipFresh[active.side] = true;
+        this.pressing[active.side] = false;
         this.overforgeControl = null;
         this.overforgeHeld = null;
         this.overforgeMode = 'idle';
@@ -3615,6 +3618,11 @@ export class MatchSystem extends createSystem({
       if (n <= 1.02 && l.y <= floor + SEAL_STAMP_H && l.y >= floor - 0.04) {
         const side = heldSide;
         this.doStrike(l.x, l.z);
+        // The stamping fingertip has just crossed the floor on purpose; do not reinterpret that
+        // same downward motion as a Cup when the seal releases ownership of the hand.
+        this.rampAt[side] = this.elapsed;
+        this.tipFresh[side] = true;
+        this.pressing[side] = false;
         this.overforgeSeal.visible = false;
         this.overforgeHeld = null;
         if (seal === 'tilt' || seal === 'magnet' || seal === 'ward') {
