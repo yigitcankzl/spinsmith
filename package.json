@@ -12,7 +12,7 @@
     "reference:warmup": "iwsdk reference warmup",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
-    "postbuild": "node scripts/clean-dist.mjs",
+    "postbuild": "node scripts/clean-dist.mjs && node scripts/check-public-release.mjs",
     "preview": "vite preview",
     "check:sim": "node scripts/sim-check.ts",
     "report:arenas": "node scripts/arena-report.ts",

@@ -5,8 +5,8 @@ Immersive Web SDK (IWSDK). Rip your top into an arena on your real table, then
 steer the fight by pulling ramps up out of the arena floor and pressing cups into it that catch a top for you to sling.
 
 Entry for the Meta VR Start Developer Competition 2026 (Gaming – New Experience).
-Current direction: [docs/GAMEPLAY-DIRECTION.md](docs/GAMEPLAY-DIRECTION.md); the remaining work:
-[docs/ACTION-PLAN.md](docs/ACTION-PLAN.md).
+This README describes the playable build; private design research and capture evidence are not
+included in the publishable source tree or production artifact.
 
 ## Try it (judges)
 
@@ -88,7 +88,7 @@ an arena. First to 3 heat wins a match.
   Titan Crater, Twin Basins, Ripple Pool, Colossus Bowl, Neon Speedway, Orbit Foundry, Glacier
   Steps, Meteor Pit and Grand Anvil, opened by level. The rotation picks the arena. `npm run report:arenas` simulates every
   type matchup on every arena and reports round length, knockouts and type balance.
-- **Build your top from parts** (`src/game/parts.ts`, design in `docs/TOP-CUSTOMIZATION.md`):
+- **Build your top from parts** (`src/game/parts.ts`):
   a Ring (contact style and mass: Striker, Hook, Anvil, Halo, Saw, Cog, Gale, Bulwark), a Core (height and
   shatter lock: Stub, Bolt, Clamp, Stilt, Spindle), a Tip (movement and rail gear: Chisel, Spur, Awl,
   Dome, Pin, Bead), spin direction and color, under a 40 g weight limit (226 legal builds).
@@ -98,7 +98,7 @@ an arena. First to 3 heat wins a match.
   their gear, Saw rings chip toward a shatter. The classic Striker (attack), Anvil (defense)
   and Halo (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
   the opponent's cool teal; each rival keeps its build and spin for the whole match (see Smith levels).
-- **Forge, by hand** (`src/game/forge.ts`, `docs/FORGE-STADIUM.md`): pinch the small anvil and
+- **Forge, by hand** (`src/game/forge.ts`): pinch the small anvil and
   the arena turns into the forge: its floor sinks, an anvil rises at the near third of the bowl
   with your top on it, five drawer tabs slide out of the near rim (Ring, Core, Tip, Look, Combat) and a
   stats plate rises on the far rim. Everything you touch is within a seated arm's reach. The open
@@ -111,12 +111,12 @@ an arena. First to 3 heat wins a match.
   the arena. The stats plate shows the build, one dial per stat with a second needle previewing
   a part (green gain, red loss), and what just happened. `npm run report:tops` plays every build against the others and flags dominant
   builds and dead parts.
-- **First session** (docs/GAMEPLAY-DIRECTION.md, section 12): until the first match is
+- **First session:** until the first match is
   finished the home is just your top in its dock (a breathing ring calls you to it) and the
   arena; the anvil and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
   the rival where lifting would push it, until your first ramp. The first match lasts at least
-  three rounds and adds one move per round: ramp, then cup and sling, then the ultimate (its third
+  three rounds and adds one move per round: ramp, then a two-hand arena squeeze, then the ultimate (its third
   round starts with the bar nearly full); rival tells come after that. Finishing the first match, won or
   lost, earns the Spur tip: the anvil appears and calls for it, the forge highlights only that
   part, and after saving the dock calls you back for the rematch.
@@ -139,7 +139,7 @@ an arena. First to 3 heat wins a match.
   After a round the match bar shows the XP earned and the level bar; a level-up rings and
   throws sparks, and each unlock spins over the arena. Your level and rank sit on the near rim.
   Progress is saved in the browser.
-- **A reason to come back** (`src/game/orders.ts`, `src/game/board.ts`, `docs/COME-BACK.md`):
+- **A reason to come back** (`src/game/orders.ts`, `src/game/board.ts`):
   once the first session is over, the Smith's board over the far rim shows **today's Smith
   Order**, made from the local date and what you have unlocked (the same all day): a rival, an
   arena and one way of winning (ramp them out, shatter them, outlast them from your cup, win
@@ -152,7 +152,7 @@ an arena. First to 3 heat wins a match.
   library.
 - **Shatter:** hard hits build up damage and a top can shatter, its parts flying and
   bouncing across the arena.
-- **Arena workshop** (`src/game/builder.ts`, `docs/ARENA-WORKSHOP-RIM.md`): pinch the
+- **Arena workshop** (`src/game/builder.ts`): pinch the
   blueprint and the arena turns into a drafting table: blueprint lines draw over its floor, brass
   knobs mark the rim, five drawer tabs fold out in a row on the near rim as in the forge
   (Pieces; Floor; Form: circle, oval, square, and one wall and one theme piece that step on each
@@ -178,7 +178,7 @@ an arena. First to 3 heat wins a match.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
   burst, topple and result jingles.
-- **Arena moves during the fight** (`docs/ARENA-SHAPING.md`): pinch the floor and a ramp
+- **Arena moves during the fight:** pinch the floor and a ramp
   rises there at once (after a 0.12 s hold, full size, about 11 cm across); keep holding and drag
   to aim which way it throws a top. Press a fingertip into the floor to open a cup that catches
   the first top to roll in; pinch it, pull back and let go to sling it the other way (snapped
@@ -193,7 +193,7 @@ an arena. First to 3 heat wins a match.
   raise a ramp there; its place locks when the pinch starts. A small blue dot marks where the ray meets the arena floor. In the
   emulator's play mode a left click is a pinch, so the game is playable by looking
   around with the mouse and click-holding.
-- **The duel layer** (`docs/DUEL-DESIGN.md`): a forge bar (the ring on the back of each hand)
+- **The duel layer:** a forge bar (the ring on the back of each hand)
   starts each round a fifth full (a white hot rip adds a quarter), fills on its own in 24 s and from solid clashes, three times
   as fast while your top is behind on spin. Full, press
   your palm on the table beside the arena: your strike. The seal you engrave in the forge's
@@ -294,7 +294,7 @@ the emulated hands (tap, drag, rip, ramp, cup, sling, palm slap), so the game's 
 detection reads them, unlike the dev keys. From a shell (dev server started with
 `--allow-browser-automation`): `scripts/emu.sh enter`, then for example
 `scripts/drive.sh '["tap","play"]' '["wait",2.5]' '["rip",{"power":0.9}]' '["wait",3]' '["ramp"]'`.
-The agent skill `.claude/skills/spinsmith-drive` describes every step and a playtest loop.
+`scripts/check-hand-mechanic.mjs` contains the repeatable interaction probes used by the build.
 
 ```sh
 npx @iwsdk/cli xr enter
@@ -323,5 +323,4 @@ src/game/audio.ts          Synthesized sound effects and the spin hum
 src/game/match-system.ts   Placement, rip-cord launch, arena moves, AI launch, match flow
 src/dev-hands.ts           Dev only: move one emulated hand with the mouse
 scripts/sim-check.ts       Headless simulation check
-docs/DESIGN.md             Game design document
 ```

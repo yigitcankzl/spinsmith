@@ -19,10 +19,10 @@
         "anchors": true,
         "gazeTracking": true,
         "hitTest": {
-          "required": true
+          "required": false
         },
         "depthSensing": {
-          "required": true,
+          "required": false,
           "usage": "gpu-optimized",
           "format": "float32"
         }

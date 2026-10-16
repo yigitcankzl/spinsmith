@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Drives the emulated hands (dev server started with --allow-browser-automation).
 # Each argument is one step as JSON: '["rip",{"power":0.9}]' '["wait",3]' '["state"]'.
-# Prints the game state after the last step. DRIVE_VIDEO=clip.mp4 also records a video. See .claude/skills/drive/SKILL.md.
+# Prints the game state after the last step. DRIVE_VIDEO=clip.mp4 also records a video.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 printf '[%s]' "$(IFS=,; echo "$*")" > .drive.json

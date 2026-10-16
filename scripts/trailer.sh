@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Records the emulator trailer shots with the hand driver and cuts a rough trailer with title
-# cards (dev server with --allow-browser-automation; see .claude/skills/spinsmith-drive/SKILL.md).
+# cards (run the dev server with browser automation enabled).
 #   scripts/trailer.sh [out-dir]        start a capture server, record every shot, then cut
 #   CUT_ONLY=1 scripts/trailer.sh       cut again from the shots already recorded
 #   CAPTURE_USE_RUNNING=1 ...           reuse an automation-enabled managed server

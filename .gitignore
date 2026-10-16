@@ -45,3 +45,23 @@ pids/
 .codex/config.toml
 .drive.json
 .drive-video
+
+# Local agent and harness instructions are development-only. They stay on this machine but are
+# never part of a public source tree or a production artifact.
+.agents/
+.claude/
+.codex/
+.cursor/
+.code-review-graph/
+AGENTS.md
+**/AGENTS.md
+CLAUDE.md
+**/CLAUDE.md
+opencode.json
+
+# Design research, judge reports and capture evidence stay with the private development workspace.
+# The publishable artifact is dist/, which is checked by scripts/check-public-release.mjs.
+docs/
+judge-report*.md
+STATUS.md
+BRIEF.md
