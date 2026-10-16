@@ -688,6 +688,18 @@ export class TopView {
   get restingAt(): Vector3 | null {
     return this.outT >= 0 && this.landed && this.deskSpin <= 0 ? this.throwPos : null;
   }
+  /** Where a thrown top is still spinning on the real desk, so a rescue rail can catch it. */
+  get rescueAt(): Vector3 | null {
+    return this.outT >= 0 && this.landed && this.deskSpin > 0 && !this.offDesk ? this.throwPos : null;
+  }
+  /** Outer Ring's readable last-chance beat: keep the top alive while its table drift brakes hard. */
+  brakeForRescue(dt: number): boolean {
+    if (this.outT < 0 || !this.landed || this.offDesk) return false;
+    this.throwVel.x *= Math.exp(-dt * 9);
+    this.throwVel.z *= Math.exp(-dt * 9);
+    this.deskSpin = Math.max(this.deskSpin, 0.32);
+    return true;
+  }
   private fallX = 1;
   private fallZ = 0;
   /** Everything drawn of the top (halo, blur disc, edge, parts), scaled up in a fight and punched by hits. */

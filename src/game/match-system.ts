@@ -167,6 +167,11 @@ const RAMP_AIM_DEADZONE = 0.005;
 /** How close a pinch must be to the floating seal, and how low it must be pressed to stamp. */
 const SEAL_GRAB = 0.065;
 const SEAL_STAMP_H = 0.026;
+/** One desk rescue per round: catch the still-spinning top and draw it back to the rim. */
+const OUTER_RING_TIME = 5;
+const OUTER_RAIL_POINTS = 48;
+const OUTER_RAIL_STEP = 0.008;
+const OUTER_RAIL_WIDTH = 0.0045;
 
 
 type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build' | 'forge';
@@ -231,6 +236,8 @@ export class MatchSystem extends createSystem({
   private placementUp = new Vector3();
   private placementQ = new Quaternion();
   private anchorPoseApplied = false;
+  private anchorRequestedAt = 0;
+  private anchorConfirmed = false;
   private spatialDirty = false;
   /** Ultimates leave a compact, persistent history on the player's real table. */
   private roomImprints = new RoomImprints((-PEDESTAL + 0.003) / ARENA_SCALE);
@@ -585,6 +592,40 @@ export class MatchSystem extends createSystem({
     ),
     { visible: false },
   ));
+  /** Real-table second chance: a rail drawn from a thrown top back into the arena. */
+  private outerRingState: 'idle' | 'rescue' | 'rail' | 'returned' | 'failed' = 'idle';
+  private outerRingUsed = false;
+  private outerRingLeft = 0;
+  private outerRingSpin = 0;
+  private outerRailSide: Side | null = null;
+  private outerRailCount = 0;
+  private outerRailLength = 0;
+  private outerRailPath = new Float32Array(OUTER_RAIL_POINTS * 2);
+  private outerRailPositions = new Float32Array((OUTER_RAIL_POINTS - 1) * 6 * 3);
+  private outerRailGeometry = new BufferGeometry();
+  private outerRail = Object.assign(new Group(), { visible: false });
+  private outerRailMesh = new Mesh(
+    this.outerRailGeometry,
+    new MeshBasicMaterial({ color: 0xff5a10, transparent: true, opacity: 0.86, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }),
+  );
+  private outerRailHead = new Mesh(
+    new RingGeometry(0.012, 0.017, 32).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0xffd090, transparent: true, opacity: 0.95, blending: AdditiveBlending, depthWrite: false }),
+  );
+  /** Root-local rescue target and rim goal, exposed to the emulator driver without allocating. */
+  private outerRingAt = new Vector3();
+  private outerRingGoal = new Vector3();
+  /** Observable competition-feature states for captures and regression probes. */
+  private anchorState: 'unsupported' | 'restoring' | 'anchored' = 'restoring';
+  private arenaMorph = { scaleX: 1, scaleZ: 1, tilt: 0 };
+  private arenaMorphing = false;
+  private arenaMorphStart = { distance: 1, angle: 0 };
+  private arenaMorphPull = 0;
+  private arenaMorphTwist = 0;
+  private arenaMorphA = new Vector3();
+  private arenaMorphB = new Vector3();
+  private arenaMorphShove = { x: 0, z: 0, t: 0 };
+  private gazeAssist = { active: false, target: '' };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
   private pressing: Record<Side, boolean> = { left: false, right: false };
   /** Each hand's fingertip height last frame (arena-local), and when it last set a ramp. */
@@ -757,6 +798,11 @@ export class MatchSystem extends createSystem({
     this.label.mesh.scale.setScalar(1.25);
     this.reticle.renderOrder = 10;
     this.chargeRing.visible = false;
+    this.outerRailGeometry.setAttribute('position', new Float32BufferAttribute(this.outerRailPositions, 3));
+    this.outerRailGeometry.setDrawRange(0, 0);
+    this.outerRailHead.visible = false;
+    this.outerRailMesh.renderOrder = this.outerRailHead.renderOrder = 8;
+    this.outerRail.add(this.outerRailMesh, this.outerRailHead);
     this.launchAim.add(this.launchAimShaft, this.launchAimHead);
     this.openingEcho.add(this.openingEchoShaft, this.openingEchoHead);
     this.rivalIntent.add(...this.rivalIntentDashes, this.rivalIntentHead);
@@ -843,7 +889,7 @@ export class MatchSystem extends createSystem({
     // Low over the arena's middle, in front of the far card and the match bar.
     this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.root.add(this.stamp.mesh);
-    this.root.add(this.handle, this.stage, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh, this.rematchButton.mesh);
+    this.root.add(this.handle, this.stage, this.outerRail, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh, this.rematchButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
@@ -873,6 +919,8 @@ export class MatchSystem extends createSystem({
     this.stage.name = 'arena-depth-layer';
     this.stageEntity = this.world.createTransformEntity(this.stage, this.rootEntity);
     this.stageEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
+    const outerRailEntity = this.world.createTransformEntity(this.outerRail, this.rootEntity);
+    outerRailEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
     const imprintsEntity = this.world.createTransformEntity(this.roomImprints.root, this.rootEntity);
     imprintsEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
     this.placementProbe.name = 'table-hit-probe';
@@ -1013,8 +1061,9 @@ export class MatchSystem extends createSystem({
           this.startMatch(RIVALS.find((r) => r.name === 'Hookjaw'));
         }
         if (e.code === 'KeyO' && this.phase === 'fight') {
-          // Throw the opponent over the wall now, outward from the center, to see it land on the table.
-          const t = this.theirs;
+          // Throw a top over the wall now, outward from the center, to see it land on the table.
+          // Shift+O throws yours and arms the Outer Ring rescue path.
+          const t = e.shiftKey ? this.mine : this.theirs;
           const r = Math.hypot(t.x, t.z) || 1;
           t.vx = (t.x / r) * 0.8;
           t.vz = (t.z / r) * 0.8;
@@ -1107,6 +1156,9 @@ export class MatchSystem extends createSystem({
     // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
     if (session !== this.xrSession) {
       this.anchorPoseApplied = false;
+      this.anchorRequestedAt = this.time;
+      this.anchorState = 'restoring';
+      this.anchorConfirmed = false;
       // Back at home, the print asks for a press again; mid-match, the arena just comes along.
       if (this.xrSession && this.phase === 'hub') {
         this.phase = 'placing';
@@ -1171,6 +1223,7 @@ export class MatchSystem extends createSystem({
       this.palmBraceActive = false;
       this.palmBraceAngles.left = this.palmBraceAngles.right = null;
       for (const wall of this.palmBraceWalls) wall.visible = false;
+      this.outerRail.visible = false;
       this.arenaView.charge = 0;
     }
     switch (this.phase) {
@@ -1260,9 +1313,13 @@ export class MatchSystem extends createSystem({
         break;
       case 'fight':
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
-        this.updateStrike(dt);
-        this.updateShaping();
-        this.updatePalmBrace();
+        if (this.outerRingState !== 'rescue' && this.outerRingState !== 'rail') {
+          this.updateStrike(dt);
+          if (!this.updateArenaMorph(dt)) {
+            this.updateShaping();
+            this.updatePalmBrace();
+          }
+        }
         this.updateFight(dt);
         break;
     }
@@ -1354,6 +1411,7 @@ export class MatchSystem extends createSystem({
     // Play never starts on a turned arena.
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'pulling') this.turn = 0;
     this.stage.rotation.set(this.arena.tiltX, this.turn, this.arena.tiltZ);
+    this.stage.scale.set(this.viewK * this.arenaMorph.scaleX, this.viewK, this.viewK * this.arenaMorph.scaleZ);
     const me = this.mine;
     const armed = this.phase === 'fight' && me.alive && me.hammer > 0;
     this.aura.visible = armed;
@@ -1516,6 +1574,7 @@ export class MatchSystem extends createSystem({
         const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < Math.max(BUTTON_REACH, b.height * 0.8);
         if (!near && !far) continue;
         hovered ??= b;
+        if (h === this.gazePointer) this.gazeAssist.target = b.id;
         if (h.justPinched && !pressed) pressed = b.id;
       }
     }
@@ -2211,7 +2270,13 @@ export class MatchSystem extends createSystem({
    */
   private updateGazePointer(frame: XRFrame, ref: XRReferenceSpace, session: XRSession) {
     const g = this.gazePointer;
-    const source = Array.from(session.inputSources).find((input) => input.targetRayMode === 'gaze');
+    let source: XRInputSource | null = null;
+    for (let i = 0; i < session.inputSources.length; i++) {
+      if (session.inputSources[i].targetRayMode === 'gaze') {
+        source = session.inputSources[i];
+        break;
+      }
+    }
     const pose = source ? frame.getPose(source.targetRaySpace, ref) : null;
     if (pose) {
       g.rayOrigin.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
@@ -2231,12 +2296,26 @@ export class MatchSystem extends createSystem({
     g.pinching = this.hands.left.pinching || this.hands.right.pinching;
     g.justPinched = g.pinching && !was;
     g.justReleased = !g.pinching && was;
+    this.gazeAssist.active = g.tracked;
+    if (g.tracked && this.root.visible && this.floorHit(g.rayOrigin, g.rayDir, this.gazeHit)) this.gazeAssist.target = 'arena';
+    else {
+      this.gazeHit.ok = false;
+      this.gazeAssist.target = '';
+    }
   }
 
   /** A persistent anchor owns the smithy's local pose; unsupported runtimes keep normal placement. */
   private updateSpatialAnchor() {
     const entity = this.rootEntity;
-    if (!entity?.active || !entity.getValue(XRAnchor, 'attached')) return;
+    if (!entity?.active) {
+      this.anchorState = 'unsupported';
+      return;
+    }
+    if (!entity.getValue(XRAnchor, 'attached')) {
+      this.anchorState = this.time - this.anchorRequestedAt > 3 ? 'unsupported' : 'restoring';
+      return;
+    }
+    this.anchorState = 'anchored';
     if (!this.anchorPoseApplied) {
       this.anchorPoseApplied = true;
       const saved = loadSpatialPose();
@@ -2261,6 +2340,10 @@ export class MatchSystem extends createSystem({
       saveSpatialPose(this.root, this.onTable);
       this.spatialDirty = false;
       console.log('[SPATIAL] saved smithy pose');
+    }
+    if (!this.anchorConfirmed && this.phase === 'hub' && this.root.visible) {
+      this.anchorConfirmed = true;
+      this.stamp.later('SMITHY ANCHORED', 'RETURNS TO THIS TABLE', 'mine', 1.2, 1.1);
     }
   }
 
@@ -2640,8 +2723,13 @@ export class MatchSystem extends createSystem({
   private setRoom() {
     const table = this.onTable ? this.tableShape() : null;
     if (!table) {
-      ROOM.poly = null;
-      ROOM.floor = null;
+      // IWER occasionally fails to load its living-room plane set. Keep production conservative
+      // (no known table means no desk rescue), but give the emulator a repeatable 78 x 62 cm desk
+      // so Outer Ring and the real-edge KO remain testable without a Quest.
+      ROOM.poly = import.meta.env.DEV
+        ? [{ x: -0.325, z: -0.26 }, { x: 0.325, z: -0.26 }, { x: 0.325, z: 0.26 }, { x: -0.325, z: 0.26 }]
+        : null;
+      ROOM.floor = import.meta.env.DEV ? -PEDESTAL / ARENA_SCALE - 0.3 : null;
       this.tableMask.visible = false;
       return;
     }
@@ -2813,6 +2901,19 @@ export class MatchSystem extends createSystem({
     this.readySince = this.time;
     this.matchOver = false;
     this.phase = 'ready';
+    this.outerRingState = 'idle';
+    this.outerRingUsed = false;
+    this.outerRingLeft = 0;
+    this.outerRailSide = null;
+    this.outerRailCount = 0;
+    this.outerRailLength = 0;
+    this.outerRail.visible = false;
+    this.outerRailHead.visible = false;
+    this.outerRailGeometry.setDrawRange(0, 0);
+    this.arenaMorphing = false;
+    this.arenaMorph.scaleX = this.arenaMorph.scaleZ = 1;
+    this.arenaMorph.tilt = 0;
+    this.arenaMorphPull = this.arenaMorphTwist = 0;
     // A pull cut short (a recenter) leaves no drone and no lit ring.
     this.cordTone.update(null);
     this.chargeRing.visible = false;
@@ -3339,6 +3440,109 @@ export class MatchSystem extends createSystem({
     this.bracedLaunch = false;
     this.launcherBrace.visible = false;
     console.log(`[MATCH] launch power ${power.toFixed(2)}${perfect ? ' PERFECT' : ''}${braced ? ' BRACED' : ''} from ${sx.toFixed(3)},${sz.toFixed(3)} ${this.launchZoneKind}/${this.launchArenaKind} timing ${this.launchTiming.toFixed(2)} twist ${this.launchTwist.toFixed(2)} steep ${steep.toFixed(2)} aim ${aim.toFixed(2)} vs AI ${aiPower.toFixed(2)} from ${rx.toFixed(3)},${rz.toFixed(3)}`);
+  }
+
+  /**
+   * Grab opposing rim sectors with both hands to forge the whole bowl. Moving the hands together
+   * squeezes it, apart stretches it, a twist winds the release, and uneven hand heights tilt it.
+   * The arena springs back after release, but the tops keep the directional impulse.
+   */
+  private updateArenaMorph(dt: number): boolean {
+    const left = this.hands.left;
+    const right = this.hands.right;
+    if (!this.arenaMorphing) {
+      const ease = 1 - Math.exp(-dt * 8);
+      this.arenaMorph.scaleX += (1 - this.arenaMorph.scaleX) * ease;
+      this.arenaMorph.scaleZ += (1 - this.arenaMorph.scaleZ) * ease;
+      this.arenaMorph.tilt += (0 - this.arenaMorph.tilt) * ease;
+
+      const a = this.rimPulls.left;
+      const b = this.rimPulls.right;
+      if (!a || !b || !left.pinching || !right.pinching) return false;
+      const ar = Math.hypot(a.sx, a.sz) || 1;
+      const br = Math.hypot(b.sx, b.sz) || 1;
+      if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > -0.55) return false;
+      const force = this.charges.spend(this.elapsed, TUNING.grace);
+      if (!force) {
+        playLocked();
+        return false;
+      }
+
+      this.root.worldToLocal(this.arenaMorphA.copy(left.pinch));
+      this.root.worldToLocal(this.arenaMorphB.copy(right.pinch));
+      const dx = this.arenaMorphB.x - this.arenaMorphA.x;
+      const dz = this.arenaMorphB.z - this.arenaMorphA.z;
+      this.arenaMorphStart.distance = Math.max(0.04, Math.hypot(dx, dz));
+      this.arenaMorphStart.angle = Math.atan2(dz, dx);
+      this.arenaMorphPull = this.arenaMorphTwist = 0;
+      this.arenaMorphing = true;
+      this.stamp.show('TWO-HAND FORGE', 'SQUEEZE · TILT · TWIST', 'mine', 0.7);
+      playTick();
+    }
+
+    if (!left.tracked || !right.tracked || !left.pinching || !right.pinching) {
+      this.arenaMorphing = false;
+      this.rimPulls.left = this.rimPulls.right = null;
+      this.rimSpringGuides[0].visible = false;
+      this.rimSpringGuides[1].visible = false;
+
+      const axisX = Math.cos(this.arenaMorphStart.angle);
+      const axisZ = Math.sin(this.arenaMorphStart.angle);
+      for (const top of this.tops) {
+        if (!top.alive) continue;
+        const radial = (top.x * axisX + top.z * axisZ) >= 0 ? 1 : -1;
+        top.vx += axisX * radial * this.arenaMorphPull * 0.7 - top.z * this.arenaMorphTwist * 1.8;
+        top.vz += axisZ * radial * this.arenaMorphPull * 0.7 + top.x * this.arenaMorphTwist * 1.8;
+      }
+      this.lastShape = { t: this.elapsed, kind: 'parry' };
+      const action = Math.abs(this.arenaMorphTwist) > 0.12
+        ? 'TWIST RELEASE'
+        : Math.abs(this.arenaMorph.tilt) > 0.025
+          ? 'ARENA TILTED'
+          : this.arenaMorphPull < -0.025 ? 'SQUEEZED' : 'STRETCHED';
+      this.stamp.show('ARENA FORGED!', action, 'mine', 0.8);
+      this.sparks.burst(0, this.arena.height(0, 0), 0, 0.9);
+      this.impacts.shock(0, this.arena.height(0, 0), 0, 0.75);
+      playThock();
+      if (import.meta.env.DEV) console.log(`[MORPH] release pull ${this.arenaMorphPull.toFixed(3)} twist ${this.arenaMorphTwist.toFixed(3)} tilt ${this.arenaMorph.tilt.toFixed(3)}`);
+      return true;
+    }
+
+    this.root.worldToLocal(this.arenaMorphA.copy(left.pinch));
+    this.root.worldToLocal(this.arenaMorphB.copy(right.pinch));
+    const dx = this.arenaMorphB.x - this.arenaMorphA.x;
+    const dz = this.arenaMorphB.z - this.arenaMorphA.z;
+    const distance = Math.hypot(dx, dz);
+    this.arenaMorphPull = Math.max(-0.16, Math.min(0.16, distance / this.arenaMorphStart.distance - 1));
+    let twist = Math.atan2(dz, dx) - this.arenaMorphStart.angle;
+    if (twist > Math.PI) twist -= Math.PI * 2;
+    else if (twist < -Math.PI) twist += Math.PI * 2;
+    this.arenaMorphTwist = Math.max(-0.35, Math.min(0.35, twist));
+
+    const c = Math.cos(this.arenaMorphStart.angle);
+    const s = Math.sin(this.arenaMorphStart.angle);
+    this.arenaMorph.scaleX = 1 + this.arenaMorphPull * (0.9 * c * c - 0.3 * s * s);
+    this.arenaMorph.scaleZ = 1 + this.arenaMorphPull * (0.9 * s * s - 0.3 * c * c);
+    this.arenaMorph.tilt = Math.max(-0.08, Math.min(0.08, this.arenaMorphB.y - this.arenaMorphA.y));
+    if (Math.abs(this.arenaMorph.tilt) > 0.012) {
+      const lowIsLeft = this.arenaMorphA.y < this.arenaMorphB.y;
+      const low = lowIsLeft ? this.arenaMorphA : this.arenaMorphB;
+      const d = Math.hypot(low.x, low.z) || 1;
+      this.arenaMorphShove.x = low.x / d;
+      this.arenaMorphShove.z = low.z / d;
+      this.arenaMorphShove.t = 0.14;
+      this.arena.shove = this.arenaMorphShove;
+    }
+
+    const g0 = this.rimSpringGuides[0];
+    const g1 = this.rimSpringGuides[1];
+    g0.visible = g1.visible = !this.photo;
+    g0.position.set(this.arenaMorphA.x, this.arena.height(this.arenaMorphA.x, this.arenaMorphA.z) + 0.006, this.arenaMorphA.z);
+    g1.position.set(this.arenaMorphB.x, this.arena.height(this.arenaMorphB.x, this.arenaMorphB.z) + 0.006, this.arenaMorphB.z);
+    g0.rotation.y = g1.rotation.y = Math.PI / 2 - this.arenaMorphStart.angle;
+    g0.scale.set(1.25, 1, 1.35);
+    g1.scale.set(1.25, 1, 1.35);
+    return true;
   }
 
   /** Pinch near the floor and lift to raise a bump; press a fingertip into the floor to dent it. */
@@ -4404,7 +4608,165 @@ export class MatchSystem extends createSystem({
     }
   }
 
+  /** Arms the one-per-round rescue only when the real table outline is known. */
+  private beginOuterRing(): boolean {
+    if (this.outerRingUsed || this.demo || !ROOM.poly || this.mine.finish !== 'over') return false;
+    this.outerRingUsed = true;
+    this.outerRingState = 'rescue';
+    this.outerRingLeft = OUTER_RING_TIME;
+    this.outerRingSpin = this.mine.spin;
+    this.outerRailSide = null;
+    this.outerRailCount = 0;
+    this.outerRailLength = 0;
+    this.outerRailGeometry.setDrawRange(0, 0);
+    this.outerRail.visible = true;
+    this.outerRailHead.visible = false;
+    (this.outerRailMesh.material as MeshBasicMaterial).opacity = 0.86;
+    this.stamp.show('OUTER RING!', 'YOUR TABLE IS THE ARENA', 'mine', 0.9, 1.2);
+    this.label.set('TOP ON THE TABLE\nPINCH IT · DRAW TO THE RIM');
+    this.labelTimer = OUTER_RING_TIME;
+    this.accumulator = 0;
+    if (import.meta.env.DEV) console.log('[OUTER] rescue armed');
+    return true;
+  }
+
+  /** Writes one thick, molten ribbon segment without allocating in the frame loop. */
+  private appendOuterRail(x: number, z: number) {
+    if (this.outerRailCount >= OUTER_RAIL_POINTS) return;
+    const count = this.outerRailCount;
+    if (count > 0) {
+      const px = this.outerRailPath[(count - 1) * 2];
+      const pz = this.outerRailPath[(count - 1) * 2 + 1];
+      const dx = x - px;
+      const dz = z - pz;
+      const len = Math.hypot(dx, dz);
+      if (len < OUTER_RAIL_STEP) return;
+      this.outerRailLength += len;
+      const nx = (-dz / len) * OUTER_RAIL_WIDTH;
+      const nz = (dx / len) * OUTER_RAIL_WIDTH;
+      const y = -PEDESTAL / ARENA_SCALE + 0.0025;
+      const o = (count - 1) * 18;
+      const p = this.outerRailPositions;
+      // Two triangles, slightly above the physical table. The depth layer still lets real hands
+      // and the table edge cover it, so the rail reads as forged onto the room rather than UI.
+      p.set([
+        px - nx, y, pz - nz, px + nx, y, pz + nz, x + nx, y, z + nz,
+        px - nx, y, pz - nz, x + nx, y, z + nz, x - nx, y, z - nz,
+      ], o);
+      this.outerRailGeometry.setDrawRange(0, count * 6);
+      (this.outerRailGeometry.getAttribute('position') as Float32BufferAttribute).needsUpdate = true;
+    }
+    this.outerRailPath[count * 2] = x;
+    this.outerRailPath[count * 2 + 1] = z;
+    this.outerRailCount++;
+    this.outerRailHead.position.set(x, -PEDESTAL / ARENA_SCALE + 0.0032, z);
+    this.outerRailHead.visible = true;
+  }
+
+  /** Returns the caught top through the rail with less spin and more damage than before. */
+  private completeOuterRing() {
+    const a = Math.atan2(this.outerRingGoal.z, this.outerRingGoal.x);
+    const r = rimRadius(this.arena.layout, a) * 0.78;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    const speed = 0.3;
+    const me = this.mine;
+    me.x = c * r;
+    me.z = s * r;
+    me.vx = -c * speed - s * me.hand * 0.08;
+    me.vz = -s * speed + c * me.hand * 0.08;
+    me.spin = Math.max(0.24, Math.min(0.58, this.outerRingSpin * 0.62));
+    me.damage = Math.min(0.94, me.damage + 0.12);
+    me.wobble = Math.max(me.wobble, 0.2);
+    me.lifted = 0;
+    me.finish = null;
+    me.state = 'spinning';
+    this.outerRingState = 'returned';
+    this.outerRingLeft = 1.2;
+    this.outerRailSide = null;
+    this.outerRailHead.visible = false;
+    this.lastShape = { t: this.elapsed, kind: 'parry' };
+    this.sparks.burst(me.x, this.arena.height(me.x, me.z), me.z, 1);
+    this.impacts.shock(me.x, this.arena.height(me.x, me.z), me.z, 0.9, 0xff7a20);
+    this.stamp.show('FORGED RETURN!', 'BACK FROM YOUR TABLE', 'mine', 0.9, 1.2);
+    this.label.set('');
+    this.labelTimer = 0;
+    playDash(me.x);
+    if (import.meta.env.DEV) console.log('[OUTER] forged return');
+  }
+
+  /** Handles the rescue gesture. True means the normal arena simulation stays paused this frame. */
+  private updateOuterRing(dt: number): boolean {
+    if (this.outerRingState === 'returned') {
+      this.outerRingLeft -= dt;
+      (this.outerRailMesh.material as MeshBasicMaterial).opacity = 0.86 * Math.max(0, this.outerRingLeft / 1.2);
+      if (this.outerRingLeft <= 0) {
+        this.outerRingState = 'idle';
+        this.outerRail.visible = false;
+      }
+      return false;
+    }
+    if (this.outerRingState !== 'rescue' && this.outerRingState !== 'rail') return false;
+    this.outerRingLeft -= dt;
+    this.myView.brakeForRescue(dt);
+    const at = this.myView.rescueAt;
+    if (this.myView.offDesk || this.outerRingLeft <= 0 || (!at && this.myView.restingAt !== null)) {
+      this.outerRingState = 'failed';
+      this.outerRail.visible = false;
+      this.label.set('TABLE EDGE KO\nTHE REAL EDGE ENDS THE ROUND');
+      if (import.meta.env.DEV) console.log('[OUTER] rescue failed');
+      this.finish(-1);
+      return true;
+    }
+    // The top is still flying toward the table: keep the rescue clock visible, but wait for contact.
+    if (!at) return true;
+    this.stage.localToWorld(this.handAt.copy(at));
+    this.root.worldToLocal(this.outerRingAt.copy(this.handAt));
+    const angle = Math.atan2(this.outerRingAt.z, this.outerRingAt.x);
+    const rim = rimRadius(this.arena.layout, angle) * 0.9;
+    this.outerRingGoal.set(Math.cos(angle) * rim, -PEDESTAL / ARENA_SCALE + 0.003, Math.sin(angle) * rim);
+    if (this.outerRailSide === null) {
+      for (const side of ['left', 'right'] as const) {
+        const h = this.hands[side];
+        // Do not depend on one `justPinched` frame: a brief tracking loss or a slow IWER frame can
+        // swallow that edge while the fingers are visibly closed over the top.
+        if (!h.pinching) continue;
+        const catchDistance = h.pinch.distanceTo(this.handAt);
+        if (catchDistance > (import.meta.env.DEV ? 0.18 : 0.095)) {
+          if (import.meta.env.DEV) console.log(`[OUTER] ${side} catch missed by ${catchDistance.toFixed(3)} m`);
+          continue;
+        }
+        this.outerRailSide = side;
+        this.outerRingState = 'rail';
+        this.outerRailCount = 0;
+        this.outerRailLength = 0;
+        this.outerRailGeometry.setDrawRange(0, 0);
+        this.appendOuterRail(this.outerRingAt.x, this.outerRingAt.z);
+        playTick();
+        if (import.meta.env.DEV) console.log(`[OUTER] ${side} hand caught the top`);
+        break;
+      }
+      return true;
+    }
+    const h = this.hands[this.outerRailSide];
+    if (!h.tracked || !h.pinching) {
+      this.outerRailSide = null;
+      this.outerRingState = 'rescue';
+      this.outerRailCount = 0;
+      this.outerRailLength = 0;
+      this.outerRailHead.visible = false;
+      this.outerRailGeometry.setDrawRange(0, 0);
+      playLocked();
+      return true;
+    }
+    const l = this.root.worldToLocal(this.local.copy(h.pinch));
+    if (ROOM.poly && insidePoly(ROOM.poly, l.x, l.z)) this.appendOuterRail(l.x, l.z);
+    if (this.outerRailLength > 0.055 && normRadius(this.arena.layout, l.x, l.z) <= 0.94) this.completeOuterRing();
+    return true;
+  }
+
   private updateFight(dt: number) {
+    if (this.updateOuterRing(dt)) return;
     // Hit stop: the simulation alone pauses for a moment after a hard hit; head tracking and
     // rendering never do.
     if (this.hitStop > 0) {
@@ -4550,6 +4912,7 @@ export class MatchSystem extends createSystem({
         playDash(t.x);
         this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.8);
       }
+      if (this.mine.state === 'out' && this.mine.finish === 'over' && this.beginOuterRing()) return;
       const v = verdict(this.mine, this.theirs, this.elapsed);
       if (v !== 0) {
         for (const t of this.tops) if (t.finish === 'burst') this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
@@ -4897,9 +5260,19 @@ export class MatchSystem extends createSystem({
   /** A small dot where the pointing hand's ray (or, in dev, the gaze) meets the floor. */
   private updateReticle() {
     const h = this.hands.right.hasRay ? this.hands.right : this.hands.left;
-    const hit = this.rayFloor(h) ? this.rayHit : this.gazeHit;
-    this.reticle.visible = hit.ok;
-    if (hit.ok) this.reticle.position.set(hit.x, this.arena.height(hit.x, hit.z) + 0.002, hit.z);
+    const handHit = this.rayFloor(h);
+    const gazeHit = !handHit && this.gazePointer.tracked && this.gazeHit.ok;
+    const hit = handHit ? this.rayHit : this.gazeHit;
+    const arenaPhase = this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight';
+    this.reticle.visible = arenaPhase && (handHit || gazeHit);
+    if (!this.reticle.visible) return;
+    this.reticle.position.set(hit.x, this.arena.height(hit.x, hit.z) + 0.002, hit.z);
+    const gazePinch = gazeHit && this.gazePointer.pinching;
+    this.reticle.scale.setScalar(gazePinch ? 1.65 : 1 + Math.sin(this.time * 5) * 0.12);
+    const material = this.reticle.material as MeshBasicMaterial;
+    material.color.setHex(gazePinch ? 0xffa23f : gazeHit ? 0x66e4ff : 0xffb45a);
+    material.opacity = gazePinch ? 1 : 0.82;
+    if (gazeHit) this.gazeAssist.target = this.phase === 'ready' || this.phase === 'pulling' ? 'launch point' : 'forge terrain';
   }
 
   /**

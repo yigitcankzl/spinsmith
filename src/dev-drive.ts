@@ -82,6 +82,14 @@ interface Game {
   palmBraceActive?: boolean;
   bracedLaunch?: boolean;
   palmForgeActive?: boolean;
+  /** Competition-feature state exposed for repeatable emulator proof. */
+  outerRingState?: 'idle' | 'rescue' | 'rail' | 'returned' | 'failed';
+  outerRingLeft?: number;
+  outerRingAt?: Vector3;
+  outerRingGoal?: Vector3;
+  anchorState?: 'unsupported' | 'restoring' | 'anchored';
+  arenaMorph?: { scaleX: number; scaleZ: number; tilt: number };
+  gazeAssist?: { active: boolean; target: string };
   overforgeSeal: { visible: boolean; getWorldPosition(v: Vector3): Vector3 };
   rivalLaunchPower: number;
   rivalLaunchAim: number;
@@ -345,6 +353,15 @@ export function installDriver() {
         palmBrace: !!g.palmBraceActive,
         bracedLaunch: !!g.bracedLaunch,
         palmForge: !!g.palmForgeActive,
+        outerRing: {
+          state: g.outerRingState ?? 'idle',
+          left: +(g.outerRingLeft ?? 0).toFixed(2),
+          at: g.outerRingAt?.toArray().map((n) => +n.toFixed(3)) ?? null,
+          goal: g.outerRingGoal?.toArray().map((n) => +n.toFixed(3)) ?? null,
+        },
+        anchor: g.anchorState ?? 'unsupported',
+        morph: g.arenaMorph ? { scaleX: +g.arenaMorph.scaleX.toFixed(3), scaleZ: +g.arenaMorph.scaleZ.toFixed(3), tilt: +g.arenaMorph.tilt.toFixed(3) } : null,
+        gazeAssist: g.gazeAssist ? { ...g.gazeAssist } : null,
         bar: +g.forgeBar.value.toFixed(2),
         arenaRadius: g.arena.radius,
         mine: top(g.mine),
@@ -518,6 +535,29 @@ export function installDriver() {
       await setPinch(side, false);
       await glide(side, 'pinch', above(end, 0.08), 0.2, 0);
       await park(side);
+    },
+
+    /** Competition hero move: throw your top onto the desk, catch it, and draw a return rail. */
+    async outerRingReturn(side: Side = 'right') {
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('Outer Ring requires a fight');
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyO', shiftKey: true }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyO', shiftKey: true }));
+      for (let i = 0; i < 260 && (g.outerRingState !== 'rescue' || !g.outerRingGoal || g.outerRingGoal.lengthSq() < 1e-6); i++) await wait(0.016);
+      if (g.outerRingState !== 'rescue' || !g.outerRingAt || !g.outerRingGoal) throw new Error(`Outer Ring did not arm (${g.outerRingState ?? 'unknown'})`);
+      const start = g.root.localToWorld(g.outerRingAt.clone());
+      const goal = g.root.localToWorld(g.outerRingGoal.clone());
+      await glide(side, 'pinch', above(start, 0.05), 0.22, 0);
+      // Follow the slowly drifting desk top until the fingers close; a frozen target makes the
+      // capture miss at low emulator frame rates even though the recorded hand looks on target.
+      await glide(side, 'pinch', () => g.root.localToWorld(g.outerRingAt!.clone()), 0.18, 0);
+      await setPinch(side, true);
+      await glide(side, 'pinch', goal, 0.65, pinchNow[side], 'linear');
+      for (let i = 0; i < 80 && String(g.outerRingState) !== 'returned'; i++) await wait(0.016);
+      await setPinch(side, false);
+      await glide(side, 'pinch', above(goal, 0.08), 0.2, 0);
+      await park(side);
+      if (String(g.outerRingState) !== 'returned' && String(g.outerRingState) !== 'idle') throw new Error(`Outer Ring ended ${g.outerRingState ?? 'unknown'}`);
     },
 
     /** A cup: a fingertip pressed down into the floor (fast enough to count), then lifted. at: 'rival' | 'mine' | {x, z}. */
