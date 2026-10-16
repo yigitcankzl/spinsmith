@@ -537,6 +537,41 @@ export function installDriver() {
       await park(side);
     },
 
+    /** Grab opposite rim sectors together, squeeze/twist/tilt the bowl, then release its impulse. */
+    async arenaForge(opts: { squeeze?: number; twist?: number; tilt?: number; hold?: number } = {}) {
+      const { squeeze = 0.026, twist = 10, tilt = 0.025, hold = 0.35 } = opts;
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('Arena Forge only exists during a fight');
+      const r = g.arena.radius * 0.94;
+      const turn = (twist * Math.PI) / 180;
+      const startLeft = local(-r, 0, 0.004);
+      const startRight = local(r, 0, 0.004);
+      await Promise.all([
+        glide('left', 'pinch', above(startLeft, 0.06), 0.3, 0),
+        glide('right', 'pinch', above(startRight, 0.06), 0.3, 0),
+      ]);
+      await Promise.all([
+        glide('left', 'pinch', startLeft, 0.16, 0),
+        glide('right', 'pinch', startRight, 0.16, 0),
+      ]);
+      await Promise.all([setPinch('left', true), setPinch('right', true)]);
+      await wait(0.12);
+      const targetR = Math.max(r * 0.72, r - squeeze);
+      const targetLeft = local(-Math.cos(turn) * targetR, -Math.sin(turn) * targetR, 0.004 - tilt * 0.5);
+      const targetRight = local(Math.cos(turn) * targetR, Math.sin(turn) * targetR, 0.004 + tilt * 0.5);
+      await Promise.all([
+        glide('left', 'pinch', targetLeft, 0.42, 1, 'natural'),
+        glide('right', 'pinch', targetRight, 0.42, 1, 'natural'),
+      ]);
+      await wait(hold);
+      await Promise.all([setPinch('left', false), setPinch('right', false)]);
+      await Promise.all([
+        glide('left', 'pinch', above(targetLeft, 0.09), 0.2, 0),
+        glide('right', 'pinch', above(targetRight, 0.09), 0.2, 0),
+      ]);
+      await Promise.all([park('left'), park('right')]);
+    },
+
     /** Competition hero move: throw your top onto the desk, catch it, and draw a return rail. */
     async outerRingReturn(side: Side = 'right') {
       const g = game();

@@ -1,6 +1,6 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
-// Other modes: dual-rip, rim-spring, palm-forge, outer-ring.
+// Other modes: dual-rip, rim-spring, palm-forge, outer-ring, arena-morph.
 export default async function run({ page, frame }) {
   let target = null;
   for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
@@ -21,11 +21,12 @@ export default async function run({ page, frame }) {
       window.__game.openForge();
       await sleep(500);
     }
-    if (check === 'outer-ring' && drive.state().phase === 'hub') {
+    if ((check === 'outer-ring' || check === 'arena-morph') && drive.state().phase === 'hub') {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
       for (let i = 0; i < 120 && drive.state().phase !== 'fight'; i++) await sleep(25);
+      if (check === 'arena-morph') await drive.fightAt(2.7);
     }
     const before = drive.state();
     let finished = false;
@@ -57,6 +58,10 @@ export default async function run({ page, frame }) {
       if (before.phase !== 'fight') throw new Error('outer-ring check requires a fight');
       stateKey = 'outerRing';
       action = drive.outerRingReturn('right');
+    } else if (check === 'arena-morph') {
+      if (before.phase !== 'fight') throw new Error('arena-morph check requires a fight');
+      stateKey = 'morph';
+      action = drive.arenaForge({ squeeze: 0.028, twist: 12, tilt: 0.03, hold: 0.45 });
     } else {
       throw new Error(`unknown HAND_CHECK ${check}`);
     }
@@ -70,6 +75,7 @@ export default async function run({ page, frame }) {
     for (let sample = 0; sample < 700 && !finished; sample++) {
       const current = drive.state();
       if (stateKey === 'outerRing') sawTransient ||= current.outerRing?.state === 'rail' || current.outerRing?.state === 'returned';
+      else if (stateKey === 'morph') sawTransient ||= !!current.morph && (Math.abs(current.morph.scaleX - 1) > 0.015 || Math.abs(current.morph.scaleZ - 1) > 0.015 || Math.abs(current.morph.tilt) > 0.01);
       else if (stateKey && current[stateKey]) sawTransient = true;
       peakCharges = Math.min(peakCharges, current.charges);
       await sleep(16);
