@@ -12,6 +12,7 @@ import { unlockAudio } from './game/audio.js';
 // level-8 smith. The flag is then dropped from the address, so a reload keeps the progress made.
 const params = new URLSearchParams(location.search);
 const preparedDemo = params.has('demo');
+const diagnosticsMode = params.has('diagnostics');
 // ?vs=CODE: the next match is against a friend's top (src/game/challenge.ts).
 if (params.has('vs')) {
   sessionStorage.setItem('spinsmith.vs', params.get('vs') ?? '');
@@ -58,6 +59,8 @@ loadFonts()
     const landing = document.getElementById('landing');
     const enter = document.getElementById('enter') as HTMLButtonElement | null;
     const launchStatus = document.getElementById('launch-status');
+    const diagnostics = document.getElementById('diagnostics');
+    const copyDiagnostics = document.getElementById('copy-diagnostics') as HTMLButtonElement | null;
     let reloadRequired = false;
 
     const showLaunchStatus = (message: string, error = false) => {
@@ -102,6 +105,26 @@ loadFonts()
       enter.textContent = preparedDemo ? 'ENTER SHOWCASE' : 'ENTER';
     }
     enter?.addEventListener('click', () => void launchXR());
+    if (diagnosticsMode && diagnostics && copyDiagnostics) {
+      diagnostics.classList.add('visible');
+      copyDiagnostics.classList.add('visible');
+      const refreshDiagnostics = async () => {
+        const report = (window as unknown as { spinsmithDiagnostics?: () => Record<string, string | number | boolean> }).spinsmithDiagnostics?.();
+        const text = report ? JSON.stringify({ capturedAt: new Date().toISOString(), ...report }, null, 2) : 'Enter XR once; the report will appear after the game starts.';
+        diagnostics.textContent = text;
+        if (!report) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          copyDiagnostics.textContent = 'REPORT COPIED';
+        } catch {
+          copyDiagnostics.textContent = 'REPORT SHOWN BELOW';
+        }
+      };
+      copyDiagnostics.addEventListener('click', () => void refreshDiagnostics());
+      world.visibilityState.subscribe((v) => {
+        if (v === VisibilityState.NonImmersive) void refreshDiagnostics();
+      });
+    }
     world.visibilityState.subscribe((v) => landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive));
     // Installed from the store (a standalone PWA): straight into the game, no 2D page (Meta's PWA
     // rule; opening the app's icon counts as the user's gesture). In a browser tab, ENTER as usual.

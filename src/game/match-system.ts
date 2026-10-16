@@ -39,6 +39,7 @@ import { TUNE } from './tuning.js';
 import type { Placement, Point } from './placement.js';
 import { applySpatialPose, loadSpatialPose, saveSpatialPose } from './spatial-state.js';
 import { RoomImprints } from './room-imprints.js';
+import { FirstFiveState } from '../components.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
@@ -226,6 +227,13 @@ export class MatchSystem extends createSystem({
   private hands = new HandInput();
   private root = new Group();
   private rootEntity?: Entity;
+  /** Session-only judge/tester evidence: placement → match → rip → intervention → result → forge. */
+  private firstFiveStep = 0;
+  private interventionCount = 0;
+  private failedGestures = 0;
+  private lowestFps = 0;
+  private fpsWindowTime = 0;
+  private fpsWindowFrames = 0;
   private arena = new Arena();
   private arenaView = new ArenaView(PEDESTAL / ARENA_SCALE);
   /** Everything that tilts with a rocking dish: the arena and what is on it. */
@@ -294,8 +302,10 @@ export class MatchSystem extends createSystem({
   private rival: Rival = RIVALS[0];
   /** Points the match bar shows (kept after a match is decided), XP just earned, the last rip. */
   private barPoints: [number, number] = [0, 0];
-  /** First-match lesson: one new arena verb per round (ramp, cup/sling, ultimate). */
+  /** First-match lesson: one new arena verb per round (ramp, two-hand forge, ultimate). */
   private tutorialRound = 0;
+  /** The signature two-hand arena move has happened at least once this session. */
+  private morphedOnce = false;
   private xpGained = 0;
   private lastPerfect = false;
   /** Today's Smith Order, whether this match plays it, and what the order needs to know. */
@@ -619,6 +629,8 @@ export class MatchSystem extends createSystem({
   private anchorState: 'unsupported' | 'restoring' | 'anchored' = 'restoring';
   private arenaMorph = { scaleX: 1, scaleZ: 1, tilt: 0 };
   private arenaMorphing = false;
+  /** Holds the visible deformation for one readable beat after release. */
+  private arenaMorphHold = 0;
   private arenaMorphStart = { distance: 1, angle: 0 };
   private arenaMorphPull = 0;
   private arenaMorphTwist = 0;
@@ -915,6 +927,18 @@ export class MatchSystem extends createSystem({
     this.setArena(this.arenas[this.arenaIndex]);
     this.rootEntity = this.world.createTransformEntity(this.root);
     this.rootEntity.addComponent(XRAnchor);
+    this.rootEntity.addComponent(FirstFiveState);
+    (window as unknown as { spinsmithDiagnostics?: () => Record<string, string | number | boolean> }).spinsmithDiagnostics = () => ({
+      device: 'IWER_DEVICE' in window ? 'IWER emulator' : 'physical XR device',
+      phase: this.phase,
+      guide: this.progress.guide,
+      firstFiveStep: this.firstFiveStep,
+      interventions: this.interventionCount,
+      failedGestures: this.failedGestures,
+      lowestFps: Math.round(this.lowestFps),
+      liteMode: this.lite,
+      matches: this.progress.matches,
+    });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
     this.stageEntity = this.world.createTransformEntity(this.stage, this.rootEntity);
@@ -1125,6 +1149,7 @@ export class MatchSystem extends createSystem({
       this.hub.photo();
     }
     this.guardFrameRate(delta);
+    this.updateFirstFiveFps(delta);
     this.stamp.update(Math.min(delta, 0.1));
     this.updateCountdown(Math.min(delta, 0.1));
     this.updatePrints(Math.min(delta, 0.1));
@@ -1588,6 +1613,7 @@ export class MatchSystem extends createSystem({
   /** Home: the arena waits with both tops; Play, Workshop, or switch arena. Pinching never launches here. */
   private toHub() {
     this.phase = 'hub';
+    this.markFirstFive(1);
     this.matchOver = false;
     this.prepareNext();
     this.arena.reset(this.arenas[this.arenaIndex]);
@@ -1721,6 +1747,7 @@ export class MatchSystem extends createSystem({
 
   private openForge() {
     this.phase = 'forge';
+    this.markFirstFive(6);
     this.label.set('');
     for (const top of this.tops) top.state = 'out';
     // The forge is the arena transformed: the floor sinks, the anvil and the drawers rise.
@@ -1754,7 +1781,10 @@ export class MatchSystem extends createSystem({
     this.quenching = null;
     this.forge.close();
     this.stage.position.y = 0;
-    if (build) this.myBuild = { ...build };
+    if (build) {
+      this.myBuild = { ...build };
+      this.markFirstFive(7);
+    }
     if (build) this.progress.advance('rematch');
     this.toHub();
     // A quenched top is a moment: steam off the rim, and its name.
@@ -2904,6 +2934,7 @@ export class MatchSystem extends createSystem({
     this.readySince = this.time;
     this.matchOver = false;
     this.phase = 'ready';
+    this.markFirstFive(2);
     this.outerRingState = 'idle';
     this.outerRingUsed = false;
     this.outerRingLeft = 0;
@@ -2914,6 +2945,7 @@ export class MatchSystem extends createSystem({
     this.outerRailHead.visible = false;
     this.outerRailGeometry.setDrawRange(0, 0);
     this.arenaMorphing = false;
+    this.arenaMorphHold = 0;
     this.arenaMorph.scaleX = this.arenaMorph.scaleZ = 1;
     this.arenaMorph.tilt = 0;
     this.arenaMorphPull = this.arenaMorphTwist = 0;
@@ -3244,11 +3276,40 @@ export class MatchSystem extends createSystem({
 
   /** Why a gesture did nothing, on the card for 2 s; the active lesson resumes afterwards. */
   private failSay(text: string) {
+    this.failedGestures++;
+    this.rootEntity?.setValue(FirstFiveState, 'failedGestures', this.failedGestures);
     // During normal play, preserve the first-round rival intro. During the first lesson the failed
     // rip is more important: silence makes the top resetting look broken to a new player.
     if (this.demo || (this.progress.guide === 'done' && this.myPoints + this.theirPoints === 0)) return;
     this.label.set(text);
     this.labelTimer = 2;
+  }
+
+  /** Advances coarse first-session evidence without ever moving it backwards. */
+  private markFirstFive(step: number) {
+    if (step <= this.firstFiveStep) return;
+    this.firstFiveStep = step;
+    this.rootEntity?.setValue(FirstFiveState, 'step', step);
+  }
+
+  /** Counts a player-authored arena change and marks the signature loop as reached. */
+  private recordIntervention() {
+    this.interventionCount++;
+    this.rootEntity?.setValue(FirstFiveState, 'interventions', this.interventionCount);
+    this.markFirstFive(4);
+  }
+
+  /** One-second samples are stable enough for a remote headset tester to report honestly. */
+  private updateFirstFiveFps(dt: number) {
+    if (dt <= 0 || dt > 0.25) return;
+    this.fpsWindowTime += dt;
+    this.fpsWindowFrames++;
+    if (this.fpsWindowTime < 1) return;
+    const fps = this.fpsWindowFrames / this.fpsWindowTime;
+    this.lowestFps = this.lowestFps === 0 ? fps : Math.min(this.lowestFps, fps);
+    this.rootEntity?.setValue(FirstFiveState, 'lowestFps', this.lowestFps);
+    this.fpsWindowTime = 0;
+    this.fpsWindowFrames = 0;
   }
 
   /** While ripping: the top spins up, the cord heats from white to orange, a glow ring grows under it. */
@@ -3427,6 +3488,7 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, launchSpin(aiPower), th);
     playTouchdown(rx, rz, 0.6 + 0.4 * aiPower);
     this.phase = 'fight';
+    this.markFirstFive(3);
     this.elapsed = 0;
     this.lastHardHit = -1;
     this.accumulator = 0;
@@ -3454,6 +3516,10 @@ export class MatchSystem extends createSystem({
     const left = this.hands.left;
     const right = this.hands.right;
     if (!this.arenaMorphing) {
+      if (this.arenaMorphHold > 0) {
+        this.arenaMorphHold = Math.max(0, this.arenaMorphHold - dt);
+        return false;
+      }
       const ease = 1 - Math.exp(-dt * 8);
       this.arenaMorph.scaleX += (1 - this.arenaMorph.scaleX) * ease;
       this.arenaMorph.scaleZ += (1 - this.arenaMorph.scaleZ) * ease;
@@ -3498,12 +3564,17 @@ export class MatchSystem extends createSystem({
         top.vz += axisZ * radial * this.arenaMorphPull * 0.7 + top.x * this.arenaMorphTwist * 1.8;
       }
       this.lastShape = { t: this.elapsed, kind: 'parry' };
+      this.morphedOnce = true;
+      this.arenaMorphHold = 0.7;
+      this.recordIntervention();
       const action = Math.abs(this.arenaMorphTwist) > 0.12
         ? 'TWIST RELEASE'
         : Math.abs(this.arenaMorph.tilt) > 0.025
           ? 'ARENA TILTED'
           : this.arenaMorphPull < -0.025 ? 'SQUEEZED' : 'STRETCHED';
       this.stamp.show('ARENA FORGED!', action, 'mine', 0.8);
+      this.label.set('YOUR HANDS CHANGED THE FIGHT');
+      this.labelTimer = 1.4;
       this.sparks.burst(0, this.arena.height(0, 0), 0, 0.9);
       this.impacts.shock(0, this.arena.height(0, 0), 0, 0.75);
       playThock();
@@ -3702,6 +3773,7 @@ export class MatchSystem extends createSystem({
       playLocked();
       return;
     }
+    this.recordIntervention();
     if (!this.cuppedOnce && this.label.current.startsWith('New: pinch')) this.label.set('');
     this.cuppedOnce = true;
     const hits = springRim(this.arena, this.tops, sx, sz, x, z, f);
@@ -3715,11 +3787,12 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) console.log(`[RIM] spring at ${sx.toFixed(3)},${sz.toFixed(3)} pull ${pull.toFixed(3)} hits ${hits}`);
   }
 
-  /** The first fight teaches one arena verb per round: ramp, cup/sling, then ultimate. */
+  /** The first fight teaches ramp, the signature two-hand arena forge, then an ultimate. */
   private taught(verb: 'strike' | 'cup' | 'tells') {
     const m = this.progress.matches;
     if (verb === 'strike') return m >= 1 || (m === 0 && this.tutorialRound >= 3);
-    if (verb === 'cup') return m >= 2 || (m === 0 && this.tutorialRound >= 2);
+    // Cup/sling arrives on the first rematch; the opening match keeps one clear hero verb per round.
+    if (verb === 'cup') return m >= 1;
     return m >= 3;
   }
 
@@ -4280,6 +4353,7 @@ export class MatchSystem extends createSystem({
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
   private doStrike(ox = 0, oz = 0) {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
+    this.recordIntervention();
     this.overforgeSeal.visible = false;
     const seal = this.myBuild.seal ?? 'anvil';
     this.beginUltimateCue(seal, ox, oz);
@@ -4439,6 +4513,7 @@ export class MatchSystem extends createSystem({
       }
     }
     this.arena.sling(sl.cup, Math.cos(a), Math.sin(a));
+    this.recordIntervention();
     if (!this.slungOnce) this.label.set('');
     this.slungOnce = true;
     this.lastShape = { t: this.elapsed, kind: 'sling' };
@@ -4458,6 +4533,7 @@ export class MatchSystem extends createSystem({
       return null;
     }
     const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz, sigma);
+    this.recordIntervention();
     this.lastShape = { t: this.elapsed, kind };
     this.progress.advance('match');
     this.impacts.shock(x, this.arena.height(x, z), z, 0.45, 0xff8a2a);
@@ -4685,6 +4761,7 @@ export class MatchSystem extends createSystem({
     me.finish = null;
     me.state = 'spinning';
     this.outerRingState = 'returned';
+    this.recordIntervention();
     this.outerRingLeft = 1.2;
     this.outerRailSide = null;
     this.outerRailHead.visible = false;
@@ -4989,6 +5066,7 @@ export class MatchSystem extends createSystem({
         this.myPoints = 0;
         this.theirPoints = 0;
         this.matchOver = true;
+        this.markFirstFive(5);
       } else {
         // A spin finish says why (the most common finish otherwise reads as luck).
         const why = loser.finish === 'spin' ? this.outlastReason(v === 1) : '';
@@ -5123,7 +5201,21 @@ export class MatchSystem extends createSystem({
       const fy = this.arena.height(x, z);
       this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.05, fy + 0.006, z + oz * 0.05, 1], [1.35, x + ox * 0.05, fy + 0.03, z + oz * 0.05, 0], [2.2, x + ox * 0.05, fy + 0.05, z + oz * 0.05, 0]], this.frameDt);
       ghost = true;
-    } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.taught('cup') && ((g === 'match' && this.progress.matches === 0) || this.progress.matches === 2) && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
+    } else if (this.phase === 'fight' && !this.demo && this.progress.matches === 0 && this.tutorialRound >= 2 && !this.morphedOnce && this.elapsed > TUNING.grace && this.labelTimer <= 0) {
+      this.label.set('PINCH BOTH GLOWING RIMS\nSQUEEZE · TILT · TWIST · RELEASE');
+      const radius = maxRim(this.arena.layout) * 0.92;
+      const pulse = 1.15 + 0.15 * Math.sin(this.time * 6);
+      for (let i = 0; i < this.rimSpringGuides.length; i++) {
+        const side = (i === 0 ? 'left' : 'right') as Side;
+        if (this.rimPulls[side]) continue;
+        const guide = this.rimSpringGuides[i];
+        const x = i === 0 ? -radius : radius;
+        guide.visible = !this.photo;
+        guide.position.set(x, this.arena.height(x, 0) + 0.005, 0);
+        guide.rotation.y = i === 0 ? Math.PI : 0;
+        guide.scale.set(pulse, 1, pulse);
+      }
+    } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.taught('cup') && this.progress.matches === 1 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set(this.rimExperiment
         ? 'New: pinch the glowing rim, pull it inward, release\nits spring can save a top near that edge'
         : 'JAB THE FLOOR → CUP\nCATCH A TOP, THEN SLING');

@@ -50,6 +50,10 @@
       #enter:disabled { background: #3a3f48; color: #aab0ba; cursor: wait; letter-spacing: 2px; font-size: 22px; }
       #launch-status { min-height: 24px; max-width: 620px; font-size: 17px !important; color: #9eabbc !important; }
       #launch-status.error { color: #ffb078 !important; }
+      #diagnostics { display: none; width: min(620px, 92vw); padding: 12px 16px; border: 1px solid #4a5566; border-radius: 6px; background: #101217; color: #c9d3e0; text-align: left; white-space: pre-wrap; font: 600 15px/1.45 Rajdhani, monospace; }
+      #diagnostics.visible { display: block; }
+      #copy-diagnostics { display: none; padding: 9px 18px; border: 1px solid #687587; border-radius: 6px; background: #23272e; color: #eef3fa; font: 700 16px Rajdhani, sans-serif; letter-spacing: 1px; cursor: pointer; }
+      #copy-diagnostics.visible { display: inline-block; }
       @media (max-height: 720px) {
         #landing { justify-content: flex-start; gap: 14px; padding-top: 18px; }
         #landing img { width: 72px; height: 72px; border-radius: 14px; }
@@ -77,8 +81,10 @@
       <ol class="how">
         <li>Pinch your top in its dock and drop it in the arena.</li>
         <li>Pinch near it, pull back and let go to rip it.</li>
-        <li>Pinch the floor by the rival: a ramp throws it. Each match teaches one more move.</li>
+        <li>Shape the floor, or pinch opposite rims with both hands to squeeze, tilt and twist the live arena.</li>
       </ol>
+      <button id="copy-diagnostics" type="button">COPY QUEST TEST REPORT</button>
+      <pre id="diagnostics" aria-live="polite"></pre>
       <p class="foot">Showcase prepares every unlocked part, rival and arena; normal Enter keeps your own progress. · <a href="./privacy.html">Privacy</a> · Font: Rajdhani (SIL OFL)</p>
     </div>
     <div id="scene-container"></div>

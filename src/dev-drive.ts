@@ -120,7 +120,7 @@ const PEDESTAL = 0.08;
 const ARENA_SCALE = 2.4;
 
 export function installDriver() {
-  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand> }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown };
+  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand> }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
   const goals: Record<Side, Goal | null> = { left: null, right: null };
   /** Where each held hand's steered point should be now. */
   const aim: Record<Side, { point: Point; at: Vector3 } | null> = { left: null, right: null };
@@ -322,6 +322,7 @@ export function installDriver() {
       if (g.menuButton.mesh.visible) targets.menu = g.menuButton.mesh.getWorldPosition(new Vector3()).toArray().map((n) => +n.toFixed(3));
       if (g.rematchButton.mesh.visible) targets.rematch = g.rematchButton.mesh.getWorldPosition(new Vector3()).toArray().map((n) => +n.toFixed(3));
       return {
+        diagnostics: w.spinsmithDiagnostics?.() ?? null,
         phase: g.phase,
         label: g.label.current,
         level: g.progress.level,
