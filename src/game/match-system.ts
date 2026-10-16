@@ -40,6 +40,8 @@ import type { Placement, Point } from './placement.js';
 import { applySpatialPose, loadSpatialPose, saveSpatialPose } from './spatial-state.js';
 import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
+import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from './arena-forge.js';
+import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
@@ -134,7 +136,6 @@ const SLOW_MO_TIME = 0.9;
 const RISE_TIME = 1.1;
 /** Early lesson rounds stay alive long enough for the newly unlocked hand move. */
 const LESSON_GRACE = 6;
-type ArenaForgeAction = 'squeeze' | 'stretch' | 'twist' | 'tilt';
 const ARENA_FORGE_CODE: Record<ArenaForgeAction, number> = { squeeze: 1, stretch: 2, twist: 3, tilt: 4 };
 const ARENA_FORGE_TITLE: Record<ArenaForgeAction, string> = {
   squeeze: 'SQUEEZE!',
@@ -245,6 +246,7 @@ export class MatchSystem extends createSystem({
   private firstFiveStep = 0;
   private interventionCount = 0;
   private failedGestures = 0;
+  private arenaForgeCancels = 0;
   private arenaForgeAction: ArenaForgeAction | 'none' = 'none';
   private arenaForgeSwing = 0;
   private lowestFps = 0;
@@ -400,6 +402,8 @@ export class MatchSystem extends createSystem({
   private sparks = new Sparks();
   /** The ghost hand that shows the first moves. */
   private ghost = new GhostHand();
+  /** A second orange guide exists only for the first two-hand arena-forge lesson. */
+  private forgeGhost = new GhostHand();
   /** The rival's cyan projection: it authors the telegraphed launch and arena moves. */
   private rivalGhost = new GhostHand(0x9cecff, 0x4fd1ff);
   private rivalGhostKeys: number[][] = [[0, 0, 0, 0, 0], [1, 0, 0, 0, 0]];
@@ -679,7 +683,7 @@ export class MatchSystem extends createSystem({
   private marks = new ShapeMarks(0xff8a2a, 10);
   private pips = new ChargePips(SHAPING.charges);
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
-  private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' } | null = null;
+  private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' | ArenaForgeAction } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
   private parried = false;
@@ -840,6 +844,7 @@ export class MatchSystem extends createSystem({
     this.stage.add(
       this.chargeRing,
       this.ghost.root,
+      this.forgeGhost.root,
       this.rivalGhost.root,
       this.portal,
       this.portalCore,
@@ -951,6 +956,7 @@ export class MatchSystem extends createSystem({
       firstFiveStep: this.firstFiveStep,
       interventions: this.interventionCount,
       failedGestures: this.failedGestures,
+      arenaForgeCancels: this.arenaForgeCancels,
       arenaForgeAction: this.arenaForgeAction,
       arenaForgeSwing: Math.round(this.arenaForgeSwing * 100) / 100,
       lowestFps: Math.round(this.lowestFps),
@@ -3325,6 +3331,20 @@ export class MatchSystem extends createSystem({
     this.rootEntity?.setValue(FirstFiveState, 'arenaForgeSwing', swing);
   }
 
+  /** A released or lost two-hand grab below the intent threshold changes neither combat nor economy. */
+  private cancelArenaForge(message: string) {
+    this.arenaForgeCancels++;
+    this.arenaForgeAction = 'none';
+    this.arenaForgeSwing = 0;
+    this.rootEntity?.setValue(FirstFiveState, 'arenaForgeCancels', this.arenaForgeCancels);
+    this.rootEntity?.setValue(FirstFiveState, 'lastArenaForge', 0);
+    this.rootEntity?.setValue(FirstFiveState, 'arenaForgeSwing', 0);
+    this.arenaMorphHold = 0;
+    this.label.set(message);
+    this.labelTimer = 1.35;
+    if (import.meta.env.DEV) console.log(`[MORPH] cancelled: ${message.replace('\n', ' ')}`);
+  }
+
   /** One-second samples are stable enough for a remote headset tester to report honestly. */
   private updateFirstFiveFps(dt: number) {
     if (dt <= 0 || dt > 0.25) return;
@@ -3502,7 +3522,11 @@ export class MatchSystem extends createSystem({
     // Difficulty is launch quality: the rival rips harder and aims steadier as you level up.
     // The very first match is steadier, so its lesson (the ramp) is not lost to a wild rip.
     // The first three matches each teach one hand move; none should end before it can be tried.
-    this.arena.grace = !this.demo && this.progress.matches < 3 ? LESSON_GRACE : TUNING.grace;
+    // The second round is the two-hand lesson. Its longer opening keeps the tops in view while the
+    // mirrored hands demonstrate Squeeze; the third still leaves room to charge the ultimate.
+    this.arena.grace = !this.demo && this.progress.matches === 0 && this.tutorialRound === 2
+      ? 10
+      : !this.demo && this.progress.matches < 3 ? LESSON_GRACE : TUNING.grace;
     const aiPower = this.rivalLaunchPower;
     this.rivalHeld = 0;
     const aiAim = this.rivalLaunchAim;
@@ -3554,12 +3578,12 @@ export class MatchSystem extends createSystem({
 
       const a = this.rimPulls.left;
       const b = this.rimPulls.right;
-      if (!a || !b || !left.pinching || !right.pinching) return false;
+      if (!a || !b || !left.tracked || !right.tracked || !left.pinching || !right.pinching) return false;
       const ar = Math.hypot(a.sx, a.sz) || 1;
       const br = Math.hypot(b.sx, b.sz) || 1;
       if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > -0.55) return false;
-      const force = this.charges.spend(this.elapsed, TUNING.grace);
-      if (!force) {
+      // Starting the grab is free. The charge is committed only after a deliberate release.
+      if (this.charges.charges < 1) {
         playLocked();
         return false;
       }
@@ -3573,54 +3597,38 @@ export class MatchSystem extends createSystem({
       this.arenaMorphPull = this.arenaMorphTwist = 0;
       this.arenaMorphing = true;
       this.arenaView.charge = 1;
-      this.stamp.show('TWO-HAND FORGE', 'SQUEEZE · TILT · TWIST', 'mine', 0.7);
+      const firstLesson = !this.demo && this.progress.matches === 0 && this.tutorialRound === 2;
+      this.stamp.show('TWO-HAND FORGE', firstLesson ? 'SQUEEZE THE RIMS' : 'SQUEEZE · STRETCH · TILT · TWIST', 'mine', 0.7);
       playTick();
     }
 
     if (!left.tracked || !right.tracked || !left.pinching || !right.pinching) {
+      const trackingLost = !left.tracked || !right.tracked;
       this.arenaMorphing = false;
       this.rimPulls.left = this.rimPulls.right = null;
       this.rimSpringGuides[0].visible = false;
       this.rimSpringGuides[1].visible = false;
 
-      const pullScore = Math.abs(this.arenaMorphPull) / 0.045;
-      const twistScore = Math.abs(this.arenaMorphTwist) / 0.12;
-      const tiltScore = Math.abs(this.arenaMorph.tilt) / 0.025;
-      const action: ArenaForgeAction = tiltScore > twistScore && tiltScore > pullScore
-        ? 'tilt'
-        : twistScore > pullScore
-          ? 'twist'
-          : this.arenaMorphPull < 0 ? 'squeeze' : 'stretch';
-      const danger = (top: Top) => {
-        const r = Math.hypot(top.x, top.z) || 1e-3;
-        const outward = (top.vx * top.x + top.vz * top.z) / r;
-        return r / Math.max(0.01, this.arena.radius) + Math.max(0, outward) * 0.8;
-      };
-      const before = danger(this.theirs) - danger(this.mine);
-      const direction = this.arenaMorphTwist >= 0 ? 1 : -1;
-      const impulse = action === 'twist'
-        ? Math.min(0.32, 0.12 + Math.abs(this.arenaMorphTwist) * 0.58)
-        : action === 'tilt'
-          ? Math.min(0.24, 0.11 + Math.abs(this.arenaMorph.tilt) * 1.1)
-          : Math.min(0.3, 0.13 + Math.abs(this.arenaMorphPull) * 0.75);
+      const gesture: ArenaForgeGesture = { pull: this.arenaMorphPull, twist: this.arenaMorphTwist, tilt: this.arenaMorph.tilt };
+      const action = trackingLost ? null : classifyArenaForge(gesture);
+      if (!action) {
+        this.cancelArenaForge(trackingLost ? 'FORGE CANCELLED\nKEEP BOTH HANDS IN VIEW' : 'FORGE CANCELLED\nMOVE BOTH HANDS BEFORE RELEASE');
+        return true;
+      }
+      const force = this.charges.spend(this.elapsed, TUNING.grace);
+      if (!force) {
+        playLocked();
+        this.cancelArenaForge('FORGE NOT READY\nWAIT FOR A CHARGE');
+        return true;
+      }
+
+      const before = arenaForgeDanger(this.theirs.x, this.theirs.z, this.theirs.vx, this.theirs.vz, this.arena.radius)
+        - arenaForgeDanger(this.mine.x, this.mine.z, this.mine.vx, this.mine.vz, this.arena.radius);
       for (const top of this.tops) {
         if (!top.alive) continue;
-        const r = Math.hypot(top.x, top.z) || 1;
-        const nx = top.x / r;
-        const nz = top.z / r;
-        let ix = 0;
-        let iz = 0;
-        if (action === 'squeeze' || action === 'stretch') {
-          const outward = action === 'stretch' ? 1 : -1;
-          ix = nx * impulse * outward;
-          iz = nz * impulse * outward;
-        } else if (action === 'twist') {
-          ix = -nz * impulse * direction;
-          iz = nx * impulse * direction;
-        } else {
-          ix = this.arenaMorphShove.x * impulse;
-          iz = this.arenaMorphShove.z * impulse;
-        }
+        const impulse = arenaForgeImpulse(action, gesture, top.x, top.z, this.arena.radius, this.arenaMorphShove.x, this.arenaMorphShove.z, force);
+        const ix = impulse.x;
+        const iz = impulse.z;
         top.vx += ix;
         top.vz += iz;
         top.kick = Math.max(top.kick, 0.55);
@@ -3631,8 +3639,9 @@ export class MatchSystem extends createSystem({
         this.arenaMorphShove.t = 1.35;
         this.arena.shove = this.arenaMorphShove;
       }
-      const swing = danger(this.theirs) - danger(this.mine) - before;
-      this.lastShape = { t: this.elapsed, kind: 'parry' };
+      const swing = arenaForgeDanger(this.theirs.x, this.theirs.z, this.theirs.vx, this.theirs.vz, this.arena.radius)
+        - arenaForgeDanger(this.mine.x, this.mine.z, this.mine.vx, this.mine.vz, this.arena.radius) - before;
+      this.lastShape = { t: this.elapsed, kind: action };
       this.morphedOnce = true;
       this.arenaMorphHold = 1.1;
       this.recordIntervention();
@@ -3672,8 +3681,6 @@ export class MatchSystem extends createSystem({
       const d = Math.hypot(low.x, low.z) || 1;
       this.arenaMorphShove.x = low.x / d;
       this.arenaMorphShove.z = low.z / d;
-      this.arenaMorphShove.t = 0.14;
-      this.arena.shove = this.arenaMorphShove;
     }
 
     const g0 = this.rimSpringGuides[0];
@@ -5207,6 +5214,7 @@ export class MatchSystem extends createSystem({
     const ready = g === 'launch' && this.phase === 'ready' && !this.demo;
     // A ghost hand shows the move: the rip at the first launch, the ramp in the first fight.
     let ghost = false;
+    let forgeGhost = false;
     // The first hub: the ghost hand picks your top off its stand and carries it into the arena.
     const dock = this.phase === 'hub' && g === 'launch' && !this.demo ? this.hub.ghostFrom() : null;
     if (dock) {
@@ -5269,8 +5277,8 @@ export class MatchSystem extends createSystem({
       const fy = this.arena.height(x, z);
       this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.05, fy + 0.006, z + oz * 0.05, 1], [1.35, x + ox * 0.05, fy + 0.03, z + oz * 0.05, 0], [2.2, x + ox * 0.05, fy + 0.05, z + oz * 0.05, 0]], this.frameDt);
       ghost = true;
-    } else if (this.phase === 'fight' && !this.demo && this.progress.matches === 0 && this.tutorialRound >= 2 && !this.morphedOnce && this.elapsed > TUNING.grace && this.labelTimer <= 0) {
-      this.label.set('PINCH BOTH GLOWING RIMS\nSQUEEZE · TILT · TWIST · RELEASE');
+    } else if (this.phase === 'fight' && !this.demo && this.progress.matches === 0 && this.tutorialRound === 2 && !this.morphedOnce && this.elapsed > TUNING.grace && this.labelTimer <= 0) {
+      this.label.set('PINCH BOTH GLOWING RIMS\nSQUEEZE INWARD · RELEASE');
       const radius = maxRim(this.arena.layout) * 0.92;
       const pulse = 1.15 + 0.15 * Math.sin(this.time * 6);
       for (let i = 0; i < this.rimSpringGuides.length; i++) {
@@ -5283,6 +5291,13 @@ export class MatchSystem extends createSystem({
         guide.rotation.y = i === 0 ? Math.PI : 0;
         guide.scale.set(pulse, 1, pulse);
       }
+      // Two mirrored hands make the new verb legible without a paragraph: grab opposite sides,
+      // move together, let go. Later matches leave the other three actions to discovery cards.
+      const y = Math.max(this.arena.height(-radius, 0), this.arena.height(radius, 0));
+      const inward = Math.min(0.045, radius * 0.3);
+      this.ghost.play([[0, -radius, y + 0.055, 0, 0], [0.45, -radius, y + 0.01, 0, 0], [0.7, -radius, y + 0.01, 0, 1], [1.35, -radius + inward, y + 0.01, 0, 1], [1.55, -radius + inward, y + 0.035, 0, 0], [2.35, -radius, y + 0.055, 0, 0]], this.frameDt);
+      this.forgeGhost.play([[0, radius, y + 0.055, 0, 0], [0.45, radius, y + 0.01, 0, 0], [0.7, radius, y + 0.01, 0, 1], [1.35, radius - inward, y + 0.01, 0, 1], [1.55, radius - inward, y + 0.035, 0, 0], [2.35, radius, y + 0.055, 0, 0]], this.frameDt);
+      ghost = forgeGhost = true;
     } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.taught('cup') && this.progress.matches === 1 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set(this.rimExperiment
         ? 'New: pinch the glowing rim, pull it inward, release\nits spring can save a top near that edge'
@@ -5293,6 +5308,7 @@ export class MatchSystem extends createSystem({
       this.label.set('');
     }
     if (!ghost) this.ghost.hide();
+    if (!forgeGhost) this.forgeGhost.hide();
   }
 
   /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */

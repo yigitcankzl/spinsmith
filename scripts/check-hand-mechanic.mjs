@@ -1,6 +1,6 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
-// Other modes: dual-rip, rim-spring, palm-forge, outer-ring, arena-morph.
+// Other modes: dual-rip, rim-spring, palm-forge, outer-ring, arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
   let target = null;
   for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
@@ -47,6 +47,7 @@ export default async function run({ page, frame }) {
     let failure = '';
     let action;
     let stateKey;
+    let tutorialProof;
 
     if (check === 'palm-brace') {
       if (before.phase !== 'fight') throw new Error('palm-brace check requires a fight');
@@ -72,6 +73,23 @@ export default async function run({ page, frame }) {
       if (before.phase !== 'fight') throw new Error('outer-ring check requires a fight');
       stateKey = 'outerRing';
       action = drive.outerRingReturn('right');
+    } else if (check === 'arena-morph-tutorial') {
+      const g = window.__game;
+      g.progress.matches = 0;
+      g.progress.guide = 'match';
+      g.tutorialRound = 2;
+      g.morphedOnce = false;
+      g.elapsed = 3.2;
+      g.labelTimer = 0;
+      await sleep(500);
+      tutorialProof = {
+        label: g.label.current,
+        leftGhost: g.ghost.root.visible,
+        rightGhost: g.forgeGhost.root.visible,
+        tutorialRound: g.tutorialRound,
+      };
+      if (!tutorialProof.leftGhost || !tutorialProof.rightGhost || !tutorialProof.label.includes('SQUEEZE INWARD')) throw new Error(`two-hand Squeeze lesson missing: ${JSON.stringify(tutorialProof)}`);
+      action = Promise.resolve();
     } else if (check.startsWith('arena-morph')) {
       if (before.phase !== 'fight') throw new Error('arena-morph check requires a fight');
       stateKey = 'morph';
@@ -81,6 +99,7 @@ export default async function run({ page, frame }) {
         stretch: { squeeze: -0.04, twist: 0, tilt: 0, hold: 0.35 },
         twist: { squeeze: 0, twist: 28, tilt: 0, hold: 0.35 },
         tilt: { squeeze: 0, twist: 0, tilt: 0.07, hold: 0.35 },
+        cancel: { squeeze: 0, twist: 0, tilt: 0, hold: 0.15 },
       };
       action = drive.arenaForge(moves[variant] ?? moves.squeeze);
     } else {
@@ -111,13 +130,17 @@ export default async function run({ page, frame }) {
     for (let sample = 0; sample < 200 && !finished; sample++) await sleep(16);
     if (!finished) throw new Error(`${check} action did not settle`);
     if (failure) throw new Error(failure);
-    if ((stateKey === 'outerRing' || stateKey === 'morph') && !sawTransient) throw new Error(`${stateKey} never became visibly active`);
+    if ((stateKey === 'outerRing' || (stateKey === 'morph' && check !== 'arena-morph-cancel')) && !sawTransient) throw new Error(`${stateKey} never became visibly active`);
 
     const after = drive.state();
+    if (check === 'arena-morph-cancel') {
+      if (after.charges !== before.charges) throw new Error(`cancel spent a charge (${before.charges} -> ${after.charges})`);
+      if ((after.morph?.cancels ?? 0) <= (before.morph?.cancels ?? 0)) throw new Error('cancel was not recorded');
+    }
     return {
       check,
       before: { phase: before.phase, charges: before.charges },
-      observed: stateKey ? { stateKey, sawTransient } : { chargeSpent: peakCharges < before.charges },
+      observed: tutorialProof ?? (stateKey ? { stateKey, sawTransient } : { chargeSpent: peakCharges < before.charges }),
       after: { phase: after.phase, charges: after.charges, build: after.build, morph: after.morph, diagnostics: after.diagnostics },
     };
   }, mode);

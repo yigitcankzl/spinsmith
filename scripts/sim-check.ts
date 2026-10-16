@@ -21,6 +21,7 @@ import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
+import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -1104,6 +1105,71 @@ TUNING.grace = 0;
     assert.ok(full / 400 >= 0.8, `a full rip at ${hz} Hz is white hot (${((full / 400) * 100).toFixed(1)}%)`);
   }
   assert.ok(Math.max(...means) - Math.min(...means) < 0.03, `the refresh rate barely changes a rip's power (${means.map((m) => m.toFixed(3)).join(' / ')})`);
+}
+
+// 31. Arena Forge is four distinct tactical moves, while tracking jitter is no move at all.
+{
+  assert.equal(classifyArenaForge({ pull: 0.01, twist: 0.03, tilt: 0.005 }), null, 'two-hand tracking noise stays inside the deadzone');
+  assert.equal(classifyArenaForge({ pull: -0.03, twist: 0, tilt: 0 }), 'squeeze');
+  assert.equal(classifyArenaForge({ pull: 0.03, twist: 0, tilt: 0 }), 'stretch');
+  assert.equal(classifyArenaForge({ pull: 0, twist: 0.09, tilt: 0 }), 'twist');
+  assert.equal(classifyArenaForge({ pull: 0, twist: 0, tilt: 0.02 }), 'tilt');
+
+  const radius = 0.17;
+  const squeeze = { pull: -0.05, twist: 0, tilt: 0 };
+  const left = { x: -0.05, z: 0, vx: 0, vz: 0 };
+  const right = { x: 0.05, z: 0, vx: 0, vz: 0 };
+  const leftKick = arenaForgeImpulse('squeeze', squeeze, left.x, left.z, radius, 0, 0);
+  const rightKick = arenaForgeImpulse('squeeze', squeeze, right.x, right.z, radius, 0, 0);
+  left.vx += leftKick.x;
+  right.vx += rightKick.x;
+  assert.ok(right.vx - left.vx < 0, 'Squeeze makes separated tops converge toward a clash');
+  const clashArena = arenaWith({ floor: 'flat', wall: 'high', pockets: [], rails: [], pillars: [] });
+  clashArena.elapsed = 5;
+  const clashLeft = new Top(ATTACK);
+  const clashRight = new Top(DEFENSE);
+  clashLeft.launch(-0.05, 0, 0, 0, 1, 1);
+  clashRight.launch(0.05, 0, 0, 0, 1, -1);
+  for (const top of [clashLeft, clashRight]) {
+    const kick = arenaForgeImpulse('squeeze', squeeze, top.x, top.z, clashArena.radius, 0, 0);
+    top.vx += kick.x;
+    top.vz += kick.z;
+  }
+  let forcedClash = false;
+  for (let i = 0; i < 120 && !forcedClash; i++) forcedClash = !!step(clashArena, clashLeft, clashRight);
+  assert.ok(forcedClash, 'Squeeze produces a collision in a separated-top scenario');
+
+  const stretch = { pull: 0.05, twist: 0, tilt: 0 };
+  const safe = { x: 0.025, z: 0, vx: 0, vz: 0 };
+  const exposed = { x: 0.135, z: 0, vx: 0, vz: 0 };
+  const before = arenaForgeDanger(exposed.x, exposed.z, exposed.vx, exposed.vz, radius)
+    - arenaForgeDanger(safe.x, safe.z, safe.vx, safe.vz, radius);
+  const safeKick = arenaForgeImpulse('stretch', stretch, safe.x, safe.z, radius, 0, 0);
+  const exposedKick = arenaForgeImpulse('stretch', stretch, exposed.x, exposed.z, radius, 0, 0);
+  safe.vx += safeKick.x;
+  exposed.vx += exposedKick.x;
+  const after = arenaForgeDanger(exposed.x, exposed.z, exposed.vx, exposed.vz, radius)
+    - arenaForgeDanger(safe.x, safe.z, safe.vx, safe.vz, radius);
+  assert.ok(after > before, 'Stretch increases ring-out pressure more on the exposed rival than a protected center top');
+
+  const twist = { pull: 0, twist: 0.2, tilt: 0 };
+  for (const top of [{ x: 0.08, z: 0 }, { x: 0, z: -0.08 }]) {
+    const kick = arenaForgeImpulse('twist', twist, top.x, top.z, radius, 0, 0);
+    const tangentX = -top.z;
+    const tangentZ = top.x;
+    assert.ok(kick.x * tangentX + kick.z * tangentZ > 0, 'Twist shifts every orbit in the chosen direction');
+  }
+
+  const tilt = { pull: 0, twist: 0, tilt: 0.07 };
+  for (const top of [{ x: 0.08, z: 0 }, { x: -0.06, z: 0.04 }]) {
+    const kick = arenaForgeImpulse('tilt', tilt, top.x, top.z, radius, 0.6, -0.8);
+    assert.ok(kick.x * 0.6 + kick.z * -0.8 > 0, 'Tilt sends every top down the same slope');
+  }
+
+  const charges = new ShapingCharges();
+  const cancelled = classifyArenaForge({ pull: 0, twist: 0, tilt: 0 });
+  if (cancelled) charges.spend(3, 2.5);
+  assert.equal(charges.charges, SHAPING.charges, 'a no-move release spends no shaping charge');
 }
 
 console.log('sim-check: all passed');

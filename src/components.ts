@@ -13,6 +13,8 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   lastArenaForge: { type: Types.Int8, default: 0 },
   /** Signed immediate momentum swing: positive means the player's top benefited. */
   arenaForgeSwing: { type: Types.Float32, default: 0 },
+  /** Two-hand grabs safely cancelled before a deliberate arena deformation. */
+  arenaForgeCancels: { type: Types.Int16, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);

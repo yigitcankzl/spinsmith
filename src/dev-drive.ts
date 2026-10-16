@@ -91,6 +91,7 @@ interface Game {
   arenaMorph?: { scaleX: number; scaleZ: number; tilt: number };
   arenaForgeAction?: 'none' | 'squeeze' | 'stretch' | 'twist' | 'tilt';
   arenaForgeSwing?: number;
+  arenaForgeCancels?: number;
   gazeAssist?: { active: boolean; target: string };
   overforgeSeal: { visible: boolean; getWorldPosition(v: Vector3): Vector3 };
   rivalLaunchPower: number;
@@ -369,6 +370,7 @@ export function installDriver() {
           tilt: +g.arenaMorph.tilt.toFixed(3),
           action: g.arenaForgeAction ?? 'none',
           swing: +(g.arenaForgeSwing ?? 0).toFixed(3),
+          cancels: g.arenaForgeCancels ?? 0,
         } : null,
         gazeAssist: g.gazeAssist ? { ...g.gazeAssist } : null,
         bar: +g.forgeBar.value.toFixed(2),
