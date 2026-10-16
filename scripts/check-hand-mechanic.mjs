@@ -21,12 +21,18 @@ export default async function run({ page, frame }) {
       window.__game.openForge();
       await sleep(500);
     }
-    if ((check === 'outer-ring' || check === 'arena-morph') && drive.state().phase === 'hub') {
+    if (check === 'outer-ring' || check === 'arena-morph') {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
       for (let i = 0; i < 120 && drive.state().phase !== 'fight'; i++) await sleep(25);
-      if (check === 'arena-morph') await drive.fightAt(2.7);
+      if (drive.state().phase === 'fight') drive.key('KeyU');
+    }
+    // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
+    // not spend most of its timeout waiting for the opening clock to reach the normal 2.5 s gate.
+    if (check === 'arena-morph' && drive.state().phase === 'fight') {
+      window.__game.elapsed = Math.max(window.__game.elapsed, 2.7);
+      drive.key('KeyU');
     }
     const before = drive.state();
     let finished = false;
@@ -82,6 +88,7 @@ export default async function run({ page, frame }) {
     }
     while (!finished) await sleep(16);
     if (failure) throw new Error(failure);
+    if ((stateKey === 'outerRing' || stateKey === 'morph') && !sawTransient) throw new Error(`${stateKey} never became visibly active`);
 
     const after = drive.state();
     return {

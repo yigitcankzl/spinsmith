@@ -588,11 +588,11 @@ export function installDriver() {
       await glide(side, 'pinch', () => g.root.localToWorld(g.outerRingAt!.clone()), 0.18, 0);
       await setPinch(side, true);
       await glide(side, 'pinch', goal, 0.65, pinchNow[side], 'linear');
-      for (let i = 0; i < 80 && String(g.outerRingState) !== 'returned'; i++) await wait(0.016);
+      for (let i = 0; i < 180 && String(g.outerRingState) !== 'returned'; i++) await wait(0.016);
       await setPinch(side, false);
       await glide(side, 'pinch', above(goal, 0.08), 0.2, 0);
       await park(side);
-      if (String(g.outerRingState) !== 'returned' && String(g.outerRingState) !== 'idle') throw new Error(`Outer Ring ended ${g.outerRingState ?? 'unknown'}`);
+      if (String(g.outerRingState) !== 'returned') throw new Error(`Outer Ring ended ${g.outerRingState ?? 'unknown'}`);
     },
 
     /** A cup: a fingertip pressed down into the floor (fast enough to count), then lifted. at: 'rival' | 'mine' | {x, z}. */

@@ -1065,8 +1065,11 @@ export class MatchSystem extends createSystem({
           // Shift+O throws yours and arms the Outer Ring rescue path.
           const t = e.shiftKey ? this.mine : this.theirs;
           const r = Math.hypot(t.x, t.z) || 1;
-          t.vx = (t.x / r) * 0.8;
-          t.vz = (t.z / r) * 0.8;
+          // The rescue probe must land on the table; the faster rival shot remains the off-desk
+          // showcase. Normal ring-outs always keep their real simulation velocity.
+          const speed = e.shiftKey ? 0.3 : 0.8;
+          t.vx = (t.x / r) * speed;
+          t.vz = (t.z / r) * speed;
           t.state = 'out';
           t.finish = 'over';
         }
