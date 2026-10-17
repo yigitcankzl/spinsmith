@@ -813,6 +813,8 @@ export class MatchSystem extends createSystem({
   private rivalEcho: Echo | null = null;
   /** The echo's forges already played this round. */
   private echoPlayed = 0;
+  /** The next echo forge whose physical hand tell has already begun. */
+  private echoWarned = 0;
   /** While ready: a faint line on the floor around where you can launch from. */
   private launchZone = new Mesh(new BufferGeometry(), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.5, depthWrite: false, side: 2 }));
   /** Seconds left before a transient fight message clears. */
@@ -3537,7 +3539,7 @@ export class MatchSystem extends createSystem({
     // veer from each side's own view is the negated aim.
     const off = Math.PI - traceAngle - Math.atan2(-sx, sz) - LAUNCH_TILT * mh;
     this.echoRec.rips.push({ power, aim: Math.max(-MAX_AIM, Math.min(MAX_AIM, -Math.atan2(Math.sin(off), Math.cos(off)))) });
-    this.echoPlayed = 0;
+    this.echoPlayed = this.echoWarned = 0;
     const traceLength = 0.07 + 0.07 * Math.min(1, Math.hypot(this.mine.vx, this.mine.vz) / Math.max(0.001, LAUNCH_SPEED));
     this.launchAim.visible = true;
     this.launchAim.position.set(sx, this.arena.height(sx, sz) + 0.003, sz);
@@ -4199,7 +4201,18 @@ export class MatchSystem extends createSystem({
     const round = this.echoRec.rips.length - 1;
     const due = echo.forges.filter((f) => f.round === round);
     const f = due[this.echoPlayed];
-    if (!f || this.elapsed < f.t) return;
+    if (!f) return;
+    // Start the hand before the arena moves. The ghost takes about 1.3 s to pinch, pull and fade;
+    // an 0.8 s lead makes the player's recorded gesture readable as the cause, not decoration.
+    const [, g] = forgeGrips(this.arena.layout);
+    const d = Math.hypot(g.x, g.z) || 1;
+    if (this.echoWarned === this.echoPlayed && this.elapsed >= Math.max(TUNING.grace, f.t - 0.8)) {
+      this.echoWarned++;
+      this.rivalHandMove(-g.x, -g.z, g.x / d, g.z / d);
+      this.stamp.show('ECHO FORGE INCOMING', ARENA_FORGE_TITLE[f.action], 'rival', 0.65);
+      playTell();
+    }
+    if (this.elapsed < f.t) return;
     this.echoPlayed++;
     const gesture: ArenaForgeGesture = {
       pull: f.action === 'squeeze' ? -0.09 : f.action === 'stretch' ? 0.09 : 0,
@@ -4217,10 +4230,6 @@ export class MatchSystem extends createSystem({
       top.kickX = impulse.x;
       top.kickZ = impulse.z;
     }
-    // Their hand at the mirror of your right grip, the far rim on their right.
-    const [, g] = forgeGrips(this.arena.layout);
-    const d = Math.hypot(g.x, g.z) || 1;
-    this.rivalHandMove(-g.x, -g.z, g.x / d, g.z / d);
     this.rivalShapeAt = this.elapsed;
     this.rivalShapeKind = `ECHO ${f.action.toUpperCase()}`;
     this.stamp.show(`ECHO ${ARENA_FORGE_TITLE[f.action]}`, 'your friend\'s hands', 'rival', 0.9);
