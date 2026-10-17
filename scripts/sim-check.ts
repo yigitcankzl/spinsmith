@@ -17,7 +17,7 @@ import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
 import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
-import { eyeView, touchTargets, traySpot } from '../src/game/reach.ts';
+import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
@@ -678,6 +678,24 @@ TUNING.grace = 0;
       assert.ok(v.distance >= 0.32 && v.distance <= 0.67, `${name} at drop ${drop}: ${v.distance.toFixed(2)} m from the eyes`);
       assert.ok(v.below <= 63, `${name} at drop ${drop}: ${v.below.toFixed(0)} degrees below the eyes`);
     }
+  }
+}
+
+// 16b. Reach: the two-hand forge grips of every arena. Both arms reach out together for a short,
+// gross gesture, so they get a little more room than a precise touch: at most 0.70 m. The old
+// side grips (x = +-r) sat 0.83-0.90 m away.
+{
+  for (const layout of ARENAS) {
+    const arena = new Arena(layout);
+    for (const g of forgeGrips(layout)) {
+      const at = { ...g, y: arena.height(g.x, g.z) };
+      for (const drop of [0.3, 0.35, 0.4, 0.45]) {
+        const v = eyeView(at, drop);
+        assert.ok(v.distance <= 0.7, `${layout.name} forge grip at drop ${drop}: ${v.distance.toFixed(2)} m from the eyes`);
+      }
+    }
+    const [l, r] = forgeGrips(layout);
+    assert.ok((l.x * r.x + l.z * r.z) / (Math.hypot(l.x, l.z) * Math.hypot(r.x, r.z)) < 0.3 - 0.25, `${layout.name} grips leave slack under the forge's opposite-rim test`);
   }
 }
 

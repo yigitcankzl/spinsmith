@@ -9,6 +9,7 @@ import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
+import { forgeGrips } from './reach.js';
 import type { ArenaLayout } from './layout.js';
 import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
@@ -3581,7 +3582,9 @@ export class MatchSystem extends createSystem({
       if (!a || !b || !left.tracked || !right.tracked || !left.pinching || !right.pinching) return false;
       const ar = Math.hypot(a.sx, a.sz) || 1;
       const br = Math.hypot(b.sx, b.sz) || 1;
-      if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > -0.55) return false;
+      // The grips sit 90 degrees apart on the near half (reach.ts FORGE_GRIP); anything wider than
+      // about 70 degrees counts, so a sloppy grip still forges but two pinches side by side do not.
+      if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > 0.3) return false;
       // Starting the grab is free. The charge is committed only after a deliberate release.
       if (this.charges.charges < 1) {
         playLocked();
@@ -5279,24 +5282,26 @@ export class MatchSystem extends createSystem({
       ghost = true;
     } else if (this.phase === 'fight' && !this.demo && this.progress.matches === 0 && this.tutorialRound === 2 && !this.morphedOnce && this.elapsed > TUNING.grace && this.labelTimer <= 0) {
       this.label.set('PINCH BOTH GLOWING RIMS\nSQUEEZE INWARD · RELEASE');
-      const radius = maxRim(this.arena.layout) * 0.92;
+      const grips = forgeGrips(this.arena.layout);
       const pulse = 1.15 + 0.15 * Math.sin(this.time * 6);
       for (let i = 0; i < this.rimSpringGuides.length; i++) {
         const side = (i === 0 ? 'left' : 'right') as Side;
         if (this.rimPulls[side]) continue;
         const guide = this.rimSpringGuides[i];
-        const x = i === 0 ? -radius : radius;
+        const { x, z } = grips[i];
         guide.visible = !this.photo;
-        guide.position.set(x, this.arena.height(x, 0) + 0.005, 0);
-        guide.rotation.y = i === 0 ? Math.PI : 0;
+        guide.position.set(x, this.arena.height(x, z) + 0.005, z);
+        guide.rotation.y = -Math.atan2(z, x);
         guide.scale.set(pulse, 1, pulse);
       }
       // Two mirrored hands make the new verb legible without a paragraph: grab opposite sides,
       // move together, let go. Later matches leave the other three actions to discovery cards.
-      const y = Math.max(this.arena.height(-radius, 0), this.arena.height(radius, 0));
-      const inward = Math.min(0.045, radius * 0.3);
-      this.ghost.play([[0, -radius, y + 0.055, 0, 0], [0.45, -radius, y + 0.01, 0, 0], [0.7, -radius, y + 0.01, 0, 1], [1.35, -radius + inward, y + 0.01, 0, 1], [1.55, -radius + inward, y + 0.035, 0, 0], [2.35, -radius, y + 0.055, 0, 0]], this.frameDt);
-      this.forgeGhost.play([[0, radius, y + 0.055, 0, 0], [0.45, radius, y + 0.01, 0, 0], [0.7, radius, y + 0.01, 0, 1], [1.35, radius - inward, y + 0.01, 0, 1], [1.55, radius - inward, y + 0.035, 0, 0], [2.35, radius, y + 0.055, 0, 0]], this.frameDt);
+      const [gl, gr] = grips;
+      const y = Math.max(this.arena.height(gl.x, gl.z), this.arena.height(gr.x, gr.z));
+      // Squeeze: the hands move toward each other, along the line between the grips.
+      const inward = Math.min(0.045, gr.x * 0.3);
+      this.ghost.play([[0, gl.x, y + 0.055, gl.z, 0], [0.45, gl.x, y + 0.01, gl.z, 0], [0.7, gl.x, y + 0.01, gl.z, 1], [1.35, gl.x + inward, y + 0.01, gl.z, 1], [1.55, gl.x + inward, y + 0.035, gl.z, 0], [2.35, gl.x, y + 0.055, gl.z, 0]], this.frameDt);
+      this.forgeGhost.play([[0, gr.x, y + 0.055, gr.z, 0], [0.45, gr.x, y + 0.01, gr.z, 0], [0.7, gr.x, y + 0.01, gr.z, 1], [1.35, gr.x - inward, y + 0.01, gr.z, 1], [1.55, gr.x - inward, y + 0.035, gr.z, 0], [2.35, gr.x, y + 0.055, gr.z, 0]], this.frameDt);
       ghost = forgeGhost = true;
     } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.taught('cup') && this.progress.matches === 1 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set(this.rimExperiment

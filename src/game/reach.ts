@@ -5,6 +5,8 @@
  * Meta's hands guidance puts direct touch at about 0.42-0.46 m and warns against 0.5-0.8 m.
  * No three.js here.
  */
+import { rimRadius } from './layout.ts';
+import type { ArenaLayout } from './layout.ts';
 import { PEDESTAL, REACH } from './placement.ts';
 
 export interface Spot {
@@ -60,6 +62,20 @@ export function traySpot(i: number, n: number): Spot {
   while (k < steps && len[k] < want) k++;
   const a = a0 - (span * (k - 1 + (want - len[k - 1]) / (len[k] - len[k - 1]))) / steps;
   return { x: WORK.x + Math.cos(a) * TRAY.r, y: TRAY.y, z: WORK.z + Math.sin(a) * rz };
+}
+
+/**
+ * The two-hand forge grips: on the rim's near half, this far round toward the player from the
+ * sides, just inside the rim. Grips at the sides (x = +-r) put the hands about 0.85 m from the eyes.
+ */
+export const FORGE_GRIP = { angle: Math.PI / 4, n: 0.86 };
+
+/** The left and right forge grips of an arena (floor level; add the arena height for y). */
+export function forgeGrips(layout: ArenaLayout): [Spot, Spot] {
+  return ([Math.PI - FORGE_GRIP.angle, FORGE_GRIP.angle] as const).map((a) => {
+    const r = rimRadius(layout, a) * FORGE_GRIP.n;
+    return { x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r };
+  }) as [Spot, Spot];
 }
 
 /** Distance (m) and angle below eye level (degrees) of an arena-local spot, for a tray `drop` below the eyes. */

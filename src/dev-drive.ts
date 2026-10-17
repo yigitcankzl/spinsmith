@@ -12,6 +12,8 @@
  * Coordinates: world metres, or arena-local {x, z} where an option says so.
  */
 import { Vector3 } from '@iwsdk/core';
+import type { ArenaLayout } from './game/layout.js';
+import { forgeGrips } from './game/reach.js';
 
 type Side = 'left' | 'right';
 type Point = 'pinch' | 'index' | 'low';
@@ -49,7 +51,7 @@ interface Game {
   player: { localToWorld(v: Vector3): Vector3; worldToLocal(v: Vector3): Vector3 };
   root: { position: Vector3; localToWorld(v: Vector3): Vector3; worldToLocal(v: Vector3): Vector3 };
   rootK: number;
-  arena: { radius: number; layout: { name?: string }; height(x: number, z: number): number; floorHeight(n: number): number };
+  arena: { radius: number; layout: ArenaLayout & { name?: string }; height(x: number, z: number): number; floorHeight(n: number): number };
   mine: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
   theirs: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
   myPoints: number;
@@ -548,15 +550,16 @@ export function installDriver() {
       await park(side);
     },
 
-    /** Grab opposite rim sectors together, squeeze/twist/tilt the bowl, then release its impulse. */
+    /** Grab the two forge grips on the near rim, squeeze/twist/tilt the bowl, then release its impulse. */
     async arenaForge(opts: { squeeze?: number; twist?: number; tilt?: number; hold?: number } = {}) {
       const { squeeze = 0.026, twist = 10, tilt = 0.025, hold = 0.35 } = opts;
       const g = game();
       if (g.phase !== 'fight') throw new Error('Arena Forge only exists during a fight');
-      const r = g.arena.radius * 0.94;
+      // The real grips (reach.ts): on the near half of the rim, where a seated player can reach.
+      const [gl, gr] = forgeGrips(g.arena.layout);
       const turn = (twist * Math.PI) / 180;
-      const startLeft = local(-r, 0, 0.004);
-      const startRight = local(r, 0, 0.004);
+      const startLeft = local(gl.x, gl.z, 0.004);
+      const startRight = local(gr.x, gr.z, 0.004);
       await Promise.all([
         glide('left', 'pinch', above(startLeft, 0.06), 0.3, 0),
         glide('right', 'pinch', above(startRight, 0.06), 0.3, 0),
@@ -567,9 +570,14 @@ export function installDriver() {
       ]);
       await Promise.all([setPinch('left', true), setPinch('right', true)]);
       await wait(0.12);
-      const targetR = Math.max(r * 0.72, r - squeeze);
-      const targetLeft = local(-Math.cos(turn) * targetR, -Math.sin(turn) * targetR, 0.004 - tilt * 0.5);
-      const targetRight = local(Math.cos(turn) * targetR, Math.sin(turn) * targetR, 0.004 + tilt * 0.5);
+      // Squeeze, twist and tilt about the midpoint between the grips, as two real hands would.
+      const mx = (gl.x + gr.x) / 2;
+      const mz = (gl.z + gr.z) / 2;
+      const half = Math.hypot(gr.x - gl.x, gr.z - gl.z) / 2;
+      const a0 = Math.atan2(gr.z - gl.z, gr.x - gl.x) + turn;
+      const targetHalf = Math.max(half * 0.72, half - squeeze);
+      const targetLeft = local(mx - Math.cos(a0) * targetHalf, mz - Math.sin(a0) * targetHalf, 0.004 - tilt * 0.5);
+      const targetRight = local(mx + Math.cos(a0) * targetHalf, mz + Math.sin(a0) * targetHalf, 0.004 + tilt * 0.5);
       await Promise.all([
         glide('left', 'pinch', targetLeft, 0.42, 1, 'natural'),
         glide('right', 'pinch', targetRight, 0.42, 1, 'natural'),

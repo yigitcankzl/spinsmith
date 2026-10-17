@@ -15,7 +15,7 @@ included in the publishable source tree or production artifact.
    the arena rises there. On later visits the anchored smithy returns to its saved place; without
    a usable surface it falls back to a floating tray and says so.
 3. Pinch your top in its dock and drop it in the arena, then pinch near it, pull back and let go to rip it.
-4. In the fight, pinch the floor beside the rival: a ramp rises and throws it. Each new match teaches one more move: the palm-slap strike in the second, the cup and sling in the third.
+4. In the fight, pinch the floor beside the rival: a ramp rises and throws it. The first match teaches one move per round: ramp, the two-hand arena forge, then the palm-slap ultimate. Cup and sling arrive on the first rematch.
 5. Add `?fresh` to start as a new player, or `?demo` for a level-8 smith with more unlocked. The brass dial on the near rim sets sound, flashes and a gentle press-and-hold strike.
 
 ## How to play
@@ -220,10 +220,10 @@ an arena. First to 3 heat wins a match.
   from white-hot and skip off the floor; each top has a ring of light in its team color; a won
   match runs sparks round the rim; a knockout your move caused replays on the table at 0.4x
   (a pinch skips it). The placed arena forges up out of the table under the title.
-- **Feats, bests and the match report** (`src/game/progress.ts`): twelve feats, each stamped the
+- **Feats, bests and the match report** (`src/game/progress.ts`): thirteen feats, each stamped the
   first time (ramp a rival out, sling one into a pit, knock one out with your strike, cut a big
   move short, rip white hot, a flawless match, a comeback from match point, a Hammer shatter, each
-  circuit, ten arenas won), counted on the board; personal bests (hardest rip, fastest knockout)
+  circuit, ten arenas won, a rival knocked off your real table), counted on the board; personal bests (hardest rip, fastest knockout)
   stamped when beaten; after a match, home shows its report (result, each round's finish, best
   rip, XP). After a loss the rival's card gives a tip against it.
 - **The room is the stage:** a rival arrives through a portal beyond the far rim and slams into
