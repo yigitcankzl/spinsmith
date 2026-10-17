@@ -56,11 +56,17 @@ interface Game {
   theirs: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
   myPoints: number;
   theirPoints: number;
+  barPoints: [number, number];
+  deskVerdict?: { left: number } | null;
+  deskKoScored?: boolean;
+  lastRoundHeat?: number;
+  theirView: { offDesk: boolean };
   forgeBar: { value: number };
   charges: { charges: number };
   cups: Record<Side, { shape: { x: number; z: number }; caught: unknown } | null>;
   label: { current: string };
   rival: { name: string; move: string };
+  rivalShapeKind?: string;
   hub: { debugPositions(): string };
   forge: { debugPositions(): string };
   builder: { debugPositions(): string };
@@ -335,6 +341,7 @@ export function installDriver() {
         guide: g.progress.guide,
         rival: g.rival?.name,
         rivalMove: g.rival?.move,
+        rivalShape: g.rivalShapeKind ?? '',
         arena: g.arena.layout.name ?? '',
         build: { ...g.myBuild },
         opening: {
@@ -353,6 +360,14 @@ export function installDriver() {
         },
         elapsed: +g.elapsed.toFixed(1),
         heat: [g.myPoints, g.theirPoints],
+        score: [...g.barPoints],
+        desk: {
+          pending: !!g.deskVerdict,
+          left: +(g.deskVerdict?.left ?? 0).toFixed(2),
+          offDesk: !!g.theirView.offDesk,
+          scored: !!g.deskKoScored,
+          awarded: g.lastRoundHeat ?? 0,
+        },
         charges: g.charges.charges,
         rimExperiment: !!g.rimExperiment,
         overforge: g.overforgeMode ?? 'idle',

@@ -1339,10 +1339,12 @@ export const MATCH_HEAT = 3;
 
 /**
  * Heat the winner scores: 1 for outlasting the other top, 2 for any knockout (into a slag pit,
- * thrown over the wall, or shattered). Every pit is worth the same.
+ * thrown over the wall, or shattered). A thrown top that also leaves the detected real desk adds
+ * one room-aware bonus heat. Every pit is worth the same.
  */
-export function finishPoints(loser: Top, tutorial = false): number {
-  return tutorial || loser.finish === 'spin' || loser.finish === null ? 1 : 2;
+export function finishPoints(loser: Top, tutorial = false, deskKo = false): number {
+  const base = tutorial || loser.finish === 'spin' || loser.finish === null ? 1 : 2;
+  return base + (deskKo && loser.finish === 'over' ? 1 : 0);
 }
 
 /**

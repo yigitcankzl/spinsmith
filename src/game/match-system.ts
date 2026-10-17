@@ -193,6 +193,10 @@ const OUTER_RING_TIME = 5;
 const OUTER_RAIL_POINTS = 48;
 const OUTER_RAIL_STEP = 0.008;
 const OUTER_RAIL_WIDTH = 0.0045;
+/** A rival crossing the detected real table edge adds this much heat after a normal ring-out. */
+const DESK_KO_BONUS = 1;
+/** Maximum real seconds to wait for a thrown rival to settle on, or leave, the detected table. */
+const DESK_VERDICT_TIME = 3.5;
 
 
 type Phase = 'placing' | 'hub' | 'ready' | 'pulling' | 'fight' | 'result' | 'build' | 'forge';
@@ -566,6 +570,15 @@ export class MatchSystem extends createSystem({
   private nextScorch = 0;
   /** This round's off-the-desk moment has been shown. */
   private offDeskShown = false;
+  /** A rival ring-out whose final score waits for the real table to accept or reject the top. */
+  private deskVerdict: { v: 1; left: number } | null = null;
+  /** Observable after the result: this round really earned the extra desk-edge heat. */
+  private deskKoScored = false;
+  /** Heat awarded by the last resolved round, kept visible after a match resets its running score. */
+  private lastRoundHeat = 0;
+  /** Reused output of the rival's table-edge prediction; avoids allocating in the fight loop. */
+  private deskAvoidX = 0;
+  private deskAvoidZ = 0;
   /** The last REPLAY_STEPS sim steps of both tops and their clashes (REC floats a step), a ring buffer. */
   private replayBuf = new Float32Array(REPLAY_STEPS * REC);
   private replayAt = 0;
@@ -982,6 +995,9 @@ export class MatchSystem extends createSystem({
       lowestFps: Math.round(this.lowestFps),
       liteMode: this.lite,
       matches: this.progress.matches,
+      deskVerdict: !!this.deskVerdict,
+      deskKoScored: this.deskKoScored,
+      lastRoundHeat: this.lastRoundHeat,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -1385,7 +1401,7 @@ export class MatchSystem extends createSystem({
         break;
       case 'fight':
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
-        if (this.outerRingState !== 'rescue' && this.outerRingState !== 'rail') {
+        if (!this.deskVerdict && this.outerRingState !== 'rescue' && this.outerRingState !== 'rail') {
           this.updateStrike(dt);
           if (!this.updateArenaMorph(dt)) {
             this.updateShaping();
@@ -1441,17 +1457,6 @@ export class MatchSystem extends createSystem({
     this.myView.sync(ga, this.arena, this.time, vdt);
     this.theirView.sync(gb, this.arena, this.time, vdt);
     this.updateEntrance(dt);
-    // The simulation has already awarded this round's deterministic THROWN heat. If the rendered
-    // top keeps travelling over the detected real edge, rename that same finish as the room-aware
-    // DESK KO moment; do not add a late point after the match result has been decided.
-    if (this.theirView.offDesk && !this.offDeskShown && !this.replay) {
-      this.offDeskShown = true;
-      this.stamp.later('DESK KO!', 'THE REAL EDGE FINISHED IT', 'mine', 1.35, 1.15);
-      const last = this.matchLog.rounds.length - 1;
-      if (last >= 0 && this.matchLog.rounds[last] === 'THROWN') this.matchLog.rounds[last] = 'DESK KO';
-      this.featDone('offDesk');
-      if (import.meta.env.DEV) console.log('[OUT] off the desk');
-    }
     this.sparks.rim = maxRim(this.arena.layout) + 0.01;
     this.sparks.update(vdt);
     this.impacts.rim = this.sparks.rim;
@@ -2999,6 +3004,9 @@ export class MatchSystem extends createSystem({
     this.phase = 'ready';
     this.markFirstFive(2);
     this.outerRingState = 'idle';
+    this.deskVerdict = null;
+    this.deskKoScored = false;
+    this.lastRoundHeat = 0;
     this.outerRingUsed = false;
     this.outerRingLeft = 0;
     this.outerRailSide = null;
@@ -3499,6 +3507,9 @@ export class MatchSystem extends createSystem({
     this.replayCount = 0;
     this.replay = null;
     this.offDeskShown = false;
+    this.deskVerdict = null;
+    this.deskKoScored = false;
+    this.lastRoundHeat = 0;
     this.lastCause = '';
     // Personal bests are their own small moment (the first record is just kept).
     if (!this.demo && this.progress.guide === 'done' && this.progress.best('rip', Math.round(power * 100) / 100)) this.stamp.later('NEW BEST RIP!', `${Math.round(power * 100)}%`, 'mine', 0.8);
@@ -4738,10 +4749,56 @@ export class MatchSystem extends createSystem({
     return shape;
   }
 
+  /**
+   * Predicts whether the rival's present line is carrying it toward a dangerous part of the real
+   * table. On success deskAvoidX/Z point back toward safe wood for the visible defensive ramp.
+   */
+  private rivalNeedsDeskGuard(): boolean {
+    const poly = ROOM.poly;
+    const top = this.theirs;
+    if (!poly || poly.length < 3 || !top.alive || normRadius(this.arena.layout, top.x, top.z) < 0.68) return false;
+    const speed = Math.hypot(top.vx, top.vz);
+    if (speed < 0.025) return false;
+    let cx = 0;
+    let cz = 0;
+    for (const p of poly) {
+      cx += p.x / poly.length;
+      cz += p.z / poly.length;
+    }
+    const safeX = cx - top.x;
+    const safeZ = cz - top.z;
+    const safeD = Math.hypot(safeX, safeZ) || 1;
+    // Only react when it is moving away from the table's safe middle. Looking half a second ahead
+    // makes the response early enough to read and late enough to be a real tactical tell.
+    if ((top.vx * safeX + top.vz * safeZ) / (speed * safeD) > -0.12) return false;
+    const px = top.x + top.vx * 0.5;
+    const pz = top.z + top.vz * 0.5;
+    if (insidePoly(poly, px, pz) && edgeDistance(poly, px, pz) > 0.055) return false;
+    this.deskAvoidX = safeX / safeD;
+    this.deskAvoidZ = safeZ / safeD;
+    return true;
+  }
+
   /** Rivals from level 6 shape the floor too; each move family uses its normal tactic, not one AI. */
   private rivalShaping() {
     if (this.demo || this.rival.level < 6) return;
     this.rivalCharges.update(STEP);
+    if (this.elapsed - this.rivalShapeAt >= RIVAL_SHAPE_GAP && this.rivalNeedsDeskGuard()) {
+      const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
+      if (f) {
+        const offset = 0.012 * (this.arena.radius / 0.17);
+        const x = this.theirs.x - this.deskAvoidX * offset;
+        const z = this.theirs.z - this.deskAvoidZ * offset;
+        this.rivalShapeKind = 'DESK GUARD';
+        this.arena.addShape('ramp', x, z, SHAPE_SIZE.ramp * f * 0.85, 'rival', this.deskAvoidX, this.deskAvoidZ, RIVAL_RAMP_SIGMA);
+        this.rivalHandMove(x, z, this.deskAvoidX, this.deskAvoidZ);
+        this.rivalShapeAt = this.elapsed;
+        this.stamp.show('RIVAL: DESK GUARD', 'AI READS THE REAL EDGE', 'rival', 0.45, 0.85);
+        playThock();
+        if (import.meta.env.DEV) console.log(`[SHAPE] rival desk guard away from table edge at ${this.theirs.x.toFixed(3)},${this.theirs.z.toFixed(3)} t ${this.elapsed.toFixed(1)}`);
+        return;
+      }
+    }
     const me = this.mine;
     const r = Math.hypot(me.x, me.z);
     const nr = normRadius(this.arena.layout, me.x, me.z);
@@ -5044,7 +5101,46 @@ export class MatchSystem extends createSystem({
     return true;
   }
 
+  /**
+   * A normal arena ring-out is provisional when a real table outline is known. The rendered top
+   * gets one readable flight across the desk; the real edge, not a late text replacement, decides
+   * whether the room-aware bonus was earned.
+   */
+  private beginDeskVerdict(): boolean {
+    if (this.demo || !ROOM.poly || this.theirs.finish !== 'over') return false;
+    this.deskVerdict = { v: 1, left: DESK_VERDICT_TIME };
+    this.accumulator = 0;
+    this.label.set('THROWN ONTO YOUR TABLE\nREAL EDGE = +1 HEAT');
+    this.labelTimer = DESK_VERDICT_TIME;
+    if (import.meta.env.DEV) console.log('[DESK_KO] table flight started; score is pending');
+    return true;
+  }
+
+  /** True while a provisional rival ring-out owns the fight loop. */
+  private updateDeskVerdict(dt: number): boolean {
+    const pending = this.deskVerdict;
+    if (!pending) return false;
+    pending.left -= dt;
+    if (this.theirView.offDesk) {
+      this.deskVerdict = null;
+      this.offDeskShown = true;
+      this.featDone('offDesk');
+      if (import.meta.env.DEV) console.log(`[DESK_KO] real edge crossed; +${DESK_KO_BONUS} bonus heat`);
+      this.finish(pending.v, true);
+      return true;
+    }
+    // Once it has stopped on the wood, or the bounded visual wait expires, the original arena
+    // knockout stands. A missing/slow frame can never invent the bonus.
+    if (this.theirView.restingAt || pending.left <= 0) {
+      this.deskVerdict = null;
+      if (import.meta.env.DEV) console.log(`[DESK_KO] ${this.theirView.restingAt ? 'top stayed on table' : 'visual timeout'}; normal heat`);
+      this.finish(pending.v);
+    }
+    return true;
+  }
+
   private updateFight(dt: number) {
+    if (this.updateDeskVerdict(dt)) return;
     if (this.updateOuterRing(dt)) return;
     // Hit stop: the simulation alone pauses for a moment after a hard hit; head tracking and
     // rendering never do.
@@ -5196,14 +5292,16 @@ export class MatchSystem extends createSystem({
       const v = verdict(this.mine, this.theirs, this.elapsed);
       if (v !== 0) {
         for (const t of this.tops) if (t.finish === 'burst') this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
+        if (v === 1 && this.beginDeskVerdict()) return;
         this.finish(v);
         return;
       }
     }
   }
 
-  private finish(v: -1 | 1 | 2) {
+  private finish(v: -1 | 1 | 2, deskKo = false) {
     this.phase = 'result';
+    this.deskKoScored = deskKo;
     this.resultTimer = RESULT_TIME;
     // One unlock per result card; the rest wait for the next ones.
     this.revealedHere = false;
@@ -5215,8 +5313,7 @@ export class MatchSystem extends createSystem({
       this.resultTimer = 3;
       return;
     }
-    const name = (t: Top) =>
-      FINISH_WORD[t.finish ?? 'spin'];
+    const name = (t: Top) => deskKo && t === this.theirs ? 'DESK KO' : FINISH_WORD[t.finish ?? 'spin'];
     for (const t of this.tops) {
       if (t.finish === 'pocket') playPocket(t.x);
       else if (t.finish === 'over') playOver(t.x);
@@ -5232,8 +5329,9 @@ export class MatchSystem extends createSystem({
       text = 'Draw\nReplay the round';
     } else {
       const loser = v === 1 ? this.theirs : this.mine;
-      // The opening match always lasts at least three rounds, so each hand verb gets its own turn.
-      const points = finishPoints(loser, this.progress.matches === 0);
+      // Tutorial finishes normally score one; the real desk edge remains an exceptional +1 rule.
+      const points = finishPoints(loser, this.progress.matches === 0, deskKo && v === 1);
+      this.lastRoundHeat = points;
       if (v === 1) this.myPoints += points;
       else this.theirPoints += points;
       // Match point down: a win from here is a comeback.
@@ -5242,6 +5340,7 @@ export class MatchSystem extends createSystem({
       const score = `Heat ${this.myPoints} - ${this.theirPoints}`;
       const decided = this.myPoints >= MATCH_HEAT || this.theirPoints >= MATCH_HEAT;
       this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
+      if (deskKo) this.matchLog.rounds[this.matchLog.rounds.length - 1] = 'DESK KO';
       if (decided) {
         const youWon = this.myPoints > this.theirPoints;
         playMatch(youWon);
@@ -5296,8 +5395,12 @@ export class MatchSystem extends createSystem({
       this.koFreeze = KO_FREEZE;
       const won = this.myPoints > this.theirPoints || (decided && v === 1);
       const cause = recent && v === 1 ? `YOUR ${recent}` : theirs && v === -1 && loser.finish !== 'spin' ? `THEIR ${this.rivalShapeKind}`.toUpperCase() : '';
-      this.lastCause = cause ? `${cause} → ${FINISH_WORD[loser.finish ?? 'spin']}` : '';
-      this.stamp.show(`${FINISH_WORD[loser.finish ?? 'spin']}!`, decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
+      const finishWord = name(loser);
+      this.lastCause = cause ? `${cause} → ${finishWord}` : '';
+      const finishSub = deskKo
+        ? `REAL EDGE · +${DESK_KO_BONUS} HEAT${decided ? ' · MATCH WON' : ''}`
+        : decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause;
+      this.stamp.show(`${finishWord}!`, finishSub, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
       if (recent && v === 1) {
         // The stamp names the cause (SLAG! / YOUR RAMP); the card keeps to the score.
         // The decisive move plays out slowly for a moment, in a shower of sparks, then again as a replay.

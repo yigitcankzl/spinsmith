@@ -608,7 +608,7 @@ TUNING.grace = 0;
 }
 
 // 13. Original vocabulary and heat scoring: no numbered cores or borrowed tip names; outlasting
-// scores 1 heat, every knockout 2, first to 3; every built-in pit is worth the same.
+// scores 1 heat, every knockout 2, a real-desk KO adds 1, first to 3; every built-in pit is worth the same.
 {
   const borrowed = ['Flat', 'Rush', 'Taper', 'Ball', 'Needle', 'Orb'];
   for (const c of CORES) assert.ok(!/^\d+-\d+$/.test(c.name), `core ${c.id} needs a name, not a number`);
@@ -620,6 +620,7 @@ TUNING.grace = 0;
     t.finish = finish;
     assert.equal(finishPoints(t), heat, `${finish} should score ${heat} heat`);
     assert.equal(finishPoints(t, true), 1, `${finish} should score one tutorial heat`);
+    assert.equal(finishPoints(t, false, finish === 'over'), heat + (finish === 'over' ? 1 : 0), 'only a thrown top can earn the desk bonus');
   }
   for (const a of ARENAS) for (const p of a.pockets) assert.equal(p.points, 2, `${a.name}: every pit is worth 2`);
 }
