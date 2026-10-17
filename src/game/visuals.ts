@@ -134,11 +134,15 @@ export function makeMatcap(kind: MatcapKind, hex: number): DataTexture {
  */
 /** Real metal on the blades and ratchets: reflections of the room environment sweep across them as they spin. */
 const BRUSHED = brushedTexture();
+// The same grayscale image serves two different jobs: visible albedo is authored in sRGB, while
+// roughness is data and must stay linear. Sharing one Texture object made one of those wrong.
+const BRUSHED_ROUGHNESS = BRUSHED.clone();
+BRUSHED.colorSpace = SRGBColorSpace;
 /** The turning marks as a normal map too, so the brushing catches the light as the top turns. */
 const BLADE_NORMAL = LATHE_NORMAL.clone();
 BLADE_NORMAL.repeat.copy(BRUSHED.repeat);
 BLADE_NORMAL.offset.copy(BRUSHED.offset);
-const BLADE_METAL = new MeshStandardMaterial({ color: 0xc4cad5, metalness: 1, roughness: 0.34, map: BRUSHED, roughnessMap: BRUSHED, normalMap: BLADE_NORMAL });
+const BLADE_METAL = new MeshStandardMaterial({ color: 0xc4cad5, metalness: 1, roughness: 0.34, map: BRUSHED, roughnessMap: BRUSHED_ROUGHNESS, normalMap: BLADE_NORMAL });
 
 /**
  * Spun metal: fine concentric brushing with a few scratches, centered on the top's axis. The
@@ -882,7 +886,9 @@ export class TopView {
       new RingGeometry(radius * 1.25, radius * 1.55, 40).rotateX(-Math.PI / 2),
       new MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: AdditiveBlending, depthWrite: false }),
     );
-    ring.position.y = 0.0003;
+    // The contact shadow is offset away from the back-left key. Counter-offset the team ring so it
+    // remains centered on the top instead of inheriting the shadow's tiny directional bias.
+    ring.position.set(-0.0024, 0.0003, -0.0018);
     ring.renderOrder = 2;
     this.teamRing = ring;
     this.shadow.add(ring);
@@ -943,11 +949,11 @@ export class TopView {
     if (this.shakeT > 0) {
       // Side to side, fading out.
       this.shakeT = Math.max(0, this.shakeT - dt);
-      const a = this.shakeAmp * (this.shakeT / 0.12) * (Math.floor(this.shakeT * 120) % 2 ? 1 : -1);
+      const a = this.shakeAmp * (this.shakeT / 0.16) * (Math.floor(this.shakeT * 120) % 2 ? 1 : -1);
       this.root.position.x += a;
       this.root.position.z -= a * 0.5;
     }
-    this.shadow.position.set(top.x, y + 0.0008, top.z);
+    this.shadow.position.set(top.x + 0.0024, y + 0.0008, top.z + 0.0018);
     // The team ring glows with the spin, and flashes with a hit.
     if (this.teamRing) (this.teamRing.material as MeshBasicMaterial).opacity = 0.3 + 0.4 * Math.min(1, Math.max(0, top.spin)) + this.flashT * 6;
     // The drawn spin: the simulation's angle sped up SPIN_DRAW times (a jump, as at a new round or a
@@ -1137,13 +1143,13 @@ export class TopView {
       const w = (0.25 - this.deskSpin) * 1.2;
       this.root.rotation.set(w * Math.sin(this.outT * 9), 0, w * Math.cos(this.outT * 9));
       this.shadow.visible = true;
-      this.shadow.position.set(p.x, p.y + 0.0008, p.z);
+      this.shadow.position.set(p.x + 0.0024, p.y + 0.0008, p.z + 0.0018);
       return;
     }
     const f = this.fall * this.fall;
     this.root.rotation.set(1.25 * f * this.fallZ, 0, -1.25 * f * this.fallX);
     this.shadow.visible = this.landed;
-    this.shadow.position.set(p.x, p.y + 0.0008, p.z);
+    this.shadow.position.set(p.x + 0.0024, p.y + 0.0008, p.z + 0.0018);
   }
 
   /** Burst: the parts fly apart, tumble, bounce on the floor and fade out. */
@@ -1431,7 +1437,7 @@ export class ArenaView {
   private layout!: ArenaLayout;
   private palette!: Palette;
   private readonly base = new Color();
-  private readonly warm = new Color(0xffa155);
+  private readonly warm = new Color(0x8f4728);
   private readonly cold = new Color(0x2c3442);
   private readonly pit = new Color();
   private readonly ember = new Color(0xff4a12);
@@ -1489,13 +1495,13 @@ export class ArenaView {
     this.geo.setAttribute('uv', new BufferAttribute(uv, 2));
     this.geo.setIndex(idx);
     // Spun steel: the turning marks glint in rings as the head moves; the theme tints it through the vertex colors.
-    const floor = new Mesh(this.geo, new MeshStandardMaterial({ map: FLOOR_TEXTURE, vertexColors: true, metalness: 0.3, roughness: 0.45, normalMap: LATHE_NORMAL }));
+    const floor = new Mesh(this.geo, new MeshStandardMaterial({ map: FLOOR_TEXTURE, vertexColors: true, metalness: 0.58, roughness: 0.34, normalMap: LATHE_NORMAL }));
     floor.frustumCulled = false;
-    // The key light: one warm, shadowless spot above the arena, a little toward the player, so the
+    // The key light: one warm, shadowless spot above and behind-left of the arena, so the
     // bowl and the tops stand in a pool of light (it lights lit materials only). Always on: hiding
     // a light would recompile every lit material.
-    const key = new SpotLight(0xffd2a0, 0.86, 0, 0.75, 0.6, 2);
-    key.position.set(-0.04, 0.26, 0.08);
+    const key = new SpotLight(0xffd2a0, 1.05, 0, 0.72, 0.58, 2);
+    key.position.set(-0.16, 0.3, -0.12);
     this.root.add(floor, this.features, key, key.target);
   }
 
@@ -1779,7 +1785,13 @@ export class ArenaView {
         pos.setXYZ(i, x, arena.height(x, z), z);
         const shape = arena.shapeHeight(x, z);
         const dip = -arena.pocketDip(x, z) / 0.003;
-        if (shape > 0) this.tmp.copy(this.base).lerp(this.warm, Math.min(1, shape / 0.02));
+        if (shape > 0) {
+          const forged = Math.min(1, shape / 0.02);
+          // A hand-forged rise reads as dark heated copper, with a thin ember-hot crown, instead
+          // of turning into a flat peach-colored blob.
+          this.tmp.copy(this.base).lerp(this.warm, forged);
+          if (forged > 0.35) this.tmp.lerp(this.ember, (forged - 0.35) * (0.18 + 0.08 * Math.sin(this.time * 7)));
+        }
         else this.tmp.copy(this.base).lerp(this.cold, Math.min(1, -shape / 0.02));
         // A raised shape is lit from above and the player's side, so its faces read as a slope
         // (a ramp's steep face is bright toward you, dark away), not as a flat glow.
@@ -2843,9 +2855,9 @@ export function forgeEnvironment(renderer: WebGLRenderer): Texture {
     m.lookAt(0, 0, 0);
     scene.add(m);
   };
-  box(3, 2.4, 0xfff4e8, 1.6, 0, 3.2, 0.6); // soft key panel overhead, a little toward the viewer
-  box(2.4, 1.2, 0xffa060, 1.4, -3, 0.5, 1); // warm softbox, low on the left
-  box(5, 0.5, 0x8fb7ff, 1.2, 1.5, 2.2, -3); // cool strip behind
+  box(3.4, 2.2, 0xfff4e8, 1.65, -1.8, 3.4, -2.2); // large back-left key panel
+  box(2.4, 1.2, 0xffa060, 1.35, -3.2, 1.1, -1.6); // warm back-left softbox
+  box(5, 0.5, 0x8fb7ff, 1.15, 2.5, 2.0, 2.8); // cool front-right separator
   box(4, 0.1, 0xffffff, 4, 0, 3, -0.6); // bright line overhead
   box(2, 1, 0x40261a, 1, 3, -0.4, 1); // a dim ember bounce on the right
   const pmrem = new PMREMGenerator(renderer);
