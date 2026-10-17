@@ -62,6 +62,25 @@ topCollar.name = 'TopCollar';
 topCollar.position.y = -0.01;
 root.add(topCollar);
 
+// One continuous brass compression belt turns the silhouette from a dark generic pedestal into a
+// forge machine. It sits on the waist, where the outer clamps visibly transfer their load.
+const compressionBand = new Mesh(
+  new TorusGeometry(ARENA_RADIUS + 0.0165, 0.0026, 8, 64).rotateX(Math.PI / 2),
+  BRASS,
+);
+compressionBand.name = 'BrassCompressionBand';
+compressionBand.position.y = -0.057;
+root.add(compressionBand);
+
+// A recessed heat seam under the shoulder separates the black iron body from the polished collar.
+const heatSeam = new Mesh(
+  new TorusGeometry(ARENA_RADIUS + 0.0182, 0.0011, 6, 64).rotateX(Math.PI / 2),
+  ember,
+);
+heatSeam.name = 'EmberShoulderSeam';
+heatSeam.position.y = -0.022;
+root.add(heatSeam);
+
 
 const clampGeo = bevelBox(0.022, 0.042, 0.016, 0.0015);
 // Shallow enough to stay inside the lathe body (only the clamps stand proud of it).

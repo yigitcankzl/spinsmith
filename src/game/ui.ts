@@ -226,7 +226,9 @@ export function metalPlate(g: CanvasRenderingContext2D, w: number, h: number, ri
   g.lineTo(w - 2 - c, h - 3);
   g.stroke();
   chamfer(g, 2, 2, w - 4, h - 4, c);
-  g.strokeStyle = 'rgba(150,160,175,0.5)';
+  // The touchable plate family belongs to the forge: brass perimeter, steel face. Read-only glass
+  // keeps its cool blue edge, so the player can tell what can be pinched before reading it.
+  g.strokeStyle = 'rgba(201,154,80,0.72)';
   g.lineWidth = 2;
   g.stroke();
   if (!rivets) return;
@@ -234,7 +236,7 @@ export function metalPlate(g: CanvasRenderingContext2D, w: number, h: number, ri
   for (const [x, y] of [[c + r * 2, c * 0.4 + r * 2], [w - c - r * 2, c * 0.4 + r * 2], [c + r * 2, h - c * 0.4 - r * 2], [w - c - r * 2, h - c * 0.4 - r * 2]]) {
     const metal = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
     metal.addColorStop(0, '#ffffff');
-    metal.addColorStop(0.45, STEEL);
+    metal.addColorStop(0.45, '#c99a50');
     metal.addColorStop(1, '#4a5566');
     g.fillStyle = metal;
     g.beginPath();

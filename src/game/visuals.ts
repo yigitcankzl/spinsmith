@@ -1239,7 +1239,7 @@ const VOID_METAL = doubleSided(metal(0x8a7ab0));
 const PALETTES: Record<Theme, Palette> = {
   // Three layers at the rim: a dark body, a metal lip (walls and rails), one accent light.
   // The floor is spun steel, clearly lighter than the graphite shell around it.
-  forge: { floor: 0x7a7f88, pit: 0x2a2523, wall: STEEL_WALL, rail: 0x9aa1ad, railHot: 0xff8a2a, accent: 0xff6a1a, pedestal: BODY },
+  forge: { floor: 0x4b5058, pit: 0x171313, wall: STEEL_WALL, rail: 0x9aa1ad, railHot: 0xff8a2a, accent: 0xff6a1a, pedestal: BODY },
   stone: { floor: 0x606369, pit: 0x26262b, wall: STONE, rail: 0x9aa1ad, railHot: 0xffe2b8, accent: 0xf2e6d2, pedestal: 0x3d3f45 },
   clockwork: { floor: 0x675d4d, pit: 0x2e2618, wall: BRASS_WALL, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0x463b2c },
   ice: { floor: 0x6a7f8f, pit: 0x22303e, wall: FROST, rail: 0xb8c6d2, railHot: 0xffffff, accent: 0xe8f4ff, pedestal: 0x3e4a56 },
@@ -1266,6 +1266,41 @@ function plinthMaterial(hex: number): MeshStandardMaterial {
  * middle, and wear where the tops run. Grayscale: the theme's floor color tints it.
  */
 const FLOOR_TEXTURE = floorTexture();
+const FLOOR_EMBER_TEXTURE = floorEmberTexture();
+
+/** Black except for the engraved rings and centre spark; used only as the forge floor's emission. */
+function floorEmberTexture(): CanvasTexture {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d')!;
+  const C = S / 2;
+  g.fillStyle = '#000000';
+  g.fillRect(0, 0, S, S);
+  g.strokeStyle = '#ffffff';
+  g.lineCap = 'round';
+  for (const f of [0.36, 0.72]) {
+    g.globalAlpha = f === 0.36 ? 0.55 : 0.38;
+    g.lineWidth = 2.5;
+    g.beginPath();
+    g.arc(C, C, C * f, 0, Math.PI * 2);
+    g.stroke();
+  }
+  g.globalAlpha = 0.65;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.arc(C, C, C * 0.16, 0, Math.PI * 2);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(C - 22, C + 8);
+  g.lineTo(C - 4, C - 20);
+  g.lineTo(C + 2, C - 5);
+  g.lineTo(C + 22, C - 12);
+  g.lineTo(C + 7, C + 19);
+  g.stroke();
+  g.globalAlpha = 1;
+  return new CanvasTexture(c);
+}
 
 function floorTexture(): CanvasTexture {
   const S = 1024;
@@ -1455,6 +1490,7 @@ export class ArenaView {
   private readonly pit = new Color();
   private readonly ember = new Color(0xff4a12);
   private readonly tmp = new Color();
+  private readonly floorMaterial: MeshStandardMaterial;
   private readonly railIdle = new Color();
   private readonly railHot = new Color();
   private railMats: MeshStandardMaterial[] = [];
@@ -1509,8 +1545,19 @@ export class ArenaView {
     this.geo.setAttribute('color', new BufferAttribute(this.colors, 3));
     this.geo.setAttribute('uv', new BufferAttribute(uv, 2));
     this.geo.setIndex(idx);
-    // Spun steel: the turning marks glint in rings as the head moves; the theme tints it through the vertex colors.
-    const floor = new Mesh(this.geo, new MeshStandardMaterial({ map: FLOOR_TEXTURE, vertexColors: true, metalness: 0.58, roughness: 0.34, normalMap: LATHE_NORMAL }));
+    // Blackened spun steel: the turning marks glint in rings, while the forge theme alone gives
+    // the engraved rings and centre spark a restrained ember response.
+    this.floorMaterial = new MeshStandardMaterial({
+      map: FLOOR_TEXTURE,
+      vertexColors: true,
+      metalness: 0.82,
+      roughness: 0.56,
+      normalMap: LATHE_NORMAL,
+      emissive: 0xff4a12,
+      emissiveMap: FLOOR_EMBER_TEXTURE,
+      emissiveIntensity: 0,
+    });
+    const floor = new Mesh(this.geo, this.floorMaterial);
     floor.frustumCulled = false;
     // The key light: one warm, shadowless spot above and behind-left of the arena, so the
     // bowl and the tops stand in a pool of light (it lights lit materials only). Always on: hiding
@@ -1528,6 +1575,7 @@ export class ArenaView {
     this.disposables = [];
     this.features.clear();
     this.base.set(P.floor);
+    this.floorMaterial.emissiveIntensity = layout.theme === 'forge' ? 0.32 : 0;
     this.pit.set(P.pit);
     this.railIdle.set(P.rail);
     this.railHot.set(P.railHot);
