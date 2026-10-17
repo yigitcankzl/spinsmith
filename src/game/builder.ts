@@ -315,6 +315,8 @@ const ITEM_SCALE = 0.95;
 const PLATE_AT = new Vector3(0, 0.1, -0.23);
 /** The tools fold out (and back for Try it) in this long (s). */
 const FOLD_TIME = 0.6;
+/** Short optical hand-tracking gaps are not releases. */
+const HAND_LOSS_GRACE = 0.28;
 
 interface Slot {
   piece: Piece;
@@ -326,8 +328,8 @@ interface Slot {
 
 /** What a pinch is holding right now. */
 type Held =
-  | { mode: 'piece'; piece: Piece; model: Group; hand: HandState; from: 'tray' | 'arena'; start: number; startAt: Vector3; pocketPoints: number }
-  | { mode: 'resize'; hand: HandState };
+  | { mode: 'piece'; piece: Piece; model: Group; hand: HandState; from: 'tray' | 'arena'; start: number; startAt: Vector3; pocketPoints: number; lost: number }
+  | { mode: 'resize'; hand: HandState; lost: number };
 
 export interface BuilderHooks {
   /** The draft changed: show it. */
@@ -530,7 +532,7 @@ export class Builder {
     }
     if (this.opened < 1 || this.folding) return;
     if (this.held) {
-      this.updateHeld();
+      this.updateHeld(dt);
       return;
     }
     // Hover feedback: pieces under a pointer lift and turn, plates light up.
@@ -577,7 +579,7 @@ export class Builder {
         const at = this.hooks.arenaPoint(h);
         if (at && this.pickFromArena(at.x, at.z, h)) return;
         if (at && this.isRim(at.x, at.z)) {
-          this.held = { mode: 'resize', hand: h };
+          this.held = { mode: 'resize', hand: h, lost: 0 };
           this.say('Pull the rim out or in to resize');
           return;
         }
@@ -616,7 +618,7 @@ export class Builder {
     const model = pieceModel(piece);
     model.scale.setScalar(1.4);
     this.root.add(model);
-    this.held = { mode: 'piece', piece, model, hand, from, start: this.time, startAt: hand.pinch.clone(), pocketPoints };
+    this.held = { mode: 'piece', piece, model, hand, from, start: this.time, startAt: hand.pinch.clone(), pocketPoints, lost: 0 };
     // The rail lifts away while a piece is carried, so the near rim stays in view.
     this.tools.visible = false;
     playPick();
@@ -630,9 +632,19 @@ export class Builder {
   }
 
   /** While holding: the piece follows the pointer over the arena; letting go drops it. */
-  private updateHeld() {
+  private updateHeld(dt: number) {
     const held = this.held!;
     const h = held.hand;
+    if (!h.tracked) {
+      if ((held.lost += dt) < HAND_LOSS_GRACE) return;
+      this.held = null;
+      if (held.mode === 'piece') {
+        this.tools.visible = true;
+        this.root.remove(held.model);
+      } else this.rebuildGuides();
+      return;
+    }
+    held.lost = 0;
     if (held.mode === 'resize') {
       const at = this.hooks.arenaPoint(h);
       if (at) {
@@ -644,7 +656,7 @@ export class Builder {
           this.hooks.preview(this.draft);
         }
       }
-      if (!h.pinching || !h.tracked) {
+      if (!h.pinching) {
         this.held = null;
         this.rebuildGuides();
         playPlace();

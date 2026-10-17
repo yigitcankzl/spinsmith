@@ -96,7 +96,9 @@ const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', bu
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
 /** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
-const HAND_LOSS_GRACE = 0.1;
+const HAND_LOSS_GRACE = 0.28;
+/** A one-hand rim pull waits this long for the other hand before it can become a spring. */
+const RIM_SPRING_INTENT = 0.25;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
 const LABEL_AT = new Vector3(0, 0.14, -0.21);
 /** At home after the first session the Smith's board fills the card's slot: notes hang just above it. */
@@ -339,6 +341,11 @@ export class MatchSystem extends createSystem({
   private paused = false;
   /** Seconds the pulling hand has been untracked. */
   private lostFor = 0;
+  /** Brief tracking holes must not erase an arena gesture that is visibly still being held. */
+  private shapeLost: Record<Side, number> = { left: 0, right: 0 };
+  private arenaMorphLost = 0;
+  private overforgeLost = 0;
+  private outerRailLost = 0;
   /** When the current ready phase began (for the intro before the first rip hint). */
   private readySince = 0;
   /** Seconds left of the simulation-only pause after a hard hit. */
@@ -615,7 +622,7 @@ export class MatchSystem extends createSystem({
   /** Each hand's ramp in the making: where, since when, and the live shape once it is set. */
   private shaping: Record<Side, { x: number; z: number; sx: number; sz: number; t: number; far: boolean; amp: number; dx: number; dz: number; shape: FloorShape | null } | null> = { left: null, right: null };
   /** The rim is pulled inward and released as a defensive spring rail. */
-  private rimPulls: Record<Side, { x: number; z: number; sx: number; sz: number } | null> = { left: null, right: null };
+  private rimPulls: Record<Side, { x: number; z: number; sx: number; sz: number; started: number } | null> = { left: null, right: null };
   /** Kept public for old capture scripts; the Spring Rail is now a normal arena verb. */
   private readonly rimExperiment = true;
   private rimSpringGuides = (['left', 'right'] as const).map(() => Object.assign(
@@ -3629,8 +3636,11 @@ export class MatchSystem extends createSystem({
       playTick();
     }
 
-    if (!left.tracked || !right.tracked || !left.pinching || !right.pinching) {
-      const trackingLost = !left.tracked || !right.tracked;
+    const trackingLost = !left.tracked || !right.tracked;
+    if (trackingLost && (this.arenaMorphLost += dt) < HAND_LOSS_GRACE) return true;
+    if (!trackingLost) this.arenaMorphLost = 0;
+    if (trackingLost || !left.pinching || !right.pinching) {
+      this.arenaMorphLost = 0;
       this.arenaMorphing = false;
       this.rimPulls.left = this.rimPulls.right = null;
       this.rimSpringGuides[0].visible = false;
@@ -3741,6 +3751,8 @@ export class MatchSystem extends createSystem({
       if (this.overforgeHeld === side || this.overforgeControl?.side === side) continue;
       this.updateCup(side);
       if (!h.tracked) {
+        if ((this.shapeLost[side] += this.frameDt) < HAND_LOSS_GRACE) continue;
+        this.shapeLost[side] = 0;
         this.shaping[side] = null;
         this.rimPulls[side] = null;
         this.pressing[side] = false;
@@ -3749,6 +3761,7 @@ export class MatchSystem extends createSystem({
         this.tipFresh[side] = true;
         continue;
       }
+      this.shapeLost[side] = 0;
       const l = this.toLocal(h.pinch);
       if (h.pinching) {
         // Keep the fingertip's height current while pinching, so letting go is not read as a fast press.
@@ -3771,10 +3784,10 @@ export class MatchSystem extends createSystem({
           continue;
         }
         let rim = this.rimPulls[side];
-        if (!rim && h.justPinched && open) {
+        if (!rim && h.justPinched && open && this.taught('defense')) {
           const n = normRadius(this.arena.layout, l.x, l.z);
           if (n >= 0.82 && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
-            rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z };
+            rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z, started: this.elapsed };
             playTick();
           }
         }
@@ -3822,6 +3835,9 @@ export class MatchSystem extends createSystem({
       const rim = this.rimPulls[side];
       if (rim) {
         this.rimPulls[side] = null;
+        // Give a second hand time to claim the opposite rim for a whole-arena forge. A quick
+        // first pinch/release is neither a forge nor a paid spring, so it changes nothing.
+        if (this.elapsed - rim.started < RIM_SPRING_INTENT) continue;
         this.doRimSpring(rim.sx, rim.sz, rim.x, rim.z);
         continue;
       }
@@ -3893,11 +3909,12 @@ export class MatchSystem extends createSystem({
   }
 
   /** The first fight teaches ramp, the signature two-hand arena forge, then an ultimate. */
-  private taught(verb: 'strike' | 'cup' | 'tells') {
+  private taught(verb: 'strike' | 'cup' | 'defense' | 'tells') {
     const m = this.progress.matches;
     if (verb === 'strike') return m >= 1 || (m === 0 && this.tutorialRound >= 3);
-    // Cup/sling arrives on the first rematch; the opening match keeps one clear hero verb per round.
-    if (verb === 'cup') return m >= 1;
+    // Cup, sling and passive rim defence arrive after two completed matches; the opening session
+    // stays focused on rip, ramp and the signature two-hand forge.
+    if (verb === 'cup' || verb === 'defense') return m >= 2;
     return m >= 3;
   }
 
@@ -3915,6 +3932,11 @@ export class MatchSystem extends createSystem({
   /** Open hands near the rim become forgiving wall sectors; the hand chooses where tops rebound. */
   private updatePalmBrace() {
     this.palmBraceActive = false;
+    if (!this.taught('defense')) {
+      this.palmBraceAngles.left = this.palmBraceAngles.right = null;
+      for (const wall of this.palmBraceWalls) wall.visible = false;
+      return;
+    }
     const radius = maxRim(this.arena.layout);
     for (let i = 0; i < 2; i++) {
       const side = (i === 0 ? 'left' : 'right') as Side;
@@ -3924,10 +3946,13 @@ export class MatchSystem extends createSystem({
       this.palmBraceAngles[side] = null;
       if (!h.tracked || h.pinching || this.overforgeControl?.side === side || this.overforgeHeld === side) continue;
       const wrist = this.handAt.copy(this.toLocal(h.wrist));
-      const palm = wrist.lerp(this.toLocal(h.index), 0.45);
+      const index = this.root.worldToLocal(this.local.copy(h.index));
+      const palm = wrist.lerp(index, 0.45);
       const n = normRadius(this.arena.layout, palm.x, palm.z);
       const floor = this.arena.height(palm.x, palm.z);
-      if (n < 0.78 || n > 1.22 || palm.y < floor - 0.025 || palm.y > floor + 0.13) continue;
+      // A defensive wall requires a low, flat open hand. A relaxed upright hand near the rim no
+      // longer creates an invisible parry sector by accident.
+      if (n < 0.78 || n > 1.22 || palm.y < floor - 0.025 || palm.y > floor + 0.055 || Math.abs(wrist.y - index.y) > 0.065) continue;
       const angle = Math.atan2(palm.z, palm.x);
       this.palmBraceAngles[side] = angle;
       this.palmBraceActive = true;
@@ -3952,7 +3977,10 @@ export class MatchSystem extends createSystem({
     if (active) {
       const h = this.hands[active.side];
       active.t -= dt;
+      if (!h.tracked && (this.overforgeLost += dt) < HAND_LOSS_GRACE) return;
+      if (h.tracked) this.overforgeLost = 0;
       if (!h.tracked || !h.pinching || active.t <= 0 || this.phase !== 'fight') {
+        this.overforgeLost = 0;
         this.rampAt[active.side] = this.elapsed;
         this.tipFresh[active.side] = true;
         this.pressing[active.side] = false;
@@ -3989,7 +4017,10 @@ export class MatchSystem extends createSystem({
     const heldSide = this.overforgeHeld;
     if (heldSide) {
       const h = this.hands[heldSide];
+      if (!h.tracked && (this.overforgeLost += dt) < HAND_LOSS_GRACE) return;
+      if (h.tracked) this.overforgeLost = 0;
       if (!h.tracked || !h.pinching) {
+        this.overforgeLost = 0;
         this.overforgeHeld = null;
         this.overforgeMode = 'ready';
         return;
@@ -4974,7 +5005,10 @@ export class MatchSystem extends createSystem({
       return true;
     }
     const h = this.hands[this.outerRailSide];
+    if (!h.tracked && (this.outerRailLost += dt) < HAND_LOSS_GRACE) return true;
+    if (h.tracked) this.outerRailLost = 0;
     if (!h.tracked || !h.pinching) {
+      this.outerRailLost = 0;
       this.outerRailSide = null;
       this.outerRingState = 'rescue';
       this.outerRailCount = 0;

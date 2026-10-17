@@ -153,7 +153,7 @@ const GRAB_RAY = 0.06;
 /** A part picked from afar flies to the hand in this many seconds. */
 const FLY_TIME = 0.3;
 /** A hand lost this long (s) cancels a carry instead of releasing it (same as the match and home). */
-const HAND_LOSS_GRACE = 0.1;
+const HAND_LOSS_GRACE = 0.28;
 /** A part let go where it was picked up (a tap) fits straight away. */
 const TAP_MOVE = 0.03;
 

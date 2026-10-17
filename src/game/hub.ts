@@ -77,7 +77,7 @@ export type HubAction =
   | { kind: 'locked'; text: string };
 
 /** A hand lost this long (s) cancels a carry instead of dropping (same as the match's rip). */
-const HAND_LOSS_GRACE = 0.1;
+const HAND_LOSS_GRACE = 0.28;
 
 /** Near-rim stations (arena-local): your top's dock at the left, the forge's anvil at the right. */
 // Home is a showcase, not a storage shelf: pull the side stations into the seated binocular view.
