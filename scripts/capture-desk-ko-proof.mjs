@@ -22,10 +22,11 @@ export default async function run({ page, frame, cdp, workspaceRoot }) {
       g.stamp.show('DESK KO!', 'REAL EDGE · +1 HEAT · MATCH WON', 'mine', 5, 1.5);
     });
     await candidate.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    const path = `${workspaceRoot}/artifacts/desk-ko-hand-proof.jpg`;
-    // Playwright's full-page screenshot waits forever on this very slow immersive canvas. Capture
-    // the compositor surface directly instead; it is the same managed IWER application view.
-    const shot = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 82, fromSurface: true, captureBeyondViewport: false });
+    const path = `${workspaceRoot}/artifacts/desk-ko-hand-proof.png`;
+    // Playwright's full-page screenshot waits forever on this very slow immersive canvas, so use
+    // Chromium's XR surface directly. IWER depth is disabled at registration because it has no
+    // physical camera-depth layer; real Quest sessions retain depth occlusion.
+    const shot = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
     await writeFile(path, Buffer.from(shot.data, 'base64'));
     return { path, proof };
   }

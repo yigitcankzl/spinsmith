@@ -49,14 +49,19 @@ loadFonts()
     world.renderer.xr.setFramebufferScaleFactor(0.85);
     // Quest depth makes real hands, furniture and the table correctly cover the virtual smithy.
     // The arena's UI remains ordinary world geometry so instructions never disappear behind noise.
-    world.registerSystem(DepthSensingSystem, {
-      configData: {
-        enableDepthTexture: true,
-        enableOcclusion: true,
-        useFloat32: true,
-        blurRadius: 20,
-      },
-    });
+    // IWER has no physical camera-depth layer; registering the compositor there leaves half of
+    // each emulated view white. Physical Quest sessions keep the complete occlusion path in both
+    // development and production builds.
+    if (!('IWER_DEVICE' in window)) {
+      world.registerSystem(DepthSensingSystem, {
+        configData: {
+          enableDepthTexture: true,
+          enableOcclusion: true,
+          useFloat32: true,
+          blurRadius: 20,
+        },
+      });
+    }
     world.registerSystem(MatchSystem);
     // The landing page (index.html): Enter starts the session; the page hides while in XR.
     const landing = document.getElementById('landing');

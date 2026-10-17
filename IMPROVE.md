@@ -43,7 +43,7 @@ Verification run after the changes:
 - `npm run build` and public-release check: pass.
 - IWER immersive-AR session: active; `DepthSensingSystem` active with three occludables; no application
   error in the browser console.
-- Screenshots: `artifacts/occlusion-perf-final.png` and `artifacts/desk-ko-hand-proof.jpg`. The
+- Screenshots: `artifacts/occlusion-perf-final.png` and `artifacts/desk-ko-hand-proof.png`. The
   second is IWER proof, not Quest passthrough or performance evidence.
 
 ## Remaining work, in order

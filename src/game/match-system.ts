@@ -2840,6 +2840,12 @@ export class MatchSystem extends createSystem({
       return { x: l.x, z: l.z };
     });
     ROOM.floor = this.root.worldToLocal(this.p.set(this.root.position.x, this.floorY(), this.root.position.z)).y;
+    // This depth-only table is for real Quest passthrough. IWER has no camera compositor behind
+    // it, so its invisible pixels become a large white cut-out in emulator recordings.
+    if ('IWER_DEVICE' in window) {
+      this.tableMask.visible = false;
+      return;
+    }
     // The mask: the table top 2 mm below the surface plus a 5 cm skirt down its edges.
     const top = new Shape(table.poly.map((p) => new Vector2(p.x, p.z)));
     const pos: number[] = [];
