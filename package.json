@@ -20,6 +20,7 @@
     "report:arenas": "node scripts/arena-report.ts",
     "report:tops": "node scripts/top-report.ts",
     "report:shaping": "node scripts/shaping-report.ts",
+    "report:render-budget": "npx @iwsdk/cli browser run scripts/measure-render-budget.mjs --timeout 90000",
     "capture:gameplay": "scripts/trailer.sh",
     "capture:ultimates": "scripts/ultimates.sh",
     "capture:competition": "scripts/competition-trailer.sh",

@@ -1,5 +1,6 @@
 import {
   AdditiveBlending,
+  BufferAttribute,
   DoubleSide,
   Group,
   Mesh,
@@ -10,6 +11,7 @@ import {
   Shape,
   ShapeGeometry,
 } from '@iwsdk/core';
+import { mergeByMaterial } from './visuals.js';
 
 export type RoomSeal = 'anvil' | 'rush' | 'magnet' | 'tilt' | 'hammer' | 'ward';
 
@@ -59,6 +61,25 @@ function material(color: number, opacity: number, glow = true) {
 export class RoomImprints {
   readonly root = new Group();
   private records = load();
+  /** All luminous traces share one vertex-coloured material, so eight memories still draw once. */
+  private readonly glowMaterial = new MeshBasicMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+    side: DoubleSide,
+    blending: AdditiveBlending,
+  });
+  /** The scorched underprint is deliberately uniform and costs one further draw call. */
+  private readonly darkMaterial = new MeshBasicMaterial({
+    color: 0x170d08,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    side: DoubleSide,
+    blending: NormalBlending,
+  });
 
   constructor(private readonly tableY: number) {
     this.root.name = 'persistent-room-imprints';
@@ -89,9 +110,41 @@ export class RoomImprints {
       for (const mat of mats) materials.add(mat);
     });
     for (const geometry of geometries) geometry.dispose();
-    for (const mat of materials) mat.dispose();
+    for (const mat of materials) if (mat !== this.glowMaterial && mat !== this.darkMaterial) mat.dispose();
     this.root.clear();
     this.records.forEach((record, index) => this.build(record, 0.34 + 0.5 * ((index + 1) / this.records.length)));
+    this.batch();
+  }
+
+  /** Bakes every saved mark into one glow mesh plus one dark underprint. */
+  private batch(): void {
+    if (this.root.children.length === 0) return;
+    const sourceGeometries = new Set<{ dispose(): void }>();
+    const sourceMaterials = new Set<{ dispose(): void }>();
+    this.root.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      sourceGeometries.add(object.geometry);
+      const source = object.material as MeshBasicMaterial;
+      sourceMaterials.add(source);
+      if (source.blending === AdditiveBlending) {
+        const color = source.color;
+        const intensity = source.opacity;
+        const count = object.geometry.getAttribute('position').count;
+        const rgb = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) {
+          rgb[i * 3] = color.r * intensity;
+          rgb[i * 3 + 1] = color.g * intensity;
+          rgb[i * 3 + 2] = color.b * intensity;
+        }
+        object.geometry.setAttribute('color', new BufferAttribute(rgb, 3));
+        object.material = this.glowMaterial;
+      } else object.material = this.darkMaterial;
+    });
+    const merged = mergeByMaterial(this.root);
+    this.root.clear();
+    this.root.add(merged);
+    for (const geometry of sourceGeometries) geometry.dispose();
+    for (const mat of sourceMaterials) mat.dispose();
   }
 
   private build(record: ImprintRecord, alpha: number): void {

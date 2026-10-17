@@ -1016,12 +1016,16 @@ export class TopView {
     const heat = Math.max(0, (top.damage - 0.12) / 0.88);
     const spinning = top.state === 'spinning';
     blur.opacity = spinning ? Math.max(0.5 * Math.min(1, Math.max(0, top.spin)), this.flashT * 9, 0.6 * heat) : 0;
+    this.blur.visible = blur.opacity > 0.01;
     // The streaks sweep round at half the simulation's rate, so the spin reads as motion.
     this.blur.rotation.y = this.drawAngle * 0.1;
     blur.color.copy(this.blurColor).lerp(this.danger, Math.min(1, heat * 1.3)).lerp(this.white, Math.min(1, this.flashT * 12));
     // Fast spin smears the blade into a disc; as the spin drops the disc fades and the parts show.
     const fast = spinning ? Math.min(1, Math.max(0, (this.rate - 9) / 15)) : 0;
-    if (this.disc) (this.disc.material as MeshBasicMaterial).opacity = 0.85 * fast * fast * (3 - 2 * fast);
+    if (this.disc) {
+      (this.disc.material as MeshBasicMaterial).opacity = 0.85 * fast * fast * (3 - 2 * fast);
+      this.disc.visible = (this.disc.material as MeshBasicMaterial).opacity > 0.01;
+    }
     if (this.edge) {
       const m = this.edge.material as MeshBasicMaterial;
       m.color.copy(this.edgeColor).lerp(this.danger, Math.min(1, heat)).lerp(this.white, COMFORT.flashes ? 0.8 * flare : 0);
@@ -1061,6 +1065,8 @@ export class TopView {
       return;
     }
     this.root.visible = true;
+    this.blur.visible = false;
+    if (this.edge) this.edge.visible = false;
     const p = this.throwPos;
     const v = this.throwVel;
     // Gravity in the arena's own units (it is drawn ARENA_SCALE times life size).
@@ -1140,7 +1146,10 @@ export class TopView {
     this.root.position.copy(p);
     this.spinner.rotation.y += dt * (8 + 50 * this.deskSpin) * (1 - this.fall) * SPIN_DRAW * 0.6;
     // Its blur fades as it spins down on the desk, so it falls over crisp.
-    if (this.disc) (this.disc.material as MeshBasicMaterial).opacity = 0.85 * Math.min(1, Math.max(0, (this.deskSpin - 0.15) * 2)) * (1 - this.fall);
+    if (this.disc) {
+      (this.disc.material as MeshBasicMaterial).opacity = 0.85 * Math.min(1, Math.max(0, (this.deskSpin - 0.15) * 2)) * (1 - this.fall);
+      this.disc.visible = (this.disc.material as MeshBasicMaterial).opacity > 0.01;
+    }
     // A slowing top wobbles before it falls.
     if (this.landed && this.deskSpin > 0 && this.deskSpin < 0.25) {
       const w = (0.25 - this.deskSpin) * 1.2;
