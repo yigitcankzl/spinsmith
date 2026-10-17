@@ -804,13 +804,13 @@ export class TopView {
 
   /** A hard hit shakes the top in place for a moment (real time, so it quivers through hit-stop). */
   shake(strength: number) {
-    this.shakeT = 0.04 + 0.08 * strength;
-    this.shakeAmp = 0.0006 + 0.0016 * strength;
+    this.shakeT = 0.055 + 0.105 * strength;
+    this.shakeAmp = 0.0009 + 0.0023 * strength;
   }
 
   /** A hard hit: the halo flashes white for about 80 ms. */
   flash() {
-    if (COMFORT.flashes) this.flashT = 0.08;
+    if (COMFORT.flashes) this.flashT = 0.11;
   }
 
   /**
@@ -1909,16 +1909,27 @@ export class Sparks {
 
   /** A shower where something hit (strength 0..1): more, faster, fatter sparks, and embers on hard hits. */
   burst(x: number, y: number, z: number, strength: number) {
-    const n = 4 + Math.round(strength * 20);
+    const n = 6 + Math.round(strength * 28);
     for (let k = 0; k < n; k++) {
       const i = this.nextSpark;
       this.nextSpark = (this.nextSpark + 1) % SPARK_POOL;
       const a = Math.random() * Math.PI * 2;
-      const sp = 0.15 + Math.random() * 0.5 * (0.5 + strength);
-      const w = 0.0009 + 0.0007 * Math.random() * (0.5 + strength);
-      this.spawn(i, x, y + 0.012, z, Math.cos(a) * sp, 0.2 + Math.random() * 0.4, Math.sin(a) * sp, 0.25 + Math.random() * 0.3, w, y);
+      const sp = 0.18 + Math.random() * 0.65 * (0.5 + strength);
+      const w = 0.0012 + 0.001 * Math.random() * (0.5 + strength);
+      this.spawn(i, x, y + 0.012, z, Math.cos(a) * sp, 0.24 + Math.random() * 0.48, Math.sin(a) * sp, 0.32 + Math.random() * 0.36, w, y);
     }
-    if (strength > 0.45) this.embers(x, y, z, Math.round(strength * 8), 0.18, 0.1 + 0.12 * strength);
+    if (strength > 0.45) this.embers(x, y, z, Math.round(strength * 11), 0.2, 0.12 + 0.14 * strength);
+  }
+
+  /** A short hot wake behind a top that has left the arena but is still crossing the real desk. */
+  flight(x: number, y: number, z: number) {
+    for (let k = 0; k < 3; k++) {
+      const i = this.nextSpark;
+      this.nextSpark = (this.nextSpark + 1) % SPARK_POOL;
+      const a = Math.random() * Math.PI * 2;
+      const speed = 0.05 + Math.random() * 0.08;
+      this.spawn(i, x, y + 0.006, z, Math.cos(a) * speed, 0.06 + Math.random() * 0.08, Math.sin(a) * speed, 0.24 + Math.random() * 0.12, 0.0018 + Math.random() * 0.0008, y);
+    }
   }
 
   /**
@@ -2299,7 +2310,7 @@ export class Impacts {
     r.mesh.visible = true;
     if (strength >= 0.8 && COMFORT.flashes) {
       this.flareT = 0;
-      this.flareSize = 0.035 + 0.025 * strength;
+      this.flareSize = 0.045 + 0.035 * strength;
       this.flare.position.set(x, y + 0.012, z);
       this.flare.visible = true;
     }
@@ -2348,7 +2359,7 @@ export class Impacts {
 
   update(dt: number) {
     if (this.flare.visible) {
-      this.flareT += dt / 0.12;
+      this.flareT += dt / 0.16;
       const k = Math.min(1, this.flareT);
       this.flare.scale.setScalar(this.flareSize * (0.5 + 0.8 * Math.sqrt(k)));
       const m = this.flare.material;
@@ -2403,7 +2414,7 @@ export class Impacts {
  * cyan), longer and brighter the faster it moves, so a 1 cm top's path reads at a glance.
  */
 export class Trails {
-  static readonly PER = 24;
+  static readonly PER = 32;
   readonly mesh: InstancedMesh;
   private age = new Float32Array(Trails.PER * 2).fill(9);
   private size = new Float32Array(Trails.PER * 2);
@@ -2435,7 +2446,7 @@ export class Trails {
     const i = side * Trails.PER + this.next[side];
     this.next[side] = (this.next[side] + 1) % Trails.PER;
     this.age[i] = 0;
-    this.size[i] = 0.01 + Math.min(0.014, speed * 0.03);
+    this.size[i] = 0.012 + Math.min(0.018, speed * 0.038);
     this.at[i * 3] = x;
     this.at[i * 3 + 1] = y + 0.0015;
     this.at[i * 3 + 2] = z;
@@ -2450,11 +2461,11 @@ export class Trails {
   update(dt: number) {
     // Nothing to draw once every dot has faded (outside fights): no draw call, no upload.
     this.newest += dt;
-    this.mesh.visible = this.newest < 0.45;
+    this.mesh.visible = this.newest < 0.6;
     if (!this.mesh.visible) return;
     for (let i = 0; i < Trails.PER * 2; i++) {
       this.age[i] += dt;
-      const k = Math.max(0, 1 - this.age[i] / 0.45);
+      const k = Math.max(0, 1 - this.age[i] / 0.6);
       this.v.fromArray(this.at, i * 3);
       const r = this.size[i] * k;
       this.mesh.setMatrixAt(i, this.m.compose(this.v, this.q, this.s.set(r, 1, r)));

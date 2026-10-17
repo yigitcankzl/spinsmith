@@ -574,6 +574,9 @@ export class MatchSystem extends createSystem({
   private deskVerdict: { v: 1; left: number } | null = null;
   /** Observable after the result: this round really earned the extra desk-edge heat. */
   private deskKoScored = false;
+  /** 0 idle, 1 rim hit, 2 crossing the desk, 3 real edge crossed. */
+  private deskKoStage = 0;
+  private deskKoTrailT = 0;
   /** Heat awarded by the last resolved round, kept visible after a match resets its running score. */
   private lastRoundHeat = 0;
   /** Reused output of the rival's table-edge prediction; avoids allocating in the fight loop. */
@@ -997,6 +1000,7 @@ export class MatchSystem extends createSystem({
       matches: this.progress.matches,
       deskVerdict: !!this.deskVerdict,
       deskKoScored: this.deskKoScored,
+      deskKoStage: this.deskKoStage,
       lastRoundHeat: this.lastRoundHeat,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
@@ -3021,6 +3025,7 @@ export class MatchSystem extends createSystem({
     this.outerRingState = 'idle';
     this.deskVerdict = null;
     this.deskKoScored = false;
+    this.setDeskKoStage(0);
     this.lastRoundHeat = 0;
     this.outerRingUsed = false;
     this.outerRingLeft = 0;
@@ -3378,6 +3383,13 @@ export class MatchSystem extends createSystem({
     this.rootEntity?.setValue(FirstFiveState, 'step', step);
   }
 
+  /** Mirrors the readable DESK KO sequence into ECS for emulator and remote-device proof. */
+  private setDeskKoStage(stage: 0 | 1 | 2 | 3) {
+    if (this.deskKoStage === stage) return;
+    this.deskKoStage = stage;
+    this.rootEntity?.setValue(FirstFiveState, 'deskKoStage', stage);
+  }
+
   /** Counts a player-authored arena change and marks the signature loop as reached. */
   private recordIntervention() {
     this.interventionCount++;
@@ -3524,6 +3536,7 @@ export class MatchSystem extends createSystem({
     this.offDeskShown = false;
     this.deskVerdict = null;
     this.deskKoScored = false;
+    this.setDeskKoStage(0);
     this.lastRoundHeat = 0;
     this.lastCause = '';
     // Personal bests are their own small moment (the first record is just kept).
@@ -5124,8 +5137,21 @@ export class MatchSystem extends createSystem({
   private beginDeskVerdict(): boolean {
     if (this.demo || !ROOM.poly || this.theirs.finish !== 'over') return false;
     this.deskVerdict = { v: 1, left: DESK_VERDICT_TIME };
+    this.deskKoTrailT = 0;
+    this.setDeskKoStage(1);
     this.accumulator = 0;
-    this.label.set('THROWN ONTO YOUR TABLE\nREAL EDGE = +1 HEAT');
+    const y = this.arena.height(this.theirs.x, this.theirs.z);
+    this.arenaView.flashRail(this.theirs.x, this.theirs.z);
+    this.impacts.hit(this.theirs.x, y, this.theirs.z, 1);
+    this.impacts.shock(this.theirs.x, y, this.theirs.z, 1, 0xff8a2a);
+    this.sparks.burst(this.theirs.x, y, this.theirs.z, 1);
+    this.theirView.flash();
+    this.theirView.shake(1);
+    this.theirView.hit(1, this.theirs.vx, this.theirs.vz, 0.09);
+    this.koFreeze = Math.max(this.koFreeze, 0.09);
+    this.roomLight.hit();
+    this.stamp.show('EDGE RUN!', 'REAL TABLE DECIDES', 'mine', 0.65, 1.25);
+    this.label.set('TOP ACROSS THE DESK\nCROSS THE REAL EDGE = +1');
     this.labelTimer = DESK_VERDICT_TIME;
     if (import.meta.env.DEV) console.log('[DESK_KO] table flight started; score is pending');
     return true;
@@ -5136,9 +5162,19 @@ export class MatchSystem extends createSystem({
     const pending = this.deskVerdict;
     if (!pending) return false;
     pending.left -= dt;
+    if (this.deskKoStage === 1) this.setDeskKoStage(2);
+    if ((this.deskKoTrailT -= dt) <= 0) {
+      this.deskKoTrailT = 0.045;
+      const p = this.theirView.root.position;
+      this.sparks.flight(p.x, p.y, p.z);
+    }
     if (this.theirView.offDesk) {
       this.deskVerdict = null;
       this.offDeskShown = true;
+      this.setDeskKoStage(3);
+      const p = this.theirView.root.position;
+      this.sparks.burst(p.x, p.y, p.z, 1);
+      this.sparks.embers(p.x, p.y, p.z, 14, 0.26, 0.2, 1);
       this.featDone('offDesk');
       if (import.meta.env.DEV) console.log(`[DESK_KO] real edge crossed; +${DESK_KO_BONUS} bonus heat`);
       this.finish(pending.v, true);
@@ -5317,6 +5353,7 @@ export class MatchSystem extends createSystem({
   private finish(v: -1 | 1 | 2, deskKo = false) {
     this.phase = 'result';
     this.deskKoScored = deskKo;
+    if (deskKo) this.setDeskKoStage(3);
     this.resultTimer = RESULT_TIME;
     // One unlock per result card; the rest wait for the next ones.
     this.revealedHere = false;
