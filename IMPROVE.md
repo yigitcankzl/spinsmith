@@ -29,30 +29,40 @@ always be labelled as IWER footage.
 | Palm placement raises the smithy where the real table is pressed; strikes leave molten prints | existing, runtime verified |
 | A thrown player top can use the real table and Outer Ring rescue; table-edge failure ends the round | existing |
 | Room imprints, scars, daily orders and the last three champion tops persist | existing |
-| The board names match count and latest champion; an opponent crossing the detected table edge reads as `DESK KO` without altering the deterministic score | `b371175` |
+| A rival ring-out stays provisional while its rendered top crosses the detected table; leaving the real edge adds +1 heat (`3` total), while settling on the table keeps the normal `2` | `dc6aab9`; `npm run check:desk-ko` |
+| Level-6 rivals predict a dangerous real-table trajectory and spend one shaping charge on a visible inward `DESK GUARD` ramp | `dc6aab9`; `npm run check:desk-guard` |
 | A hand entering the actionable 5 cm fight band lights the existing mark and gives one quiet hover tick | current sprint |
 
 Verification run after the changes:
 
 - `npm run typecheck`: pass.
 - `npm run check:sim`: pass.
+- `npm run check:desk-ko`: pass in immersive IWER hand mode; production palm press incremented
+  interventions `2 → 3`, result retained `awarded: 3` and score `3 - 0`.
+- `npm run check:desk-guard`: pass; one rival charge produced an inward `DESK GUARD` ramp.
 - `npm run build` and public-release check: pass.
 - IWER immersive-AR session: active; `DepthSensingSystem` active with three occludables; no application
   error in the browser console.
-- Screenshot: `artifacts/occlusion-perf-final.png`.
+- Screenshots: `artifacts/occlusion-perf-final.png` and `artifacts/desk-ko-hand-proof.jpg`. The
+  second is IWER proof, not Quest passthrough or performance evidence.
 
 ## Remaining work, in order
 
-1. **Physical Quest smoke test through another person.** Host the locked build, ask one Quest 3/3S
+1. **Visible defeated-rival trophies.** Persistence currently keeps champion builds, scars, orders
+   and match history, but it does not yet leave each defeated rival's top beside its desk mark.
+2. **Match-time palm forge hero beat.** Palm placement raises the initial smithy, but there is no
+   separate in-match “touch the desk and the arena rises here” reveal. Prototype it only if it does
+   not duplicate or obscure the current palm strike.
+3. **Physical Quest smoke test through another person.** Host the locked build, ask one Quest 3/3S
    owner to complete placement, rip, ramp and forge, then report the lowest FPS and any lost gesture.
    No code claim can replace this evidence.
-2. **Submission video story.** In a labelled IWER room: palm placement → rip → two-hand forge →
+4. **Submission video story.** In a labelled IWER room: palm placement → rip → two-hand forge →
    table/Outer Ring moment → reload to show orders, scars and champions. Put “Captured in Meta IWER
    emulator — no headset used” on the footage.
-3. **Measured performance only.** Do not globally cache `topPlastic` (each `TopView.dispose()` owns
+5. **Measured performance only.** Do not globally cache `topPlastic` (each `TopView.dispose()` owns
    that material) or convert soft shadows/glows to alpha-test blindly. Optimize further only after a
    headset trace identifies a real bottleneck.
-4. **Optional comfort polish:** a between-round hand-rest prompt. Do not hard-gate the countdown
+6. **Optional comfort polish:** a between-round hand-rest prompt. Do not hard-gate the countdown
    without physical hand tests; a bad table-height estimate could otherwise lock a judge out.
 
 ## Submission framing
