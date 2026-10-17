@@ -975,11 +975,11 @@ export class MatchSystem extends createSystem({
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
     this.stageEntity = this.world.createTransformEntity(this.stage, this.rootEntity);
-    this.stageEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
+    this.stageEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
     const outerRailEntity = this.world.createTransformEntity(this.outerRail, this.rootEntity);
-    outerRailEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
+    outerRailEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
     const imprintsEntity = this.world.createTransformEntity(this.roomImprints.root, this.rootEntity);
-    imprintsEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
+    imprintsEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
     this.placementProbe.name = 'table-hit-probe';
     const placementProbeEntity = this.world.createTransformEntity(this.placementProbe);
     placementProbeEntity.addComponent(EnvironmentRaycastTarget, {
@@ -2443,7 +2443,7 @@ export class MatchSystem extends createSystem({
     const entity = this.stageEntity;
     if (!entity?.active || !entity.hasComponent(DepthOccludable)) return;
     entity.removeComponent(DepthOccludable);
-    entity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
+    entity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
   }
 
   /** Where a hand points at the arena (near pinch first, else its ray), including just past the rim. */

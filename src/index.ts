@@ -44,6 +44,9 @@ loadFonts()
     world.renderer.toneMappingExposure = 1;
     world.scene.environment = forgeEnvironment(world.renderer);
     world.renderer.xr.setFoveation?.(0.5);
+    // Render fewer eye-buffer pixels on standalone headsets. This is set before the immersive
+    // session starts, as required by WebXRRenderer, and leaves desktop/IWER canvas captures alone.
+    world.renderer.xr.setFramebufferScaleFactor(0.85);
     // Quest depth makes real hands, furniture and the table correctly cover the virtual smithy.
     // The arena's UI remains ordinary world geometry so instructions never disappear behind noise.
     world.registerSystem(DepthSensingSystem, {
