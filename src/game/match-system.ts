@@ -1,6 +1,6 @@
 import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
-import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
+import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -556,6 +556,8 @@ export class MatchSystem extends createSystem({
   private handMarks = (['left', 'right'] as const).map(() =>
     Object.assign(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, depthWrite: false })), { visible: false }),
   );
+  /** Plays one quiet tick when a hand first enters the arena's actionable near-surface band. */
+  private handHover: Record<Side, boolean> = { left: false, right: false };
   /** Molten handprints left on the desk by strikes (a small pool). */
   private palmPrints = [0, 1, 2].map(() => Object.assign(new Mesh(new PlaneGeometry(0.075, 0.075), new MeshBasicMaterial({ map: PALM, transparent: true, depthWrite: false, blending: AdditiveBlending })), { visible: false }));
   private nextPrint = 0;
@@ -2113,6 +2115,8 @@ export class MatchSystem extends createSystem({
     (['left', 'right'] as const).forEach((side, i) => {
       const m = this.handMarks[i];
       const h = this.hands[side];
+      const wasHovering = this.handHover[side];
+      this.handHover[side] = false;
       m.visible = false;
       if (!play || !h.tracked) return;
       // Between the wrist and the fingertip (toLocal reuses one vector, so copy first).
@@ -2123,13 +2127,16 @@ export class MatchSystem extends createSystem({
       const floor = this.arena.height(l.x, l.z);
       const up = l.y - floor;
       if (up < 0 || up > 0.12) return;
+      const hovering = this.phase === 'fight' && this.elapsed >= TUNING.grace && !h.pinching && up <= 0.05;
+      this.handHover[side] = hovering;
+      if (hovering && !wasHovering) playHover();
       m.visible = true;
       // Light from above and behind you: the shadow falls a little ahead of the hand.
       m.position.set(l.x, floor + 0.0015, l.z - up * 0.5);
       const k = 1 - up / 0.12;
       m.scale.setScalar(0.05 + 0.04 * (1 - k));
       const mat = m.material as MeshBasicMaterial;
-      const shaping = this.phase === 'fight' && (h.pinching || !!this.shaping[side] || !!this.slings[side] || this.pressing[side]);
+      const shaping = this.phase === 'fight' && (hovering || h.pinching || !!this.shaping[side] || !!this.slings[side] || this.pressing[side]);
       if (hot || shaping) {
         mat.color.setHex(0xff8a2a);
         mat.blending = AdditiveBlending;

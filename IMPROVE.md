@@ -29,6 +29,8 @@ always be labelled as IWER footage.
 | Palm placement raises the smithy where the real table is pressed; strikes leave molten prints | existing, runtime verified |
 | A thrown player top can use the real table and Outer Ring rescue; table-edge failure ends the round | existing |
 | Room imprints, scars, daily orders and the last three champion tops persist | existing |
+| The board names match count and latest champion; an opponent crossing the detected table edge reads as `DESK KO` without altering the deterministic score | `b371175` |
+| A hand entering the actionable 5 cm fight band lights the existing mark and gives one quiet hover tick | current sprint |
 
 Verification run after the changes:
 
@@ -47,17 +49,11 @@ Verification run after the changes:
 2. **Submission video story.** In a labelled IWER room: palm placement → rip → two-hand forge →
    table/Outer Ring moment → reload to show orders, scars and champions. Put “Captured in Meta IWER
    emulator — no headset used” on the footage.
-3. **Make the opponent's off-desk landing a clearer verdict.** It currently awards the feat and a
-   moment after an `over` finish, but is presentation layered on the existing score rather than a
-   separate heat rule. Prefer a `DESK KO` verdict/bonus only if simulation tests can keep the match
-   result deterministic.
-4. **Come-back copy.** Add a short board line such as “2 orders waiting · last champion: …”; use
-   existing persisted data and do not introduce background timers or fake offline progress.
-5. **Measured performance only.** Do not globally cache `topPlastic` (each `TopView.dispose()` owns
+3. **Measured performance only.** Do not globally cache `topPlastic` (each `TopView.dispose()` owns
    that material) or convert soft shadows/glows to alpha-test blindly. Optimize further only after a
    headset trace identifies a real bottleneck.
-6. **Optional polish:** fight-target hover audio/lighting and a between-round hand-rest prompt. These
-   are lower value than the video and device proof.
+4. **Optional comfort polish:** a between-round hand-rest prompt. Do not hard-gate the countdown
+   without physical hand tests; a bad table-height estimate could otherwise lock a judge out.
 
 ## Submission framing
 
