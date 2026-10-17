@@ -34,6 +34,8 @@ export interface BoardState {
   featsOf: number;
   /** Your top's challenge code (a friend opens the game with it to fight your top). */
   code: string;
+  /** One compact persistent-history line that makes returning progress visible at a glance. */
+  history: string;
 }
 
 const W = 1200;
@@ -93,8 +95,10 @@ export class SmithBoard {
       const next = s.tomorrow ? `TOMORROW: ${s.tomorrow.rival} ON ${s.tomorrow.arena}` : 'A NEW ORDER COMES TOMORROW';
       engrave(g, (s.done ? next : `${s.order.arena} · POINT AND PINCH TO TAKE IT`).toUpperCase(), W / 2, 280, s.done ? STEEL : ORANGE, W - 120);
     }
+    setType(g, 'caption', this.k, DIST);
+    engrave(g, s.history.toUpperCase(), W / 2, 314, TEXT_DIM, W - 140);
     g.fillStyle = 'rgba(0,0,0,0.35)';
-    g.fillRect(80, 330, W - 160, 3);
+    g.fillRect(80, 344, W - 160, 3);
     this.drawStamps(g, s, 396);
   }
 

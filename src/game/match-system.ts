@@ -1439,10 +1439,14 @@ export class MatchSystem extends createSystem({
     this.myView.sync(ga, this.arena, this.time, vdt);
     this.theirView.sync(gb, this.arena, this.time, vdt);
     this.updateEntrance(dt);
-    // A thrown rival that skated off the real table's edge: its own moment (cosmetic, never heat).
+    // The simulation has already awarded this round's deterministic THROWN heat. If the rendered
+    // top keeps travelling over the detected real edge, rename that same finish as the room-aware
+    // DESK KO moment; do not add a late point after the match result has been decided.
     if (this.theirView.offDesk && !this.offDeskShown && !this.replay) {
       this.offDeskShown = true;
-      this.stamp.later('OFF THE DESK!', 'onto your floor', 'mine', 1.2);
+      this.stamp.later('DESK KO!', 'THE REAL EDGE FINISHED IT', 'mine', 1.35, 1.15);
+      const last = this.matchLog.rounds.length - 1;
+      if (last >= 0 && this.matchLog.rounds[last] === 'THROWN') this.matchLog.rounds[last] = 'DESK KO';
       this.featDone('offDesk');
       if (import.meta.env.DEV) console.log('[OUT] off the desk');
     }

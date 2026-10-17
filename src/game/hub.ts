@@ -43,7 +43,7 @@ import type { Progress } from './progress.js';
 import { addSlab, engrave, GUIDE, metalPlate, Nameplate, ORANGE, PLATE_DEPTH, pxPerM, setType, SIGN_TILT, signTexture, STEEL as UI_STEEL, tag, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
-import { RIVALS } from './parts.js';
+import { buildName, RIVALS } from './parts.js';
 import { SmithBoard } from './board.js';
 import { encodeBuild } from './challenge.js';
 import { ECHO_KEY } from './echo.js';
@@ -222,6 +222,7 @@ export class Hub {
     this.champions.visible = !this.teaching;
     if (!this.teaching) {
       const next = Object.keys(STAMP_UNLOCKS).map(Number).find((n) => n > progress.stamps) ?? null;
+      const champion = progress.champions[0];
       this.boardState = {
         order,
         done: order ? progress.hasOrder(order.date) : false,
@@ -231,6 +232,9 @@ export class Hub {
         rivals: RIVALS.map((r) => ({ name: r.name, level: r.level, met: r.level <= progress.level, marks: progress.marksOf(r.name) })),
         gilded: progress.isUnlocked('ledger:gold') || progress.level >= MAX_LEVEL,
         code: echoCode(encodeBuild(build)),
+        history: champion
+          ? `${progress.matches} matches · latest champion: ${buildName(champion.build)} ×${champion.wins}`
+          : `${progress.matches} matches · first champion awaits`,
         feats: progress.feats.size,
         featsOf: Object.keys(FEATS).length,
       };
