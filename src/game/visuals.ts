@@ -2676,6 +2676,8 @@ export class Stamp {
   private t = -1;
   private hold = 1;
   private size = 1;
+  /** Cancels the table-fit scale so result words keep the same readable world size. */
+  worldScale = 1;
   private queue: [string, string, 'mine' | 'rival' | 'neutral', number, number][] = [];
 
   /** Ends what shows now at once (a skipped replay's plate); what waits shows next. */
@@ -2757,7 +2759,7 @@ export class Stamp {
     // In over 0.12 s from 1.5x with a 1.08 overshoot, hold, then sink and fade over 0.3 s.
     const k = t < 0.12 ? 1.5 - 0.5 * (t / 0.12) - 0.08 * Math.sin((t / 0.12) * Math.PI) : 1;
     const out = Math.max(0, (t - 0.12 - this.hold) / 0.3);
-    this.mesh.scale.setScalar(this.size * k * (1 - 0.15 * out));
+    this.mesh.scale.setScalar(this.worldScale * this.size * k * (1 - 0.15 * out));
     m.opacity = Math.min(1, t / 0.05) * (1 - out);
     if (out >= 1) {
       this.t = -1;

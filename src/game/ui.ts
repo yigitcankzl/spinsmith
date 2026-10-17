@@ -42,13 +42,13 @@ export const TEXT_DIM = '#8f9bb0';
  */
 export const TYPE = {
   /** Stamps (RIP!, THROWN!) and the result word only. */
-  display: { dmm: 60, weight: 700, track: 0.06 },
+  display: { dmm: 68, weight: 700, track: 0.06 },
   /** Station names, panel titles, names in the match bar, tab labels. */
-  title: { dmm: 36, weight: 700, track: 0.04 },
+  title: { dmm: 40, weight: 700, track: 0.04 },
   /** Sentences: the card's body, the order, the dial plate's message. */
-  body: { dmm: 24, weight: 600, track: 0 },
+  body: { dmm: 28, weight: 600, track: 0 },
   /** Section labels, units, numbers beside a bar. */
-  caption: { dmm: 18, weight: 600, track: 0.08 },
+  caption: { dmm: 21, weight: 600, track: 0.08 },
 } as const;
 export type Role = keyof typeof TYPE;
 

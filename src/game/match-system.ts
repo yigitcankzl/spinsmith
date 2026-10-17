@@ -1301,6 +1301,8 @@ export class MatchSystem extends createSystem({
     this.launchGuide.visible = (launchPhase || openingFight) && !this.demo;
     this.launchSafeZone.visible = this.launchDangerZone.visible = this.phase === 'ready' && !this.demo;
     this.openingEcho.visible = launchPhase && !!this.lastOpeningTrace && this.lastOpeningTrace.rival === this.rival.name && this.lastOpeningTrace.arena === this.arena.layout.name && !this.demo;
+    // Large near-rim actions only appear when play has stopped; during a fight the arena is the UI.
+    this.menuButton.mesh.visible = this.phase === 'result' && !this.demo;
     this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo;
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
@@ -2682,8 +2684,12 @@ export class MatchSystem extends createSystem({
     // Further away, the card and the bar grow so they read the same.
     const reach = TUNE.reach / ARENA_SCALE;
     const grow = Math.max(1, (reach + this.pushed / ARENA_SCALE + far) / (reach + 0.17));
-    this.label.mesh.scale.setScalar(1.25 * grow);
-    this.bar.mesh.scale.setScalar(0.21 * grow);
+    // fitMatch may shrink the whole root to 70% to stay on a real table. Read surfaces cancel that
+    // parent scale so type never becomes 30% smaller on the very tables that need it most.
+    const readScale = 1 / Math.max(0.7, this.rootK);
+    this.label.mesh.scale.setScalar(1.25 * grow * readScale);
+    this.bar.mesh.scale.setScalar(0.21 * grow * readScale);
+    this.stamp.worldScale = readScale;
     // The bar's top edge under the card's lower edge (it leans back, the card stands upright).
     this.bar.mesh.position.z = this.label.mesh.position.z + BAR_BACK * grow;
     // Their heights grow with them, so the card stays clear above the bar.
@@ -2695,8 +2701,11 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + 0.07 * grow, this.label.mesh.position.z + 0.01);
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
-    this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
-    this.rematchButton.mesh.position.set(0.2, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
+    this.menuButton.mesh.scale.setScalar(readScale);
+    this.rematchButton.mesh.scale.setScalar(readScale);
+    const resultButtonX = 0.15 * readScale;
+    this.menuButton.mesh.position.set(-resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
+    this.rematchButton.mesh.position.set(resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
   }
 
@@ -3029,7 +3038,7 @@ export class MatchSystem extends createSystem({
     // A pull cut short (a recenter) leaves no drone and no lit ring.
     this.cordTone.update(null);
     this.chargeRing.visible = false;
-    this.menuButton.mesh.visible = true;
+    this.menuButton.mesh.visible = false;
     this.rematchButton.mesh.visible = false;
     this.arena.reset();
     this.arenaDirty = true;
@@ -5404,7 +5413,7 @@ export class MatchSystem extends createSystem({
       const finishWord = name(loser);
       this.lastCause = cause ? `${cause} → ${finishWord}` : '';
       const finishSub = deskKo
-        ? `REAL EDGE · +${DESK_KO_BONUS} HEAT${decided ? ' · MATCH WON' : ''}`
+        ? `EDGE +${DESK_KO_BONUS}${decided ? ' · WIN' : ''}`
         : decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause;
       this.stamp.show(`${finishWord}!`, finishSub, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
       if (recent && v === 1) {
@@ -5438,7 +5447,8 @@ export class MatchSystem extends createSystem({
       }
     }
     this.label.set(text);
-    this.barMessage = text.split('\n')[0].replace(/!.*$/, '!');
+    // The card and stamp already name the finish. The bar uses its scarce centre slot for score.
+    this.barMessage = v === 2 ? 'DRAW' : `${this.barPoints[0]} — ${this.barPoints[1]}`;
     console.log(`[MATCH] ${this.lastCause ? `${this.lastCause} - ` : ''}${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
     if (v !== 2) {
       this.round++;
