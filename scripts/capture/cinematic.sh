@@ -20,6 +20,7 @@ cat >"$PARAMS" <<JSON
   "backgroundBlur": 0,
   "backgroundIntensity": 0.9,
   "skinHands": true,
+  "devTable": true,
   "disclosure": true,
   "settleFrames": 6
 }

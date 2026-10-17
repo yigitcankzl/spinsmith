@@ -122,8 +122,8 @@ export default async function run({ page, frame, cdp }) {
           return;
         }
         object.material = new standardMaterial.constructor({
-          color: p.handColor ?? 0xb98269,
-          roughness: 0.72,
+          color: p.handColor ?? 0xd09a7d,
+          roughness: 0.66,
           metalness: 0,
           transparent: false,
           depthWrite: true,
@@ -133,7 +133,81 @@ export default async function run({ page, frame, cdp }) {
         object.visible = true;
         patched += 1;
       });
+      // Quest needs the game's invisible depth-only hand proxy because the real hand comes from
+      // passthrough. IWER already renders a synthetic hand; leaving both active cuts holes through
+      // that visible mesh where the proxy and skin occupy the same depth.
+      if (game.handOccluder) {
+        game.handOccluder.joints.visible = false;
+        game.handOccluder.bones.visible = false;
+      }
       result.handsPatched = patched;
+    }
+
+    if (p.devTable) {
+      const game = window.__game;
+      const scene = game.world?.scene ?? game.scene;
+      game.__captureTable?.traverse?.((object) => {
+        object.geometry?.dispose?.();
+        object.material?.dispose?.();
+      });
+      game.__captureTable?.removeFromParent();
+      let MeshConstructor = null;
+      let BoxGeometryConstructor = null;
+      let StandardMaterialConstructor = null;
+      let TextureConstructor = null;
+      scene.traverse((object) => {
+        if (!MeshConstructor && object.isMesh) MeshConstructor = object.constructor;
+        if (!BoxGeometryConstructor && object.geometry?.type === 'BoxGeometry') BoxGeometryConstructor = object.geometry.constructor;
+        if (!StandardMaterialConstructor && object.material?.isMeshStandardMaterial) StandardMaterialConstructor = object.material.constructor;
+        if (!TextureConstructor && object.material?.map?.isTexture) TextureConstructor = object.material.map.constructor;
+      });
+      if (!MeshConstructor || !BoxGeometryConstructor || !StandardMaterialConstructor || !TextureConstructor) {
+        throw new Error('Could not resolve constructors for the capture table.');
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 512;
+      const context = canvas.getContext('2d');
+      const gradient = context.createLinearGradient(0, 0, 0, 512);
+      gradient.addColorStop(0, '#835337');
+      gradient.addColorStop(0.5, '#5f3825');
+      gradient.addColorStop(1, '#76472e');
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, 512, 512);
+      let seed = 29;
+      const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 150; i += 1) {
+        const y = random() * 512;
+        const bend = (random() - 0.5) * 24;
+        context.strokeStyle = `rgba(${random() > 0.5 ? '35,14,7' : '235,170,112'},${0.035 + random() * 0.08})`;
+        context.lineWidth = 0.6 + random() * 2;
+        context.beginPath();
+        context.moveTo(0, y);
+        context.bezierCurveTo(150, y + bend, 360, y - bend, 512, y + bend * 0.35);
+        context.stroke();
+      }
+      const wood = new TextureConstructor(canvas);
+      wood.colorSpace = 'srgb';
+      wood.needsUpdate = true;
+
+      const table = new game.root.constructor();
+      const base = new MeshConstructor(
+        new BoxGeometryConstructor(1.13, 0.045, 0.79, 1, 1, 1),
+        new StandardMaterialConstructor({ color: 0x18120f, metalness: 0.04, roughness: 0.78 }),
+      );
+      const top = new MeshConstructor(
+        new BoxGeometryConstructor(1.1, 0.014, 0.76, 1, 1, 1),
+        new StandardMaterialConstructor({ color: 0xffffff, map: wood, metalness: 0.04, roughness: 0.62 }),
+      );
+      base.position.y = game.root.position.y - 0.1165;
+      top.position.y = game.root.position.y - 0.087;
+      table.add(base, top);
+      table.name = 'capture-dev-table';
+      table.position.set(game.root.position.x, 0, game.root.position.z + 0.015);
+      table.rotation.y = game.root.rotation.y;
+      scene.add(table);
+      game.__captureTable = table;
+      result.devTable = true;
     }
 
     result.size = [innerWidth, innerHeight];
