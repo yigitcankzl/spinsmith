@@ -697,7 +697,9 @@ export function installDriver() {
           await glide(side, 'low', above(spot, 0.18), 0.16, 0);
         }
         await glide(side, 'low', spot, gentle ? 0.6 : 0.1, 0, gentle ? 'natural' : 'linear');
-        await wait(gentle ? 0.6 : 0.35);
+        // Low-IWER-fps capture runs may expose only a handful of stable contact frames. Keep the
+        // dev hand visibly planted long enough to prove the production hold gesture every time.
+        await wait(gentle ? 1.2 : 0.35);
         await glide(side, 'low', above(spot, 0.15), 0.3, 0);
         if (!armedAtStart || g.forgeBar.value < 0.999) break;
         await wait(0.15);

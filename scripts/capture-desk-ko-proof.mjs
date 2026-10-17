@@ -3,13 +3,13 @@ import { writeFile } from 'node:fs/promises';
 // Captures the managed IWER surface after a successful Desk KO proof.
 export default async function run({ page, frame, cdp, workspaceRoot }) {
   for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
-    await candidate.waitForFunction(() => !!window.__game?.deskKoScored && window.__game?.lastRoundHeat === 3, null, { timeout: 55_000 }).catch(() => {});
+    await candidate.waitForFunction(() => !!window.__game?.deskKoScored && window.__game?.lastRoundHeat === 3 && window.__game?.deskKoStage === 3, null, { timeout: 55_000 }).catch(() => {});
     const proof = await candidate.evaluate(() => {
       const g = window.__game;
-      return g ? { phase: g.phase, scored: !!g.deskKoScored, awarded: g.lastRoundHeat, score: [...g.barPoints] } : null;
+      return g ? { phase: g.phase, stage: g.deskKoStage, scored: !!g.deskKoScored, awarded: g.lastRoundHeat, score: [...g.barPoints] } : null;
     }).catch(() => null);
     if (!proof) continue;
-    if (!proof.scored || proof.awarded !== 3) throw new Error(`Desk KO proof is not ready: ${JSON.stringify(proof)}`);
+    if (proof.stage !== 3 || !proof.scored || proof.awarded !== 3) throw new Error(`Desk KO proof is not ready: ${JSON.stringify(proof)}`);
     // The result immediately starts a slow-motion replay. End only that dev replay and re-show the
     // exact production result stamp so the still proves the rule instead of catching a depth-mask
     // transition halfway through the replay.
@@ -19,7 +19,7 @@ export default async function run({ page, frame, cdp, workspaceRoot }) {
       g.replayCount = 0;
       g.koFreeze = 0;
       g.slowMo = 0;
-      g.stamp.show('DESK KO!', 'REAL EDGE · +1 HEAT · MATCH WON', 'mine', 5, 1.5);
+      g.stamp.show('DESK KO!', 'EDGE +1 · WIN', 'mine', 5, 1.5);
     });
     await candidate.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const path = `${workspaceRoot}/artifacts/desk-ko-hand-proof.png`;

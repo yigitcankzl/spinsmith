@@ -22,6 +22,7 @@ export default async function run({ page, frame }) {
       g.arena.shapes.splice(0);
       g.deskVerdict = null;
       g.deskKoScored = false;
+      g.setDeskKoStage(0);
       g.lastRoundHeat = 0;
       g.myPoints = 0;
       g.theirPoints = 0;
