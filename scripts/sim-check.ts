@@ -502,7 +502,7 @@ TUNING.grace = 0;
   // Orders: deterministic per date, playable with what the player has, different over days.
   const builtIn = ARENAS.slice(0, 3);
   const mine = { ...cloneLayout(ARENAS[0]), name: 'My Arena 1' };
-  const ctx = { rivals: ['Rim Raider', 'Iron Keep', 'Drifter'], arenas: builtIn, built: [mine], cup: true };
+  const ctx = { rivals: ['Rim Raider', 'Iron Keep', 'Drifter'], arenas: builtIn, built: [mine], cup: true, table: true };
   const goals = new Set<string>();
   const start = new Date(2026, 9, 1);
   for (let i = 0; i < 120; i++) {
@@ -516,7 +516,8 @@ TUNING.grace = 0;
     if (o.goal === 'rampKO') assert.ok(canKnockOut(arena!), 'a knockout order needs an arena where knockouts happen');
     goals.add(o.goal);
   }
-  assert.ok(goals.size >= 6, `orders should vary over days (got ${[...goals].join(', ')})`);
+  assert.ok(goals.size >= 7, `orders should vary over days (got ${[...goals].join(', ')})`);
+  assert.ok(goals.has('deskKO'), 'a known table can offer a real desk-edge order');
   // Tomorrow's teaser differs from today's order on most days.
   let differs = 0;
   for (let i = 0; i < 7; i++) {
@@ -539,10 +540,13 @@ TUNING.grace = 0;
   assert.equal(orderMet({ ...o, goal: 'rampKO' }, base), true);
   assert.equal(orderMet({ ...o, goal: 'rampKO' }, { ...base, cause: null }), false, 'a knockout without your ramp does not count');
   assert.equal(orderMet({ ...o, goal: 'rampKO' }, { ...base, rival: 'Nobody' }), false, 'only against the order rival');
+  assert.equal(orderMet({ ...o, goal: 'deskKO' }, { ...base, deskKo: true }), true);
+  assert.equal(orderMet({ ...o, goal: 'deskKO' }, { ...base, deskKo: false }), false, 'a virtual rim-out is not a desk KO');
   assert.equal(orderMet({ ...o, goal: 'wellSpin' }, { ...base, finish: 'spin', cupCaughtInRound: false }), false, 'placing an empty cup is not enough');
   assert.equal(orderMet({ ...o, goal: 'wellSpin' }, { ...base, finish: 'spin', cupCaughtInRound: true }), true);
-  const earlyGoals = new Set(Array.from({ length: 120 }, (_, i) => dailyOrder(localDate(new Date(2026, 9, 1 + i)), { ...ctx, cup: false }).goal));
+  const earlyGoals = new Set(Array.from({ length: 120 }, (_, i) => dailyOrder(localDate(new Date(2026, 9, 1 + i)), { ...ctx, cup: false, table: false }).goal));
   assert.ok(!earlyGoals.has('wellSpin'), 'orders must not ask for a cup before cups are taught');
+  assert.ok(!earlyGoals.has('deskKO'), 'orders must not ask for a real edge when no table boundary exists');
   assert.equal(orderMet({ ...o, goal: 'sweep' }, { ...base, matchWon: true, shutout: true }), true);
   // Stamps: once per date, with XP; glows at 5 stamps; a fresh progress has none.
   const storage = new Map<string, string>();
@@ -568,6 +572,13 @@ TUNING.grace = 0;
   assert.equal(back.marksOf('Iron Keep'), MARK.beaten | MARK.knockout, 'marks survive a reload');
   assert.deepEqual(back.champions.map((c) => c.build.tip), ['bead', 'pin', 'chisel']);
   assert.equal(back.champions[2].wins, 2, 'a champion keeps its record');
+  back.recordDeskKo('Iron Keep', PRESETS[1].build, Math.PI / 3, new Date(2026, 9, 7));
+  back.recordDeskKo('Drifter', PRESETS[2].build, -Math.PI / 4, new Date(2026, 9, 8));
+  back.recordDeskKo('Rim Raider', PRESETS[0].build, 0, new Date(2026, 9, 9));
+  back.recordDeskKo('Hookjaw', PRESETS[0].build, Math.PI, new Date(2026, 9, 10));
+  const rememberedDesk = new Progress(st).deskTrophies;
+  assert.deepEqual(rememberedDesk.map((t) => t.rival), ['Hookjaw', 'Rim Raider', 'Drifter']);
+  assert.equal(rememberedDesk[0].date, '2026-10-10', 'desk trophies survive reload with a local date');
   // Rivals remember a repeated opening zone without exposing their stored object to mutation.
   const firstOpening = back.rememberOpening('Iron Keep', 'edge', 0.7, 0.1);
   firstOpening.streak = 99;

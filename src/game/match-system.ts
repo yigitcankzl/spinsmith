@@ -33,7 +33,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, mergeByMaterial, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
 import { BRASS } from './materials.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, SHAPING, ShapingCharges, StrikeBar } from './shaping.js';
@@ -305,6 +305,11 @@ export class MatchSystem extends createSystem({
   });
   /** Smith level, XP and unlocks, saved in the browser. */
   private progress = new Progress(typeof localStorage === 'undefined' ? null : localStorage);
+  /** The last three rivals thrown across the physical desk edge, batched into a small trophy row. */
+  private deskMemory = new Group();
+  private deskMemoryBatch: Group | null = null;
+  private deskMemoryViews: TopView[] = [];
+  private deskMemoryKey = '';
   /** The match bar on the far rim. */
   private bar = new MatchBar();
   /** The forge: build your own top from parts. */
@@ -1013,6 +1018,10 @@ export class MatchSystem extends createSystem({
     outerRailEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
     const imprintsEntity = this.world.createTransformEntity(this.roomImprints.root, this.rootEntity);
     imprintsEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
+    this.deskMemory.name = 'desk-ko-trophies';
+    this.deskMemory.position.y = (-PEDESTAL + 0.004) / ARENA_SCALE;
+    const deskMemoryEntity = this.world.createTransformEntity(this.deskMemory, this.rootEntity);
+    deskMemoryEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
     this.placementProbe.name = 'table-hit-probe';
     const placementProbeEntity = this.world.createTransformEntity(this.placementProbe);
     placementProbeEntity.addComponent(EnvironmentRaycastTarget, {
@@ -1710,11 +1719,13 @@ export class MatchSystem extends createSystem({
       arenas: ARENAS.filter((a) => this.progress.isUnlocked(`arena:${a.name}`)),
       built: this.arenas.filter((a) => !ARENAS.includes(a)),
       cup: this.taught('cup'),
+      table: !!ROOM.poly,
     };
     this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
     // A teaser of tomorrow's order once today's is done (as things stand now).
     const tomorrow = this.progress.hasOrder(today) ? dailyOrder(localDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)), ctx) : null;
     this.hub.show(this.myBuild, this.progress, this.order, tomorrow, this.nextRival ? `${this.nextRival.name} in ${this.arenas[this.arenaIndex].name}${this.boutText(this.nextRival.name)}` : null);
+    this.rebuildDeskMemory();
     if (import.meta.env.DEV) console.log(`[ORDER] today ${this.order.date}: ${this.order.text} in ${this.order.arena}${this.progress.hasOrder(this.order.date) ? ' (done)' : ''} · ${this.progress.stamps} stamps`);
     this.label.set('');
     // A message still timing out must not wipe the note set below.
@@ -1727,6 +1738,61 @@ export class MatchSystem extends createSystem({
     this.label.mesh.position.set(LABEL_AT.x, this.progress.guide === 'done' ? HOME_NOTE_Y : LABEL_AT.y, LABEL_AT.z);
     this.label.mesh.scale.setScalar(1.25);
     if (import.meta.env.DEV) this.hubLogPending = true;
+  }
+
+  /** A ray from the arena centre to the known table polygon, pulled inward to keep the trophy on wood. */
+  private deskEdgePoint(angle: number, inward = 0.04, tangent = 0): Vector2 | null {
+    const poly = ROOM.poly;
+    if (!poly || poly.length < 3) return null;
+    const dx = Math.cos(angle);
+    const dz = Math.sin(angle);
+    let best = Infinity;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i];
+      const b = poly[(i + 1) % poly.length];
+      const ex = b.x - a.x;
+      const ez = b.z - a.z;
+      const den = dx * ez - dz * ex;
+      if (Math.abs(den) < 1e-6) continue;
+      const t = (a.x * ez - a.z * ex) / den;
+      const u = (a.x * dz - a.z * dx) / den;
+      if (t > 0 && u >= 0 && u <= 1) best = Math.min(best, t);
+    }
+    if (!Number.isFinite(best)) return null;
+    const r = Math.max(0.18, best - inward);
+    return new Vector2(dx * r - dz * tangent, dz * r + dx * tangent);
+  }
+
+  /** Rebuilds the visible desk history only when the saved trophies or table outline change. */
+  private rebuildDeskMemory() {
+    const polyKey = ROOM.poly?.map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)}`).join(';') ?? '';
+    const key = `${polyKey}|${JSON.stringify(this.progress.deskTrophies)}`;
+    if (key === this.deskMemoryKey) return;
+    this.deskMemoryKey = key;
+    if (this.deskMemoryBatch) {
+      this.deskMemoryBatch.traverse((object) => { if (object instanceof Mesh) object.geometry.dispose(); });
+      this.deskMemoryBatch.removeFromParent();
+      this.deskMemoryBatch = null;
+    }
+    for (const view of this.deskMemoryViews) view.dispose();
+    this.deskMemoryViews = [];
+    if (!ROOM.poly || this.progress.deskTrophies.length === 0) return;
+    const source = new Group();
+    const count = this.progress.deskTrophies.length;
+    this.progress.deskTrophies.forEach((trophy, i) => {
+      const point = this.deskEdgePoint(trophy.angle, 0.04, (i - (count - 1) / 2) * 0.052);
+      if (!point) return;
+      const view = new TopView({ ...trophy.build, color: OPPONENT_COLOR }, OPPONENT_COLOR);
+      view.root.position.set(point.x, 0.006, point.y);
+      view.root.rotation.set(0, -trophy.angle, i % 2 ? -1.05 : 1.05);
+      view.root.scale.setScalar(0.72);
+      this.deskMemoryViews.push(view);
+      source.add(view.root);
+    });
+    if (source.children.length === 0) return;
+    this.deskMemoryBatch = mergeByMaterial(source);
+    this.deskMemoryBatch.name = 'batched-defeated-rivals';
+    this.deskMemory.add(this.deskMemoryBatch);
   }
 
   /** The first session's note at home: where to reach next ('' once the guide is done). */
@@ -5234,6 +5300,12 @@ export class MatchSystem extends createSystem({
       this.offDeskShown = true;
       this.setDeskKoStage(3);
       const p = this.theirView.root.position;
+      const angle = Math.atan2(p.z, p.x);
+      const edge = this.deskEdgePoint(angle, 0.006);
+      this.progress.recordDeskKo(this.rival.name, this.rival.build, angle);
+      this.roomImprints.record('desk', angle, new Date(), edge ? { x: edge.x, z: edge.y } : undefined);
+      this.deskMemoryKey = '';
+      this.rebuildDeskMemory();
       this.sparks.burst(p.x, p.y, p.z, 1);
       this.sparks.embers(p.x, p.y, p.z, 14, 0.26, 0.2, 1);
       this.impacts.hit(p.x, p.y, p.z, 1);
@@ -5730,6 +5802,7 @@ export class MatchSystem extends createSystem({
       shutout: matchWon && this.theirPoints === 0,
       role: roleOf(specFromBuild(this.myBuild)),
       perfectInMatch: this.perfectInMatch,
+      deskKo: this.deskKoScored,
     });
     if (!met) return;
     const before = this.progress.level;

@@ -5,7 +5,7 @@
  */
 import type { ArenaLayout } from './layout.ts';
 
-export type Goal = 'rampKO' | 'burst' | 'wellSpin' | 'role' | 'perfect' | 'sweep' | 'ownArena';
+export type Goal = 'rampKO' | 'deskKO' | 'burst' | 'wellSpin' | 'role' | 'perfect' | 'sweep' | 'ownArena';
 export type Role = 'attack' | 'defense' | 'stamina';
 
 export interface Order {
@@ -29,6 +29,8 @@ export interface OrderContext {
   built: ArenaLayout[];
   /** The player has reached the match that teaches cups. */
   cup?: boolean;
+  /** A horizontal real-world table plane and boundary are available. */
+  table?: boolean;
 }
 
 /** What a finished round or match tells the order. */
@@ -49,6 +51,8 @@ export interface OrderEvent {
   role: Role;
   /** A perfect rip happened in this match. */
   perfectInMatch: boolean;
+  /** This round crossed the real table edge, not only the virtual rim. */
+  deskKo?: boolean;
 }
 
 /** The local date of a JS Date as YYYY-MM-DD. */
@@ -85,6 +89,7 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
   const rival = pick(ctx.rivals);
   const goals: Goal[] = ['rampKO', 'burst', 'role', 'perfect', 'sweep'];
   if (ctx.cup) goals.push('wellSpin');
+  if (ctx.table) goals.push('deskKO');
   if (ctx.built.length > 0) goals.push('ownArena');
   const goal = pick(goals);
   // The arena: your own for 'ownArena'; one where a knockout is possible for 'rampKO'.
@@ -93,6 +98,7 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
   const role = goal === 'role' ? pick<Role>(['attack', 'defense', 'stamina']) : undefined;
   const text: Record<Goal, string> = {
     rampKO: `Ramp ${rival} out: into a slag pit or over the wall`,
+    deskKO: `Knock ${rival} off the real desk edge`,
     burst: `Shatter ${rival}`,
     wellSpin: `Outlast ${rival} from your cup`,
     role: `Beat ${rival} with ${ROLE_WORD[role ?? 'attack']} top`,
@@ -110,6 +116,8 @@ export function orderMet(o: Order, e: OrderEvent): boolean {
   switch (o.goal) {
     case 'rampKO':
       return e.wonRound && (e.finish === 'pocket' || e.finish === 'over') && e.cause === 'ramp';
+    case 'deskKO':
+      return e.wonRound && e.deskKo === true;
     case 'burst':
       return e.wonRound && e.finish === 'burst';
     case 'wellSpin':

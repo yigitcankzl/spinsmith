@@ -123,6 +123,15 @@ export interface Champion {
   wins: number;
 }
 
+/** A rival physically knocked past the real desk edge; newest trophies are shown on that desk. */
+export interface DeskTrophy {
+  rival: string;
+  build: TopBuild;
+  /** Arena-local direction of the crossed table edge. */
+  angle: number;
+  date: string;
+}
+
 export type OpeningZone = 'center' | 'edge' | 'ambush' | 'neutral';
 export interface OpeningMemory {
   zone: OpeningZone;
@@ -245,6 +254,8 @@ export class Progress {
   private scars: Record<string, TopScars> = {};
   /** Most recent first. */
   champions: Champion[] = [];
+  /** The real desk remembers its three newest ring-outs. */
+  deskTrophies: DeskTrophy[] = [];
   /** Today's order, kept once made so a level-up mid-day does not change it. */
   private order: Order | null = null;
   /** The arena the player pinned (null: the rotation picks), arenas played most recent first, and every arena played once. */
@@ -264,7 +275,7 @@ export class Progress {
     try {
       const raw = storage?.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; openings?: Record<string, OpeningMemory>; scars?: Record<string, TopScars>; champions?: Champion[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[] };
+        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; openings?: Record<string, OpeningMemory>; scars?: Record<string, TopScars>; champions?: Champion[]; deskTrophies?: DeskTrophy[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[] };
         this.matches = s.matches ?? 0;
         // Saves from before the guide existed skip it.
         this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
@@ -279,6 +290,11 @@ export class Progress {
         this.openings = { ...(s.openings ?? {}) };
         this.scars = { ...(s.scars ?? {}) };
         this.champions = (s.champions ?? []).slice(0, CHAMPIONS).map((c) => ({ ...c, build: migrateBuild(c.build) }));
+        this.deskTrophies = (s.deskTrophies ?? []).slice(0, CHAMPIONS).flatMap((t) =>
+          t && typeof t.rival === 'string' && Number.isFinite(t.angle) && typeof t.date === 'string'
+            ? [{ ...t, angle: Number(t.angle), build: migrateBuild(t.build) }]
+            : [],
+        );
         this.order = s.order ?? null;
         this.arenaPin = s.arenaPin ?? null;
         this.recentArenas = s.recentArenas ?? [];
@@ -453,6 +469,13 @@ export class Progress {
     this.save();
   }
 
+  /** Keeps the defeated rival, not merely a counter: this is what appears beside the arena tomorrow. */
+  recordDeskKo(rival: string, build: TopBuild, angle: number, date = new Date()) {
+    const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    this.deskTrophies = [{ rival, build: { ...build }, angle: Number.isFinite(angle) ? angle : 0, date: day }, ...this.deskTrophies].slice(0, CHAMPIONS);
+    this.save();
+  }
+
   /** A match starts in this arena: it becomes the most recent and counts as played. */
   playedArena(name: string) {
     this.recentArenas = [name, ...this.recentArenas.filter((a) => a !== name)].slice(0, 8);
@@ -504,6 +527,7 @@ export class Progress {
     this.openings = {};
     this.scars = {};
     this.champions = [];
+    this.deskTrophies = [];
     this.order = null;
     this.arenaPin = null;
     this.recentArenas = [];
@@ -525,7 +549,7 @@ export class Progress {
     try {
       this.storage?.setItem(
         KEY,
-        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, openings: this.openings, scars: this.scars, champions: this.champions, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn] }),
+        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, openings: this.openings, scars: this.scars, champions: this.champions, deskTrophies: this.deskTrophies, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn] }),
       );
     } catch {
       // Storage full or blocked (a private window): progress lives for this session only.

@@ -763,6 +763,7 @@ export class TopView {
       new RingGeometry(ring.radius * 0.5, ring.radius * 1.12, 48).rotateX(-Math.PI / 2),
       new MeshBasicMaterial({ color: new Color(color).lerp(new Color(0xffffff), 0.12), map: SPIN_STREAKS, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
     );
+    this.blur.visible = false;
     this.blurColor = (this.blur.material as MeshBasicMaterial).color.clone();
     this.blur.position.y = topHeight(ring, base) - 0.002;
     this.body.add(this.blur);

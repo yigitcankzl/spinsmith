@@ -71,7 +71,7 @@ interface Game {
   forge: { debugPositions(): string };
   builder: { debugPositions(): string };
   myBuild: { ring: string; core: string; tip: string; spin: number; color: number; emblem?: number; seal?: string };
-  progress: { level: number; matches: number; guide: string };
+  progress: { level: number; matches: number; guide: string; deskTrophies?: { rival: string; angle: number; date: string }[] };
   launchZoneKind: string;
   launchArenaKind: string;
   launchTiming: number;
@@ -367,6 +367,7 @@ export function installDriver() {
           offDesk: !!g.theirView.offDesk,
           scored: !!g.deskKoScored,
           awarded: g.lastRoundHeat ?? 0,
+          trophies: g.progress.deskTrophies?.map((t) => ({ rival: t.rival, angle: +t.angle.toFixed(2), date: t.date })) ?? [],
         },
         charges: g.charges.charges,
         rimExperiment: !!g.rimExperiment,

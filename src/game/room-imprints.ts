@@ -13,13 +13,15 @@ import {
 } from '@iwsdk/core';
 import { mergeByMaterial } from './visuals.js';
 
-export type RoomSeal = 'anvil' | 'rush' | 'magnet' | 'tilt' | 'hammer' | 'ward';
+export type RoomSeal = 'anvil' | 'rush' | 'magnet' | 'tilt' | 'hammer' | 'ward' | 'desk';
 
 interface ImprintRecord {
   seal: RoomSeal;
   angle: number;
   seed: number;
   date: string;
+  x?: number;
+  z?: number;
 }
 
 const KEY = 'spinsmith.room-imprints.v1';
@@ -31,6 +33,7 @@ const COLOR: Record<RoomSeal, number> = {
   tilt: 0x7de07d,
   hammer: 0xffe066,
   ward: 0xd9d4ff,
+  desk: 0xff8a2a,
 };
 
 function load(): ImprintRecord[] {
@@ -39,7 +42,7 @@ function load(): ImprintRecord[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.flatMap((r) => {
       if (!r || typeof r.seal !== 'string' || !(r.seal in COLOR) || !Number.isFinite(r.angle) || !Number.isFinite(r.seed) || typeof r.date !== 'string') return [];
-      return [{ seal: r.seal as RoomSeal, angle: Number(r.angle), seed: Number(r.seed), date: r.date }];
+      return [{ seal: r.seal as RoomSeal, angle: Number(r.angle), seed: Number(r.seed), date: r.date, ...(Number.isFinite(r.x) && Number.isFinite(r.z) ? { x: Number(r.x), z: Number(r.z) } : {}) }];
     }).slice(-MAX);
   } catch {
     return [];
@@ -87,10 +90,10 @@ export class RoomImprints {
     this.rebuild();
   }
 
-  record(seal: RoomSeal, angle: number, date = new Date()): void {
+  record(seal: RoomSeal, angle: number, date = new Date(), at?: { x: number; z: number }): void {
     const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const seed = ((date.getTime() >>> 3) % 997) / 997;
-    this.records.push({ seal, angle: Number.isFinite(angle) ? angle : 0, seed, date: day });
+    this.records.push({ seal, angle: Number.isFinite(angle) ? angle : 0, seed, date: day, ...(at ? { x: at.x, z: at.z } : {}) });
     this.records = this.records.slice(-MAX);
     try {
       localStorage.setItem(KEY, JSON.stringify(this.records));
@@ -152,7 +155,15 @@ export class RoomImprints {
     const color = COLOR[record.seal];
     group.rotation.y = -record.angle;
     group.rotation.z = (record.seed - 0.5) * 0.08;
-    if (record.seal === 'anvil') {
+    if (record.seal === 'desk') {
+      group.position.set(record.x ?? 0, 0, record.z ?? -0.24);
+      for (let i = -1; i <= 1; i++) {
+        const notch = new Mesh(new PlaneGeometry(0.0025, 0.045 - Math.abs(i) * 0.009).rotateX(-Math.PI / 2), material(color, alpha * (1 - Math.abs(i) * 0.14)));
+        notch.position.x = i * 0.006;
+        notch.rotation.y = i * 0.12;
+        group.add(notch);
+      }
+    } else if (record.seal === 'anvil') {
       for (let i = -2; i <= 2; i++) {
         const length = 0.07 + 0.025 * ((record.seed * 13 + i * 0.31 + 2) % 1);
         const crack = new Mesh(new PlaneGeometry(0.0022, length).rotateX(-Math.PI / 2).translate(0, 0, -length / 2), material(color, alpha));

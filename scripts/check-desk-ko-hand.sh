@@ -35,10 +35,11 @@ done
 after="$(jq -r '.data.result.diagnostics.interventions' <<<"$state")"
 awarded="$(jq -r '.data.result.desk.awarded' <<<"$state")"
 score="$(jq -r '.data.result.score[0]' <<<"$state")"
-if (( after <= before )) || [[ "$awarded" != 3 || "$score" != 3 ]]; then
+trophies="$(jq -r '.data.result.desk.trophies | length' <<<"$state")"
+if (( after <= before )) || [[ "$awarded" != 3 || "$score" != 3 ]] || (( trophies < 1 )); then
   jq '.data.result | {phase, score, desk, diagnostics, probe, handProbe, strikeProbe}' <<<"$state" >&2
   jq '.data.result | {error, probe}' <<<"$gesture" >&2
-  echo "Desk KO proof failed: interventions $before->$after, awarded=$awarded, score=$score" >&2
+  echo "Desk KO proof failed: interventions $before->$after, awarded=$awarded, score=$score, trophies=$trophies" >&2
   exit 1
 fi
 
@@ -48,4 +49,5 @@ jq -n \
   --argjson before "$before" \
   --argjson after "$after" \
   --arg path "$(jq -r '.data.result.path' <<<"$capture")" \
-  '{ok:true, handInterventions:{before:$before,after:$after}, deskKo:{awarded:3,score:[3,0]}, screenshot:$path}'
+  --argjson trophies "$trophies" \
+  '{ok:true, handInterventions:{before:$before,after:$after}, deskKo:{awarded:3,score:[3,0],savedTrophies:$trophies}, screenshot:$path}'
