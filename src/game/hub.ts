@@ -46,12 +46,23 @@ import type { TopBuild } from './parts.js';
 import { RIVALS } from './parts.js';
 import { SmithBoard } from './board.js';
 import { encodeBuild } from './challenge.js';
+import { ECHO_KEY } from './echo.js';
 import { popIn } from './rim.js';
 import { ARENA_SCALE, COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
 import { FEATS, MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
 import { bevelBox, BRASS, FORGED, GRAPHITE, GRAPHITE_AO, plastic, STEEL } from './materials.js';
+
+/** Your top's code, with your last match's echo when it was played with this same top. */
+function echoCode(build: string): string {
+  try {
+    const saved = localStorage.getItem(ECHO_KEY) ?? '';
+    return saved.startsWith(`${build}.`) ? saved : build;
+  } catch {
+    return build;
+  }
+}
 
 export type HubAction =
   | { kind: 'play' }
@@ -219,7 +230,7 @@ export class Hub {
         nextGlow: next,
         rivals: RIVALS.map((r) => ({ name: r.name, level: r.level, met: r.level <= progress.level, marks: progress.marksOf(r.name) })),
         gilded: progress.isUnlocked('ledger:gold') || progress.level >= MAX_LEVEL,
-        code: encodeBuild(build),
+        code: echoCode(encodeBuild(build)),
         feats: progress.feats.size,
         featsOf: Object.keys(FEATS).length,
       };

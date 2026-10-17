@@ -140,10 +140,11 @@ export class SmithBoard {
     setType(g, 'caption', this.k, DIST);
     const lw = g.measureText(label).width;
     setType(g, 'title', this.k, DIST);
-    const cw = g.measureText(s.code).width;
+    // An echo makes the code long; it squeezes to fit rather than run off the plate.
+    const cw = Math.min(g.measureText(s.code).width, W - 160 - lw - 32);
     const x = (W - lw - 32 - cw) / 2;
     g.textAlign = 'left';
-    engrave(g, s.code, x + lw + 32, 424, TEXT);
+    engrave(g, s.code, x + lw + 32, 424, TEXT, cw);
     setType(g, 'caption', this.k, DIST);
     engrave(g, label, x, 428, TEXT_DIM);
     g.textAlign = 'center';

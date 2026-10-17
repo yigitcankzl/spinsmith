@@ -18,6 +18,7 @@ import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
+import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
@@ -697,6 +698,34 @@ TUNING.grace = 0;
     const [l, r] = forgeGrips(layout);
     assert.ok((l.x * r.x + l.z * r.z) / (Math.hypot(l.x, l.z) * Math.hypot(r.x, r.z)) < 0.3 - 0.25, `${layout.name} grips leave slack under the forge's opposite-rim test`);
   }
+}
+
+// 16c. Echo codes: a recorded match survives the code (to its steps), in any case, after the build.
+{
+  const echo = {
+    rips: [{ power: 0.91, aim: -0.3 }, { power: 0.5, aim: 0.6 }, { power: 1, aim: 0 }],
+    forges: [
+      { round: 0, t: 3.5, action: 'squeeze' as const, sign: 1 as const },
+      { round: 1, t: 12.25, action: 'twist' as const, sign: -1 as const },
+      { round: 2, t: 0.75, action: 'tilt' as const, sign: 1 as const },
+    ],
+  };
+  const text = encodeEcho(echo);
+  const back = decodeEcho(text.toLowerCase());
+  assert.ok(back, `echo ${text} decodes`);
+  assert.equal(back.rips.length, 3);
+  back.rips.forEach((r, i) => {
+    assert.ok(Math.abs(r.power - echo.rips[i].power) <= 0.5 / 35 + 1e-9, `rip ${i} power`);
+    assert.ok(Math.abs(r.aim - echo.rips[i].aim) <= 0.6 / 35 + 1e-9, `rip ${i} aim`);
+  });
+  assert.deepEqual(back.forges, echo.forges, 'forges survive exactly (quarter-second times)');
+  assert.equal(decodeEcho(encodeEcho({ rips: [{ power: 0.7, aim: 0 }], forges: [] }))?.forges.length, 0, 'an echo without forges');
+  assert.equal(decodeEcho('R1'), null, 'half a rip is not an echo');
+  assert.equal(decodeEcho('R1A_1'), null, 'a cut-off forge is not an echo');
+  const split = splitCode(`k3f9-2.${text}`);
+  assert.equal(split.build, 'K3F9-2');
+  assert.deepEqual(split.echo?.forges, echo.forges);
+  assert.equal(splitCode('K3F9-2').echo, null, 'a plain challenge code has no echo');
 }
 
 // 17. The arena rotation: a newly opened arena comes first, then the rival's home unless it was

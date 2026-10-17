@@ -236,6 +236,10 @@ an arena. First to 3 heat wins a match.
   the game counts a pinch; a ghost hand shows the first rip and the first ramp.
 - **Challenge codes** (`src/game/challenge.ts`): the board shows your top's code; a friend adds
   `?vs=CODE` to the address and their next match is against your top.
+- **Echo duels** (`src/game/echo.ts`): after a match the code also carries how you played it
+  (`K3F9-2.R…_…`): each round's rip and when your two hands forged the arena. Your friend's
+  Challenger rips the way you did and forges their arena at the same moments, from the far rim,
+  with a ghost hand. No server: the code is the recording.
 - **Store basics:** a service worker keeps the installed game working offline; `privacy.html`; a
   maskable icon; the landing page has how-to-play and credits; a failed start says so.
 - **Sound** (`src/game/audio.ts`): spatial (HRTF) placement of hums, clashes and landings; one generated room reverb, music that follows the game at 96

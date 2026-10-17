@@ -7,9 +7,11 @@ import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
-import { decodeBuild } from './challenge.js';
+import { decodeBuild, encodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
 import { forgeGrips } from './reach.js';
+import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
+import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
 import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
@@ -798,6 +800,12 @@ export class MatchSystem extends createSystem({
   private rivalAngle = -Math.PI / 2;
   /** The next match's rival, picked at home and shown there with its arena. */
   private nextRival: Rival | null = null;
+  /** This match as an echo for a friend's game: each rip and each two-hand forge (echo.ts). */
+  private echoRec: Echo = { rips: [], forges: [] };
+  /** A friend's recorded match the Challenger replays (rips and forges), or null. */
+  private rivalEcho: Echo | null = null;
+  /** The echo's forges already played this round. */
+  private echoPlayed = 0;
   /** While ready: a faint line on the floor around where you can launch from. */
   private launchZone = new Mesh(new BufferGeometry(), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.5, depthWrite: false, side: 2 }));
   /** Seconds left before a transient fight message clears. */
@@ -1513,6 +1521,12 @@ export class MatchSystem extends createSystem({
       this.rivalLaunchPower = memory.zone === 'center' ? 0.96 : 0.88;
       this.rivalLaunchAim = memory.zone === 'ambush' ? -Math.sign(memory.x || 1) * 0.24 : memory.zone === 'edge' ? Math.sign(memory.x || 1) * 0.16 : 0;
     }
+    // A friend's echo rips the way they did in that round (the next round still to be launched).
+    const echoRip = this.rivalEcho?.rips[this.echoRec.rips.length];
+    if (echoRip) {
+      this.rivalLaunchPower = echoRip.power;
+      this.rivalLaunchAim = echoRip.aim;
+    }
     const [x, z] = this.rivalSpot();
     const angle = Math.atan2(-x, -z) + this.rivalLaunchAim + LAUNCH_TILT * this.theirs.hand;
     const length = 0.07 + 0.07 * this.rivalLaunchPower;
@@ -1786,7 +1800,7 @@ export class MatchSystem extends createSystem({
     let friend = false;
     try {
       // As challenger() decides: a code that decodes, after the first session.
-      friend = this.progress.guide === 'done' && !!decodeBuild(sessionStorage.getItem('spinsmith.vs') ?? '');
+      friend = this.progress.guide === 'done' && !!decodeBuild(splitCode(sessionStorage.getItem('spinsmith.vs') ?? '').build);
     } catch {
       // No storage: no challenge waits.
     }
@@ -2260,9 +2274,11 @@ export class MatchSystem extends createSystem({
     } catch {
       return null;
     }
-    const build = code ? decodeBuild(code) : null;
+    const { build: buildCode, echo } = splitCode(code);
+    const build = buildCode ? decodeBuild(buildCode) : null;
     if (!build) return null;
-    return { name: 'Challenger', move: 'charge', style: 'a friend\'s top', title: `code ${code.toUpperCase()}`, intro: 'Your friend forged me. Beat me.', win: 'Tell them I won.', lose: 'Tell them you won.', tip: 'Read its parts in the intro: a heavy ring holds, a light one hits', build: { ...build, color: OPPONENT_COLOR }, level: 1 };
+    this.rivalEcho = echo;
+    return { name: 'Challenger', move: 'charge', style: echo ? 'a friend\'s top and hands' : 'a friend\'s top', title: `code ${buildCode}`, intro: echo ? 'Your friend forged me and played this match. Their hands are in it.' : 'Your friend forged me. Beat me.', win: 'Tell them I won.', lose: 'Tell them you won.', tip: 'Read its parts in the intro: a heavy ring holds, a light one hits', build: { ...build, color: OPPONENT_COLOR }, level: 1 };
   }
 
   private pickRival(): Rival {
@@ -2467,6 +2483,8 @@ export class MatchSystem extends createSystem({
     this.stage.visible = true;
     this.demo = false;
     // A friend's challenge goes first (after the first session).
+    this.rivalEcho = null;
+    this.echoRec = { rips: [], forges: [] };
     const friend = !rival && this.progress.guide === 'done' ? this.challenger() : null;
     this.rival = rival ?? friend ?? this.nextRival ?? this.pickRival();
     this.nextRival = null;
@@ -3507,6 +3525,12 @@ export class MatchSystem extends createSystem({
     }
     // Lock the blueprint to the actual post-bonus velocity, not the raw hand motion.
     const traceAngle = Math.atan2(this.mine.vx, this.mine.vz);
+    // The echo keeps the rip as an intent: power, and aim off straight in past the orbit angle
+    // the game adds. Your launch heads (sin a, -cos a) and the rival's (sin a, cos a), so the same
+    // veer from each side's own view is the negated aim.
+    const off = Math.PI - traceAngle - Math.atan2(-sx, sz) - LAUNCH_TILT * mh;
+    this.echoRec.rips.push({ power, aim: Math.max(-MAX_AIM, Math.min(MAX_AIM, -Math.atan2(Math.sin(off), Math.cos(off)))) });
+    this.echoPlayed = 0;
     const traceLength = 0.07 + 0.07 * Math.min(1, Math.hypot(this.mine.vx, this.mine.vz) / Math.max(0.001, LAUNCH_SPEED));
     this.launchAim.visible = true;
     this.launchAim.position.set(sx, this.arena.height(sx, sz) + 0.003, sz);
@@ -3649,6 +3673,9 @@ export class MatchSystem extends createSystem({
       this.arenaMorphHold = 1.1;
       this.recordIntervention();
       this.recordArenaForge(action, swing);
+      // Twist keeps its turn; tilt keeps which side went low (the echo mirrors it to the far side).
+      const sign = action === 'twist' ? Math.sign(this.arenaMorphTwist) : action === 'tilt' ? Math.sign(this.arenaMorphShove.x) : 1;
+      this.echoRec.forges.push({ round: this.echoRec.rips.length - 1, t: this.elapsed, action, sign: sign < 0 ? -1 : 1 });
       this.stamp.show(ARENA_FORGE_TITLE[action], ARENA_FORGE_EFFECT[action], 'mine', 1.05, 1.15);
       this.label.set(`${ARENA_FORGE_TITLE[action]} ${ARENA_FORGE_EFFECT[action]}\nWATCH THE TOPS REACT`);
       this.labelTimer = 1.65;
@@ -4131,6 +4158,46 @@ export class MatchSystem extends createSystem({
    * telegraphs its move for TELL_TIME (it flashes, rings spread under it, a rising whine), then the
    * move lands, unless your Anvil Strike cut it short.
    */
+  /**
+   * A friend's echo forges the arena when they did, from the far side: the same move through the
+   * same impulse as a player's (arena-forge.ts), at a firm standard strength, with their ghost hand.
+   */
+  private playEcho() {
+    const echo = this.rivalEcho;
+    if (!echo || this.demo) return;
+    const round = this.echoRec.rips.length - 1;
+    const due = echo.forges.filter((f) => f.round === round);
+    const f = due[this.echoPlayed];
+    if (!f || this.elapsed < f.t) return;
+    this.echoPlayed++;
+    const gesture: ArenaForgeGesture = {
+      pull: f.action === 'squeeze' ? -0.09 : f.action === 'stretch' ? 0.09 : 0,
+      twist: f.action === 'twist' ? 0.24 * f.sign : 0,
+      tilt: f.action === 'tilt' ? 0.05 : 0,
+    };
+    // Seen from the far side the friend's low hand is on the other side: downhill flips in x.
+    const downhill = -f.sign;
+    for (const top of this.tops) {
+      if (!top.alive) continue;
+      const impulse = arenaForgeImpulse(f.action, gesture, top.x, top.z, this.arena.radius, downhill, 0);
+      top.vx += impulse.x;
+      top.vz += impulse.z;
+      top.kick = Math.max(top.kick, 0.55);
+      top.kickX = impulse.x;
+      top.kickZ = impulse.z;
+    }
+    // Their hand at the mirror of your right grip, the far rim on their right.
+    const [, g] = forgeGrips(this.arena.layout);
+    const d = Math.hypot(g.x, g.z) || 1;
+    this.rivalHandMove(-g.x, -g.z, g.x / d, g.z / d);
+    this.rivalShapeAt = this.elapsed;
+    this.rivalShapeKind = `ECHO ${f.action.toUpperCase()}`;
+    this.stamp.show(`ECHO ${ARENA_FORGE_TITLE[f.action]}`, 'your friend\'s hands', 'rival', 0.9);
+    this.impacts.shock(0, this.arena.height(0, 0), 0, 0.6);
+    playThock();
+    if (import.meta.env.DEV) console.log(`[ECHO] ${f.action} ${f.sign} at t ${this.elapsed.toFixed(2)} round ${round}`);
+  }
+
   private rivalTell(clash: number) {
     if (this.demo || !this.taught('tells')) return;
     this.rivalBar.update(STEP, false);
@@ -5002,6 +5069,7 @@ export class MatchSystem extends createSystem({
       this.forgeBar.update(STEP, behind);
       if (clash) this.forgeBar.clash(clash.strength, this.elapsed, behind);
       this.rivalTell(clash ? clash.strength : 0);
+      this.playEcho();
       for (const t of [this.mine, this.theirs]) {
         if (t.sincePad !== 0) continue;
         // A boost pad fired: it flashes, sparks fly along it, a whoosh.
@@ -5145,6 +5213,14 @@ export class MatchSystem extends createSystem({
         this.theirPoints = 0;
         this.matchOver = true;
         this.markFirstFive(5);
+        // The match becomes your echo: the board's challenge code carries it to a friend.
+        if (!this.demo && this.echoRec.rips.length) {
+          try {
+            localStorage.setItem(ECHO_KEY, `${encodeBuild(this.myBuild)}.${encodeEcho(this.echoRec)}`);
+          } catch {
+            // No storage: the board keeps the plain build code.
+          }
+        }
       } else {
         // A spin finish says why (the most common finish otherwise reads as luck).
         const why = loser.finish === 'spin' ? this.outlastReason(v === 1) : '';

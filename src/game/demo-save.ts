@@ -11,7 +11,7 @@ import { MARK, Progress } from './progress.ts';
 import type { Storage } from './progress.ts';
 
 /** Every key the game saves under. */
-export const SAVE_KEYS = ['spinsmith.progress.v1', 'spinsmith.top.v1', 'spinsmith.arenas.v1'];
+export const SAVE_KEYS = ['spinsmith.progress.v1', 'spinsmith.top.v1', 'spinsmith.arenas.v1', 'spinsmith.echo.v1'];
 
 export interface WritableStorage extends Storage {
   removeItem(key: string): void;
