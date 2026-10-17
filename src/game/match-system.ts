@@ -571,7 +571,7 @@ export class MatchSystem extends createSystem({
   /** This round's off-the-desk moment has been shown. */
   private offDeskShown = false;
   /** A rival ring-out whose final score waits for the real table to accept or reject the top. */
-  private deskVerdict: { v: 1; left: number } | null = null;
+  private deskVerdict: { v: 1; left: number; edge?: boolean } | null = null;
   /** Observable after the result: this round really earned the extra desk-edge heat. */
   private deskKoScored = false;
   /** 0 idle, 1 rim hit, 2 crossing the desk, 3 real edge crossed. */
@@ -679,6 +679,8 @@ export class MatchSystem extends createSystem({
   private arenaMorphing = false;
   /** Holds the visible deformation for one readable beat after release. */
   private arenaMorphHold = 0;
+  /** Released deformation used by the damped visual spring; combat already received its impulse. */
+  private arenaMorphRelease = { scaleX: 1, scaleZ: 1, tilt: 0, twist: 0 };
   private arenaMorphStart = { distance: 1, angle: 0 };
   private arenaMorphPull = 0;
   private arenaMorphTwist = 0;
@@ -1497,8 +1499,14 @@ export class MatchSystem extends createSystem({
     this.turn += Math.max(-rate * dt, Math.min(rate * dt, want - this.turn));
     // Play never starts on a turned arena.
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'pulling') this.turn = 0;
-    this.stage.rotation.set(this.arena.tiltX, this.turn, this.arena.tiltZ);
+    this.stage.rotation.set(this.arena.tiltX, this.turn + this.arenaMorphTwist, this.arena.tiltZ + this.arenaMorph.tilt);
     this.stage.scale.set(this.viewK * this.arenaMorph.scaleX, this.viewK, this.viewK * this.arenaMorph.scaleZ);
+    // The bowl changes shape, not the physical tops. Their positions follow the forged floor but
+    // their metal bodies counter-scale so they never become oval toy silhouettes.
+    const invMorphX = 1 / Math.max(0.01, this.arenaMorph.scaleX);
+    const invMorphZ = 1 / Math.max(0.01, this.arenaMorph.scaleZ);
+    this.myView.root.scale.set(invMorphX, 1, invMorphZ);
+    this.theirView.root.scale.set(invMorphX, 1, invMorphZ);
     const me = this.mine;
     const armed = this.phase === 'fight' && me.alive && me.hammer > 0;
     this.aura.visible = armed;
@@ -2702,7 +2710,10 @@ export class MatchSystem extends createSystem({
     this.bar.mesh.position.y = (BAR_Y + lift) * grow;
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
     // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
-    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + 0.07 * grow, this.label.mesh.position.z + 0.01);
+    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') {
+      const stampLift = this.phase === 'result' ? 0.12 : 0.08;
+      this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + stampLift * grow, this.label.mesh.position.z + 0.01);
+    }
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.scale.setScalar(readScale);
@@ -3040,6 +3051,8 @@ export class MatchSystem extends createSystem({
     this.arenaMorph.scaleX = this.arenaMorph.scaleZ = 1;
     this.arenaMorph.tilt = 0;
     this.arenaMorphPull = this.arenaMorphTwist = 0;
+    this.arenaView.setForgeDents(0, 0, 0, 0, 0);
+    this.publishArenaMorph();
     // A pull cut short (a recenter) leaves no drone and no lit ring.
     this.cordTone.update(null);
     this.chargeRing.visible = false;
@@ -3405,6 +3418,12 @@ export class MatchSystem extends createSystem({
     this.rootEntity?.setValue(FirstFiveState, 'arenaForgeSwing', swing);
   }
 
+  /** Publishes the live deformation for deterministic emulator and remote-device proof. */
+  private publishArenaMorph() {
+    this.rootEntity?.setValue(FirstFiveState, 'arenaMorphTwist', this.arenaMorphTwist);
+    this.rootEntity?.setValue(FirstFiveState, 'arenaMorphTilt', this.arenaMorph.tilt);
+  }
+
   /** A released or lost two-hand grab below the intent threshold changes neither combat nor economy. */
   private cancelArenaForge(message: string) {
     this.arenaForgeCancels++;
@@ -3414,6 +3433,10 @@ export class MatchSystem extends createSystem({
     this.rootEntity?.setValue(FirstFiveState, 'lastArenaForge', 0);
     this.rootEntity?.setValue(FirstFiveState, 'arenaForgeSwing', 0);
     this.arenaMorphHold = 0;
+    this.arenaMorphTwist = 0;
+    this.arenaView.setForgeDents(0, 0, 0, 0, 0);
+    this.arenaDirty = true;
+    this.publishArenaMorph();
     this.label.set(message);
     this.labelTimer = 1.35;
     if (import.meta.env.DEV) console.log(`[MORPH] cancelled: ${message.replace('\n', ' ')}`);
@@ -3651,14 +3674,32 @@ export class MatchSystem extends createSystem({
     const right = this.hands.right;
     if (!this.arenaMorphing) {
       if (this.arenaMorphHold > 0) {
+        const duration = 0.55;
         this.arenaMorphHold = Math.max(0, this.arenaMorphHold - dt);
+        const t = 1 - this.arenaMorphHold / duration;
+        const spring = Math.cos(t * Math.PI * 2.4) * (1 - t) * (1 - t);
+        this.arenaMorph.scaleX = 1 + (this.arenaMorphRelease.scaleX - 1) * spring;
+        this.arenaMorph.scaleZ = 1 + (this.arenaMorphRelease.scaleZ - 1) * spring;
+        this.arenaMorph.tilt = this.arenaMorphRelease.tilt * spring;
+        this.arenaMorphTwist = this.arenaMorphRelease.twist * spring;
+        this.arenaView.setForgeDents(this.arenaMorphA.x, this.arenaMorphA.z, this.arenaMorphB.x, this.arenaMorphB.z, Math.abs(spring));
+        this.arenaDirty = true;
+        this.publishArenaMorph();
         this.arenaView.charge = Math.max(this.arenaView.charge, 0.9);
+        if (this.arenaMorphHold <= 0) {
+          this.arenaMorph.scaleX = this.arenaMorph.scaleZ = 1;
+          this.arenaMorph.tilt = this.arenaMorphTwist = 0;
+          this.arenaView.setForgeDents(0, 0, 0, 0, 0);
+          this.arenaDirty = true;
+          this.publishArenaMorph();
+        }
         return false;
       }
       const ease = 1 - Math.exp(-dt * 8);
       this.arenaMorph.scaleX += (1 - this.arenaMorph.scaleX) * ease;
       this.arenaMorph.scaleZ += (1 - this.arenaMorph.scaleZ) * ease;
       this.arenaMorph.tilt += (0 - this.arenaMorph.tilt) * ease;
+      this.arenaMorphTwist += (0 - this.arenaMorphTwist) * ease;
 
       const a = this.rimPulls.left;
       const b = this.rimPulls.right;
@@ -3682,6 +3723,7 @@ export class MatchSystem extends createSystem({
       this.arenaMorphStart.angle = Math.atan2(dz, dx);
       this.arenaMorphPull = this.arenaMorphTwist = 0;
       this.arenaMorphing = true;
+      this.arenaMorphHold = 0;
       this.arenaView.charge = 1;
       const firstLesson = !this.demo && this.progress.matches === 0 && this.tutorialRound === 2;
       this.stamp.show('TWO-HAND FORGE', firstLesson ? 'SQUEEZE THE RIMS' : 'SQUEEZE · STRETCH · TILT · TWIST', 'mine', 0.7);
@@ -3732,7 +3774,14 @@ export class MatchSystem extends createSystem({
         - arenaForgeDanger(this.mine.x, this.mine.z, this.mine.vx, this.mine.vz, this.arena.radius) - before;
       this.lastShape = { t: this.elapsed, kind: action };
       this.morphedOnce = true;
-      this.arenaMorphHold = 1.1;
+      Object.assign(this.arenaMorphRelease, {
+        scaleX: this.arenaMorph.scaleX,
+        scaleZ: this.arenaMorph.scaleZ,
+        tilt: this.arenaMorph.tilt,
+        twist: this.arenaMorphTwist,
+      });
+      this.arenaMorphHold = 0.55;
+      this.slowMo = Math.max(this.slowMo, 0.4);
       this.recordIntervention();
       this.recordArenaForge(action, swing);
       // Twist keeps its turn; tilt keeps which side went low (the echo mirrors it to the far side).
@@ -3766,6 +3815,9 @@ export class MatchSystem extends createSystem({
     this.arenaMorph.scaleX = 1 + this.arenaMorphPull * (1.1 * c * c - 0.4 * s * s);
     this.arenaMorph.scaleZ = 1 + this.arenaMorphPull * (1.1 * s * s - 0.4 * c * c);
     this.arenaMorph.tilt = Math.max(-0.1, Math.min(0.1, this.arenaMorphB.y - this.arenaMorphA.y));
+    this.arenaView.setForgeDents(this.arenaMorphA.x, this.arenaMorphA.z, this.arenaMorphB.x, this.arenaMorphB.z, 1);
+    this.arenaDirty = true;
+    this.publishArenaMorph();
     this.arenaView.charge = 1;
     if (Math.abs(this.arenaMorph.tilt) > 0.012) {
       const lowIsLeft = this.arenaMorphA.y < this.arenaMorphB.y;
@@ -5161,6 +5213,14 @@ export class MatchSystem extends createSystem({
   private updateDeskVerdict(dt: number): boolean {
     const pending = this.deskVerdict;
     if (!pending) return false;
+    if (pending.edge) {
+      pending.left -= dt;
+      if (pending.left <= 0) {
+        this.deskVerdict = null;
+        this.finish(pending.v, true);
+      }
+      return true;
+    }
     pending.left -= dt;
     if (this.deskKoStage === 1) this.setDeskKoStage(2);
     if ((this.deskKoTrailT -= dt) <= 0) {
@@ -5169,15 +5229,19 @@ export class MatchSystem extends createSystem({
       this.sparks.flight(p.x, p.y, p.z);
     }
     if (this.theirView.offDesk) {
-      this.deskVerdict = null;
+      pending.edge = true;
+      pending.left = 0.6;
       this.offDeskShown = true;
       this.setDeskKoStage(3);
       const p = this.theirView.root.position;
       this.sparks.burst(p.x, p.y, p.z, 1);
       this.sparks.embers(p.x, p.y, p.z, 14, 0.26, 0.2, 1);
+      this.impacts.hit(p.x, p.y, p.z, 1);
+      this.impacts.shock(p.x, p.y, p.z, 1, 0xff8a2a);
+      this.slowMo = Math.max(this.slowMo, 0.6);
+      this.stamp.show('OFF THE DESK!', 'REAL EDGE · +1', 'mine', 0.55, 1.25);
       this.featDone('offDesk');
       if (import.meta.env.DEV) console.log(`[DESK_KO] real edge crossed; +${DESK_KO_BONUS} bonus heat`);
-      this.finish(pending.v, true);
       return true;
     }
     // Once it has stopped on the wood, or the bounded visual wait expires, the original arena

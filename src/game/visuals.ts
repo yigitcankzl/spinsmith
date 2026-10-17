@@ -1130,6 +1130,9 @@ export class TopView {
       p.x += v.x * dt;
       p.z += v.z * dt;
       if (roomSurface(p.x, p.z) < p.y - 0.001) {
+        // The real edge is the event. Report it while the top is still visible in the air,
+        // rather than waiting until it reaches the physical floor below the table.
+        this.offDesk = true;
         this.landed = false;
         v.y = 0;
       }
@@ -1461,6 +1464,8 @@ export class ArenaView {
   private vortexDisc: Mesh | null = null;
   private disposables: { dispose(): void }[] = [];
   private time = 0;
+  /** Two visual-only finger dents in the forged floor: ax, az, bx, bz, strength. */
+  private forgeDents = new Float32Array(5);
 
   constructor(private readonly pedestalHeight: number) {
     const count = 1 + this.rings * this.segs;
@@ -1782,7 +1787,16 @@ export class ArenaView {
         const x = Math.cos(a) * radius;
         const z = Math.sin(a) * radius;
         const i = r === 0 ? 0 : this.vi(r, s);
-        pos.setXYZ(i, x, arena.height(x, z), z);
+        let forgeDent = 0;
+        const dentStrength = this.forgeDents[4];
+        if (dentStrength > 0) {
+          const ad = Math.hypot(x - this.forgeDents[0], z - this.forgeDents[1]);
+          const bd = Math.hypot(x - this.forgeDents[2], z - this.forgeDents[3]);
+          const ak = Math.max(0, 1 - ad / 0.055);
+          const bk = Math.max(0, 1 - bd / 0.055);
+          forgeDent = Math.max(ak * ak, bk * bk) * 0.012 * dentStrength;
+        }
+        pos.setXYZ(i, x, arena.height(x, z) - forgeDent, z);
         const shape = arena.shapeHeight(x, z);
         const dip = -arena.pocketDip(x, z) / 0.003;
         if (shape > 0) {
@@ -1811,6 +1825,15 @@ export class ArenaView {
     pos.needsUpdate = true;
     (this.geo.attributes.color as BufferAttribute).needsUpdate = true;
     this.geo.computeVertexNormals();
+  }
+
+  /** Presses the visible floor under two pinched rim sectors; the simulation height is untouched. */
+  setForgeDents(ax: number, az: number, bx: number, bz: number, strength: number) {
+    this.forgeDents[0] = ax;
+    this.forgeDents[1] = az;
+    this.forgeDents[2] = bx;
+    this.forgeDents[3] = bz;
+    this.forgeDents[4] = Math.max(0, Math.min(1, strength));
   }
 }
 
@@ -1889,9 +1912,10 @@ export class Sparks {
             'float sl = length(sd);',
             'vec2 dir = sl > 1e-6 ? sd / sl : vec2(1.0, 0.0);',
             'float w = iCol.a * length(modelViewMatrix[0].xyz);',
+            'float trail = min(sl, w * 6.0);',
             'vec4 mvPosition = head;',
-            'mvPosition.xy += dir * (position.x * (sl + w) - 0.5 * w) + vec2(-dir.y, dir.x) * (position.y * 0.5 * w);',
-            'mvPosition.z += (tail.z - head.z) * position.x;',
+            'mvPosition.xy += dir * (position.x * (trail + w) - 0.5 * w) + vec2(-dir.y, dir.x) * (position.y * 0.5 * w);',
+            'mvPosition.z += (tail.z - head.z) * position.x * (sl > 1e-6 ? trail / sl : 0.0);',
             'gl_Position = projectionMatrix * mvPosition;',
           ].join('\n'),
         );

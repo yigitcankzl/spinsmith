@@ -13,6 +13,10 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   lastArenaForge: { type: Types.Int8, default: 0 },
   /** Signed immediate momentum swing: positive means the player's top benefited. */
   arenaForgeSwing: { type: Types.Float32, default: 0 },
+  /** Live visual yaw applied while two hands twist the arena. */
+  arenaMorphTwist: { type: Types.Float32, default: 0 },
+  /** Live visual roll applied while two hands tilt the arena. */
+  arenaMorphTilt: { type: Types.Float32, default: 0 },
   /** Two-hand grabs safely cancelled before a deliberate arena deformation. */
   arenaForgeCancels: { type: Types.Int16, default: 0 },
   /** DESK KO presentation: 0 idle, 1 rim impact, 2 airborne, 3 scored. */
