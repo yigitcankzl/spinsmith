@@ -249,6 +249,8 @@ export class Hub {
         code: echoCode(encodeBuild(build)),
         history: [
           (() => {
+            // A pinned arena is free play: say so, or PLAY and the map disagree.
+            if (progress.arenaPin) return `free play in ${progress.arenaPin} (pinned)`;
             const next = nextBout(progress.bouts);
             return next ? `next bout ${next.id}: ${next.rival}` : 'every bout won';
           })(),
