@@ -188,6 +188,8 @@ Final smoke (IWER, 06:40): bout (2-1) and rematch (bout kept), PASS → Challeng
 
 The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Online regression passes. |
 
+| 5587d93 | Seventh (last) review: `endOnline` no longer redraws home itself. That redraw had wiped the "left" and "no one connected" cards and could save a new smith's order from the old smith's arenas; the callers now redraw, then speak. The cord tone is silenced on a remote launch and while waiting for the peer. |
+
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
