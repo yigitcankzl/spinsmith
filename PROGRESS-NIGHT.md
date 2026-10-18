@@ -151,8 +151,12 @@ IWER: MENU in ready → "Leave this match?" → hub; the online round regression
 
 | 8d5ba2c | **Online trust boundary** (crash-risk sweep agent): the host validates and clamps every guest event (finite numbers, ranges, known kinds, actions and seals) via `sanitizeGuestEvent` (tested in check:net). A malformed launch spot or hello is ignored, pending online starts are voided when a peer leaves (this fixes a null crash), the early-event window is bounded, and the pegs are capped at four. Snapshots from a host are now checked on the guest too (d6064cc: only finite snapshots reach the view). |
 
+| d6064cc | The guest refuses non-finite host snapshots (validSnapshot, tested). |
+| 05d10f2 | An open online room's code leads the board's front line while you wait (IWER: pegs → room 5J4PT on the board → pegs → closed). |
+| 9b40f60, 2c4b985 | The old circuit counts ("CINDER CIRCUIT 2/3") are gone from the plate and the intro: it is the bout, "brawl" or "free play". |
+
 **Local only (gitignored):**
-- `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes, and the interaction notes are updated.
+- `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
 
 **Checkpoint 05:58:**
