@@ -1367,8 +1367,9 @@ export class MatchSystem extends createSystem({
     this.launchSafeZone.visible = this.launchDangerZone.visible = this.phase === 'ready' && !this.demo;
     this.openingEcho.visible = launchPhase && !!this.lastOpeningTrace && this.lastOpeningTrace.rival === this.rival.name && this.lastOpeningTrace.arena === this.arena.layout.name && !this.demo;
     // Large near-rim actions only appear when play has stopped; during a fight the arena is the UI.
-    // MENU also waits while you aim (ready): a match can always be left, never only in a 4 s window.
-    this.menuButton.mesh.visible = (this.phase === 'result' || this.phase === 'ready') && !this.demo;
+    // MENU also waits while you aim (ready, after the first session keeps one thing to look at): a
+    // match can always be left, never only in a 4 s window.
+    this.menuButton.mesh.visible = (this.phase === 'result' || (this.phase === 'ready' && this.progress.guide === 'done')) && !this.demo;
     this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo && !(this.online?.role === 'guest' && this.online.peer);
     this.passButton.mesh.visible = this.rematchButton.mesh.visible && this.canPass();
     if (this.passButton.mesh.visible && !this.passHinted && once('pass')) this.stamp.later('PASS', 'A FRIEND FIGHTS YOUR TOP AND HANDS', 'neutral', 1.6, 1);
