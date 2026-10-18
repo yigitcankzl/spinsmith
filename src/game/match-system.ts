@@ -8,7 +8,7 @@ import { Builder, Button, loadArenas } from './builder.js';
 import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
-import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
+import { cloneLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance, validate } from './layout.js';
 import { forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
@@ -2801,7 +2801,8 @@ export class MatchSystem extends createSystem({
       this.setupBrawl(seats - 2);
     }
     this.progress.playedArena(this.arena.layout.name);
-    if (this.online?.role === 'host' && this.online.peer) this.online.launched(-1, this.arena.layout.name);
+    // A built-in arena goes by name; a workshop arena goes whole (the guest does not have it).
+    if (this.online?.role === 'host' && this.online.peer) this.online.launched(-1, this.arena.layout.name, ARENAS.some((a) => a.name === this.arena.layout.name) ? undefined : this.arena.layout);
     this.perfectInMatch = false;
     this.myPoints = 0;
     this.theirPoints = 0;
@@ -6200,11 +6201,20 @@ export class MatchSystem extends createSystem({
         this.startMatch(this.remoteRival());
       } else say(`In room ${link.code}\n${link.peerName} starts the match`);
     };
-    link.onLaunch = (round, arena) => {
+    link.onLaunch = (round, arena, layout) => {
       if (round < 0) {
-        // A match begins: the host's arena, against the host's top.
+        // A match begins: the host's arena (by name, or whole when it was built in the workshop), against the host's top.
         const index = this.arenas.findIndex((a) => a.name === arena);
-        if (index >= 0) {
+        // Untrusted input: a layout that fails to clone or validate falls back to the name.
+        let sent: ArenaLayout | null = null;
+        try {
+          sent = layout && typeof layout === 'object' ? cloneLayout(layout as ArenaLayout) : null;
+          if (sent && validate(sent)) sent = null;
+        } catch {
+          sent = null;
+        }
+        if (sent) this.setArena(sent);
+        else if (index >= 0) {
           this.arenaIndex = index;
           this.setArena(this.arenas[index]);
         }

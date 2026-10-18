@@ -59,7 +59,7 @@ export interface HandsMsg {
 
 export type NetMsg =
   | { type: 'hello'; v: number; build: string; name: string }
-  | { type: 'start'; arena: string; seed: number; round: number }
+  | { type: 'start'; arena: string; seed: number; round: number; layout?: unknown }
   | SnapshotMsg
   | EventMsg
   | HandsMsg

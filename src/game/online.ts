@@ -22,7 +22,7 @@ export class OnlineLink {
   shapesVersion = -1;
   onHello: (() => void) | null = null;
   onEvent: ((ev: GuestEvent) => void) | null = null;
-  onLaunch: ((round: number, arena: string) => void) | null = null;
+  onLaunch: ((round: number, arena: string, layout?: unknown) => void) | null = null;
   onResult: ((winner: number, heat: [number, number]) => void) | null = null;
   onLeft: (() => void) | null = null;
   private encoder = new SnapshotEncoder();
@@ -101,7 +101,7 @@ export class OnlineLink {
     } else if (m.type === 'start' && this.role === 'guest') {
       // A new round: last round's final positions must not show at its start.
       if (m.round >= 0) this.buffer = new SnapshotBuffer();
-      this.onLaunch?.(m.round, m.arena);
+      this.onLaunch?.(m.round, m.arena, m.layout);
     } else if (m.type === 'result' && this.role === 'guest') this.onResult?.(m.winner, m.heat);
     else if (m.type === 'bye') {
       this.peer = false;
@@ -137,8 +137,8 @@ export class OnlineLink {
   }
 
   /** Host: the round's tops have left the launchers (round -1: a match begins in this arena). */
-  launched(round: number, arena: string) {
-    this.transport.send({ type: 'start', arena, seed: 0, round });
+  launched(round: number, arena: string, layout?: unknown) {
+    this.transport.send({ type: 'start', arena, seed: 0, round, ...(layout ? { layout } : {}) });
   }
 
   /** Host: the round ended; winner 1 is the host, -1 the guest, 2 a draw. */
