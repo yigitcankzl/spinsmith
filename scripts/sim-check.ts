@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
@@ -1373,6 +1373,56 @@ assert.equal(edgeOf('defense', 'defense'), 0);
     }
   }
   assert.ok(chased >= 8 && chased <= 22, `medal orders come about every other day (${chased}/30)`);
+}
+
+// 35. No wall on the map: in every bout's arena, some build a smith can forge beats that bout's
+// rival at least about half the time (crowded bouts measured one on one against the named rival).
+{
+  const candidates = [...PRESETS.map((p) => p.build), ...NAMED_BUILDS.map((n) => n.build), ...RIVALS.map((r) => r.build)];
+  const a = new Top(specFromBuild(candidates[0]));
+  const b = new Top(specFromBuild(candidates[0]));
+  let worst = 1;
+  let worstBout = '';
+  for (const bout of BOUTS) {
+    const layout = ARENAS.find((x) => x.name === bout.arena)!;
+    const rival = RIVALS.find((r) => r.name === bout.rival)!;
+    const arena = new Arena(layout);
+    const spawn = layout.shape === 'oval' ? layout.radius * 0.78 * 0.72 : layout.radius * 0.72;
+    let best = 0;
+    for (const build of candidates) {
+      let wins = 0;
+      let games = 0;
+      for (let k = 0; k < 10; k++) {
+        arena.reset(layout);
+        a.spec = specFromBuild(build);
+        b.spec = specFromBuild(rival.build);
+        const pa = 0.7 + (k % 4) * 0.08;
+        const pb = 0.6 + ((k * 3) % 5) * 0.08;
+        const da = LAUNCH_TILT + ((k % 3) - 1) * 0.25;
+        const db = LAUNCH_TILT + (((k + 1) % 3) - 1) * 0.25;
+        const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa);
+        const sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
+        a.launch(0, spawn, Math.sin(da) * sa, -Math.cos(da) * sa, launchSpin(pa), 1);
+        b.launch(0, -spawn, Math.sin(db) * sb * rival.build.spin, Math.cos(db) * sb, launchSpin(pb), rival.build.spin);
+        let t = 0;
+        while (verdict(a, b, t) === 0) {
+          step(arena, a, b);
+          t += STEP;
+        }
+        const v = verdict(a, b, t);
+        if (v === 2) continue;
+        games++;
+        if (v === 1) wins++;
+      }
+      best = Math.max(best, games ? wins / games : 0);
+    }
+    if (best < worst) {
+      worst = best;
+      worstBout = bout.id;
+    }
+    assert.ok(best >= 0.5, `bout ${bout.id}: some forgeable build beats ${bout.rival} in ${bout.arena} (best ${best.toFixed(2)})`);
+  }
+  console.log(`map counters: the hardest bout to counter is ${worstBout} (best build wins ${(worst * 100).toFixed(0)}% without hands)`);
 }
 
 console.log('sim-check: all passed');
