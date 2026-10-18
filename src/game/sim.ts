@@ -435,6 +435,27 @@ export class Arena {
     cup.age = Math.max(cup.age, TUNING.shapeHold);
   }
 
+  /** A top crossing a re-pinched ramp catches its authored direction like a temporary dash rail. */
+  dashShape(t: Top): boolean {
+    if (!t.alive || t.sinceDash < 0.45) return false;
+    for (const s of this.shapes) {
+      if (s.kind !== 'ramp' || !s.boost || s.boost <= 0) continue;
+      const sigma = s.sigma ?? RAMP_SIGMA;
+      if (Math.hypot(t.x - s.x, t.z - s.z) > sigma * 0.72) continue;
+      const along = t.vx * s.dx + t.vz * s.dz;
+      const add = Math.max(0.28, 0.82 - along);
+      t.vx += s.dx * add;
+      t.vz += s.dz * add;
+      t.kick = Math.max(t.kick, 0.65);
+      t.kickX = s.dx;
+      t.kickZ = s.dz;
+      t.sinceDash = 0;
+      s.boost = 0;
+      return true;
+    }
+    return false;
+  }
+
   /** Per-step arena update: shapes relax, the dish rocks under the tops' weight (two tops, or a list). */
   update(dt: number, a: Top | readonly Top[], b?: Top) {
     const tops = Array.isArray(a) ? (a as readonly Top[]) : b ? [a as Top, b] : [a as Top];
@@ -443,7 +464,10 @@ export class Arena {
     const k = Math.exp(-dt / RELAX_TAU);
     for (let i = 0; i < this.shape.length; i++) this.shape[i] *= k;
     if (this.shapes.length) {
-      for (const s of this.shapes) s.age += dt;
+      for (const s of this.shapes) {
+        s.age += dt;
+        if (s.boost) s.boost = Math.max(0, s.boost - dt);
+      }
       this.shapes = this.shapes.filter((s) => Arena.strength(s) > 0.03);
     }
     if (this.shove && (this.shove.t -= dt) <= 0) this.shove = null;
@@ -532,6 +556,8 @@ export interface FloorShape {
   trap?: boolean;
   held?: boolean;
   caught?: Top | null;
+  /** Seconds left as a re-pinched dash rail; consumed by the first top crossing it. */
+  boost?: number;
 }
 
 function smoothstep(e0: number, e1: number, x: number) {
@@ -856,6 +882,7 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.hammer = Math.max(0, t.hammer - dt);
   t.guard = Math.max(0, t.guard - dt);
   t.anchor = Math.max(0, t.anchor - dt);
+  arena.dashShape(t);
   pillars(arena, t);
   pads(arena, t);
   wall(arena, t);

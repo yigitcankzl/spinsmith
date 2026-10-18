@@ -22,7 +22,9 @@ export interface ArenaForgeImpulse {
 export function classifyArenaForge({ pull, twist, tilt }: ArenaForgeGesture): ArenaForgeAction | null {
   const pullScore = Math.abs(pull) / 0.045;
   const twistScore = Math.abs(twist) / 0.12;
-  const tiltScore = Math.abs(tilt) / 0.025;
+  // A real height split of about 4 cm is deliberate. Smaller differences are normal tracking
+  // noise or a squeeze with uneven wrists and must not steal the gesture from pull/twist.
+  const tiltScore = Math.abs(tilt) / 0.072;
   if (Math.max(pullScore, twistScore, tiltScore) < 0.55) return null;
   if (tiltScore > twistScore && tiltScore > pullScore) return 'tilt';
   if (twistScore > pullScore) return 'twist';

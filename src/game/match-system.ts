@@ -54,6 +54,8 @@ import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
+/** Fingertip distance from a live top that claims the magnetic catch gesture (arena-local m). */
+const MAGNET_CATCH = 0.052;
 /** Placing waits at least this long for planes, and places on the tray after SETTLE_MAX without a table (s). */
 const SETTLE_MIN = 0.5;
 const SETTLE_MAX = 5;
@@ -579,6 +581,7 @@ export class MatchSystem extends createSystem({
   );
   /** Plays one quiet tick when a hand first enters the arena's actionable near-surface band. */
   private handHover: Record<Side, boolean> = { left: false, right: false };
+  private handHoverClaim: Record<Side, '' | 'RAMP' | 'RIM' | 'CATCH' | 'SLING'> = { left: '', right: '' };
   /** Molten handprints left on the desk by strikes (a small pool). */
   private palmPrints = [0, 1, 2].map(() => Object.assign(new Mesh(new PlaneGeometry(0.075, 0.075), new MeshBasicMaterial({ map: PALM, transparent: true, depthWrite: false, blending: AdditiveBlending })), { visible: false }));
   private nextPrint = 0;
@@ -755,6 +758,9 @@ export class MatchSystem extends createSystem({
   private rivalTellDuration = TELL_TIME;
   private rivalBraceShown = false;
   private strikeTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.strikePress), right: new TableTouch(TUNE.strikePress) };
+  private knuckleTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.press), right: new TableTouch(TUNE.press) };
+  private knuckleTapAt: Record<Side, number> = { left: -9, right: -9 };
+  private knuckleUsed = false;
   /** When the bar last became full: the strike arms half a second later (a hand already resting there is not a strike). */
   private fullSince = -1;
   /** A strike has landed this session: the hint stops. */
@@ -1492,6 +1498,7 @@ export class MatchSystem extends createSystem({
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
         if (!this.deskVerdict && this.outerRingState !== 'rescue' && this.outerRingState !== 'rail') {
           this.updateStrike(dt);
+          this.updateKnuckleKnock(dt);
           if (!this.updateArenaMorph(dt)) {
             this.updateShaping();
             this.updatePalmBrace();
@@ -2434,12 +2441,39 @@ export class MatchSystem extends createSystem({
       const k = 1 - up / 0.12;
       m.scale.setScalar(0.05 + 0.04 * (1 - k));
       const mat = m.material as MeshBasicMaterial;
+      let claim: '' | 'RAMP' | 'RIM' | 'CATCH' | 'SLING' = '';
+      if (hovering) {
+        let caught = false;
+        let nearTop = false;
+        for (const shape of this.arena.shapes) {
+          if (shape.trap && shape.caught && Math.hypot(shape.caught.x - l.x, shape.caught.z - l.z) <= MAGNET_CATCH) {
+            caught = true;
+            break;
+          }
+        }
+        for (const top of this.tops) {
+          if (top.alive && Math.hypot(top.x - l.x, top.z - l.z) <= MAGNET_CATCH) {
+            nearTop = true;
+            break;
+          }
+        }
+        claim = caught ? 'SLING' : n >= 0.82 ? 'RIM' : nearTop && this.taught('cup') ? 'CATCH' : 'RAMP';
+      }
+      if (claim !== this.handHoverClaim[side]) {
+        this.handHoverClaim[side] = claim;
+        if (claim && this.labelTimer <= 0) {
+          const instruction = claim === 'CATCH' ? 'PRESS TO MAGNET-CATCH' : claim === 'SLING' ? 'PINCH + PULL TO SLING' : claim === 'RIM' ? 'SECOND HAND: FORGE · OPEN PALM: BRACE' : 'PINCH + DRAG TO RAISE A RAMP';
+          this.label.set(`${claim} CLAIMED\n${instruction}`);
+          this.labelTimer = 0.65;
+        }
+      }
       const shaping = this.phase === 'fight' && (hovering || h.pinching || !!this.shaping[side] || !!this.slings[side] || this.pressing[side]);
       if (hot || shaping) {
-        mat.color.setHex(0xff8a2a);
+        mat.color.setHex(claim === 'CATCH' || claim === 'SLING' ? 0xffd060 : claim === 'RIM' ? 0xff9a32 : 0xff8a2a);
         mat.blending = AdditiveBlending;
         mat.opacity = (hot ? 0.5 : 0.25) + (hot ? 0.5 : 0.45) * k;
       } else {
+        this.handHoverClaim[side] = '';
         mat.color.setHex(0x000000);
         mat.blending = NormalBlending;
         mat.opacity = 0.45 * k;
@@ -4028,6 +4062,8 @@ export class MatchSystem extends createSystem({
     this.elapsed = 0;
     this.pressureShown = false;
     this.strikeWindowShown = false;
+    this.knuckleTapAt.left = this.knuckleTapAt.right = -9;
+    this.knuckleUsed = false;
     this.lastHardHit = -1;
     this.accumulator = 0;
     this.clashes = 0;
@@ -4204,6 +4240,14 @@ export class MatchSystem extends createSystem({
     this.arenaMorph.scaleX = 1 + this.arenaMorphPull * (1.1 * c * c - 0.4 * s * s);
     this.arenaMorph.scaleZ = 1 + this.arenaMorphPull * (1.1 * s * s - 0.4 * c * c);
     this.arenaMorph.tilt = Math.max(-0.1, Math.min(0.1, this.arenaMorphB.y - this.arenaMorphA.y));
+    const liveAction = classifyArenaForge({ pull: this.arenaMorphPull, twist: this.arenaMorphTwist, tilt: this.arenaMorph.tilt });
+    if ((liveAction ?? 'none') !== this.arenaForgeAction) {
+      this.arenaForgeAction = liveAction ?? 'none';
+      if (liveAction) {
+        this.label.set(`FORGE: ${ARENA_FORGE_TITLE[liveAction]}\nRELEASE TO COMMIT`);
+        this.labelTimer = 0.45;
+      }
+    }
     this.arenaView.setForgeDents(this.arenaMorphA.x, this.arenaMorphA.z, this.arenaMorphB.x, this.arenaMorphB.z, 1);
     this.arenaDirty = true;
     this.publishArenaMorph();
@@ -4225,6 +4269,53 @@ export class MatchSystem extends createSystem({
     g0.scale.set(1.25, 1, 1.35);
     g1.scale.set(1.25, 1, 1.35);
     return true;
+  }
+
+  /**
+   * Two quick pinched-hand taps on the real table send a small quake from that side. It is once per
+   * round, weaker on your own top, and unavailable while the ultimate is ready so one contact can
+   * never mean both a strike and a knock.
+   */
+  private updateKnuckleKnock(dt: number) {
+    if (this.knuckleUsed || this.forgeBar.full || this.elapsed < TUNING.grace || this.demo) return;
+    const tableY = this.root.position.y - PEDESTAL * this.rootK;
+    for (const side of ['left', 'right'] as const) {
+      const h = this.hands[side];
+      const l = h.tracked ? this.root.worldToLocal(this.handAt.copy(h.index)) : null;
+      const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > 1.02 && normRadius(this.arena.layout, l.x, l.z) < 1.8;
+      const hit = this.knuckleTouch[side].update(outside && h.pinching ? h.low : null, dt, tableY - 0.05, tableY + 0.05);
+      if (hit === null || !l) continue;
+      if (this.time - this.knuckleTapAt[side] > 0.65) {
+        this.knuckleTapAt[side] = this.time;
+        this.stamp.show('KNOCK 1/2', 'TAP THE SAME SIDE AGAIN', 'neutral', 0.35);
+        playTick();
+        continue;
+      }
+      this.knuckleUsed = true;
+      this.knuckleTapAt[side] = -9;
+      for (const top of this.tops) {
+        if (!top.alive) continue;
+        const dx = top.x - l.x;
+        const dz = top.z - l.z;
+        const d = Math.hypot(dx, dz) || 1;
+        const impulse = 0.24 * (top === this.mine ? 0.5 : 1);
+        top.vx += (dx / d) * impulse;
+        top.vz += (dz / d) * impulse;
+        top.kick = Math.max(top.kick, 0.55);
+        top.kickX = dx / d;
+        top.kickZ = dz / d;
+      }
+      this.lastShape = { t: this.elapsed, kind: 'parry' };
+      this.recordIntervention();
+      this.impacts.shock(l.x, this.arena.floorHeight(1), l.z, 0.85, 0xffb347);
+      this.sparks.burst(l.x, this.arena.floorHeight(1), l.z, 0.8);
+      this.stamp.show('KNUCKLE QUAKE!', 'DOUBLE TAP → TABLE SHOCK', 'mine', 0.75, 1.05);
+      this.label.set('THE REAL TABLE HIT THE ARENA');
+      this.labelTimer = 1.2;
+      this.roomLight.hit();
+      playThock();
+      return;
+    }
   }
 
   /** Pinch near the floor and lift to raise a bump; press a fingertip into the floor to dent it. */
@@ -4275,6 +4366,31 @@ export class MatchSystem extends createSystem({
             this.cord.set(this.slingFrom, h.pinch, Math.min(1, Math.hypot(sl.px, sl.pz) / SLING_FULL), this.frameDt);
           }
           continue;
+        }
+        if (!d && h.justPinched && open && this.online?.role !== 'guest') {
+          let rail: FloorShape | null = null;
+          let railGap = 0.048;
+          for (const shape of this.arena.shapes) {
+            if (shape.kind !== 'ramp' || shape.owner !== side) continue;
+            const gap = Math.hypot(shape.x - l.x, shape.z - l.z);
+            if (gap < railGap) {
+              railGap = gap;
+              rail = shape;
+            }
+          }
+          if (rail) {
+            const force = this.charges.spend(this.elapsed, TUNING.grace);
+            if (!force) this.locked('No charge yet\nDash rail needs one charge');
+            else {
+              rail.boost = 1.4;
+              this.recordIntervention();
+              this.lastShape = { t: this.elapsed, kind: 'ramp' };
+              this.arenaView.flashRail(rail.x, rail.z);
+              this.stamp.show('DASH RAIL!', 'FIRST TOP ACROSS GETS THE KICK', 'mine', 0.65);
+              playDash(rail.x);
+            }
+            continue;
+          }
         }
         let rim = this.rimPulls[side];
         // A rim grip is half of the two-hand forge (from its lesson on); alone it is a rim spring (later).
@@ -4329,10 +4445,12 @@ export class MatchSystem extends createSystem({
       const rim = this.rimPulls[side];
       if (rim) {
         this.rimPulls[side] = null;
-        // Give a second hand time to claim the opposite rim for a whole-arena forge. A quick
-        // first pinch/release is neither a forge nor a paid spring, so it changes nothing.
-        if (!this.taught('defense') || this.elapsed - rim.started < RIM_SPRING_INTENT) continue;
-        this.doRimSpring(rim.sx, rim.sz, rim.x, rim.z);
+        // Rim pinch has one meaning: wait for the second hand and forge. Defence belongs to the
+        // visible open-palm wall, so releasing one rim can no longer spend a charge by accident.
+        if (this.taught('defense') && this.elapsed - rim.started >= RIM_SPRING_INTENT) {
+          this.label.set('RIM RELEASED\nOPEN YOUR PALM AT THE EDGE TO BRACE');
+          this.labelTimer = 0.9;
+        }
         continue;
       }
       this.shaping[side] = null;
@@ -4361,7 +4479,23 @@ export class MatchSystem extends createSystem({
         const slapping = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, palm.x, palm.z) > 1.0;
         if (slapping) {
           if (import.meta.env.DEV) console.log('[SHAPE] well ignored: a slap outside the rim');
-        } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) this.makeCup(side, tip.x, tip.z);
+        } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) {
+          let target: Top | null = null;
+          let gap = MAGNET_CATCH;
+          for (const top of this.tops) {
+            if (!top.alive) continue;
+            const d = Math.hypot(top.x - tip.x, top.z - tip.z);
+            if (d < gap) {
+              gap = d;
+              target = top;
+            }
+          }
+          if (target) this.makeCup(side, target.x, target.z);
+          else {
+            this.stamp.show('NO CATCH', 'PRESS BESIDE A TOP', 'neutral', 0.4);
+            playLocked();
+          }
+        }
         else if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${down.toFixed(2)} m/s down`);
       } else if (depth < 0) this.pressing[side] = false;
     }

@@ -264,6 +264,14 @@ TUNING.grace = 0;
   assert.ok(memory.shapes.every((s) => s.x >= 0), 'the oldest same-hand ramp dissolves first');
   memory.addShape('ramp', 0, 0.04, 0.04, 'right', 0, -1);
   assert.equal(memory.shapes.length, 3, 'the other hand adds its own terrain history');
+
+  const dashArena = arenaWith({ floor: 'flat', pockets: [], rails: [] });
+  const dash = dashArena.addShape('ramp', 0, 0, 0.04, 'left', 1, 0);
+  dash.boost = 1.4;
+  const runner = new Top(ATTACK);
+  runner.launch(0, 0, 0.12, 0, 0.8, 1);
+  assert.equal(dashArena.dashShape(runner), true, 'a top on a live dash rail is claimed');
+  assert.ok(runner.sinceDash < 0.2 && runner.vx > 0.4, 'a re-pinched ramp becomes a one-top dash rail');
 }
 
 TUNING.grace = GRACE;
@@ -1222,7 +1230,7 @@ TUNING.grace = 0;
   assert.equal(classifyArenaForge({ pull: -0.03, twist: 0, tilt: 0 }), 'squeeze');
   assert.equal(classifyArenaForge({ pull: 0.03, twist: 0, tilt: 0 }), 'stretch');
   assert.equal(classifyArenaForge({ pull: 0, twist: 0.09, tilt: 0 }), 'twist');
-  assert.equal(classifyArenaForge({ pull: 0, twist: 0, tilt: 0.02 }), 'tilt');
+  assert.equal(classifyArenaForge({ pull: 0, twist: 0, tilt: 0.045 }), 'tilt');
 
   const radius = 0.17;
   const squeeze = { pull: -0.05, twist: 0, tilt: 0 };
