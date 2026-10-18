@@ -171,8 +171,8 @@ an arena. First to 3 heat wins a match.
   a campaign of fifteen bouts in three chapters (Cinder Circuit, Iron Circuit, The Crown). Each
   bout fixes a rival and an arena, teaches one thing and twists it, and asks for two medals beyond
   the win (ramp KO, forge KO, strike KO, shatter, white-hot rip, no heat lost, cup outlast, edge
-  KO). The fifth bout of each chapter is its boss; bout 2-3 is crowded (a third top joins, last
-  top spinning wins). Rival skill follows the map, not your level:
+  KO). The fifth bout of each chapter is its boss; bouts 2-3 and 3-3 are crowded (three and four
+  tops, last top spinning wins). Rival skill follows the map, not your level:
   it climbs through a chapter and dips at the next one's start, and two losses in a row on a
   bout quietly ease it. A chapter opens with 8 or 18 medals and the previous boss beaten, so
   skill stands in for grinding. The intro card names the bout's lesson and the medals still

@@ -55,7 +55,7 @@ export const BOUTS: Bout[] = [
   b('2-5', 'Sawtooth', 'Meteor Pit', 0.6, 'Keep your top whole', 'Every hit chips you toward a shatter', ['burst', 'perfect']),
   b('3-1', 'Iron Keep', 'Colossus Bowl', 0.55, 'Iron Keep returns, in a bigger bowl', 'More room to drift, farther to the pits', ['forgeKO', 'sweep']),
   b('3-2', 'Comet', 'Titan Crater', 0.65, 'It never stops: catch it on the crater lip', 'The middle drops away under its lift', ['strikeKO', 'perfect']),
-  b('3-3', 'Gearwright', 'Sentinel Gates', 0.75, 'Match its spin, then aim between the guards', 'It grinds opposite spin behind the sentinels', ['rampKO', 'burst']),
+  b('3-3', 'Gearwright', 'Sentinel Gates', 0.75, 'Four tops: aim between the guards', 'Twin Gear and Long Ember join the grind', ['rampKO', 'burst'], { crowd: ['Twin Gear', 'Long Ember'] }),
   b('3-4', 'Bastion', 'Glacier Steps', 0.85, 'Tall and locked, on ice tiers', 'Low hits get under it', ['forgeKO', 'sweep']),
   b('3-5', 'Bastion', 'Grand Anvil', 1, 'Everything you know, one last time', 'Ring it out to end it', ['edgeKO', 'sweep']),
 ];
