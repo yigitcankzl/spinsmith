@@ -235,3 +235,11 @@ console.log('net check: OK');
 }
 console.log('direction check: ok');
 
+// Cups and slings from a guest are checked like the rest.
+{
+  const c = sanitizeGuestEvent({ kind: 'cup', x: 9, z: 0 }, 0.17, 0.6)!;
+  assert.ok(c.kind === 'cup' && c.x === 0.17 * 1.5, 'a cup far outside is pulled to the arena');
+  assert.equal(sanitizeGuestEvent({ kind: 'sling', px: NaN, pz: 0 }, 0.17, 0.6), null, 'a NaN sling is dropped');
+}
+console.log('cup and sling check: ok');
+

@@ -54,8 +54,7 @@ an arena. First to 3 heat wins a match.
 - **Known limits:** nothing has been measured on a headset yet; table detection relies on the
   room's Space Setup labelling a table or desk. Depth occlusion, persistent-anchor stability and
   gaze input have only been exercised in IWSDK's browser emulator (IWER). The online duel has
-  been run between two browser windows, not two headsets; an online guest's cups and slings are not
-  carried yet.
+  been run between two browser windows, not two headsets.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
   slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
@@ -195,7 +194,7 @@ an arena. First to 3 heat wins a match.
 - **Online duel (beta)** (`src/game/online.ts`, `src/game/net.ts`): open the game with
   `?online=host` and the card shows a five-letter room code; a friend on another headset opens
   `?online=CODE`. The host's game runs the only simulation: it waits for both rips, applies the
-  guest's ramps, rim springs, arena forges and strikes from the far side, and sends both tops and the floor 30 times a
+  guest's ramps, cups and slings, rim springs, arena forges and strikes from the far side, and sends both tops and the floor 30 times a
   second; the guest sees the fight turned half round, so their own top is near them. Each smith's
   hands reach the other table live (20 times a second) as two ghost hands on the far side. Signalling
   goes over public Nostr relays to a WebRTC link (Trystero, loaded only when a room is opened) with public STUN

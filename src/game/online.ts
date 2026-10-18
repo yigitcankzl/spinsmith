@@ -230,6 +230,12 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
     case 'rim':
       if (![ev.sx, ev.sz, ev.x, ev.z, ev.f].every(num)) return null;
       return { kind: 'rim', sx: pos(ev.sx), sz: pos(ev.sz), x: pos(ev.x), z: pos(ev.z), f: clamp(ev.f, 0, 1.5) };
+    case 'cup':
+      if (!num(ev.x) || !num(ev.z)) return null;
+      return { kind: 'cup', x: pos(ev.x), z: pos(ev.z) };
+    case 'sling':
+      if (!num(ev.px) || !num(ev.pz)) return null;
+      return { kind: 'sling', px: clamp(ev.px, -reach, reach), pz: clamp(ev.pz, -reach, reach) };
     case 'strike':
       if (!num(ev.x) || !num(ev.z)) return null;
       return { kind: 'strike', x: pos(ev.x), z: pos(ev.z), ...(typeof ev.seal === 'string' && SEAL_NAMES.includes(ev.seal) ? { seal: ev.seal } : {}) };

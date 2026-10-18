@@ -15,7 +15,7 @@ Goal: turn Spinsmith from a deep systems sandbox into a finished game that can w
   - a README audit against the code;
   - `check:sim` now proves every bout can be countered, and that crowded bouts can be won;
   - `check:sim-n` and `check:net` were added.
-- **Still open:** Quest device test, the video, guest cups and slings online, captions and left-hand layout, hosting (last step).
+- **Still open:** Quest device test, the video, captions and left-hand layout, hosting (last step).
 - **State at 08:00:** see the end of this file. Every check passes, and the tree is clean.
 
 ## Research (4 read-only agents, 03:10–03:25)
@@ -190,6 +190,8 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 
 | 5587d93 | Seventh (last) review: `endOnline` no longer redraws home itself. That redraw had wiped the "left" and "no one connected" cards and could save a new smith's order from the old smith's arenas; the callers now redraw, then speak. The cord tone is silenced on a remote launch and while waiting for the peer. |
 
+| (this) | **Online cups and slings:** the guest's cup is held on the host (it catches, then lets go after the hold); the guest's sling sends its pull and the host slings the caught top, snapped toward a pit. Both are sanitised. IWER, two windows: the cup event made a host cup that caught a top, and the sling event slung it ("THEIR SLING"). |
+
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
@@ -228,7 +230,7 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
   - the online duel in two windows, labelled as such;
   - the two-hand forge and DESK KO (Codex's hero shots).
 - **Online (beta) gaps:**
-  - a guest's cups and slings are not carried (ramps, forges, rim springs, rips with spot and direction, strikes with the guest's seal, and live hands are);
+  - (fixed at the end) a guest's cups and slings are carried too, along with ramps, forges, rim springs, rips with spot and direction, strikes with the guest's seal, and live hands;
   - not tested across the internet or between two headsets;
   - no TURN server;
   - (fixed) a host's workshop arena is sent whole and validated on the guest.

@@ -25,6 +25,7 @@ export type GuestEvent =
   | { kind: 'rip'; power: number; aim: number; steep: number; twist: number; at?: [number, number]; dir?: [number, number] }
   | { kind: 'ramp'; x: number; z: number; dx: number; dz: number }
   | { kind: 'cup'; x: number; z: number }
+  | { kind: 'sling'; px: number; pz: number }
   | { kind: 'forge'; action: string; pull: number; twist: number; tilt: number; sign: number; sx?: number; sz?: number; force?: number }
   | { kind: 'strike'; x: number; z: number; seal?: string }
   | { kind: 'rim'; sx: number; sz: number; x: number; z: number; f: number };
