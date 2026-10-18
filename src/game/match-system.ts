@@ -4311,8 +4311,6 @@ export class MatchSystem extends createSystem({
    * is still the player's skill.
    */
   private doRimSpring(sx: number, sz: number, x: number, z: number) {
-    // Not carried online yet: a guest's spring would only move its own screen.
-    if (this.online?.peer) return;
     const r = Math.hypot(sx, sz) || 1;
     const ix = -sx / r;
     const iz = -sz / r;
@@ -4331,6 +4329,13 @@ export class MatchSystem extends createSystem({
     this.recordIntervention();
     if (!this.cuppedOnce && this.label.current.startsWith('New: pinch')) this.label.set('');
     this.cuppedOnce = true;
+    // Online guest: the host springs the rim (its frame, turned half round); the snapshot shows it.
+    if (this.online?.role === 'guest' && this.online.peer) {
+      this.online.sendEvent({ kind: 'rim', sx: -sx, sz: -sz, x: -x, z: -z, f });
+      this.arenaView.flashRail(sx, sz);
+      playThock();
+      return;
+    }
     const hits = springRim(this.arena, this.tops, sx, sz, x, z, f);
     this.arenaView.flashRail(sx, sz);
     this.impacts.shock(sx, this.arena.height(sx, sz), sz, hits ? 0.75 : 0.35);
@@ -6293,6 +6298,14 @@ export class MatchSystem extends createSystem({
       this.rivalHandMove(ev.x, ev.z, ev.dx, ev.dz);
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = 'RAMP';
+      playThock();
+    } else if (ev.kind === 'rim') {
+      const hits = springRim(this.arena, this.tops, ev.sx, ev.sz, ev.x, ev.z, Math.max(0, Math.min(1.5, ev.f)));
+      this.arenaView.flashRail(ev.sx, ev.sz);
+      this.impacts.shock(ev.sx, this.arena.height(ev.sx, ev.sz), ev.sz, hits ? 0.75 : 0.35);
+      if (hits) this.stamp.show('THEIR RIM SPRING', 'live hands', 'rival', 0.6);
+      this.rivalShapeAt = this.elapsed;
+      this.rivalShapeKind = 'RIM SPRING';
       playThock();
     } else if (ev.kind === 'strike') {
       // The guest's palm comes down: their seal (Anvil when unknown), centred where they slapped, their top the striker.
