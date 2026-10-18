@@ -44,7 +44,7 @@ import { addSlab, engrave, GUIDE, metalPlate, Nameplate, ORANGE, PLATE_DEPTH, px
 import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
 import { buildName } from './parts.js';
-import { BOUTS, boutOpen, CHAPTERS, medalCount, nextBout, nextGate } from './campaign.js';
+import { BOUTS, boutOpen, CHAPTERS, MEDAL_SHORT, medalCount, nextBout, nextGate } from './campaign.js';
 import type { BoutRecord } from './campaign.js';
 import type { BoardMap } from './board.js';
 import { SmithBoard } from './board.js';
@@ -835,5 +835,10 @@ function boardMap(rec: BoutRecord, matches: number): BoardMap {
     medals: medalCount(rec),
     of: BOUTS.length * 3,
     gate: nextGate(rec),
+    todo: next ? (() => {
+      const have = rec[next.id] ?? 0;
+      const left = next.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]);
+      return left.length ? `next ${next.id} · medals: ${left.join(' · ')}` : '';
+    })() : '',
   };
 }

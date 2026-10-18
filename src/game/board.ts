@@ -29,6 +29,8 @@ export interface BoardMap {
   of: number;
   /** What opens the next chapter, or ''. */
   gate: string;
+  /** The next bout's medals still to earn ('next 2-2 · medals: ramp KO · no heat lost'), or ''. */
+  todo: string;
 }
 
 export interface BoardState {
@@ -148,9 +150,13 @@ export class SmithBoard {
       const lines = b.open ? wrap(g, b.rival.toUpperCase(), col - 12, 2) : ['?'];
       lines.forEach((l, j) => engrave(g, l, cx, cy + R + 28 + j * t * 1.1, b.open ? TEXT : TEXT_DIM, col - 8));
     });
-    if (s.map.gate) {
+    // One line under the map: medals short of the next chapter is news; otherwise what the next bout
+    // still asks for, and only then the plain "beat the boss" gate.
+    const short = s.map.gate.includes('more medal');
+    const line = short ? s.map.gate : s.map.todo || s.map.gate;
+    if (line) {
       setType(g, 'caption', this.k, DIST);
-      engrave(g, s.map.gate.toUpperCase(), W / 2, 244, ORANGE, W - 120);
+      engrave(g, line.toUpperCase(), W / 2, 244, line === s.map.gate ? ORANGE : TEXT_DIM, W - 120);
     }
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(80, 268, W - 160, 3);
