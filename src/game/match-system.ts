@@ -695,6 +695,10 @@ export class MatchSystem extends createSystem({
   private arenaMorphTwist = 0;
   private arenaMorphA = new Vector3();
   private arenaMorphB = new Vector3();
+  /** One-hand forge (comfort mode): the real hand's side and its grip height; the mirrored partner's point. */
+  private oneHand: { side: Side; y: number } | null = null;
+  private oneHandPinch = new Vector3();
+  private oneHandAt = -1;
   private arenaMorphShove = { x: 0, z: 0, t: 0 };
   private gazeAssist = { active: false, target: '' };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
@@ -3816,8 +3820,11 @@ export class MatchSystem extends createSystem({
    * The arena springs back after release, but the tops keep the directional impulse.
    */
   private updateArenaMorph(dt: number): boolean {
-    const left = this.hands.left;
-    const right = this.hands.right;
+    let left = this.hands.left;
+    let right = this.hands.right;
+    // One-hand comfort mode: a held rim grip gets a mirrored partner on the far rim.
+    const one = this.oneHandForge(left, right);
+    if (one) [left, right] = one;
     if (!this.arenaMorphing) {
       if (this.arenaMorphHold > 0) {
         const duration = 0.55;
@@ -4157,6 +4164,38 @@ export class MatchSystem extends createSystem({
     this.stamp.show(hits ? 'RIM SPRING!' : 'MISSED SPRING', hits ? `${hits} top${hits === 1 ? '' : 's'} pulled in` : 'no top in that sector', hits ? 'mine' : 'neutral', 0.55);
     playThock();
     if (import.meta.env.DEV) console.log(`[RIM] spring at ${sx.toFixed(3)},${sz.toFixed(3)} pull ${pull.toFixed(3)} hits ${hits}`);
+  }
+
+  /**
+   * One hand forges alone (comfort mode): after a rim grip has been held a moment with the other
+   * hand free, a virtual hand mirrors it through the arena's middle at the grip's starting height.
+   * Turning the hand round the rim twists, pushing in or out squeezes or stretches, lifting tilts.
+   */
+  private oneHandForge(left: HandState, right: HandState): [HandState, HandState] | null {
+    if (!COMFORT.oneHand) return null;
+    if (!this.arenaMorphing) {
+      this.oneHand = null;
+      const sides = (['left', 'right'] as const).filter((s) => this.rimPulls[s]);
+      if (sides.length !== 1) {
+        this.oneHandAt = -1;
+        return null;
+      }
+      const side = sides[0];
+      const pull = this.rimPulls[side]!;
+      const free = side === 'left' ? right : left;
+      // Held in wall-clock time: a hit-stop freezes the fight clock, not the hand.
+      if (this.oneHandAt < 0) this.oneHandAt = this.time;
+      if (free.pinching || this.time - this.oneHandAt < ONE_HAND_HOLD) return null;
+      this.oneHandAt = -1;
+      const real = side === 'left' ? left : right;
+      this.oneHand = { side, y: this.root.worldToLocal(this.handAt.copy(real.pinch)).y };
+      this.rimPulls[side === 'left' ? 'right' : 'left'] = { x: -pull.x, z: -pull.z, sx: -pull.sx, sz: -pull.sz, started: pull.started };
+    }
+    if (!this.oneHand) return null;
+    const real = this.oneHand.side === 'left' ? left : right;
+    const l = this.root.worldToLocal(this.handAt.copy(real.pinch));
+    const ghost: HandState = { ...real, pinch: this.root.localToWorld(this.oneHandPinch.set(-l.x, this.oneHand.y, -l.z)), justPinched: false, justReleased: false };
+    return this.oneHand.side === 'left' ? [real, ghost] : [ghost, real];
   }
 
   /** The first fight teaches ramp, the signature two-hand arena forge, then an ultimate. */
@@ -6207,6 +6246,9 @@ function unlockModel(key: string, arenas: ArenaLayout[]): Object3D {
   for (const [, items] of ROWS) for (const item of items) if (itemKey(item) === key) return itemModel(item);
   return new Group();
 }
+
+/** One-hand forge: how long a lone rim grip is held before the far rim mirrors it (s). */
+const ONE_HAND_HOLD = 0.3;
 
 /** The brawl's extra tops: green and violet, apart from your orange and the rival's teal. */
 const BRAWL_COLORS = [0x6fd35a, 0xb07cff];

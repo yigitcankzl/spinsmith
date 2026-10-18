@@ -10,6 +10,8 @@ export interface Comfort {
   gentle: boolean;
   /** Assist: fights run at 80% speed (more time to read and reach). */
   assist?: boolean;
+  /** One hand: a single rim grip forges the arena; the far rim mirrors the hand. */
+  oneHand?: boolean;
 }
 
 const KEY = 'spinsmith.comfort.v1';
@@ -21,6 +23,7 @@ export const COMFORT_MODES: (Comfort & { name: string })[] = [
   { name: 'Quiet: sound off', sound: false, flashes: true, gentle: false },
   { name: 'Quiet and calm', sound: false, flashes: false, gentle: true },
   { name: 'Assist: fights at 80% speed, calm', sound: true, flashes: false, gentle: true, assist: true },
+  { name: 'One hand: hold the rim to forge, calm', sound: true, flashes: false, gentle: true, oneHand: true },
 ];
 
 /** The live settings (read every frame where they matter). */
@@ -37,8 +40,8 @@ function storage(): Storage | null {
 
 function apply(i: number) {
   mode = (i + COMFORT_MODES.length) % COMFORT_MODES.length;
-  const { sound, flashes, gentle, assist = false } = COMFORT_MODES[mode];
-  Object.assign(COMFORT, { sound, flashes, gentle, assist });
+  const { sound, flashes, gentle, assist = false, oneHand = false } = COMFORT_MODES[mode];
+  Object.assign(COMFORT, { sound, flashes, gentle, assist, oneHand });
 }
 
 apply(Number(storage()?.getItem(KEY) ?? 0) || 0);
