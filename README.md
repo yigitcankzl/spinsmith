@@ -380,11 +380,16 @@ src/game/builder.ts        Arena workshop: drafting table, piece rail, drag and 
 src/game/check-worker.ts   The workshop's arena check, off the main thread
 src/game/rim.ts            The machine's shared tabs, pop-in and dial plate
 src/game/match-bar.ts      The match bar on the far rim
-src/game/sim.ts            Fight simulation (no three.js): arena from a layout, tops, collisions, verdict
+src/game/sim.ts            Fight simulation (no three.js): arena from a layout, tops, collisions, verdict; stepN for 2-4 tops
+src/game/campaign.ts       The Circuit Map: bouts, medals, chapter gates, map-paced rival skill
+src/game/online.ts         The online duel: host and guest roles over a transport
+src/game/net.ts            Online transports (WebRTC via Trystero, BroadcastChannel, loopback), snapshots, reliable events
 src/game/hands.ts          Pinch and fingertip input from WebXR hand joints
 src/game/visuals.ts        Generated matcaps, top shapes per type, burst debris, arena, sparks, cord, text card
 src/game/audio.ts          Synthesized sound effects and the spin hum
 src/game/match-system.ts   Placement, rip-cord launch, arena moves, AI launch, match flow
 src/dev-hands.ts           Dev only: move one emulated hand with the mouse
-scripts/sim-check.ts       Headless simulation check
+scripts/sim-check.ts       Headless simulation check (campaign, orders, parts, arenas included)
+scripts/sim-n-check.ts     Two-to-four-top simulation check (2-top equality, determinism, rounds end)
+scripts/net-check.ts       Online protocol check over a lossy, delayed loopback
 ```
