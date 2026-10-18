@@ -410,7 +410,9 @@ export class MatchSystem extends createSystem({
   private mine = new Top(ATTACK);
   private theirs = new Top(DEFENSE);
   private tops = [this.mine, this.theirs];
-  private hums = [new SpinHum(230), new SpinHum(190)];
+  /** One spin hum per top: yours, the rival's, and a brawl's two extra seats (silent otherwise). */
+  private hums = [new SpinHum(230), new SpinHum(190), new SpinHum(260), new SpinHum(165)];
+  private humLive = [false, false, false, false];
   private cordTone = new CordTone();
   /** Seconds since the last clash sound, to keep grinding contacts from machine-gunning. */
   private sinceClashSound = 1;
@@ -1493,7 +1495,13 @@ export class MatchSystem extends createSystem({
     this.player.head.getWorldPosition(this.head);
     this.player.head.getWorldDirection(this.fwd).negate();
     setAudioFrame(this.root.matrixWorld.elements, this.head, this.fwd);
-    this.tops.forEach((t, i) => this.hums[i]?.update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time, t.x, t.z));
+    this.hums.forEach((h, i) => {
+      const t = this.tops[i];
+      if (t) h.update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time, t.x, t.z);
+      // A brawl seat that emptied gets one silent update (its sound stops); unused seats never start.
+      else if (this.humLive[i]) h.update(0, 0, 0, this.time, 0, 0);
+      this.humLive[i] = !!t;
+    });
     this.sinceClashSound += dt;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
       const p = this.progress;
