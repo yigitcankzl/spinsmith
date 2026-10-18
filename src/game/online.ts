@@ -85,8 +85,9 @@ export class OnlineLink {
       // A new peer numbers everything from 1 again: start the counters over for them.
       if (fresh) this.reset();
       this.peer = true;
-      this.peerName = m.name;
-      this.peerBuild = m.build;
+      // Untrusted: anything that is not a short string is ignored.
+      this.peerName = typeof m.name === 'string' ? m.name.slice(0, 40) : '';
+      this.peerBuild = typeof m.build === 'string' ? m.build.slice(0, 64) : '';
       // Answer once so a peer that joined late still hears us.
       if (fresh) {
         this.hello();
@@ -175,6 +176,7 @@ export function linkFromAddress(search: string, build: string, name: string): On
  * host's own spot; null when it is not a number at all.
  */
 export function clampGuestSpot(at: [number, number], sx: number, sz: number, max: number, gap: number): [number, number] | null {
+  if (!Array.isArray(at) || at.length < 2) return null;
   let [x, z] = at;
   if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
   const r = Math.hypot(x, z);
@@ -195,4 +197,46 @@ export function clampGuestSpot(at: [number, number], sx: number, sz: number, max
 export function guestPointsBefore(heat: [number, number], v: 1 | -1 | 2, points: number): [number, number] {
   if (v === 2) return [heat[1], heat[0]];
   return [heat[1] - (v === 1 ? points : 0), heat[0] - (v === -1 ? points : 0)];
+}
+
+const FORGE_ACTIONS = ['squeeze', 'stretch', 'twist', 'tilt'];
+const SEAL_NAMES = ['anvil', 'rush', 'magnet', 'tilt', 'hammer', 'ward'];
+
+/**
+ * Host: a guest's event made safe before it touches the simulation (a buggy or hostile peer). Every
+ * number must be finite and is clamped to what a hand could do in this arena (`radius`, arena-local);
+ * unknown kinds, actions or seals are dropped. Returns null when the event cannot be used at all.
+ */
+export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: number): GuestEvent | null {
+  if (!ev || typeof ev !== 'object') return null;
+  const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  const reach = radius * 1.5;
+  const pos = (v: number) => clamp(v, -reach, reach);
+  const pair = (p: unknown): [number, number] | undefined => (Array.isArray(p) && p.length >= 2 && num(p[0]) && num(p[1]) ? [pos(p[0]), pos(p[1])] : undefined);
+  switch (ev.kind) {
+    case 'rip': {
+      if (!num(ev.power) || !num(ev.aim)) return null;
+      const at = pair(ev.at);
+      const dir = pair(ev.dir);
+      return { kind: 'rip', power: clamp(ev.power, 0, 1), aim: clamp(ev.aim, -maxAim, maxAim), steep: num(ev.steep) ? clamp(ev.steep, 0, 1) : 0, twist: num(ev.twist) ? clamp(ev.twist, -1, 1) : 0, ...(at ? { at } : {}), ...(dir ? { dir } : {}) };
+    }
+    case 'ramp':
+      if (![ev.x, ev.z, ev.dx, ev.dz].every(num)) return null;
+      return { kind: 'ramp', x: pos(ev.x), z: pos(ev.z), dx: clamp(ev.dx, -1, 1), dz: clamp(ev.dz, -1, 1) };
+    case 'rim':
+      if (![ev.sx, ev.sz, ev.x, ev.z, ev.f].every(num)) return null;
+      return { kind: 'rim', sx: pos(ev.sx), sz: pos(ev.sz), x: pos(ev.x), z: pos(ev.z), f: clamp(ev.f, 0, 1.5) };
+    case 'strike':
+      if (!num(ev.x) || !num(ev.z)) return null;
+      return { kind: 'strike', x: pos(ev.x), z: pos(ev.z), ...(typeof ev.seal === 'string' && SEAL_NAMES.includes(ev.seal) ? { seal: ev.seal } : {}) };
+    case 'forge': {
+      if (typeof ev.action !== 'string' || !FORGE_ACTIONS.includes(ev.action) || ![ev.pull, ev.twist, ev.tilt].every(num)) return null;
+      const sx = num(ev.sx) ? clamp(ev.sx as number, -1, 1) : undefined;
+      const sz = num(ev.sz) ? clamp(ev.sz as number, -1, 1) : undefined;
+      return { kind: 'forge', action: ev.action, pull: clamp(ev.pull, -0.3, 0.3), twist: clamp(ev.twist, -0.4, 0.4), tilt: clamp(ev.tilt, -0.12, 0.12), sign: ev.sign < 0 ? -1 : 1, ...(sx !== undefined ? { sx } : {}), ...(sz !== undefined ? { sz } : {}), force: num(ev.force) ? clamp(ev.force as number, 0, 1.5) : 1 };
+    }
+    default:
+      return null;
+  }
 }

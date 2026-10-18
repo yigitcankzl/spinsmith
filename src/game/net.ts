@@ -316,7 +316,8 @@ export class EventReceiver {
   }
 
   receive(msg: EventMsg): void {
-    if (msg.seq > this.applied) this.early.set(msg.seq, msg.ev);
+    // Only a short window ahead is held: a peer skipping sequence numbers cannot grow this without bound.
+    if (Number.isInteger(msg.seq) && msg.seq > this.applied && msg.seq <= this.applied + 256) this.early.set(msg.seq, msg.ev);
     for (let ev = this.early.get(this.applied + 1); ev; ev = this.early.get(this.applied + 1)) {
       this.early.delete(++this.applied);
       this.apply(ev, this.applied);

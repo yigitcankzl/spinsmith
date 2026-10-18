@@ -45,7 +45,7 @@ import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from './arena-forge.js';
 import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
-import { clampGuestSpot, guestPointsBefore, linkFromAddress } from './online.js';
+import { clampGuestSpot, guestPointsBefore, linkFromAddress, sanitizeGuestEvent } from './online.js';
 import type { OnlineLink } from './online.js';
 import type { GuestEvent, PackedShape, Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from './campaign.js';
@@ -2041,7 +2041,7 @@ export class MatchSystem extends createSystem({
         this.hub.setBrawl(4, true);
         playTick();
         return;
-      } else this.seats++;
+      } else this.seats = Math.min(4, this.seats + 1);
       saveSeats(this.seats);
       this.hub.setBrawl(this.seats);
       this.label.set(this.seats === 2 ? 'Duel: you and one rival\nPinch the pegs for a brawl' : `Brawl: ${this.seats} tops\nLast top spinning takes the heat`);
@@ -6234,6 +6234,7 @@ export class MatchSystem extends createSystem({
       if (import.meta.env.DEV) console.log(`[ONLINE] ${link.role}: ${link.peerName} joined ${link.code}`);
       if (link.role === 'host') {
         const start = () => {
+          if (this.online !== link || !link.peer) return;
           this.toHub();
           this.startMatch(this.remoteRival());
         };
@@ -6247,11 +6248,15 @@ export class MatchSystem extends createSystem({
     };
     link.onLaunch = (round, arena, layout) => {
       if (round < 0 && this.phase === 'placing') {
-        this.afterPlace = () => link.onLaunch?.(round, arena, layout);
+        this.afterPlace = () => {
+          if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout);
+        };
         return;
       }
       if (round < 0 && (this.phase === 'build' || this.phase === 'forge')) {
-        this.afterHome = () => link.onLaunch?.(round, arena, layout);
+        this.afterHome = () => {
+          if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout);
+        };
         say(`${link.peerName || 'The host'} is ready\nThe duel starts when you are home`);
         return;
       }
@@ -6344,6 +6349,8 @@ export class MatchSystem extends createSystem({
 
   /** Closes the online duel and returns to offline play (the pegs light for the seats again). */
   private endOnline() {
+    // Whatever waited for the other smith (placement, home) is void with them gone.
+    this.afterPlace = this.afterHome = null;
     if (!this.online) return;
     this.online.close();
     this.online = null;
@@ -6362,7 +6369,10 @@ export class MatchSystem extends createSystem({
   }
 
   /** Host: what the guest's hands did, from the far side. */
-  private applyGuestEvent(ev: GuestEvent) {
+  private applyGuestEvent(raw: GuestEvent) {
+    // A trust boundary: a guest's event is checked and clamped before it can touch the simulation.
+    const ev = sanitizeGuestEvent(raw, this.arena.radius, MAX_AIM);
+    if (!ev) return;
     if (ev.kind === 'rip') {
       // A rip that arrives mid-fight belongs to no round: the next one starts from a fresh rip.
       if (this.phase === 'fight') return;

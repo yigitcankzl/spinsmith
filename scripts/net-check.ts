@@ -4,7 +4,7 @@
  * jittery loopback link (200 ms RTT, +-30 ms, 5% loss); the guest's interpolated view must stay
  * on the curves, survive an outage, and every guest event must be applied exactly once, in order.
  */
-import { clampGuestSpot, guestPointsBefore } from '../src/game/online.ts';
+import { clampGuestSpot, guestPointsBefore, sanitizeGuestEvent } from '../src/game/online.ts';
 import assert from 'node:assert/strict';
 import {
   EventReceiver, EventSender, HandsReceiver, isRoomCode, loopbackPair, mirror, newRoomCode, parseMsg, prng,
@@ -199,5 +199,22 @@ console.log('net check: OK');
   assert.deepEqual(guestPointsBefore([3, 1], -1, 2), [1, 1], 'guest lost 2: host stood at 1 before');
   assert.deepEqual(guestPointsBefore([2, 2], 2, 0), [2, 2], 'a draw changes nothing');
   console.log('online helpers: ok');
+}
+
+// The host's trust boundary: a guest's events are checked and clamped before the simulation sees them.
+{
+  const R = 0.17;
+  assert.equal(sanitizeGuestEvent({ kind: 'rip', power: NaN, aim: 0, steep: 0, twist: 0 }, R, 0.6), null, 'NaN power is dropped');
+  const rip = sanitizeGuestEvent({ kind: 'rip', power: 9, aim: -4, steep: 0, twist: 0, at: [5, -5] as [number, number] }, R, 0.6)!;
+  assert.ok(rip.kind === 'rip' && rip.power === 1 && rip.aim === -0.6 && rip.at![0] === R * 1.5 && rip.at![1] === -R * 1.5, 'rip values are clamped');
+  assert.equal((sanitizeGuestEvent({ kind: 'rip', power: 0.5, aim: 0, steep: 0, twist: 0, at: 5 as unknown as [number, number] }, R, 0.6) as { at?: unknown }).at, undefined, 'a malformed launch spot is dropped');
+  assert.equal(sanitizeGuestEvent({ kind: 'rim', sx: 0, sz: 0.1, x: 0, z: 0.08, f: NaN }, R, 0.6), null, 'NaN rim strength is dropped');
+  assert.equal(sanitizeGuestEvent({ kind: 'forge', action: 'explode', pull: 0, twist: 0, tilt: 0, sign: 1 }, R, 0.6), null, 'unknown forge action is dropped');
+  const f = sanitizeGuestEvent({ kind: 'forge', action: 'tilt', pull: 0, twist: 0, tilt: 5, sign: 1, force: 1e9 }, R, 0.6)!;
+  assert.ok(f.kind === 'forge' && f.tilt === 0.12 && f.force === 1.5, 'forge strength is capped');
+  const st = sanitizeGuestEvent({ kind: 'strike', x: 0, z: 0, seal: 'nuke' }, R, 0.6)!;
+  assert.ok(st.kind === 'strike' && !('seal' in st), 'unknown seal falls back to Anvil');
+  assert.equal(sanitizeGuestEvent({ kind: 'teleport' } as unknown as Parameters<typeof sanitizeGuestEvent>[0], R, 0.6), null, 'unknown kinds are dropped');
+  console.log('guest event sanitizer: ok');
 }
 
