@@ -6249,6 +6249,11 @@ export class MatchSystem extends createSystem({
         this.afterPlace = () => link.onLaunch?.(round, arena, layout);
         return;
       }
+      if (round < 0 && (this.phase === 'build' || this.phase === 'forge')) {
+        this.afterHome = () => link.onLaunch?.(round, arena, layout);
+        say(`${link.peerName || 'The host'} is ready\nThe duel starts when you are home`);
+        return;
+      }
       if (round < 0) {
         // A match begins: the host's arena (by name, or whole when it was built in the workshop), against the host's top.
         // Home first: going home picks this device's own next bout and arena, which the host's replaces.
