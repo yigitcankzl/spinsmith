@@ -1,6 +1,6 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
-// Other modes: single-rip, dual-rip, finger-groove, rim-spring, palm-brace, palm-gust, palm-gust-left, palm-forge, outer-ring, arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
+// Other modes: single-rip, dual-rip, finger-groove, rim-spring, palm-brace, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring, arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
   let target = null;
   for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
@@ -25,7 +25,7 @@ export default async function run({ page, frame }) {
       window.__game.openForge();
       await sleep(1200);
     }
-    const gustCheck = check === 'palm-gust' || check === 'palm-gust-left';
+    const gustCheck = check === 'palm-gust' || check === 'palm-gust-left' || check === 'palm-gust-riposte';
     if (check === 'palm-brace' || gustCheck || check === 'rim-spring') game.progress.matches = Math.max(2, game.progress.matches);
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
@@ -77,7 +77,9 @@ export default async function run({ page, frame }) {
     } else if (gustCheck) {
       if (before.phase !== 'fight') throw new Error('palm-gust check requires a fight');
       stateKey = 'palmGust';
-      action = drive.palmGust({ angle: 0, side: check === 'palm-gust-left' ? 'left' : 'right' });
+      action = check === 'palm-gust-riposte'
+        ? drive.counterflow({ angle: 0, side: 'right' })
+        : drive.palmGust({ angle: 0, side: check === 'palm-gust-left' ? 'left' : 'right' });
     } else if (check === 'palm-forge') {
       if (before.phase !== 'forge') throw new Error('palm-forge check requires the forge');
       stateKey = 'palmForge';
@@ -158,6 +160,11 @@ export default async function run({ page, frame }) {
       if (after.charges !== before.charges) throw new Error(`cancel spent a charge (${before.charges} -> ${after.charges})`);
       if ((after.morph?.cancels ?? 0) <= (before.morph?.cancels ?? 0)) throw new Error('cancel was not recorded');
     }
+    if ((check === 'palm-gust' || check === 'palm-gust-left') && after.charges !== before.charges - 1) throw new Error(`normal Forge Gust must spend exactly one charge (${before.charges} -> ${after.charges})`);
+    if (check === 'palm-gust-riposte' && (after.charges !== before.charges || !after.palmGust?.riposte)) throw new Error(`Counterflow was not free and marked as a riposte (${before.charges} -> ${after.charges})`);
+    if (check === 'rim-spring' && after.charges !== before.charges - 1) throw new Error(`Rim Spring must spend exactly one charge (${before.charges} -> ${after.charges})`);
+    if (check.startsWith('arena-morph-') && check !== 'arena-morph-tutorial' && check !== 'arena-morph-cancel' && after.charges !== before.charges - 1) throw new Error(`Arena Forge must commit exactly one charge (${before.charges} -> ${after.charges})`);
+    if (check.startsWith('arena-morph-') && check !== 'arena-morph-tutorial' && !before.strikeCommitted && after.strikeCommitted) throw new Error('pinched Arena Forge was misread as an ultimate slap');
     return {
       check,
       before: { phase: before.phase, charges: before.charges },

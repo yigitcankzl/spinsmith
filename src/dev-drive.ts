@@ -12,7 +12,7 @@
  * Coordinates: world metres, or arena-local {x, z} where an option says so.
  */
 import { Vector3 } from '@iwsdk/core';
-import type { ArenaLayout } from './game/layout.js';
+import { rimRadius, type ArenaLayout } from './game/layout.js';
 import { forgeGrips } from './game/reach.js';
 
 type Side = 'left' | 'right';
@@ -55,8 +55,8 @@ interface Game {
   root: { position: Vector3; localToWorld(v: Vector3): Vector3; worldToLocal(v: Vector3): Vector3 };
   rootK: number;
   arena: { radius: number; layout: ArenaLayout & { name?: string }; height(x: number, z: number): number; floorHeight(n: number): number; shapes: { kind: string; boost?: number; length?: number }[] };
-  mine: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
-  theirs: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
+  mine: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string; sinceWall: number };
+  theirs: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string; sinceWall: number };
   myPoints: number;
   theirPoints: number;
   barPoints: [number, number];
@@ -65,7 +65,9 @@ interface Game {
   lastRoundHeat?: number;
   theirView: { offDesk: boolean };
   forgeBar: { value: number };
+  struckOnce: boolean;
   charges: { charges: number };
+  rimPulls?: Record<Side, unknown | null>;
   cups: Record<Side, { shape: { x: number; z: number }; caught: unknown } | null>;
   label: { current: string };
   rival: { name: string; move: string };
@@ -96,6 +98,11 @@ interface Game {
   palmGustCount?: number;
   palmGustSide?: Side | null;
   palmGustDirection?: { x: number; y: number };
+  palmGustHits?: number;
+  palmGustRiposte?: boolean;
+  riposteUntil?: number;
+  riposteSide?: Side | null;
+  riposteTop?: Game['mine'] | null;
   bracedLaunch?: boolean;
   palmLauncherSide?: Side | null;
   palmLauncherDebug?: string;
@@ -421,6 +428,9 @@ export function installDriver() {
           count: g.palmGustCount ?? 0,
           side: g.palmGustSide ?? null,
           direction: [+(g.palmGustDirection?.x ?? 0).toFixed(2), +(g.palmGustDirection?.y ?? 0).toFixed(2)],
+          hits: g.palmGustHits ?? 0,
+          riposte: !!g.palmGustRiposte,
+          counterReady: !!g.riposteSide && (g.riposteUntil ?? -9) >= g.elapsed,
         },
         bracedLaunch: !!g.bracedLaunch,
         palmLauncher: g.palmLauncherSide ?? null,
@@ -444,6 +454,7 @@ export function installDriver() {
         } : null,
         gazeAssist: g.gazeAssist ? { ...g.gazeAssist } : null,
         bar: +g.forgeBar.value.toFixed(2),
+        strikeCommitted: !!g.struckOnce,
         arenaRadius: g.arena.radius,
         mine: top(g.mine),
         rival_top: top(g.theirs),
@@ -637,7 +648,9 @@ export function installDriver() {
       const { angle = 35, pull = 0.04, side = 'right' } = opts;
       const g = game();
       const a = (angle * Math.PI) / 180;
-      const r = g.arena.radius * 0.94;
+      // Non-circular arenas do not share `arena.radius` at every angle. Aim at the actual local
+      // rim so the pinch claims a rim grip instead of accidentally beginning a floor ramp.
+      const r = rimRadius(g.arena.layout, a) * 0.94;
       const x = Math.cos(a) * r;
       const z = Math.sin(a) * r;
       const start = local(x, z, 0.004);
@@ -645,6 +658,11 @@ export function installDriver() {
       await glide(side, 'pinch', above(start, 0.06), 0.3, 0);
       await glide(side, 'pinch', start, 0.15, 0);
       await setPinch(side, true);
+      await wait(0.08);
+      if (!g.rimPulls?.[side]) {
+        const actual = g.root.worldToLocal(g.hands[side].pinch.clone());
+        throw new Error(`rim grip was not claimed at n=${(Math.hypot(actual.x, actual.z) / rimRadius(g.arena.layout, Math.atan2(actual.z, actual.x))).toFixed(3)}, y=${actual.y.toFixed(3)}, floor=${g.arena.height(actual.x, actual.z).toFixed(3)}`);
+      }
       await glide(side, 'pinch', end, 0.28);
       await setPinch(side, false);
       await glide(side, 'pinch', above(end, 0.08), 0.2, 0);
@@ -850,9 +868,14 @@ export function installDriver() {
     },
 
     /** Sweep a relaxed open palm across the inner bowl so the real gesture drives Forge Gust. */
-    async palmGust(opts: { angle?: number; side?: Side } = {}) {
-      const { angle = 0, side = 'right' } = opts;
+    async palmGust(opts: { angle?: number; side?: Side; riposte?: boolean } = {}) {
+      const { angle = 0, side = 'right', riposte = false } = opts;
       if (game().phase !== 'fight') throw new Error('Forge Gust only exists during a fight');
+      if (riposte) {
+        game().riposteSide = side;
+        game().riposteUntil = game().elapsed + 1;
+        game().riposteTop = game().theirs;
+      }
       const a = (angle * Math.PI) / 180;
       const r = game().arena.radius * 0.58;
       const start = local(-Math.cos(a) * r, -Math.sin(a) * r, 0.065);
@@ -866,6 +889,47 @@ export function installDriver() {
       await glide(side, 'palm', above(end, 0.08), 0.18, 0);
       await park(side);
       if ((game().palmGustCount ?? 0) <= before) throw new Error('open-palm sweep did not trigger Forge Gust');
+    },
+
+    /** Prepare one outward-moving rival, parry it with an open palm, then sweep that force inward. */
+    async counterflow(opts: { angle?: number; side?: Side } = {}) {
+      const { angle = 0, side = 'right' } = opts;
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('Counterflow only exists during a fight');
+      // This driver is also the reusable proof shot. Keep an unrelated ready ultimate's raised
+      // seal from hiding the hand, the parried top, and the return corridor.
+      g.forgeBar.value = Math.min(g.forgeBar.value, 0.7);
+      const a = (angle * Math.PI) / 180;
+      const ux = Math.cos(a);
+      const uz = Math.sin(a);
+      const top = g.theirs;
+      const brace = local(ux * g.arena.radius * 0.98, uz * g.arena.radius * 0.98, 0.05);
+      const start = local(ux * g.arena.radius * 0.58, uz * g.arena.radius * 0.58, 0.065);
+      const end = local(-ux * g.arena.radius * 0.58, -uz * g.arena.radius * 0.58, 0.065);
+      const beforeCount = g.palmGustCount ?? 0;
+      const beforeCharges = g.charges.charges;
+      await setPinch(side, false);
+      await glide(side, 'palm', above(brace, 0.07), 0.2, 0);
+      await glide(side, 'palm', brace, 0.12, 0, 'linear');
+      // Establish the visible palm wall before releasing the test top. Otherwise the top can reach
+      // the physical rail during the hand's approach and the arena—not the player's palm—rebounds it.
+      Object.assign(top, {
+        x: ux * g.arena.radius * 0.82,
+        z: uz * g.arena.radius * 0.82,
+        vx: ux * 0.24,
+        vz: uz * 0.24,
+        spin: Math.max(0.55, top.spin),
+        state: 'spinning',
+        sinceWall: 1,
+      });
+      for (let i = 0; i < 30 && g.riposteSide !== side; i++) await wait(0.01);
+      if (g.riposteSide !== side) throw new Error('open palm did not earn a riposte window');
+      await glide(side, 'palm', start, 0.09, 0, 'linear');
+      await glide(side, 'palm', end, 0.22, 0, 'linear');
+      await wait(0.18);
+      await park(side);
+      if ((g.palmGustCount ?? 0) <= beforeCount || !g.palmGustRiposte) throw new Error('parry sweep did not trigger Counterflow');
+      if (g.charges.charges !== beforeCharges) throw new Error('Counterflow spent a shaping charge');
     },
 
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */
