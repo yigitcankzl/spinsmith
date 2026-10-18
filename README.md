@@ -6,7 +6,7 @@ battlefield while the tops fight. Throw the rival off the real edge of your desk
 A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with the Immersive
 Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming, New Experience).
 
-## Try it (judges): 90 seconds to the hero move
+## Try it (judges): the hero move in the first match
 
 1. Sit at a table with a Meta Quest 3 or 3S, hands free (no controllers), and open the hosted URL
    in the Quest Browser.
@@ -32,7 +32,7 @@ move says why on the card ("No charge yet", "Strike not ready").
 | **Pass and play** on one headset | After a duel, pinch PASS: the next person fights that top and its recorded hands. |
 | **Daily Smith Order** | Point at the board over the arena and pinch. About every other day it chases a medal you left on the map, and playing it counts for that bout. |
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
-| **Online duel (beta)**, tested in two browser windows | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE`. |
+| **Online duel (beta)**, tested in two browser windows | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE` (both after the first session). |
 | **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |
 | **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed), One hand (forge with one hand) and High contrast. |
 
@@ -42,8 +42,7 @@ All interactions are pinches, palm presses or grabs. Nothing needs a controller.
 
 Sit at a table, enable hand tracking, and allow spatial data so the arena can stand on your
 table. Everything is done with a pinch: carry your top from its dock into the arena, pinch near
-it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (or
-press a fingertip in for a cup, then pinch, pull and let go to sling what it caught). Pinch the small anvil to forge your top, the blueprint to build
+it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (from your third match, press a fingertip in for a cup, then pinch, pull and let go to sling what it caught). Pinch the small anvil to forge your top, the blueprint to build
 an arena. First to 3 heat wins a match.
 
 - **Shared headset:** add `?fresh` to the address to start as a new player, or `?demo` for a
@@ -74,8 +73,7 @@ an arena. First to 3 heat wins a match.
   table, drawn 2.4 times its simulation size (about 72 cm across), and everything else is built into
   it. At home, your top waits in its dock on the near rim's left (carry it into the arena or tap
   it to play), a small anvil on the near rim's right opens the forge, a blueprint beside it opens
-  the arena workshop, your level sits on a plate between them; their names show during the
-  first session and afterwards only while pointed at. The next match is picked at home and shown
+  the arena workshop, your level sits on a plate between them; the dock, anvil and blueprint always show their names; the other controls name themselves in the first session or while pointed at. The next match is picked at home and shown
   on the level plate ("Next match: Hookjaw in Ember Ring"), its arena already on the table: a
   newly opened arena first, else the rival's home arena (Iron Keep in Sumo Square, Drifter in
   Zero-G Dish, ...) unless it was just played, else the one played longest ago
@@ -157,7 +155,7 @@ an arena. First to 3 heat wins a match.
   start with the classic tops' parts, two paints and two arenas, and each level opens a part, a
   paint, an arena, a seal or a rival, with emblem glows near the top, ending in a gilded ledger;
   the Clamp core comes from a first shatter win and the Bead tip from a first slag or throw win.
-  A rival's signature part also opens by level, a few levels after that rival arrives: knocking
+  Leech's, Hookjaw's, Sawtooth's and Bastion's signature parts also open by level, a few levels after they arrive: knocking
   the rival out is the early way to it. Locked parts and arenas show dark with how they are earned. A match is
   against one rival that keeps its build and spin for every round (Rim Raider, Iron
   Keep and Drifter at first; Leech, Hookjaw, Sawtooth, Bastion, Comet and Gearwright join with levels, announced as
@@ -196,10 +194,10 @@ an arena. First to 3 heat wins a match.
 - **Online duel (beta)** (`src/game/online.ts`, `src/game/net.ts`): open the game with
   `?online=host` and the card shows a five-letter room code; a friend on another headset opens
   `?online=CODE`. The host's game runs the only simulation: it waits for both rips, applies the
-  guest's ramps and arena forges from the far side, and sends both tops and the floor 30 times a
+  guest's ramps, rim springs, arena forges and strikes from the far side, and sends both tops and the floor 30 times a
   second; the guest sees the fight turned half round, so their own top is near them. Each smith's
   hands reach the other table live (20 times a second) as two ghost hands on the far side. Signalling
-  goes over public WebRTC relays (Trystero, loaded only when a room is opened) with public STUN
+  goes over public Nostr relays to a WebRTC link (Trystero, loaded only when a room is opened) with public STUN
   only, so some strict networks will not connect, and it says so. Tested with two browser
   windows (`&net=bc`) and a node loopback with 200 ms round trips and 5% loss
   (`npm run check:net`); not yet between two headsets.
@@ -212,8 +210,8 @@ an arena. First to 3 heat wins a match.
   glows). Missed days cost nothing. The board's back (a pinch on the level plate) shows the
   current chapter of the Circuit Map as medallions with three medal notches each. The last three tops
   that won a match stand as champions on the left rim with their record; pinch one to make it
-  your top again. The hosted build has a web app manifest, so it can be added to the Quest
-  library.
+  your top again. The hosted build has a web app manifest, so it should be installable to the Quest
+  library (not yet tried on a headset).
 - **Shatter:** hard hits build up damage and a top can shatter, its parts flying and
   bouncing across the arena.
 - **Arena workshop** (`src/game/builder.ts`): pinch the
@@ -236,21 +234,18 @@ an arena. First to 3 heat wins a match.
   pull to resize; the rail steps away while a piece is carried. *Try* folds the tools away and
   plays an AI-vs-AI demo round in the draft (no points), then unfolds them; *Save* stores the
   arena in the browser, adds it to the rotation and starts a match in it.
-- **Heat, first to 3:** a knockout (SLAG into a pit, THROWN over the wall, SHATTER) scores 2
-  heat, OUTLAST (the other top stops first, or has less spin at the 45 s limit) scores 1. The
+- **Heat, first to 3:** a knockout (SLAG into a pit, THROWN over the wall, SHATTER) scores 2 heat (3 when it leaves your real table: a DESK KO), OUTLAST (the other top stops first, or has less spin at the 45 s limit) scores 1. The
   score shows on the match bar.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
   burst, topple and result jingles.
 - **Arena moves during the fight:** pinch the floor and a ramp
   rises there at once (after a 0.12 s hold, full size, about 11 cm across); keep holding and drag
-  to aim which way it throws a top. Press a fingertip into the floor to open a cup that catches
+  to aim which way it throws a top. From the third match, press a fingertip into the floor to open a cup that catches
   the first top to roll in; pinch it, pull back and let go to sling it the other way (snapped
   into a slag pit within 20°). A cup with nothing in it, or a catch not slung, lets go after 2 s. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
   shape affects both tops. In the opening match every finish scores one heat so all three lessons
-  get a round. Afterwards knockouts score two as normal. Three charges, shown as sparks on the near rim: a shape spends one, a
-  strong clash or about 6 s refills one, a hand keeps one live shape, and nothing can be shaped
-  in the first 2.5 s. A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
+  get a round. Afterwards knockouts score two as normal. Three charges, shown as sparks on the near rim: a shape spends one, a strong clash or about 4 s refills one, a hand keeps one live shape, and nothing can be shaped in the first 2.5 s (6 s in the first three matches). A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on
   contact, lean into hits, wobble as spin drains, then topple.
 - **Far ramps:** point the hand ray at the floor during a fight and hold the pinch to
@@ -269,12 +264,12 @@ an arena. First to 3 heat wins a match.
   cracks three times as hard). A top
   that has taken a beating glows red: it flies further. The strike is staged: a short freeze, the
   seal rising off your top, its name stamped over the arena.
-- **Rival tells:** from the fourth match (the third, once you have struck) each rival has one big move (a charge, a quake or a
+- **Rival tells:** from the fourth match each rival has one big move (a charge, a quake or a
   pull). Its own bar fills like yours; when full it flashes and whines for a second, then the
   move lands, unless your strike cuts it short ("INTERRUPTED!") or your Ward turns it back. Once
   you know the tells, a rival with its move ready waits a few seconds while your strike is ready
   too: strike first, or hold the strike as the answer.
-- **Rival signature parts:** knock a rival out once and its part is yours (Rim Raider's Gale
+- **Rival signature parts:** knock one of the seven older rivals out once and its part is yours (Rim Raider's Gale
   ring, Iron Keep's Bulwark ring, Drifter's Spindle core, ...).
 - **Framing and feel** (`Stamp` in `src/game/visuals.ts`): big stamped words over the arena for
   the bout (VS), each later round (ROUND 2, MATCH POINT, FINAL ROUND, with a gong), the rip
@@ -287,7 +282,7 @@ an arena. First to 3 heat wins a match.
 - **Feats, bests and the match report** (`src/game/progress.ts`): thirteen feats, each stamped the
   first time (ramp a rival out, sling one into a pit, knock one out with your strike, cut a big
   move short, rip white hot, a flawless match, a comeback from match point, a Hammer shatter, each
-  circuit, ten arenas won, a rival knocked off your real table), counted on the board; personal bests (hardest rip, fastest knockout)
+  circuit, ten arenas won, a rival knocked off your real table), counted on the board's back; personal bests (hardest rip, fastest knockout)
   stamped when beaten; after a match, home shows its report (result, each round's finish, best
   rip, XP). After a loss the rival's card gives a tip against it.
 - **The room is the stage:** a rival arrives through a portal beyond the far rim and slams into
@@ -304,7 +299,7 @@ an arena. First to 3 heat wins a match.
   (`K3F9-2.R…_…`): each round's rip and when your two hands forged the arena. Your friend's
   Challenger rips the way you did and forges their arena at the same moments, from the far rim,
   with a ghost hand. No server: the code is the recording.
-- **Store basics:** a service worker keeps the installed game working offline; `privacy.html`; a
+- **Store basics:** a service worker caches the game for offline play (checked in the browser, not on a headset); `privacy.html`; a
   maskable icon; the landing page has how-to-play and credits; a failed start says so.
 - **Sound** (`src/game/audio.ts`): spatial (HRTF) placement of hums, clashes and landings; one generated room reverb, music that follows the game at 96
   bpm in D minor on the game's four-note motif (home: drone and anvil; getting ready: bass;
