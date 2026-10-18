@@ -10,13 +10,25 @@ import type { Order } from './orders.js';
 import { ARENA_SCALE } from './reach.js';
 import { addSlab, engrave, metalPlate, ORANGE, PLATE_DEPTH, pxPerM, setType, signTexture, STEEL, TEXT, TEXT_DIM, wrap } from './ui.js';
 
-export interface BoardRival {
-  name: string;
-  /** Smith level it arrives at. */
-  level: number;
-  met: boolean;
-  /** MARK bits: beaten 1, knockout 2, shape 4. */
-  marks: number;
+/** One bout of the Circuit Map's current chapter (campaign.ts). */
+export interface BoardBout {
+  id: string;
+  rival: string;
+  /** Medal bits: win 1, then the bout's two medals 2 and 4. */
+  medals: number;
+  open: boolean;
+  boss: boolean;
+  /** The bout the map offers next. */
+  next: boolean;
+}
+
+export interface BoardMap {
+  chapter: string;
+  bouts: BoardBout[];
+  medals: number;
+  of: number;
+  /** What opens the next chapter, or ''. */
+  gate: string;
 }
 
 export interface BoardState {
@@ -27,7 +39,7 @@ export interface BoardState {
   stamps: number;
   /** Stamps needed for the next glow, or null when all are earned. */
   nextGlow: number | null;
-  rivals: BoardRival[];
+  map: BoardMap;
   gilded: boolean;
   /** Feats earned, of how many. */
   feats: number;
@@ -103,38 +115,45 @@ export class SmithBoard {
   }
 
   private drawBack(g: CanvasRenderingContext2D, s: BoardState) {
+    // The Circuit Map: this chapter's five bouts as medallions, three medal notches each.
     setType(g, 'caption', this.k, DIST);
-    engrave(g, 'RIVALS', W / 2, 50, TEXT_DIM);
-    const n = s.rivals.length;
+    engrave(g, `${s.map.chapter} · ${s.map.medals} OF ${s.map.of} MEDALS`.toUpperCase(), W / 2, 44, TEXT_DIM, W - 120);
+    const n = s.map.bouts.length;
     const col = (W - 80) / n;
-    const R = 40;
-    s.rivals.forEach((r, i) => {
+    s.map.bouts.forEach((b, i) => {
+      const R = b.boss ? 46 : 38;
       const cx = 40 + col * (i + 0.5);
-      const cy = 126;
-      g.fillStyle = r.met ? '#3a3f48' : '#16191e';
+      const cy = 122;
+      if (i > 0) {
+        g.fillStyle = b.open ? '#8a94a3' : '#2c3138';
+        g.fillRect(cx - col + R + 6, cy - 2, col - 2 * R - 12, 4);
+      }
+      g.fillStyle = b.open ? '#3a3f48' : '#16191e';
       g.beginPath();
       g.arc(cx, cy, R, 0, Math.PI * 2);
       g.fill();
-      g.strokeStyle = r.marks === 7 ? GILT : r.met ? '#8a94a3' : '#2c3138';
-      g.lineWidth = r.marks === 7 ? 5 : 3;
+      g.strokeStyle = b.medals === 7 ? GILT : b.next ? ORANGE : b.open ? '#8a94a3' : '#2c3138';
+      g.lineWidth = b.medals === 7 || b.next ? 6 : 3;
       g.stroke();
-      // Three notches around the top: beaten, knockout, by your shape.
       for (let k = 0; k < 3; k++) {
         const a = -Math.PI / 2 + (k - 1) * 0.6;
-        g.strokeStyle = r.marks & (1 << k) ? ORANGE : 'rgba(0,0,0,0.6)';
+        g.strokeStyle = b.medals & (1 << k) ? ORANGE : 'rgba(0,0,0,0.6)';
         g.lineWidth = 8;
         g.beginPath();
         g.arc(cx, cy, R - 10, a - 0.22, a + 0.22);
         g.stroke();
       }
-      // The name under its medallion, on two even lines when it has two words; unmet rivals show
-      // only the level they come at.
-      const c = setType(g, 'caption', this.k, DIST);
-      const lines = r.met ? wrap(g, r.name.toUpperCase(), col - 12, 2) : [`LV ${r.level}`];
-      lines.forEach((l, j) => engrave(g, l, cx, cy + R + 30 + j * c * 1.1, r.met ? TEXT : TEXT_DIM, col - 8));
+      const t = setType(g, 'caption', this.k, DIST);
+      engrave(g, b.boss ? 'BOSS' : b.id, cx, cy + 8, b.open ? TEXT : TEXT_DIM, R * 1.6);
+      const lines = b.open ? wrap(g, b.rival.toUpperCase(), col - 12, 2) : ['?'];
+      lines.forEach((l, j) => engrave(g, l, cx, cy + R + 28 + j * t * 1.1, b.open ? TEXT : TEXT_DIM, col - 8));
     });
+    if (s.map.gate) {
+      setType(g, 'caption', this.k, DIST);
+      engrave(g, s.map.gate.toUpperCase(), W / 2, 244, ORANGE, W - 120);
+    }
     g.fillStyle = 'rgba(0,0,0,0.35)';
-    g.fillRect(80, 262, W - 160, 3);
+    g.fillRect(80, 268, W - 160, 3);
     this.drawStamps(g, s, 304);
     setType(g, 'caption', this.k, DIST);
     const glow = s.nextGlow ? ` · NEXT EMBLEM GLOW AT ${s.nextGlow}` : '';

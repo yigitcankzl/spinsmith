@@ -43,7 +43,10 @@ import type { Progress } from './progress.js';
 import { addSlab, engrave, GUIDE, metalPlate, Nameplate, ORANGE, PLATE_DEPTH, pxPerM, setType, SIGN_TILT, signTexture, STEEL as UI_STEEL, tag, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
-import { buildName, RIVALS } from './parts.js';
+import { buildName } from './parts.js';
+import { BOUTS, boutOpen, CHAPTERS, medalCount, nextBout, nextGate } from './campaign.js';
+import type { BoutRecord } from './campaign.js';
+import type { BoardMap } from './board.js';
 import { SmithBoard } from './board.js';
 import { encodeBuild } from './challenge.js';
 import { ECHO_KEY } from './echo.js';
@@ -229,7 +232,7 @@ export class Hub {
         tomorrow,
         stamps: progress.stamps,
         nextGlow: next,
-        rivals: RIVALS.map((r) => ({ name: r.name, level: r.level, met: r.level <= progress.level, marks: progress.marksOf(r.name) })),
+        map: boardMap(progress.bouts),
         gilded: progress.isUnlocked('ledger:gold') || progress.level >= MAX_LEVEL,
         code: echoCode(encodeBuild(build)),
         history: champion
@@ -539,7 +542,7 @@ export class Hub {
     if (progress.guide === 'done') {
       setType(g, 'caption', k, D);
       engrave(g, (next ? `NEXT: ${unlockLabel(next.key)} at LV ${next.level}` : 'EVERY PART IS YOURS').toUpperCase(), 48, 176, UI_STEEL, RANK_W - 96);
-      engrave(g, `${bout ? `${bout.toUpperCase()} · ` : ''}PINCH FOR RIVALS`, 48, 230, TEXT_DIM, RANK_W - 96);
+      engrave(g, `${bout ? `${bout.toUpperCase()} · ` : ''}PINCH FOR THE MAP`, 48, 230, TEXT_DIM, RANK_W - 96);
     }
     this.rankTex.needsUpdate = true;
   }
@@ -767,4 +770,17 @@ export function unlockLabel(key: string): string {
 function shown(o: Object3D): boolean {
   for (let p: Object3D | null = o; p; p = p.parent) if (!p.visible) return false;
   return true;
+}
+
+/** The Circuit Map's chapter in play (the next bout's, or the last one when all are won), for the board. */
+function boardMap(rec: BoutRecord): BoardMap {
+  const next = nextBout(rec);
+  const chapter = next?.chapter ?? CHAPTERS.length;
+  return {
+    chapter: CHAPTERS[chapter - 1].name,
+    bouts: BOUTS.filter((b) => b.chapter === chapter).map((b) => ({ id: b.id, rival: b.rival, medals: rec[b.id] ?? 0, open: boutOpen(b, rec), boss: b.boss, next: b === next })),
+    medals: medalCount(rec),
+    of: BOUTS.length * 3,
+    gate: nextGate(rec),
+  };
 }

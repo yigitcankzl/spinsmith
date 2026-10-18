@@ -22,6 +22,7 @@ import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
+import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
 
 const FORGE = ARENAS[0];
@@ -1229,6 +1230,63 @@ TUNING.grace = 0;
   const cancelled = classifyArenaForge({ pull: 0, twist: 0, tilt: 0 });
   if (cancelled) charges.spend(3, 2.5);
   assert.equal(charges.charges, SHAPING.charges, 'a no-move release spends no shaping charge');
+}
+
+// 32. The Circuit Map: every bout names a real rival and arena; KO medals sit in arenas that allow
+// a knockout; difficulty is a sawtooth; bouts open in order, chapters open by medals and a beaten
+// boss; medals are kept win or lose; two losses in a row ease the rival.
+{
+  const ids = new Set<string>();
+  for (const b of BOUTS) {
+    assert.ok(!ids.has(b.id), `bout ${b.id} is unique`);
+    ids.add(b.id);
+    assert.ok(RIVALS.some((r) => r.name === b.rival), `bout ${b.id} rival ${b.rival} exists`);
+    const arena = ARENAS.find((a) => a.name === b.arena);
+    assert.ok(arena, `bout ${b.id} arena ${b.arena} exists`);
+    for (const m of b.medals) if (m === 'rampKO' || m === 'forgeKO' || m === 'edgeKO') assert.ok(canKnockOut(arena!), `bout ${b.id}'s ${m} medal is possible in ${b.arena}`);
+    assert.ok(b.skill >= 0 && b.skill <= 1, `bout ${b.id} skill in range`);
+  }
+  assert.equal(BOUTS.length, CHAPTERS.length * 5, 'five bouts a chapter');
+  for (let c = 1; c <= CHAPTERS.length; c++) {
+    const ch = BOUTS.filter((b) => b.chapter === c);
+    for (let i = 1; i < ch.length; i++) assert.ok(ch[i].skill > ch[i - 1].skill, `chapter ${c} climbs`);
+    assert.ok(ch[ch.length - 1].boss && ch.filter((b) => b.boss).length === 1, `chapter ${c} ends in its one boss`);
+    if (c > 1) assert.ok(ch[0].skill < BOUTS.filter((b) => b.chapter === c - 1).at(-1)!.skill, `chapter ${c} starts below the last boss (sawtooth)`);
+  }
+  // The cup medal only where cups have been taught (after two finished matches, bout 1-3 at the earliest).
+  for (const b of BOUTS) if (b.medals.includes('wellSpin')) assert.ok(BOUTS.indexOf(b) >= 3, `bout ${b.id} asks for a cup only after cups are taught`);
+  const p = new Progress(null);
+  assert.equal(nextBout(p.bouts)?.id, '1-1', 'a new smith starts at 1-1');
+  assert.ok(!boutOpen(BOUTS[1], p.bouts), '1-2 waits for 1-1');
+  const ev = (o: Partial<OrderEvent>): OrderEvent => ({ rival: '', arena: '', wonRound: false, finish: null, cause: null, cupCaughtInRound: false, matchWon: false, shutout: false, role: 'attack', perfectInMatch: false, ...o });
+  assert.equal(medalsFrom(BOUTS[0], ev({ wonRound: true, finish: 'pocket', cause: 'ramp' }), false), 2, 'a ramp KO round earns 1-1\'s ramp medal, not the win');
+  assert.equal(medalsFrom(BOUTS[0], ev({ wonRound: true, matchWon: true, perfectInMatch: true }), false), 5, 'a won match with a white-hot rip earns win and perfect');
+  assert.equal(medalsFrom(BOUTS[1], ev({ wonRound: true, finish: 'over', cause: 'twist' }), false), 2, 'a twist ring-out is a forge KO');
+  assert.equal(medalsFrom(BOUTS[14], ev({ wonRound: true, finish: 'over' }), false), 2, 'without a table, the edge medal is any ring-out');
+  assert.equal(medalsFrom(BOUTS[14], ev({ wonRound: true, finish: 'over' }), true), 0, 'with a table, the edge medal needs the real edge');
+  assert.equal(medalsFrom(BOUTS[14], ev({ wonRound: true, finish: 'over', deskKo: true }), true), 2, 'a desk KO earns the edge medal');
+  // A lost match keeps its medal and counts a loss; two losses ease the rival.
+  let r = p.recordBout('1-1', 2, false);
+  assert.equal(r.fresh, 2, 'a medal earned in a lost match is kept');
+  p.recordBout('1-1', 0, false);
+  assert.ok(Math.abs(boutSkill(BOUTS[0], p.boutLosses['1-1']) - 0) < 1e-9 && boutSkill(BOUTS[4], 2) < BOUTS[4].skill, 'two losses ease the bout');
+  r = p.recordBout('1-1', 1, true);
+  assert.equal(p.boutLosses['1-1'], 0, 'a win clears the loss streak');
+  assert.equal(nextBout(p.bouts)?.id, '1-2', 'winning 1-1 opens 1-2');
+  assert.ok(r.unlocked.includes('arena:Ember Ring') || p.isUnlocked('arena:Ember Ring'), "the next bout's arena opens");
+  // Win every Cinder bout with the win alone: the Iron Circuit still needs medals.
+  for (const b of BOUTS.filter((x) => x.chapter === 1)) p.recordBout(b.id, 1, true);
+  assert.equal(medalCount(p.bouts), 6, 'six medals: five wins and 1-1\'s ramp');
+  assert.ok(nextGate(p.bouts).includes('2 more medals to open the Iron Circuit'), `the map says what opens the next chapter (${nextGate(p.bouts)})`);
+  assert.equal(nextBout(p.bouts)?.id, '1-1', 'with the chapter won, the map points back at missing medals');
+  p.recordBout('1-2', 7, true);
+  assert.equal(nextBout(p.bouts)?.id, '2-1', 'eight medals and the boss open the Iron Circuit');
+  // The record survives a reload.
+  const store = new Map<string, string>();
+  const st = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+  const q = new Progress(st);
+  q.recordBout('1-1', 3, true);
+  assert.equal(new Progress(st).bouts['1-1'], 3, 'bout medals reload');
 }
 
 console.log('sim-check: all passed');

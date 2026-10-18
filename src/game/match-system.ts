@@ -45,6 +45,8 @@ import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from './arena-forge.js';
 import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
+import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalsFrom, nextBout, nextGate } from './campaign.js';
+import type { Bout } from './campaign.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
@@ -832,6 +834,10 @@ export class MatchSystem extends createSystem({
   private rivalAngle = -Math.PI / 2;
   /** The next match's rival, picked at home and shown there with its arena. */
   private nextRival: Rival | null = null;
+  /** The Circuit Map bout picked for the next match, and the one being played (campaign.ts), with its medal bits so far. */
+  private nextBoutPick: Bout | null = null;
+  private bout: Bout | null = null;
+  private boutEarned = 0;
   /** This match as an echo for a friend's game: each rip and each two-hand forge (echo.ts). */
   private echoRec: Echo = { rips: [], forges: [] };
   /** A friend's recorded match the Challenger replays (rips and forges), or null. */
@@ -1535,7 +1541,8 @@ export class MatchSystem extends createSystem({
 
   /** Fix the rival's rip before the player chooses a lane, then show that promise on the floor. */
   private planRivalLaunch() {
-    const skill = Math.min(1, (this.progress.level - 1) / 15);
+    // A bout sets the rival's skill by where it sits on the map; free play keeps the level-based one.
+    const skill = this.bout ? boutSkill(this.bout, this.progress.boutLosses[this.bout.id] ?? 0) : Math.min(1, (this.progress.level - 1) / 15);
     const first = this.progress.matches === 0 && !this.demo;
     const min = 0.5 + 0.25 * skill;
     this.rivalLaunchPower = first ? 0.7 + Math.random() * 0.1 : Math.random() < 0.5 * skill ? 1 : min + Math.random() * (0.98 - min);
@@ -1639,8 +1646,28 @@ export class MatchSystem extends createSystem({
       this.nextRival = null;
       return;
     }
-    this.nextRival ??= this.pickRival();
+    // The Circuit Map picks rival and arena, unless an arena is pinned (free play) or it is all won.
     const pin = this.progress.arenaPin;
+    if (!this.nextRival) {
+      const bout = pin ? null : nextBout(this.progress.bouts);
+      const rival = bout && RIVALS.find((r) => r.name === bout.rival);
+      const index = bout ? this.arenas.findIndex((a) => a.name === bout.arena) : -1;
+      if (bout && rival && index >= 0) {
+        this.nextBoutPick = bout;
+        this.nextRival = rival;
+        this.arenaIndex = index;
+        if (import.meta.env.DEV) console.log(`[MATCH] next: bout ${bout.id} ${rival.name} in ${bout.arena}`);
+        return;
+      }
+      this.nextBoutPick = null;
+    } else if (this.nextBoutPick) {
+      const index = this.arenas.findIndex((a) => a.name === this.nextBoutPick!.arena);
+      if (index >= 0) {
+        this.arenaIndex = index;
+        return;
+      }
+    }
+    this.nextRival ??= this.pickRival();
     let index = pin ? this.arenas.findIndex((a) => a.name === pin) : -1;
     if (pin && index < 0) this.progress.pinArena(null);
     if (index < 0) {
@@ -2365,6 +2392,8 @@ export class MatchSystem extends createSystem({
 
   /** ' · Cinder Circuit champion' or ' · Cinder Circuit 2/3' for a rival not beaten yet; '' otherwise. */
   private boutText(name: string) {
+    const b = this.nextBoutPick;
+    if (b && b.rival === name) return ` · ${b.boss ? `${b.id} boss` : `bout ${b.id}`}`;
     const c = circuitOf(name);
     if (!c || this.progress.marksOf(name) & MARK.beaten) return '';
     return ` · ${c.circuit} ${c.champion ? 'champion' : `${c.bout}/${c.of}`}`;
@@ -2592,7 +2621,12 @@ export class MatchSystem extends createSystem({
     this.echoRec = { rips: [], forges: [] };
     const friend = !rival && this.progress.guide === 'done' ? this.challenger() : null;
     this.rival = rival ?? friend ?? this.nextRival ?? this.pickRival();
+    // A campaign bout: the planned one, or the first match (the first bout's rival in its arena).
+    const planned = this.nextBoutPick ?? (this.progress.guide !== 'done' ? BOUTS[0] : null);
+    this.bout = !friend && !rival && planned && planned.rival === this.rival.name && planned.arena === this.arena.layout.name ? planned : null;
+    this.boutEarned = 0;
     this.nextRival = null;
+    this.nextBoutPick = null;
     this.progress.playedArena(this.arena.layout.name);
     this.perfectInMatch = false;
     this.myPoints = 0;
@@ -3185,13 +3219,18 @@ export class MatchSystem extends createSystem({
       const c = circuitOf(this.rival.name);
       // The rival arrives: a portal burns open beyond the far rim and its top arcs in; VS as it lands.
       const vs = `VS ${this.rival.name.toUpperCase()}`;
-      const sub = c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title;
+      const bout = this.bout;
+      const sub = bout ? `${CHAPTERS[bout.chapter - 1].name} · ${bout.boss ? 'BOSS' : `BOUT ${bout.id}`}` : c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title;
       if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
-      else if (!this.introDone) this.entrance = { t: 0, vs, sub, champion: !!c?.champion };
+      else if (!this.introDone) this.entrance = { t: 0, vs, sub, champion: bout ? bout.boss : !!c?.champion };
       this.introDone = true;
       // The first rematch says what the new part changes (the same rival: a clean comparison).
       const watch = this.progress.matches === 1 && this.myBuild.tip === 'spur' ? `Watch your Spur: it turns on ${this.rival.name} sooner` : `"${this.rival.intro}"`;
-      this.label.set(`${this.rival.name}, ${this.rival.title}\n${this.rivalRead || watch}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
+      // A bout after the first match names its lesson and twist, and the medals still to earn.
+      const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
+      const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
+      const line = bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
+      this.label.set(`${this.rival.name}, ${this.rival.title}\n${line}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
     }
     else {
       this.label.set('');
@@ -4927,7 +4966,7 @@ export class MatchSystem extends createSystem({
 
   /** Rivals from level 6 shape the floor too; each move family uses its normal tactic, not one AI. */
   private rivalShaping() {
-    if (this.demo || this.rival.level < 6) return;
+    if (this.demo || !(this.bout ? this.bout.shapes : this.rival.level >= 6)) return;
     this.rivalCharges.update(STEP);
     if (this.elapsed - this.rivalShapeAt >= RIVAL_SHAPE_GAP && this.rivalNeedsDeskGuard()) {
       const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
@@ -5789,9 +5828,7 @@ export class MatchSystem extends createSystem({
       this.featDone(c.circuit.startsWith('Cinder') ? 'cinder' : c.circuit.startsWith('Iron') ? 'iron' : 'crown');
     }
     if (matchWon) this.progress.recordChampion(this.myBuild);
-    const o = this.order;
-    if (!this.orderMatch || !o || this.progress.hasOrder(o.date)) return;
-    const met = orderMet(o, {
+    const event = {
       rival: this.rival.name,
       arena: this.arena.layout.name,
       wonRound: won,
@@ -5803,7 +5840,11 @@ export class MatchSystem extends createSystem({
       role: roleOf(specFromBuild(this.myBuild)),
       perfectInMatch: this.perfectInMatch,
       deskKo: this.deskKoScored,
-    });
+    };
+    if (this.bout && !this.demo) this.trackBout(this.bout, event, matchOver, matchWon);
+    const o = this.order;
+    if (!this.orderMatch || !o || this.progress.hasOrder(o.date)) return;
+    const met = orderMet(o, event);
     if (!met) return;
     const before = this.progress.level;
     const a = this.progress.completeOrder(o.date);
@@ -5816,6 +5857,32 @@ export class MatchSystem extends createSystem({
       playLevelUp();
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
     }
+  }
+
+  /**
+   * Medals earned in a bout this round build up through the match and are kept when it ends (won
+   * or lost: a medal earned is earned). Each new one stamps in turn, then the map says what opened.
+   */
+  private trackBout(bout: Bout, event: Parameters<typeof medalsFrom>[1], matchOver: boolean, matchWon: boolean) {
+    this.boutEarned |= medalsFrom(bout, event, !!ROOM.poly);
+    if (!matchOver) return;
+    const before = nextBout(this.progress.bouts);
+    const { fresh, unlocked } = this.progress.recordBout(bout.id, this.boutEarned, matchWon);
+    // One stamp for the bout (the queue keeps three; feats and levels share it), one for a new chapter.
+    const got = bout.medals.filter((_, i) => fresh & (2 << i)).map((m) => MEDAL_TEXT[m].toUpperCase());
+    const have = [1, 2, 4].filter((m) => (this.progress.bouts[bout.id] ?? 0) & m).length;
+    if (fresh) {
+      const word = fresh & 1 ? (bout.boss ? 'BOSS DOWN!' : 'BOUT WON!') : 'MEDAL!';
+      this.stamp.later(word, `${bout.id} · ${have}/3 MEDALS${got.length ? ` · ${got.join(' · ')}` : ''}`, 'mine', 1.6, fresh & 1 && bout.boss ? 1.5 : 1.2);
+      playStamp();
+    }
+    const after = nextBout(this.progress.bouts);
+    if (after && before && after.chapter > before.chapter) {
+      this.stamp.later(`${CHAPTERS[after.chapter - 1].name.toUpperCase()} OPEN!`, `NEXT: ${after.rival.toUpperCase()} IN ${after.arena.toUpperCase()}`, 'mine', 1.8, 1.5);
+      playLevelUp();
+    }
+    this.reveals.push(...unlocked);
+    if (import.meta.env.DEV) console.log(`[BOUT] ${bout.id} ${matchWon ? 'won' : 'lost'} bits ${this.progress.bouts[bout.id] ?? 0} (+${fresh}) next ${after?.id ?? '-'}${nextGate(this.progress.bouts) ? ` · ${nextGate(this.progress.bouts)}` : ''}`);
   }
 
   /** Shows a level-up, then each new unlock spinning over the arena before it flies off. */

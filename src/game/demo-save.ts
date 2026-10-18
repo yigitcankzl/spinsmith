@@ -22,7 +22,7 @@ export function freshSave(storage: WritableStorage) {
   for (const k of SAVE_KEYS) storage.removeItem(k);
 }
 
-/** A smith at level 8, past the first session, with three stamps, some marks and two champions. */
+/** A smith at level 8, past the first session, with three stamps, some marks, the first chapter cleared and two champions. */
 export function demoSave(storage: WritableStorage, today = new Date()): Progress {
   freshSave(storage);
   const p = new Progress(storage);
@@ -34,6 +34,8 @@ export function demoSave(storage: WritableStorage, today = new Date()): Progress
   p.mark('Drifter', MARK.beaten);
   p.claimSignature('Rim Raider');
   p.claimSignature('Iron Keep');
+  // The Cinder Circuit cleared with ten medals: the Circuit Map opens on the Iron Circuit.
+  for (const [id, bits] of [['1-1', 7], ['1-2', 3], ['1-3', 5], ['1-4', 1], ['1-5', 3]] as const) p.recordBout(id, bits, true);
   const halo: TopBuild = { ...PRESETS[2].build };
   const striker: TopBuild = { ...PRESETS[0].build, tip: 'spur' };
   p.recordChampion(halo);
