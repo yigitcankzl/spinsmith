@@ -126,6 +126,7 @@ export function linkFromAddress(search: string, build: string, name: string): On
   const host = want === 'HOST';
   if (!host && !isRoomCode(want)) return null;
   const code = host ? newRoomCode() : want;
-  const transport = q.get('net') === 'bc' ? new BroadcastChannelTransport(code) : new TrysteroTransport(code);
+  // The host waits for a friend for up to ten minutes; a guest gives up on a dead code after 30 s.
+  const transport = q.get('net') === 'bc' ? new BroadcastChannelTransport(code) : new TrysteroTransport(code, host ? 600_000 : 30_000);
   return new OnlineLink(host ? 'host' : 'guest', code, transport, build, name);
 }
