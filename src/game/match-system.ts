@@ -3993,7 +3993,8 @@ export class MatchSystem extends createSystem({
           continue;
         }
         let rim = this.rimPulls[side];
-        if (!rim && h.justPinched && open && this.taught('defense')) {
+        // A rim grip is half of the two-hand forge (from its lesson on); alone it is a rim spring (later).
+        if (!rim && h.justPinched && open && this.taught('forge')) {
           const n = normRadius(this.arena.layout, l.x, l.z);
           if (n >= 0.82 && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
             rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z, started: this.elapsed };
@@ -4005,7 +4006,7 @@ export class MatchSystem extends createSystem({
           rim.z = l.z;
           const mx = (rim.sx + rim.x) * 0.5;
           const mz = (rim.sz + rim.z) * 0.5;
-          rimGuide.visible = !this.photo;
+          rimGuide.visible = !this.photo && this.taught('defense');
           rimGuide.position.set(mx, this.arena.height(mx, mz) + 0.004, mz);
           rimGuide.rotation.y = Math.PI / 2 - Math.atan2(rim.sz, rim.sx);
           rimGuide.scale.set(1 + Math.min(1, Math.hypot(rim.x - rim.sx, rim.z - rim.sz) / 0.04) * 0.35, 1, 1);
@@ -4046,7 +4047,7 @@ export class MatchSystem extends createSystem({
         this.rimPulls[side] = null;
         // Give a second hand time to claim the opposite rim for a whole-arena forge. A quick
         // first pinch/release is neither a forge nor a paid spring, so it changes nothing.
-        if (this.elapsed - rim.started < RIM_SPRING_INTENT) continue;
+        if (!this.taught('defense') || this.elapsed - rim.started < RIM_SPRING_INTENT) continue;
         this.doRimSpring(rim.sx, rim.sz, rim.x, rim.z);
         continue;
       }
@@ -4118,8 +4119,10 @@ export class MatchSystem extends createSystem({
   }
 
   /** The first fight teaches ramp, the signature two-hand arena forge, then an ultimate. */
-  private taught(verb: 'strike' | 'cup' | 'defense' | 'tells') {
+  private taught(verb: 'forge' | 'strike' | 'cup' | 'defense' | 'tells') {
     const m = this.progress.matches;
+    // The two-hand forge is the first match's second lesson.
+    if (verb === 'forge') return m >= 1 || (m === 0 && this.tutorialRound >= 2);
     if (verb === 'strike') return m >= 1 || (m === 0 && this.tutorialRound >= 3);
     // Cup, sling and passive rim defence arrive after two completed matches; the opening session
     // stays focused on rip, ramp and the signature two-hand forge.
