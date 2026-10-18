@@ -869,7 +869,7 @@ export class MatchSystem extends createSystem({
   private netGo = false;
   private netShapes = new Map<number, FloorShape>();
   /** Host: the online guest's cup, held here until slung or its hold runs out. */
-  private netCup: { shape: FloorShape; at: number } | null = null;
+  private netCup: { shape: FloorShape; at: number; caught?: boolean } | null = null;
   /** Something that must wait for the arena to be placed (an online match starting). */
   private afterPlace: (() => void) | null = null;
   /** Something that waits until the player is home (an online duel while they forge or build). */
@@ -5184,7 +5184,7 @@ export class MatchSystem extends createSystem({
     // turned half round into this frame) takes the sling, and the pull goes to the host on release.
     if (this.online?.role === 'guest' && this.online.peer) {
       for (const cup of this.netShapes.values()) {
-        if (!cup.trap || cup.owner !== 'left') continue;
+        if (!cup.trap || !cup.caught || cup.owner !== 'left') continue;
         const cx = -cup.x;
         const cz = -cup.z;
         if (Math.hypot(cx - x, cz - z) > SLING_GRAB * 1.5) continue;
@@ -5716,7 +5716,12 @@ export class MatchSystem extends createSystem({
     }
     // The guest's cup lets go like yours: after the hold (restarting when it catches a top).
     const nc = this.netCup;
-    if (nc && (!this.arena.shapes.includes(nc.shape) || this.elapsed - nc.at > TUNE.cupHold * (nc.shape.caught ? 1.5 : 1))) {
+    // The hold clock restarts at the catch, as yours does.
+    if (nc && nc.shape.caught && !nc.caught) {
+      nc.caught = true;
+      nc.at = this.elapsed;
+    }
+    if (nc && (!this.arena.shapes.includes(nc.shape) || this.elapsed - nc.at > TUNE.cupHold)) {
       if (this.arena.shapes.includes(nc.shape)) this.arena.free(nc.shape);
       this.netCup = null;
     }
@@ -6392,6 +6397,7 @@ export class MatchSystem extends createSystem({
   private endOnline() {
     // Whatever waited for the other smith (placement, home) is void with them gone.
     this.afterPlace = this.afterHome = null;
+    this.netCup = null;
     this.hub.roomCode = null;
     if (!this.online) return;
     this.online.close();
@@ -6555,13 +6561,19 @@ export class MatchSystem extends createSystem({
       // The host's 'rival' shapes are this guest's own; the host's hands' shapes are the rival's here.
       const mine = owner === 'rival' || owner === 'rival-cup';
       if (!shape) {
-        shape = { kind: kind === 0 ? 'ramp' : 'well', x, z, dx, dz, amp, age: 0, owner: mine ? 'left' : 'rival', ...(kind === 2 ? { trap: true } : {}) };
+        shape = { kind: kind === 0 ? 'ramp' : 'well', x, z, dx, dz, amp, age: 0, owner: mine ? 'left' : 'rival' };
         this.netShapes.set(id, shape);
         this.arenaDirty = true;
       } else if (shape.dx !== dx || shape.dz !== dz || shape.amp !== amp) {
         Object.assign(shape, { x, z, dx, dz, amp });
         this.arenaDirty = true;
       }
+      // A cup (2), or a cup holding a top (3), as the host says now: let go there, let go here.
+      const trap = kind >= 2;
+      if (!!shape.trap !== trap) this.arenaDirty = true;
+      shape.trap = shape.held = trap;
+      // The top it holds: the one nearest the cup (this side only needs it for the sling cord).
+      shape.caught = kind === 3 ? [this.mine, this.theirs].reduce((a, b) => (Math.hypot(a.x - x, a.z - z) <= Math.hypot(b.x - x, b.z - z) ? a : b)) : null;
       shape.age += dt;
       out.push(shape);
     }

@@ -158,7 +158,8 @@ export class SnapshotEncoder {
   private packShape(s: FloorShape): PackedShape {
     let id = this.ids.get(s);
     if (!id) this.ids.set(s, (id = this.nextId++));
-    const kind = s.trap ? 2 : s.kind === 'well' ? 1 : 0;
+    // 3: a cup holding a top (the guest may only sling a cup that has caught one).
+    const kind = s.trap ? (s.caught ? 3 : 2) : s.kind === 'well' ? 1 : 0;
     return [id, kind, r4(s.x), r4(s.z), r3(s.dx), r3(s.dz), r4(s.amp), s.owner];
   }
 }
