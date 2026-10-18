@@ -119,6 +119,10 @@ IWER two windows after the fix: the guest's top equals the host's rival top, the
 
 | 50a3126, c74e44b | Brawl tops leave trails in their own colours (still one instanced draw); the knockout replay is skipped in brawls. |
 
+| 90c94d2, 7c6c7d4 | Copy pass by a review agent: stamp subs and card lines fit their slots, terms match the game, there is no "both hands" in the forge lesson (one-hand mode), the final bout has a real lesson, and online errors are in plain words. |
+| 0c7b02e, 661bde0 | **Crowded bouts:** 2-3 is three tops (Leech + Saw Wraith) and 3-3 is four tops (Gearwright + Twin Gear + Long Ember). Last top spinning wins, and the bout still counts. IWER: 2-3 starts with its crowd and its lesson. |
+| e4ec69e | `artifacts/online-two-windows-iwer.png`: host and guest views of one online duel in two IWER windows, each showing the other's ghost hands on the far side. |
+
 **First session, verified with real emulated gestures (IWER, fresh save):**
 - round 1, ramp → lastShape ramp;
 - round 2, the two-hand forge → squeeze (this was broken before d16e34d);
