@@ -2781,6 +2781,8 @@ export class MatchSystem extends createSystem({
     this.introDone = false;
     this.rematchTip = '';
     this.matchLog = { rounds: [], rip: 0, xp: 0, won: false, score: '' };
+    // Rounds count within a match ('ROUND 2', the bout's twist), not across the session.
+    this.round = 0;
     for (const m of [...this.palmPrints, ...this.scorches]) m.visible = false;
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
     this.typesPicked = false;
