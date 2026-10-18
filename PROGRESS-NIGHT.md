@@ -201,6 +201,7 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 | 064a388 | Ninth review: refusals held every frame are throttled to one every 0.6 s and never cut a stamp already showing (NO SPRING too); a dropped rescue rail keeps the rescue card; with `?lefty` the anvil, blueprint and champion tags face and sit mirrored. Smoke: a full crowded bout 2-3 with forced refusals, no errors. |
 
 | (07:48) | **Raw video clip, not a trailer:** `~/Desktop/spinsmith-videos/night/brawl-four-tops-iwer.mp4` (7.4 s, 1080p, outside the repo) records a 4-top brawl round on Forge Bowl through the keyboard rip, with "IWER EMULATOR · NO HEADSET FOOTAGE" burned in. It has the grey IWER room and a distant camera. It is material for the edit, not the submission video. |
+| (07:50) | **Closer clip:** `brawl-close-iwer.mp4` in the same folder. The camera sits about 0.45 m from the arena (y 1.55, pitch -36). The four tops, sparks and the 4 LEFT bar fill the frame, and the IWER label is burned in. Use this one for the edit. Camera recipe for later shots: the arena stage sits at world (0, 1.25, -0.68) in a fight. |
 
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
