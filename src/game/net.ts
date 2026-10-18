@@ -30,7 +30,7 @@ export type GuestEvent =
   | { kind: 'forge'; action: string; pull: number; twist: number; tilt: number; sign: number; sx?: number; sz?: number; force?: number }
   | { kind: 'strike'; x: number; z: number; seal?: string }
   | { kind: 'rim'; sx: number; sz: number; x: number; z: number; f: number }
-  | { kind: 'gust'; sx: number; sz: number; ex: number; ez: number; f: number };
+  | { kind: 'gust'; sx: number; sz: number; ex: number; ez: number; f: number; target?: 'mine' | 'rival' };
 
 export interface SnapshotMsg {
   type: 'snapshot';

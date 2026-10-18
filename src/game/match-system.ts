@@ -13,7 +13,7 @@ import { forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, palmBrace, palmGust, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -113,7 +113,13 @@ const RIM_SPRING_INTENT = 0.25;
 /** An open palm must sweep this fast above the bowl before it becomes a deliberate forge gust. */
 const PALM_GUST_SPEED = 0.34;
 /** A gust is a committed move, not a free per-frame force; this keeps it tactical and readable. */
-const PALM_GUST_COOLDOWN = 1.35;
+const PALM_GUST_COOLDOWN = 1.8;
+/** Long enough to survive a slow emulator frame and still leave the hand's direction readable. */
+const PALM_GUST_FX_TIME = 0.65;
+/** A real palm parry can be swept back into the bowl without spending another charge. */
+const RIPOSTE_WINDOW = 0.75;
+/** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
+const SLAP_MIN_N = 1.18;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
 const LABEL_AT = new Vector3(0, 0.14, -0.21);
 /** At home after the first session the Smith's board fills the card's slot: notes hang just above it. */
@@ -278,11 +284,19 @@ export class MatchSystem extends createSystem({
   private palmGustCooldown = 0;
   private palmGustSide: Side | null = null;
   private palmGustDirection = new Vector2();
+  private palmGustLength = 0;
+  private palmGustHits = 0;
+  private palmGustRiposte = false;
   private palmGustLast: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
   private palmGustOrigin: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
   private palmGustAge: Record<Side, number> = { left: 0, right: 0 };
   private palmGustSampled: Record<Side, boolean> = { left: false, right: false };
+  /** A released pinch owns the hand briefly, so withdrawing it cannot become a second gesture. */
+  private palmGustBlockedUntil: Record<Side, number> = { left: -9, right: -9 };
   private palmGustCount = 0;
+  private riposteUntil = -9;
+  private riposteSide: Side | null = null;
+  private riposteTop: Top | null = null;
   private lowestFps = 0;
   private fpsWindowTime = 0;
   private fpsWindowFrames = 0;
@@ -498,16 +512,41 @@ export class MatchSystem extends createSystem({
     ),
     { visible: false },
   ));
-  /** Three low streaks follow the open-palm sweep without covering either top. */
-  private palmGustBlades = [-1, 0, 1].map((lane) => {
-    const blade = new Mesh(
-      new PlaneGeometry(0.12, 0.008).rotateX(-Math.PI / 2),
-      new MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }),
+  /** One draw call: two true-width rails plus three chevrons show the exact gust corridor. */
+  private palmGustFx = (() => {
+    const vertices: number[] = [];
+    const bar = (ax: number, az: number, bx: number, bz: number, half: number) => {
+      const dx = bx - ax;
+      const dz = bz - az;
+      const d = Math.hypot(dx, dz) || 1;
+      const nx = (-dz / d) * half;
+      const nz = (dx / d) * half;
+      vertices.push(
+        ax + nx, 0, az + nz, ax - nx, 0, az - nz, bx + nx, 0, bz + nz,
+        bx + nx, 0, bz + nz, ax - nx, 0, az - nz, bx - nx, 0, bz - nz,
+      );
+    };
+    bar(0, -0.065, 1, -0.065, 0.003);
+    bar(0, 0.065, 1, 0.065, 0.003);
+    for (const x of [0.28, 0.52, 0.76]) {
+      bar(x - 0.035, -0.026, x + 0.018, 0, 0.004);
+      bar(x - 0.035, 0.026, x + 0.018, 0, 0.004);
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
+    return Object.assign(
+      new Mesh(geometry, new MeshBasicMaterial({ color: 0xffad42, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, toneMapped: false })),
+      { visible: false },
     );
-    blade.position.z = lane * 0.018;
-    return blade;
-  });
-  private palmGustFx = Object.assign(new Group(), { visible: false });
+  })();
+  /** A short rim pulse shows where the hand-authored force leaves the bowl. */
+  private palmGustRim = Object.assign(
+    new Mesh(
+      new RingGeometry(0.164, 0.172, 32, 1, -0.32, 0.64).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: 0xff7a20, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, toneMapped: false }),
+    ),
+    { visible: false },
+  );
   /** A short-lived, arena-sized cause → target cue; unlike the seal coin it never covers the tops. */
   private ultimateCue = { t: 0, age: 0, seal: 'anvil' as Seal, ox: 0, oz: 0, fx: 0, fz: 0, tx: 0, tz: 0 };
   private ultimatePath = Object.assign(
@@ -1003,7 +1042,6 @@ export class MatchSystem extends createSystem({
     this.launchAim.add(this.launchAimShaft, this.launchAimHead);
     this.openingEcho.add(this.openingEchoShaft, this.openingEchoHead);
     this.rivalIntent.add(...this.rivalIntentDashes, this.rivalIntentHead);
-    this.palmGustFx.add(...this.palmGustBlades);
     this.launchGuide.add(this.launchSafeZone, this.launchDangerZone, this.launchMarker, this.launchAim, this.launchGhost, this.openingEcho, this.rivalIntent);
     this.launchGuide.visible = false;
     this.launchMarker.visible = this.launchAim.visible = this.launchGhost.visible = this.openingEcho.visible = this.rivalIntent.visible = false;
@@ -1029,6 +1067,7 @@ export class MatchSystem extends createSystem({
       ...this.palmBraceWalls,
       ...this.palmBraceFeet,
       this.palmGustFx,
+      this.palmGustRim,
       ...this.rimSpringGuides,
       this.launcherBrace,
       this.reticle,
@@ -1061,7 +1100,7 @@ export class MatchSystem extends createSystem({
     this.overforgeRing.renderOrder = 9;
     for (const wall of this.palmBraceWalls) wall.renderOrder = 8;
     for (const foot of this.palmBraceFeet) foot.renderOrder = 8;
-    for (const blade of this.palmGustBlades) blade.renderOrder = 8;
+    this.palmGustFx.renderOrder = this.palmGustRim.renderOrder = 8;
     for (const guide of this.rimSpringGuides) guide.renderOrder = 8;
     this.launcherBrace.traverse((o) => { if ((o as Mesh).isMesh) (o as Mesh).renderOrder = 8; });
     this.setOverforgeModel(this.myBuild.seal ?? 'anvil');
@@ -1339,6 +1378,7 @@ export class MatchSystem extends createSystem({
     // and every sound stop until the player is back, and the paused time is not simulated.
     const paused = this.world.visibilityState.peek() !== VisibilityState.Visible;
     if (paused !== this.paused) {
+      if (paused) this.cancelActiveGestures();
       this.paused = paused;
       setAudioPaused(paused);
     }
@@ -1348,6 +1388,7 @@ export class MatchSystem extends createSystem({
       for (const wall of this.palmBraceWalls) wall.visible = false;
       for (const foot of this.palmBraceFeet) foot.visible = false;
       this.palmGustFx.visible = false;
+      this.palmGustRim.visible = false;
       this.palmGustSampled.left = this.palmGustSampled.right = false;
       this.palmGustAge.left = this.palmGustAge.right = 0;
       this.cord.set(null);
@@ -1480,10 +1521,14 @@ export class MatchSystem extends createSystem({
       for (const wall of this.palmBraceWalls) wall.visible = false;
       for (const foot of this.palmBraceFeet) foot.visible = false;
       this.palmGustFx.visible = false;
+      this.palmGustRim.visible = false;
       this.palmGustTime = 0;
       this.palmGustCooldown = 0;
       this.palmGustSampled.left = this.palmGustSampled.right = false;
       this.palmGustAge.left = this.palmGustAge.right = 0;
+      this.riposteUntil = -9;
+      this.riposteSide = null;
+      this.riposteTop = null;
       this.outerRail.visible = false;
       this.arenaView.charge = 0;
     }
@@ -3600,6 +3645,7 @@ export class MatchSystem extends createSystem({
   }
 
   private toReady() {
+    this.cancelActiveGestures();
     for (const t of this.extras) {
       t.state = 'out';
       t.finish = null;
@@ -4433,6 +4479,7 @@ export class MatchSystem extends createSystem({
       this.arenaMorphStart.angle = Math.atan2(dz, dx);
       this.arenaMorphPull = this.arenaMorphTwist = 0;
       this.arenaMorphing = true;
+      this.clearPalmBrace();
       this.arenaMorphHold = 0;
       this.arenaView.charge = 1;
       const firstLesson = !this.demo && this.progress.matches === 0 && this.tutorialRound === 2;
@@ -4638,6 +4685,11 @@ export class MatchSystem extends createSystem({
       }
       this.shapeLost[side] = 0;
       const l = this.toLocal(h.pinch);
+      if (h.justReleased) {
+        this.palmGustBlockedUntil[side] = this.elapsed + 0.35;
+        this.palmGustSampled[side] = false;
+        this.palmGustAge[side] = 0;
+      }
       if (h.pinching) {
         this.grooving[side] = null;
         // Keep the fingertip's height current while pinching, so letting go is not read as a fast press.
@@ -4788,7 +4840,7 @@ export class MatchSystem extends createSystem({
         // table counts as a slap, so cups reached in over the rim still work with the bar full.
         const palm = this.root.worldToLocal(this.handAt.copy(h.wrist)).lerp(tip, 0.5);
         const atTable = h.low < this.root.position.y - PEDESTAL * this.rootK + 0.05;
-        const slapping = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, palm.x, palm.z) > 1.0;
+        const slapping = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, palm.x, palm.z) > SLAP_MIN_N;
         if (slapping) {
           if (import.meta.env.DEV) console.log('[SHAPE] well ignored: a slap outside the rim');
         } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) {
@@ -4914,6 +4966,52 @@ export class MatchSystem extends createSystem({
     (this.overforgeRing.material as MeshBasicMaterial).color.setHex(SEAL_COLOR[seal]);
   }
 
+  private clearPalmBrace() {
+    this.palmBraceActive = false;
+    this.palmBraceAngles.left = this.palmBraceAngles.right = null;
+    this.palmBraceGrace.left = this.palmBraceGrace.right = 0;
+    for (const wall of this.palmBraceWalls) wall.visible = false;
+    for (const foot of this.palmBraceFeet) foot.visible = false;
+    this.riposteUntil = -9;
+    this.riposteSide = null;
+    this.riposteTop = null;
+  }
+
+  /** A pause, rescue, round end, or committed slap can never be mistaken for releasing a gesture. */
+  private cancelActiveGestures() {
+    for (const side of ['left', 'right'] as const) {
+      this.shaping[side] = null;
+      this.grooving[side] = null;
+      this.pressing[side] = false;
+      this.slings[side] = null;
+      this.rimPulls[side] = null;
+      this.shapeLost[side] = 0;
+      this.tipFresh[side] = true;
+      this.palmGustSampled[side] = false;
+      this.palmGustAge[side] = 0;
+      this.palmGustBlockedUntil[side] = -9;
+    }
+    this.cord.set(null);
+    this.arenaMorphing = false;
+    this.oneHand = null;
+    this.oneHandAt = -1;
+    this.arenaMorphHold = 0;
+    this.arenaMorph.scaleX = this.arenaMorph.scaleZ = 1;
+    this.arenaMorph.tilt = 0;
+    this.arenaMorphPull = this.arenaMorphTwist = 0;
+    this.arenaView.setForgeDents(0, 0, 0, 0, 0);
+    this.arenaDirty = true;
+    this.publishArenaMorph();
+    this.overforgeHeld = null;
+    this.overforgeControl = null;
+    this.overforgeMode = 'idle';
+    this.overforgeSeal.visible = false;
+    this.rimSpringGuides[0].visible = this.rimSpringGuides[1].visible = false;
+    this.palmGustTime = 0;
+    this.palmGustFx.visible = this.palmGustRim.visible = false;
+    this.clearPalmBrace();
+  }
+
   /** Open hands near the rim become forgiving wall sectors; the hand chooses where tops rebound. */
   private updatePalmBrace() {
     this.palmBraceActive = false;
@@ -4965,13 +5063,16 @@ export class MatchSystem extends createSystem({
       const shapeX = this.arena.layout.shape === 'square' ? 1.12 : 1;
       const shapeZ = this.arena.layout.shape === 'oval' ? 0.78 : shapeX;
       const hitFlash = Math.max(0, 1 - (this.elapsed - this.palmBraceHitAt) / 0.24);
+      const counterReady = this.riposteSide === side && this.elapsed <= this.riposteUntil;
       const pulse = 1 + hitFlash * 0.09;
       wall.scale.set((radius / 0.15) * shapeX * pulse, 1 + hitFlash * 0.45, (radius / 0.15) * shapeZ * pulse);
       foot.scale.set((radius / 0.15) * shapeX * pulse, 1, (radius / 0.15) * shapeZ * pulse);
       const material = wall.material as MeshBasicMaterial;
-      material.color.setHex(hitFlash > 0 ? 0xfff0c2 : side === 'left' ? 0xff9a32 : 0xffb24d);
-      material.opacity = 0.56 + hitFlash * 0.3 + 0.12 * (0.5 + 0.5 * Math.sin(this.time * 9));
-      (foot.material as MeshBasicMaterial).opacity = 0.48 + hitFlash * 0.35;
+      material.color.setHex(hitFlash > 0 || counterReady ? 0xfff0c2 : side === 'left' ? 0xff9a32 : 0xffb24d);
+      material.opacity = 0.56 + (hitFlash > 0 || counterReady ? 0.3 : 0) + 0.12 * (0.5 + 0.5 * Math.sin(this.time * 9));
+      const footMaterial = foot.material as MeshBasicMaterial;
+      footMaterial.color.setHex(counterReady ? 0xfff0c2 : side === 'left' ? 0xff9a32 : 0xffb24d);
+      footMaterial.opacity = 0.48 + (hitFlash > 0 || counterReady ? 0.35 : 0);
     }
   }
 
@@ -4981,21 +5082,35 @@ export class MatchSystem extends createSystem({
    */
   private updatePalmGust(dt: number) {
     this.palmGustCooldown = Math.max(0, this.palmGustCooldown - dt);
+    if (this.elapsed > this.riposteUntil) {
+      this.riposteSide = null;
+      this.riposteTop = null;
+    }
     if (this.palmGustTime > 0) {
       this.palmGustTime = Math.max(0, this.palmGustTime - dt);
-      const life = this.palmGustTime / 0.48;
+      const life = this.palmGustTime / PALM_GUST_FX_TIME;
+      const age = PALM_GUST_FX_TIME - this.palmGustTime;
+      const open = Math.min(1, age / 0.12);
+      const fade = age <= 0.12 ? 1 : Math.max(0, 1 - (age - 0.12) / (PALM_GUST_FX_TIME - 0.12));
       this.palmGustFx.visible = !this.photo && life > 0;
-      this.palmGustFx.position.x += this.palmGustDirection.x * dt * 0.16;
-      this.palmGustFx.position.z += this.palmGustDirection.y * dt * 0.16;
-      this.palmGustFx.scale.set(1 + (1 - life) * 0.45, 1, 0.8 + life * 0.35);
-      for (let i = 0; i < this.palmGustBlades.length; i++) {
-        (this.palmGustBlades[i].material as MeshBasicMaterial).opacity = life * (i === 1 ? 0.9 : 0.55);
+      this.palmGustFx.scale.set(this.palmGustLength * open, 1, 1);
+      (this.palmGustFx.material as MeshBasicMaterial).opacity = fade * (this.palmGustRiposte ? 1 : 0.82);
+      const rimAge = age - 0.06;
+      this.palmGustRim.visible = !this.photo && this.palmGustHits > 0 && rimAge >= 0 && rimAge < 0.24;
+      if (this.palmGustRim.visible) {
+        const t = rimAge / 0.24;
+        const radius = maxRim(this.arena.layout) / 0.17;
+        this.palmGustRim.scale.setScalar(radius * (0.96 + t * 0.07));
+        (this.palmGustRim.material as MeshBasicMaterial).opacity = (1 - t) * 0.9;
       }
-    } else this.palmGustFx.visible = false;
+    } else {
+      this.palmGustFx.visible = false;
+      this.palmGustRim.visible = false;
+    }
 
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      if (!this.taught('defense') || !h.tracked || h.pinching || this.overforgeControl?.side === side || this.overforgeHeld === side) {
+      if (!this.taught('defense') || !h.tracked || h.pinching || this.elapsed < this.palmGustBlockedUntil[side] || this.overforgeControl?.side === side || this.overforgeHeld === side) {
         this.palmGustSampled[side] = false;
         this.palmGustAge[side] = 0;
         continue;
@@ -5043,28 +5158,74 @@ export class MatchSystem extends createSystem({
 
   private doPalmGust(side: Side, sx: number, sz: number, ex: number, ez: number, strength: number) {
     const length = Math.hypot(ex - sx, ez - sz) || 1;
-    this.palmGustDirection.set((ex - sx) / length, (ez - sz) / length);
+    const dirX = (ex - sx) / length;
+    const dirZ = (ez - sz) / length;
+    // The hand only needs a short, comfortable sweep to declare its direction. Project that
+    // physical intent to the opposite rim so the player never has to reach across the whole table.
+    const maxTravel = maxRim(this.arena.layout) * 2.5;
+    let travel = maxTravel;
+    for (let i = 1; i <= 24; i++) {
+      const t = (maxTravel * i) / 24;
+      if (normRadius(this.arena.layout, sx + dirX * t, sz + dirZ * t) >= 1.04) {
+        travel = t;
+        break;
+      }
+    }
+    const gustEx = sx + dirX * travel;
+    const gustEz = sz + dirZ * travel;
+    const riposte = side === this.riposteSide && this.riposteTop?.alive && this.elapsed <= this.riposteUntil;
+    const force = riposte ? 1 : this.charges.spend(this.elapsed, TUNING.grace);
+    if (!force) {
+      this.palmGustCooldown = 0.35;
+      this.locked('Forge Gust needs one charge\nParry first for a free riposte');
+      return;
+    }
+    const power = Math.min(1.5, strength * force * (riposte ? 1.25 : 1));
+    const candidates = riposte && this.riposteTop ? [this.riposteTop] : this.tops;
+    const struck = candidates.filter((top) => palmGustCrosses(this.arena, top, sx, sz, gustEx, gustEz));
+    this.palmGustDirection.set(dirX, dirZ);
     this.palmGustCooldown = PALM_GUST_COOLDOWN;
-    this.palmGustTime = 0.48;
+    this.palmGustTime = PALM_GUST_FX_TIME;
+    this.palmGustLength = travel;
+    this.palmGustHits = struck.length;
+    this.palmGustRiposte = !!riposte;
     this.palmGustSide = side;
     this.palmGustCount++;
     this.palmGustFx.visible = !this.photo;
-    this.palmGustFx.position.set((sx + ex) * 0.5, this.arena.height((sx + ex) * 0.5, (sz + ez) * 0.5) + 0.008, (sz + ez) * 0.5);
+    this.palmGustFx.position.set(sx, this.arena.height(sx, sz) + 0.006, sz);
     this.palmGustFx.rotation.y = -Math.atan2(this.palmGustDirection.y, this.palmGustDirection.x);
-    this.palmGustFx.scale.set(1, 1, 1);
-    for (const blade of this.palmGustBlades) (blade.material as MeshBasicMaterial).opacity = 0.8;
+    this.palmGustFx.scale.set(0.001, 1, 1);
+    (this.palmGustFx.material as MeshBasicMaterial).color.setHex(riposte ? 0xfff0c2 : 0xffad42);
+    (this.palmGustFx.material as MeshBasicMaterial).opacity = riposte ? 1 : 0.82;
+    const exitAngle = Math.atan2(this.palmGustDirection.y, this.palmGustDirection.x);
+    this.palmGustRim.position.set(0, this.arena.floorHeight(1) + 0.003, 0);
+    this.palmGustRim.rotation.y = -exitAngle;
+    (this.palmGustRim.material as MeshBasicMaterial).color.setHex(riposte ? 0xfff0c2 : 0xff7a20);
     if (this.online?.role === 'guest' && this.online.peer) {
-      this.online.sendEvent({ kind: 'gust', sx: -sx, sz: -sz, ex: -ex, ez: -ez, f: strength });
-    } else palmGust(this.arena, this.tops, sx, sz, ex, ez, strength);
+      const target = riposte && this.riposteTop ? (this.riposteTop === this.mine ? 'mine' : 'rival') : undefined;
+      this.online.sendEvent({ kind: 'gust', sx: -sx, sz: -sz, ex: -gustEx, ez: -gustEz, f: power, ...(target ? { target } : {}) });
+    } else palmGust(this.arena, candidates, sx, sz, gustEx, gustEz, power);
+    for (const top of struck) {
+      const y = this.arena.height(top.x, top.z);
+      const view = top === this.mine ? this.myView : top === this.theirs ? this.theirView : null;
+      view?.flash();
+      view?.hit(Math.min(1, 0.55 + power * 0.25), this.palmGustDirection.x, this.palmGustDirection.y, 0.04);
+      this.impacts.hit(top.x, y, top.z, Math.min(1, 0.5 + power * 0.25));
+      this.sparks.burst(top.x, y, top.z, 0.45 + power * 0.2);
+    }
     this.lastShape = { t: this.elapsed, kind: 'parry' };
     this.recordIntervention();
-    this.impacts.shock((sx + ex) * 0.5, this.arena.floorHeight(0.6), (sz + ez) * 0.5, 0.55, 0xffb04a);
-    this.sparks.burst(ex, this.arena.height(ex, ez), ez, 0.45);
-    this.stamp.show('FORGE GUST!', 'OPEN PALM SWEEP → PUSH THE ORBIT', 'mine', 0.6, 0.9);
-    this.label.set('YOUR HAND MOVED THE FIGHT');
+    if (struck.length) this.impacts.shock(struck[0].x, this.arena.height(struck[0].x, struck[0].z), struck[0].z, riposte ? 0.72 : 0.5, riposte ? 0xfff0c2 : 0xffb04a);
+    this.stamp.show(riposte ? 'COUNTERFLOW!' : struck.length ? 'FORGE GUST!' : 'GUST MISSED', riposte ? 'PARRY → SWEEP → RETURN' : struck.length ? `${struck.length} TOP${struck.length === 1 ? '' : 'S'} IN THE CORRIDOR` : 'SWEEP THROUGH A TOP', struck.length ? 'mine' : 'neutral', 0.6, 0.9);
+    this.label.set(riposte ? 'THE PARRY CAME BACK STRONGER' : struck.length ? 'YOUR HAND MOVED THE FIGHT' : 'THE CORRIDOR MISSED');
     this.labelTimer = 1.1;
-    playDash(ex);
-    if (import.meta.env.DEV) console.log(`[GUST] ${side} ${sx.toFixed(3)},${sz.toFixed(3)} → ${ex.toFixed(3)},${ez.toFixed(3)} ×${strength.toFixed(2)}`);
+    if (riposte) {
+      this.riposteUntil = -9;
+      this.riposteSide = null;
+      this.riposteTop = null;
+    }
+    playDash(gustEx);
+    if (import.meta.env.DEV) console.log(`[GUST] ${side}${riposte ? ' riposte' : ''} ${sx.toFixed(3)},${sz.toFixed(3)} → ${gustEx.toFixed(3)},${gustEz.toFixed(3)} ×${power.toFixed(2)} hits ${struck.length}`);
   }
 
   /**
@@ -5243,8 +5404,13 @@ export class MatchSystem extends createSystem({
       // Outside is judged at the palm (between the wrist and the fingertip): a palm on the print with
       // its fingers toward the arena put the fingertip right on the old 1.05 line and missed.
       const l = h.tracked ? this.slapAt.copy(this.toLocal(h.wrist)).lerp(this.toLocal(h.index), 0.5) : null;
-      const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > 1.0;
-      const hit = (COMFORT.gentle ? this.touches : this.strikeTouch)[side].update(outside ? h.low : null, dt, tableY - 0.05, tableY + 0.05);
+      const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > SLAP_MIN_N;
+      const openPalm = h.tracked && !h.pinching && Math.abs(h.wrist.y - h.index.y) <= 0.08;
+      const ownsAnotherGesture = this.arenaMorphing || !!this.rimPulls[side] || !!this.shaping[side] || !!this.slings[side] || this.overforgeHeld === side || this.overforgeControl?.side === side;
+      // The open-palm press is a delayed accessibility fallback for the seal stamp. Keeping its
+      // detector live before the fallback appears made the two open hands approaching Arena Forge
+      // count as a hidden ultimate slap.
+      const hit = (COMFORT.gentle ? this.touches : this.strikeTouch)[side].update(slapFallback && outside && openPalm && !ownsAnotherGesture ? h.low : null, dt, tableY - 0.05, tableY + 0.05);
       if (hit === null) continue;
       if (!armed) {
         if (import.meta.env.DEV) console.log(`[STRIKE] pressed with the bar at ${Math.round(this.forgeBar.value * 100)}%`);
@@ -5654,6 +5820,7 @@ export class MatchSystem extends createSystem({
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
   private doStrike(ox = 0, oz = 0) {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
+    this.cancelActiveGestures();
     this.recordIntervention();
     this.overforgeSeal.visible = false;
     const seal = this.myBuild.seal ?? 'anvil';
@@ -5791,6 +5958,8 @@ export class MatchSystem extends createSystem({
     if (this.online?.role === 'guest' && this.online.peer) {
       for (const cup of this.netShapes.values()) {
         if (!cup.trap || !cup.caught || cup.owner !== 'left') continue;
+        const other = side === 'left' ? 'right' : 'left';
+        if (this.slings[other]?.cup === cup) continue;
         const cx = -cup.x;
         const cz = -cup.z;
         if (Math.hypot(cx - x, cz - z) > SLING_GRAB * 1.5) continue;
@@ -5803,6 +5972,8 @@ export class MatchSystem extends createSystem({
       const cup = this.cups[s]?.shape;
       const t = cup?.caught;
       if (!cup || !t || Math.hypot(t.x - x, t.z - z) > SLING_GRAB) continue;
+      const other = side === 'left' ? 'right' : 'left';
+      if (this.slings[other]?.cup === cup) continue;
       this.slings[side] = { cup, sx: x, sz: z, px: 0, pz: 0 };
       return true;
     }
@@ -6138,6 +6309,7 @@ export class MatchSystem extends createSystem({
   /** Arms the one-per-round rescue only when the real table outline is known. */
   private beginOuterRing(): boolean {
     if (this.outerRingUsed || this.demo || !ROOM.poly || this.mine.finish !== 'over') return false;
+    this.cancelActiveGestures();
     this.outerRingUsed = true;
     this.outerRingState = 'rescue';
     this.outerRingLeft = OUTER_RING_TIME;
@@ -6443,20 +6615,33 @@ export class MatchSystem extends createSystem({
       const openingDx = this.theirs.x - this.mine.x;
       const openingDz = this.theirs.z - this.mine.z;
       let braced = false;
+      let bracedSide: Side | null = null;
+      let bracedTop: Top | null = null;
       for (const side of ['left', 'right'] as const) {
         const angle = this.palmBraceAngles[side];
         if (angle === null) continue;
-        braced = palmBrace(this.arena, this.mine, angle) || braced;
-        braced = palmBrace(this.arena, this.theirs, angle) || braced;
+        if (palmBrace(this.arena, this.mine, angle)) {
+          braced = true;
+          bracedSide = side;
+          bracedTop = this.mine;
+        }
+        if (palmBrace(this.arena, this.theirs, angle)) {
+          braced = true;
+          bracedSide = side;
+          bracedTop = this.theirs;
+        }
       }
       if (braced && this.elapsed - this.palmBraceHitAt > 0.22) {
         this.palmBraceHitAt = this.elapsed;
+        this.riposteUntil = this.elapsed + RIPOSTE_WINDOW;
+        this.riposteSide = bracedSide;
+        this.riposteTop = bracedTop;
         this.lastShape = { t: this.elapsed, kind: 'parry' };
         const top = this.mine.sinceWall === 0 ? this.mine : this.theirs;
         const y = this.arena.height(top.x, top.z);
         this.impacts.shock(top.x, y, top.z, 0.72, 0xffa142);
         this.sparks.burst(top.x, y, top.z, 0.7);
-        this.stamp.show('PALM PARRY!', 'your hand became the wall', 'mine', 0.5);
+        this.stamp.show('PALM PARRY!', 'SWEEP IN NOW → FREE RIPOSTE', 'mine', 0.5);
         playThock();
       }
       let clash: Clash | null;
@@ -6603,6 +6788,7 @@ export class MatchSystem extends createSystem({
   }
 
   private finish(v: -1 | 1 | 2, deskKo = false) {
+    this.cancelActiveGestures();
     if (this.online?.role === 'host' && this.online.peer) {
       this.online.snapshot(performance.now(), [this.mine, this.theirs], [this.arena.tiltX, this.arena.tiltZ], this.arena.shapes, true);
       // The heat after this round, so the guest's score cannot drift (a DESK KO's extra point included).
@@ -7207,11 +7393,18 @@ export class MatchSystem extends createSystem({
       this.rivalShapeKind = 'RIM SPRING';
       playThock();
     } else if (ev.kind === 'gust') {
-      const hits = palmGust(this.arena, this.tops, ev.sx, ev.sz, ev.ex, ev.ez, ev.f);
+      const targets = ev.target === 'mine' ? [this.theirs] : ev.target === 'rival' ? [this.mine] : this.tops;
+      const struck = targets.filter((top) => palmGustCrosses(this.arena, top, ev.sx, ev.sz, ev.ex, ev.ez));
+      const hits = palmGust(this.arena, targets, ev.sx, ev.sz, ev.ex, ev.ez, ev.f);
       this.rivalHandMove(ev.ex, ev.ez, ev.ex - ev.sx, ev.ez - ev.sz);
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = 'FORGE GUST';
       this.impacts.shock((ev.sx + ev.ex) * 0.5, this.arena.floorHeight(0.6), (ev.sz + ev.ez) * 0.5, hits ? 0.6 : 0.3, TEAM_RIVAL);
+      for (const top of struck) {
+        const view = top === this.mine ? this.myView : top === this.theirs ? this.theirView : null;
+        view?.flash();
+        this.impacts.hit(top.x, this.arena.height(top.x, top.z), top.z, 0.75);
+      }
       if (hits) this.stamp.show('THEIR FORGE GUST', 'LIVE HANDS', 'rival', 0.6);
       playDash(ev.ex);
     } else if (ev.kind === 'strike') {

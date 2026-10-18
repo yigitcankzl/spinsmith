@@ -1106,12 +1106,9 @@ export function palmGust(arena: Arena, tops: readonly Top[], sx: number, sz: num
   const reach = Math.max(arena.radius * 0.46, 0.065);
   let hits = 0;
   for (const top of tops) {
-    if (!top.alive) continue;
+    if (!palmGustCrosses(arena, top, sx, sz, ex, ez)) continue;
     const along = Math.max(0, Math.min(1, ((top.x - sx) * dx + (top.z - sz) * dz) / (length * length)));
-    const px = sx + dx * along;
-    const pz = sz + dz * along;
-    const gap = Math.hypot(top.x - px, top.z - pz);
-    if (gap > reach) continue;
+    const gap = Math.hypot(top.x - (sx + dx * along), top.z - (sz + dz * along));
     const falloff = 1 - gap / reach;
     const impulse = (0.075 + 0.055 * Math.max(0, Math.min(1.5, strength))) * (0.45 + falloff * 0.55);
     top.vx += nx * impulse;
@@ -1123,6 +1120,19 @@ export function palmGust(arena: Arena, tops: readonly Top[], sx: number, sz: num
     hits++;
   }
   return hits;
+}
+
+/** True when the hand's physical sweep corridor crosses this live top. */
+export function palmGustCrosses(arena: Arena, top: Top, sx: number, sz: number, ex: number, ez: number) {
+  if (!top.alive) return false;
+  const dx = ex - sx;
+  const dz = ez - sz;
+  const length2 = dx * dx + dz * dz;
+  if (length2 < 1e-10) return false;
+  const along = Math.max(0, Math.min(1, ((top.x - sx) * dx + (top.z - sz) * dz) / length2));
+  const px = sx + dx * along;
+  const pz = sz + dz * along;
+  return Math.hypot(top.x - px, top.z - pz) <= Math.max(arena.radius * 0.46, 0.065);
 }
 
 /** The palm-authored spatial target shared by simulation and presentation. */

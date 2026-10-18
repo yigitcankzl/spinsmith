@@ -262,7 +262,8 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
         ex = sx + dx * (max / length);
         ez = sz + dz * (max / length);
       }
-      return { kind: 'gust', sx, sz, ex, ez, f: clamp(ev.f, 0, 1.5) };
+      const target = ev.target === 'mine' || ev.target === 'rival' ? ev.target : undefined;
+      return { kind: 'gust', sx, sz, ex, ez, f: clamp(ev.f, 0, 1.5), ...(target ? { target } : {}) };
     }
     case 'cup':
       if (!num(ev.x) || !num(ev.z)) return null;
