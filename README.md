@@ -152,7 +152,7 @@ an arena. First to 3 heat wins a match.
   A rival's signature part also opens by level, a few levels after that rival arrives: knocking
   the rival out is the early way to it. Locked parts and arenas show dark with how they are earned. A match is
   against one rival that keeps its build and spin for every round (Rim Raider, Iron
-  Keep and Drifter at first; Leech, Hookjaw, Sawtooth and Bastion join with levels, announced as
+  Keep and Drifter at first; Leech, Hookjaw, Sawtooth, Bastion, Comet and Gearwright join with levels, announced as
   NEW RIVAL). Rivals come as a ladder, **the circuits**: the Cinder Circuit (Drifter, Rim Raider,
   then its champion Iron Keep), the Iron Circuit (Leech, Hookjaw, champion Sawtooth) and the
   Crown (Bastion); the next bout is the first rival you have not beaten, and beating a champion

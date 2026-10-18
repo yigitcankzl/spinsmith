@@ -71,6 +71,8 @@ export const RIVAL_UNLOCKS: Record<number, string> = {
   6: 'rival:Hookjaw',
   8: 'rival:Sawtooth',
   10: 'rival:Bastion',
+  12: 'rival:Comet',
+  14: 'rival:Gearwright',
 };
 
 /** The newer arenas, opened beside a level's part or paint (the classics come with LEVEL_UNLOCKS). */

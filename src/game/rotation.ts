@@ -13,6 +13,8 @@ export const RIVAL_HOME: Record<string, string> = {
   Hookjaw: 'Ember Ring',
   Sawtooth: 'Clockwork Spire',
   Bastion: 'Zero-G Dish',
+  Comet: 'Neon Speedway',
+  Gearwright: 'Ripple Pool',
 };
 
 /**

@@ -52,8 +52,8 @@ export const BOUTS: Bout[] = [
   b('2-4', 'Hookjaw', 'Neon Speedway', 0.5, 'Rails: geared tips dash', 'It shapes the floor now, as you do', ['forgeKO', 'sweep']),
   b('2-5', 'Sawtooth', 'Meteor Pit', 0.6, 'Keep your top whole', 'Every hit chips you toward a shatter', ['burst', 'perfect']),
   b('3-1', 'Iron Keep', 'Colossus Bowl', 0.55, 'The champion returns, in a bigger bowl', 'More room to drift, farther to the pits', ['forgeKO', 'sweep']),
-  b('3-2', 'Sawtooth', 'Titan Crater', 0.65, 'Fight on the crater rim', 'The middle drops away', ['strikeKO', 'perfect']),
-  b('3-3', 'Drifter', 'Sentinel Gates', 0.75, 'Bumpers guard every pit: aim between them', 'It drifts behind the guards', ['rampKO', 'burst']),
+  b('3-2', 'Comet', 'Titan Crater', 0.65, 'It never stops moving: meet it on the crater rim', 'The middle drops away under its lift', ['strikeKO', 'perfect']),
+  b('3-3', 'Gearwright', 'Sentinel Gates', 0.75, 'Match its spin, then aim between the guards', 'It grinds opposite spin and waits behind the bumpers', ['rampKO', 'burst']),
   b('3-4', 'Bastion', 'Glacier Steps', 0.85, 'Tall and locked, on ice tiers', 'Low hits get under it', ['forgeKO', 'sweep']),
   b('3-5', 'Bastion', 'Grand Anvil', 1, 'The Crown', 'Knock it off the edge to end it', ['edgeKO', 'sweep']),
 ];
