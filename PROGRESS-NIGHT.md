@@ -15,7 +15,7 @@ Goal: turn Spinsmith from a deep systems sandbox into a finished game that can w
   - a README audit against the code;
   - `check:sim` now proves every bout can be countered, and that crowded bouts can be won;
   - `check:sim-n` and `check:net` were added.
-- **Still open:** Quest device test, the video, a mirrored (left-hand) hub layout, hosting (last step).
+- **Still open:** Quest device test, the video, hosting (last step).
 - **State at 08:00:** see the end of this file. Every check passes, and the tree is clean.
 
 ## Research (4 read-only agents, 03:10–03:25)
@@ -195,6 +195,8 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 | c569ea3 | The board's map names the medals the next bout still asks for (unless the next chapter is short of medals, which is shown instead). |
 
 | (latest) | **Sound has a visual twin:** an agent audited every play*() call in match-system and found five sound-only cues (rejected rim spring, a spring without a charge, a busy-card refusal, a dropped rescue rail, the new-smith reset). All five now show a stamp or card. |
+
+| (latest) | **Left-handed layout:** `?lefty` (kept; `?lefty=0` to undo) mirrors the near-rim stations (dock, anvil, blueprint, dial, pegs, champions). Distances mirror, so reach is unchanged. IWER: dock at +0.123, anvil at -0.123, and a screenshot shows the swapped sides. |
 
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.

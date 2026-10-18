@@ -93,9 +93,25 @@ const HAND_LOSS_GRACE = 0.28;
 /** Near-rim stations (arena-local): your top's dock at the left, the forge's anvil at the right. */
 // Home is a showcase, not a storage shelf: pull the side stations into the seated binocular view.
 // The interaction distances only get easier; the full forge/workshop retain their wider layouts.
-export const FORGE_AT = new Vector3(REACH_FORGE.x * 0.88, REACH_FORGE.y, REACH_FORGE.z);
-const DOCK_AT = new Vector3(REACH_DOCK.x * 0.88, REACH_DOCK.y, REACH_DOCK.z);
-const BLUEPRINT_AT = new Vector3(REACH_BLUEPRINT.x * 0.86, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
+/**
+ * Left-handed layout: open the game once with ?lefty (?lefty=0 to undo) and the near-rim stations
+ * swap sides (dock, anvil, blueprint, dial, pegs, champions). Every gesture works with either hand
+ * already; this only moves where things sit. Distances are mirrored, so reach is unchanged.
+ */
+const SIDE = (() => {
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.has('lefty')) localStorage.setItem('spinsmith.lefty.v1', q.get('lefty') === '0' ? '' : '1');
+    return localStorage.getItem('spinsmith.lefty.v1') ? -1 : 1;
+  } catch {
+    return 1;
+  }
+})();
+export const FORGE_AT = new Vector3(SIDE * REACH_FORGE.x * 0.88, REACH_FORGE.y, REACH_FORGE.z);
+const DOCK_AT = new Vector3(SIDE * REACH_DOCK.x * 0.88, REACH_DOCK.y, REACH_DOCK.z);
+const BLUEPRINT_AT = new Vector3(SIDE * REACH_BLUEPRINT.x * 0.86, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
+const DIAL_AT = new Vector3(SIDE * COMFORT_AT.x, COMFORT_AT.y, COMFORT_AT.z);
+const PEGS_AT = new Vector3(SIDE * BRAWL_AT.x, BRAWL_AT.y, BRAWL_AT.z);
 /**
  * The Smith's board, centred just over the far rim in the read band (about 1.2 m from the eyes), and
  * the champions' stands on the left rim.
@@ -110,7 +126,7 @@ const SIGN_Y = 0.012;
 const RANK_W = 1024;
 const RANK_H = 280;
 const RANK_SIZE = 0.1;
-const CHAMPION_AT = [new Vector3(-0.2, 0, 0.065), new Vector3(-0.21, 0, -0.01), new Vector3(-0.2, 0, -0.085)];
+const CHAMPION_AT = [new Vector3(-0.2 * SIDE, 0, 0.065), new Vector3(-0.21 * SIDE, 0, -0.01), new Vector3(-0.2 * SIDE, 0, -0.085)];
 /** The anvil and the dock on the rim are small models of the full ones. */
 const RIM_SCALE = 0.42;
 /** Starting over: hold the level plate this long (s), then pinch it again within this long. */
@@ -489,7 +505,7 @@ export class Hub {
     this.blueprint.add(cradle, holder);
     this.root.add(this.blueprint);
     // On the table in front of the roll, between the level plate and the anvil's name.
-    const build = this.label('WORKSHOP', this.blueprint, BLUEPRINT_AT.x - 0.008, BLUEPRINT_AT.z + SIGN_AHEAD - 0.01);
+    const build = this.label('WORKSHOP', this.blueprint, BLUEPRINT_AT.x - 0.008 * SIDE, BLUEPRINT_AT.z + SIGN_AHEAD - 0.01);
     build.position.y += TABLE_Y;
     this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home, name: build });
   }
@@ -502,12 +518,12 @@ export class Hub {
     // The pointer notch shows the mode the dial is on.
     const notch = new Mesh(new BoxGeometry(0.003, 0.002, 0.009).translate(0, 0.009, 0.005), new MeshBasicMaterial({ color: ORANGE }));
     knob.add(notch);
-    const home = new Vector3(COMFORT_AT.x, TABLE_Y, COMFORT_AT.z);
+    const home = new Vector3(DIAL_AT.x, TABLE_Y, DIAL_AT.z);
     knob.position.copy(home);
     this.comfortKnob = knob;
     this.root.add(knob);
     // Its name lies beside it, not on the knob (the knob turns).
-    const name = this.label('COMFORT', this.root, COMFORT_AT.x, COMFORT_AT.z + 0.03);
+    const name = this.label('COMFORT', this.root, DIAL_AT.x, DIAL_AT.z + 0.03);
     name.position.y += TABLE_Y;
     this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, name, quiet: true });
   }
@@ -524,13 +540,13 @@ export class Hub {
       pegs.add(peg);
     }
     pegs.add(new Mesh(new BoxGeometry(0.05, 0.003, 0.014).translate(0, 0.0015, 0), BRASS));
-    const home = new Vector3(BRAWL_AT.x, TABLE_Y, BRAWL_AT.z);
+    const home = new Vector3(PEGS_AT.x, TABLE_Y, PEGS_AT.z);
     pegs.position.copy(home);
     // A short column running away from you between the comfort dial and the level plate; your peg is nearest.
     pegs.rotation.y = Math.PI / 2;
     this.brawlPegs = pegs;
     this.root.add(pegs);
-    const name = this.label('BRAWL', this.root, BRAWL_AT.x, BRAWL_AT.z + 0.035);
+    const name = this.label('BRAWL', this.root, PEGS_AT.x, PEGS_AT.z + 0.035);
     name.position.y += TABLE_Y;
     this.items.push({ action: { kind: 'brawl' }, carry: false, model: pegs, home, name, quiet: true });
   }
