@@ -20,6 +20,20 @@ export default async function run({ page, frame }) {
       g.mine.launch(0, g.arena.radius * 0.55, 0, 0, 0.9, g.mine.hand);
       g.theirs.launch(g.arena.radius * 0.97, 0, 0, 0, 0.9, g.theirs.hand);
       g.arena.shapes.splice(0);
+      // Capture scripts may deliberately hold the two rim grips for several seconds. This proof
+      // is independent: clear every transient forge latch so only the palm motion below can spend
+      // the ready meter or count as an intervention.
+      g.arenaMorphing = false;
+      g.arenaMorphHold = 0;
+      g.arenaMorphLost = 0;
+      g.arenaMorphPull = 0;
+      g.arenaMorphTwist = 0;
+      g.arenaMorph.scaleX = 1;
+      g.arenaMorph.scaleZ = 1;
+      g.arenaMorph.tilt = 0;
+      g.rimPulls.left = null;
+      g.rimPulls.right = null;
+      g.arenaView.setForgeDents(0, 0, 0, 0, 0);
       g.deskVerdict = null;
       g.deskKoScored = false;
       g.setDeskKoStage(0);

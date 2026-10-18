@@ -697,7 +697,9 @@ export function installDriver() {
           spot = spotAt(aimAngle());
           await glide(side, 'low', above(spot, 0.18), 0.16, 0);
         }
-        await glide(side, 'low', spot, gentle ? 0.6 : 0.1, 0, gentle ? 'natural' : 'linear');
+        // 300 ms still reads as a deliberate human palm slap, and retains the production minimum
+        // downward speed even when IWER only samples the natural easing every 50 ms.
+        await glide(side, 'low', spot, gentle ? 0.3 : 0.1, 0, gentle ? 'natural' : 'linear');
         // Low-IWER-fps capture runs may expose only a handful of stable contact frames. Keep the
         // dev hand visibly planted long enough to prove the production hold gesture every time.
         await wait(gentle ? 1.2 : 0.35);

@@ -121,13 +121,28 @@ export default async function run({ page, frame, cdp }) {
           object.visible = false;
           return;
         }
-        object.material = new standardMaterial.constructor({
+        const material = new standardMaterial.constructor({
           color: p.handColor ?? 0xd09a7d,
           roughness: 0.66,
           metalness: 0,
-          transparent: false,
+          emissive: 0x1b0905,
+          emissiveIntensity: 0.08,
+          transparent: true,
           depthWrite: true,
+          alphaTest: 0,
         });
+        // IWER exposes a distance-from-wrist vertex attribute on its hand mesh. Fade only that
+        // short cuff instead of showing the synthetic hand end as a hard amputated plane.
+        material.onBeforeCompile = (shader) => {
+          shader.vertexShader = shader.vertexShader
+            .replace('#include <common>', '#include <common>\nattribute float wristDist;\nvarying float vWristFade;')
+            .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWristFade = smoothstep(0.015, 0.12, wristDist);');
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', '#include <common>\nvarying float vWristFade;')
+            .replace('#include <dithering_fragment>', 'diffuseColor.a *= vWristFade;\n#include <dithering_fragment>');
+        };
+        material.customProgramCacheKey = () => 'spinsmith-capture-wrist-fade-v1';
+        object.material = material;
         object.renderOrder = 10;
         object.frustumCulled = false;
         object.visible = true;
@@ -210,12 +225,94 @@ export default async function run({ page, frame, cdp }) {
       result.devTable = true;
     }
 
+    if (p.pose === 'arena-forge') {
+      const game = window.__game;
+      if (game.phase !== 'fight') throw new Error(`Arena Forge hero pose needs a fight, got ${game.phase}`);
+      // Keep one readable information surface (the score bar). The gesture, deformed bowl and
+      // moving tops should own the frame rather than a stack of tutorial cards.
+      game.label.mesh.visible = false;
+      game.printLabel.mesh.visible = false;
+      game.stamp.mesh.visible = false;
+      game.menuButton.mesh.visible = false;
+      game.rematchButton.mesh.visible = false;
+      window.__capturePoseError = '';
+      window.__capturePosePromise = window.drive.arenaForge({ squeeze: 0.034, twist: 20, tilt: 0.052, hold: 6 })
+        .catch((error) => { window.__capturePoseError = String(error?.message ?? error); });
+      // Reach, close both pinches and arrive at the maximum deformation. The long hold above
+      // keeps this deterministic while Chromium writes a high-resolution frame.
+      const startedAt = performance.now();
+      while (
+        performance.now() - startedAt < 6000
+        && Math.abs((game.arenaMorph?.scaleX ?? 1) - 1) < 0.04
+        && Math.abs(game.arenaMorphTwist ?? 0) < 0.05
+      ) await new Promise((resolve) => setTimeout(resolve, 50));
+      // The threshold above means both grips are active; keep following the smooth hand motion to
+      // its apex so the still shows the full deformation rather than its first readable frame.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      // The fight loop may refresh contextual copy during the reach; enforce the one-panel frame
+      // once more at the exact held pose.
+      game.label.mesh.visible = false;
+      game.printLabel.mesh.visible = false;
+      game.stamp.mesh.visible = false;
+      game.menuButton.mesh.visible = false;
+      game.rematchButton.mesh.visible = false;
+      result.pose = 'arena-forge';
+      result.morph = {
+        scaleX: game.arenaMorph?.scaleX ?? 1,
+        scaleZ: game.arenaMorph?.scaleZ ?? 1,
+        tilt: game.arenaMorph?.tilt ?? 0,
+        twist: game.arenaMorphTwist ?? 0,
+      };
+      result.poseError = window.__capturePoseError;
+    }
+
+    if (p.pose === 'desk-ko') {
+      const game = window.__game;
+      if (!game.deskKoScored || game.lastRoundHeat !== 3) {
+        throw new Error('DESK KO hero pose requires the verified +3 result');
+      }
+      // Freeze the verified consequence, not the later unlock carousel. The score panel and the
+      // top beyond the physical table edge are enough to explain the rule in one frame.
+      game.reveal?.obj?.removeFromParent?.();
+      game.reveal = null;
+      game.reveals.splice(0);
+      game.rewardHold = 0;
+      game.levelUpText = '';
+      game.replay = null;
+      game.replayCount = 0;
+      game.koFreeze = 0;
+      game.slowMo = 0;
+      game.label.mesh.visible = false;
+      game.printLabel.mesh.visible = false;
+      game.menuButton.mesh.visible = false;
+      game.rematchButton.mesh.visible = false;
+      game.bar.mesh.visible = true;
+      game.stamp.show('DESK KO!', 'REAL EDGE · +1', 'mine', 8, 1.5);
+      result.pose = 'desk-ko';
+      result.score = [...game.barPoints];
+    }
+
     result.size = [innerWidth, innerHeight];
     return result;
   }, { p, backgroundData });
 
   for (let i = 0; i < (p.settleFrames ?? 4); i += 1) {
     await frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  }
+
+  if (p.pose) {
+    await frame.evaluate((pose) => {
+      const game = window.__game;
+      for (const surface of [game.label.mesh, game.printLabel.mesh, game.menuButton.mesh, game.rematchButton.mesh]) {
+        surface.visible = false;
+      }
+      if (pose === 'arena-forge') game.stamp.mesh.visible = false;
+      if (pose === 'desk-ko') {
+        // updateSize normally lifts result words above the card. This hero frame deliberately has
+        // no card, so reclaim that space and keep the full stamp inside the seated camera.
+        game.stamp.mesh.position.y = game.label.mesh.position.y + 0.04;
+      }
+    }, p.pose);
   }
 
   const screenshot = await cdp.send('Page.captureScreenshot', {

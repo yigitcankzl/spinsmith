@@ -21,11 +21,14 @@ cat >"$PARAMS" <<JSON
   "backgroundIntensity": 0.9,
   "skinHands": true,
   "devTable": true,
+  "pose": "${SPINSMITH_CAPTURE_POSE:-}",
   "disclosure": true,
   "settleFrames": 6
 }
 JSON
 
-"$ROOT/scripts/capture/setup.sh" "${SPINSMITH_CAPTURE_SETUP:-restart}"
+if [[ -z "${SPINSMITH_CAPTURE_SKIP_SETUP:-}" ]]; then
+  "$ROOT/scripts/capture/setup.sh" "${SPINSMITH_CAPTURE_SETUP:-restart}"
+fi
 SPINSMITH_CAPTURE_PARAMS="$PARAMS" timeout 120 npx @iwsdk/cli browser run scripts/capture/shot.mjs --timeout 90000
 echo "Saved $OUTPUT"

@@ -24,7 +24,8 @@
     "capture:gameplay": "scripts/trailer.sh",
     "capture:ultimates": "scripts/ultimates.sh",
     "capture:competition": "scripts/competition-trailer.sh",
-    "capture:cinematic": "scripts/capture/cinematic.sh"
+    "capture:cinematic": "scripts/capture/cinematic.sh",
+    "capture:heroes": "scripts/capture/heroes.sh"
   },
   "dependencies": {
     "@iwsdk/core": "1.0.1",

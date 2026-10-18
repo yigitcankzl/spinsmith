@@ -13,3 +13,9 @@ https://polyhaven.com/a/comfy_cafe
 
 This rig is for presentation and regression comparison. It is not evidence of
 Quest performance, real passthrough, or physical-device hand tracking.
+
+Run `npm run capture:heroes` for the two competition-facing gameplay frames. The first enters a
+real simulated bout and holds the two-handed arena forge at maximum deformation; the second runs
+the asserted palm-to-DESK-KO path before capture. Both remain explicitly labelled as IWER footage.
+The setup restarts the managed browser with NVIDIA PRIME offload enabled; renderer identity can be
+checked without guessing via `npx @iwsdk/cli browser run scripts/capture/gpu-info.mjs`.
