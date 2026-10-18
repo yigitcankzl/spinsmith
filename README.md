@@ -30,7 +30,7 @@ Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming,
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
 | **Online duel (beta)** between two headsets | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE`. |
 | **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |
-| **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed) and One hand (forge with one hand). |
+| **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed), One hand (forge with one hand) and High contrast. |
 
 All interactions are pinches, palm presses or grabs. Nothing needs a controller.
 
@@ -55,7 +55,7 @@ an arena. First to 3 heat wins a match.
   slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
   80% speed, calm); and One hand: hold the rim with one hand for a moment and a mirrored partner
   appears on the far rim, so turning, pushing in or out and lifting that one hand twist, squeeze,
-  stretch and tilt the arena (calm).
+  stretch and tilt the arena (calm); and High contrast: each top's team ring wide and solid (calm).
 
 ## What is in the game
 

@@ -960,7 +960,10 @@ export class TopView {
     }
     this.shadow.position.set(top.x + 0.0024, y + 0.0008, top.z + 0.0018);
     // The team ring glows with the spin, and flashes with a hit.
-    if (this.teamRing) (this.teamRing.material as MeshBasicMaterial).opacity = 0.3 + 0.4 * Math.min(1, Math.max(0, top.spin)) + this.flashT * 6;
+    if (this.teamRing) {
+      (this.teamRing.material as MeshBasicMaterial).opacity = COMFORT.contrast ? 1 : 0.3 + 0.4 * Math.min(1, Math.max(0, top.spin)) + this.flashT * 6;
+      this.teamRing.scale.setScalar(COMFORT.contrast ? 1.35 : 1);
+    }
     // The drawn spin: the simulation's angle sped up SPIN_DRAW times (a jump, as at a new round or a
     // replay's start, is not a turn). Held while the simulation is; coasting on once it has stopped.
     let turn = top.angle - this.lastAngle;

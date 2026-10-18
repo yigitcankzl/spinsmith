@@ -12,6 +12,8 @@ export interface Comfort {
   assist?: boolean;
   /** One hand: a single rim grip forges the arena; the far rim mirrors the hand. */
   oneHand?: boolean;
+  /** High contrast: each top's team ring is wide and solid, so who is who reads at a glance. */
+  contrast?: boolean;
 }
 
 const KEY = 'spinsmith.comfort.v1';
@@ -24,6 +26,7 @@ export const COMFORT_MODES: (Comfort & { name: string })[] = [
   { name: 'Quiet and calm', sound: false, flashes: false, gentle: true },
   { name: 'Assist: fights at 80% speed, calm', sound: true, flashes: false, gentle: true, assist: true },
   { name: 'One hand: hold the rim to forge, calm', sound: true, flashes: false, gentle: true, oneHand: true },
+  { name: 'High contrast: bold team rings, calm', sound: true, flashes: false, gentle: true, contrast: true },
 ];
 
 /** The live settings (read every frame where they matter). */
@@ -40,8 +43,8 @@ function storage(): Storage | null {
 
 function apply(i: number) {
   mode = (i + COMFORT_MODES.length) % COMFORT_MODES.length;
-  const { sound, flashes, gentle, assist = false, oneHand = false } = COMFORT_MODES[mode];
-  Object.assign(COMFORT, { sound, flashes, gentle, assist, oneHand });
+  const { sound, flashes, gentle, assist = false, oneHand = false, contrast = false } = COMFORT_MODES[mode];
+  Object.assign(COMFORT, { sound, flashes, gentle, assist, oneHand, contrast });
 }
 
 apply(Number(storage()?.getItem(KEY) ?? 0) || 0);
