@@ -6295,6 +6295,7 @@ export class MatchSystem extends createSystem({
       // The host has launched: whatever this side is doing with the cord, its sent rip is the one that flies.
       this.puller = null;
       this.cord.set(null);
+      this.cordTone.update(null);
       this.chargeRing.visible = false;
       this.netGo = true;
       const [power, aim, from, dir, steep] = this.netPending ?? [0.75, 0, null, null, 0];
@@ -6313,15 +6314,18 @@ export class MatchSystem extends createSystem({
       this.finish(v);
     };
     link.onLeft = () => {
-      say(`${link.peerName || 'Your opponent'} left\nThe online duel is over`);
+      // Close first, redraw home, then say it (a redraw would wipe the card).
       this.endOnline();
+      if (this.phase === 'hub') this.toHub();
+      say(`${link.peerName || 'Your opponent'} left\nThe online duel is over`);
     };
     // WebRTC through public relays: a room nobody reaches, or a strict network, ends with a plain reason.
     const t = link.transport as { onState?: (cb: (s: string) => void) => void; error?: string };
     t.onState?.((state) => {
       if (state === 'failed' && !link.peer) {
-        say(`Room ${link.code}: no one connected\n${t.error ?? 'Check the code, or try another network'}`, 12);
         this.endOnline();
+        if (this.phase === 'hub') this.toHub();
+        say(`Room ${link.code}: no one connected\n${t.error ?? 'Check the code, or try another network'}`, 12);
       }
     });
   }
@@ -6348,6 +6352,7 @@ export class MatchSystem extends createSystem({
     this.puller = null;
     this.chargeRing.visible = false;
     this.cord.set(null);
+    this.cordTone.update(null);
     this.phase = 'ready';
   }
 
@@ -6363,7 +6368,6 @@ export class MatchSystem extends createSystem({
     this.netPending = null;
     this.netShapes.clear();
     this.hub.setBrawl(this.seats);
-    if (this.phase === 'hub') this.toHub();
   }
 
   /** The other smith's top, as a rival for the online duel. */
