@@ -218,7 +218,7 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
     - **online:** host-authoritative over WebRTC.
   - Lockstep was rejected: hand input is per frame, not per step, and one stall would freeze both players.
   - No TURN server, so some networks won't connect, and the game says so.
-- **Online on the guest:** cups and slings are not sent yet (ramps, forges, rips, strikes and hands are). Online matches still award XP on each side for that side's own result.
+- **Online on the guest:** every hand move is sent (ramps, cups and slings, forges, rim springs, rips, strikes, hands). Online matches award XP on each side for that side's own result, but no marks, bouts or orders.
 - The `docs/GAMEPLAY-DIRECTION.md` scope freeze ("no more parts/arenas") is overridden by the user's explicit request for more and better tops and arenas. New content still has to pass `report:tops` and `report:arenas`.
 
 ## Remaining (honest)
