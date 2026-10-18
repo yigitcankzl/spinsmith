@@ -868,6 +868,10 @@ export class MatchSystem extends createSystem({
   private netPending: Parameters<MatchSystem['launch']> | null = null;
   private netGo = false;
   private netShapes = new Map<number, FloorShape>();
+  /** Something that must wait for the arena to be placed (an online match starting). */
+  private afterPlace: (() => void) | null = null;
+  /** The address's online room was opened (it waits for the first session to end). */
+  private onlineTried = false;
   private bout: Bout | null = null;
   private boutEarned = 0;
   /** This match as an echo for a friend's game: each rip and each two-hand forge (echo.ts). */
@@ -1331,7 +1335,8 @@ export class MatchSystem extends createSystem({
     if (this.needPlace && this.phase !== 'placing') {
       this.needPlace = false;
       if (this.demo) this.endDemo();
-      if (this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') this.toReady();
+      // Recentring keeps a finished match's screen (REMATCH, MENU) as it is.
+      if (this.phase === 'pulling' || this.phase === 'fight' || (this.phase === 'result' && !this.matchOver)) this.toReady();
       this.placeRoot();
     }
     this.easeToTable(dt);
@@ -1360,7 +1365,8 @@ export class MatchSystem extends createSystem({
     this.launchSafeZone.visible = this.launchDangerZone.visible = this.phase === 'ready' && !this.demo;
     this.openingEcho.visible = launchPhase && !!this.lastOpeningTrace && this.lastOpeningTrace.rival === this.rival.name && this.lastOpeningTrace.arena === this.arena.layout.name && !this.demo;
     // Large near-rim actions only appear when play has stopped; during a fight the arena is the UI.
-    this.menuButton.mesh.visible = this.phase === 'result' && !this.demo;
+    // MENU also waits while you aim (ready): a match can always be left, never only in a 4 s window.
+    this.menuButton.mesh.visible = (this.phase === 'result' || this.phase === 'ready') && !this.demo;
     this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo && !(this.online?.role === 'guest' && this.online.peer);
     this.passButton.mesh.visible = this.rematchButton.mesh.visible && this.canPass();
     if (this.passButton.mesh.visible && !this.passHinted && once('pass')) this.stamp.later('PASS', 'A FRIEND FIGHTS YOUR TOP AND HANDS', 'neutral', 1.6, 1);
@@ -1415,7 +1421,8 @@ export class MatchSystem extends createSystem({
       case 'ready':
       case 'result':
         if (this.phase === 'result') {
-          this.resultTimer -= dt;
+          // Asked to leave? The result holds while the second pinch comes.
+          if (this.time - this.menuArmed >= 3) this.resultTimer -= dt;
           if (this.resultTimer <= 0) {
             if (this.demo) {
               this.endDemo();
@@ -1756,7 +1763,7 @@ export class MatchSystem extends createSystem({
     const pin = this.progress.arenaPin;
     if (!this.nextRival) {
       // With every bout won, the map offers a missing medal every other match; the rotation gets the rest.
-      const bout = pin ? null : nextBout(this.progress.bouts, this.progress.matches % 2 === 0);
+      const bout = pin ? null : nextBout(this.progress.bouts, this.progress.matches % 2 === 0, this.progress.matches);
       const rival = bout && RIVALS.find((r) => r.name === bout.rival);
       const index = bout ? this.arenas.findIndex((a) => a.name === bout.arena) : -1;
       if (bout && rival && index >= 0) {
@@ -1830,6 +1837,8 @@ export class MatchSystem extends createSystem({
   private toHub() {
     this.clearBrawl();
     this.bout = null;
+    // ?online=… on a new headset waits for the first session; once it is over the room opens.
+    if (!this.online && !this.onlineTried && this.progress.guide === 'done' && new URLSearchParams(location.search).has('online')) queueMicrotask(() => this.openOnline());
     this.hub.setBrawl(this.seats, this.online?.role === 'host' && !this.online.peer);
     this.phase = 'hub';
     this.markFirstFive(1);
@@ -2047,6 +2056,10 @@ export class MatchSystem extends createSystem({
       this.progress.reset();
       this.seats = 2;
       saveSeats(2);
+      // A new smith gets every lesson again, and an open online room closes.
+      this.morphedOnce = false;
+      this.slungOnce = false;
+      this.endOnline();
       for (const k of SAVE_KEYS) if (k !== 'spinsmith.progress.v1') localStorage.removeItem(k);
       this.myBuild = this.forge.allowed({ ...PRESETS[0].build });
       this.arenas = [...ARENAS];
@@ -2785,13 +2798,14 @@ export class MatchSystem extends createSystem({
     this.forge.close();
     this.stage.visible = true;
     this.demo = false;
-    // A friend's challenge goes first (after the first session).
-    this.rivalEcho = null;
+    // A friend's challenge goes first (after the first session); a rematch keeps the echo it fought.
+    if (!again) this.rivalEcho = null;
     this.echoRec = { rips: [], forges: [] };
     const friend = !rival && this.progress.guide === 'done' ? this.challenger() : null;
     this.rival = rival ?? friend ?? this.nextRival ?? this.pickRival();
     // A campaign bout: the planned one, or the first match (the first bout's rival in its arena).
-    const planned = last ?? this.nextBoutPick ?? (this.progress.guide !== 'done' ? BOUTS[0] : null);
+    // The first session's guided rematch is still the first bout.
+    const planned = last ?? this.nextBoutPick ?? (this.progress.guide !== 'done' || (again && this.progress.matches <= 1) ? BOUTS[0] : null);
     this.bout = !friend && (again || !rival) && planned && planned.rival === this.rival.name && planned.arena === this.arena.layout.name ? planned : null;
     this.boutEarned = 0;
     this.nextRival = null;
@@ -2905,6 +2919,10 @@ export class MatchSystem extends createSystem({
   private place() {
     this.placeRoot();
     this.toHub();
+    // An online match that arrived while the arena was still being placed starts now.
+    const after = this.afterPlace;
+    this.afterPlace = null;
+    after?.();
 
     if (!this.onTable) {
       // No table found (or none labelled one): say so once the title is gone, then the first
@@ -3838,12 +3856,14 @@ export class MatchSystem extends createSystem({
         // The spot the guest picked (its own arena-local frame) goes in the host's frame: turned half round.
         net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist, ...(from ? { at: [-from.x, -from.z] as [number, number] } : {}), ...(dir ? { dir: [-dir.x, -dir.z] as [number, number] } : {}) });
         this.netPending = [power, aim, from, dir, steep];
+        this.waitForPeer();
         this.label.set(`Ripped\nWaiting for ${net.peerName || 'the host'}`);
         this.labelTimer = 0;
         return;
       }
       if (!this.netRip) {
         this.netPending = [power, aim, from, dir, steep];
+        this.waitForPeer();
         this.label.set(`Ripped\nWaiting for ${net.peerName || 'your guest'} to rip`);
         this.labelTimer = 0;
         return;
@@ -6066,7 +6086,7 @@ export class MatchSystem extends createSystem({
       this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.05, fy + 0.006, z + oz * 0.05, 1], [1.35, x + ox * 0.05, fy + 0.03, z + oz * 0.05, 0], [2.2, x + ox * 0.05, fy + 0.05, z + oz * 0.05, 0]], this.frameDt);
       ghost = true;
     } else if (this.phase === 'fight' && !this.demo && this.progress.matches === 0 && this.tutorialRound === 2 && !this.morphedOnce && this.elapsed > TUNING.grace && this.labelTimer <= 0) {
-      this.label.set('PINCH BOTH GLOWING RIMS\nSQUEEZE INWARD · RELEASE');
+      this.label.set(COMFORT.oneHand ? 'HOLD ONE GLOWING RIM\nPUSH INWARD · RELEASE' : 'PINCH BOTH GLOWING RIMS\nSQUEEZE INWARD · RELEASE');
       const grips = forgeGrips(this.arena.layout);
       const pulse = 1.15 + 0.15 * Math.sin(this.time * 6);
       for (let i = 0; i < this.rimSpringGuides.length; i++) {
@@ -6194,6 +6214,7 @@ export class MatchSystem extends createSystem({
   /** Opens the online duel the address asks for (after the first session), and wires its messages. */
   private openOnline(open?: 'host') {
     if (this.progress.guide !== 'done') return;
+    if (!open) this.onlineTried = true;
     const link = linkFromAddress(open ? `?online=host${new URLSearchParams(location.search).get('net') === 'bc' ? '&net=bc' : ''}` : location.search, encodeBuild(this.myBuild), buildName(this.myBuild));
     if (!link) return;
     this.online = link;
@@ -6206,11 +6227,19 @@ export class MatchSystem extends createSystem({
     link.onHello = () => {
       if (import.meta.env.DEV) console.log(`[ONLINE] ${link.role}: ${link.peerName} joined ${link.code}`);
       if (link.role === 'host') {
-        this.toHub();
-        this.startMatch(this.remoteRival());
+        const start = () => {
+          this.toHub();
+          this.startMatch(this.remoteRival());
+        };
+        if (this.phase === 'placing') this.afterPlace = start;
+        else start();
       } else say(`In room ${link.code}\n${link.peerName} starts the match`);
     };
     link.onLaunch = (round, arena, layout) => {
+      if (round < 0 && this.phase === 'placing') {
+        this.afterPlace = () => link.onLaunch?.(round, arena, layout);
+        return;
+      }
       if (round < 0) {
         // A match begins: the host's arena (by name, or whole when it was built in the workshop), against the host's top.
         // Home first: going home picks this device's own next bout and arena, which the host's replaces.
@@ -6306,6 +6335,13 @@ export class MatchSystem extends createSystem({
     this.labelTimer = 1.4;
   }
 
+  /** Online: your rip is sent and held; drop the cord and wait in ready (MENU is there) until the other side rips. */
+  private waitForPeer() {
+    this.puller = null;
+    this.cord.set(null);
+    this.phase = 'ready';
+  }
+
   /** Closes the online duel and returns to offline play (the pegs light for the seats again). */
   private endOnline() {
     if (!this.online) return;
@@ -6328,8 +6364,10 @@ export class MatchSystem extends createSystem({
   /** Host: what the guest's hands did, from the far side. */
   private applyGuestEvent(ev: GuestEvent) {
     if (ev.kind === 'rip') {
+      // A rip that arrives mid-fight belongs to no round: the next one starts from a fresh rip.
+      if (this.phase === 'fight') return;
       this.netRip = { power: ev.power, aim: ev.aim, ...(ev.at ? { at: ev.at } : {}), ...(ev.dir ? { dir: ev.dir } : {}) };
-      if (this.netPending && this.phase !== 'fight') {
+      if (this.netPending) {
         const [power, aim, from, dir, steep] = this.netPending;
         this.netGo = true;
         this.launch(power, aim, from, dir, steep);
@@ -6625,6 +6663,8 @@ export class MatchSystem extends createSystem({
       playLevelUp();
     }
     const after = nextBout(this.progress.bouts);
+    // A boss beaten without the medals to open the next chapter: say what is missing, right here.
+    if (fresh & 1 && bout.boss && !finale && (!after || after.chapter <= bout.chapter) && nextGate(this.progress.bouts)) this.stamp.later('NOT YET', nextGate(this.progress.bouts).toUpperCase(), 'neutral', 1.8, 1.1);
     if (after && before && after.chapter > before.chapter) {
       this.stamp.later(`${CHAPTERS[after.chapter - 1].name.toUpperCase()} OPEN!`, `NEXT: ${after.rival.toUpperCase()} IN ${after.arena.toUpperCase()}`, 'mine', 1.8, 1.5);
       playLevelUp();

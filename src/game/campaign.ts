@@ -113,11 +113,15 @@ export function boutOpen(bout: Bout, rec: BoutRecord): boolean {
 }
 
 /** The bout the map offers next: the first open one not won yet, else the first open one missing a medal (when it is a medal turn), else null. */
-export function nextBout(rec: BoutRecord, medalTurn = true): Bout | null {
+export function nextBout(rec: BoutRecord, medalTurn = true, rotate = 0): Bout | null {
   const open = BOUTS.filter((x) => boutOpen(x, rec));
   // Once every bout is won, medal hunting shares the matches with free play.
   if (!medalTurn && BOUTS.every((x) => (rec[x.id] ?? 0) & WIN)) return null;
-  return open.find((x) => !((rec[x.id] ?? 0) & WIN)) ?? open.find((x) => (rec[x.id] ?? 0) !== 7) ?? null;
+  const unwon = open.find((x) => !((rec[x.id] ?? 0) & WIN));
+  if (unwon) return unwon;
+  // Bouts still missing a medal take turns (rotate: e.g. matches played), so no one bout repeats.
+  const missing = open.filter((x) => (rec[x.id] ?? 0) !== 7);
+  return missing.length ? missing[rotate % missing.length] : null;
 }
 
 /** What blocks the next chapter, for the map ('8 medals to open the Iron Circuit'), or '' when nothing does. */

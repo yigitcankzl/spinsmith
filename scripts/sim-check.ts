@@ -1342,6 +1342,9 @@ TUNING.grace = 0;
   const all: Record<string, number> = {};
   for (const b of BOUTS) all[b.id] = 1;
   assert.ok(nextBout(all, true) && nextBout(all, false) === null, 'with the map won, medal turns alternate with free play');
+  // Bouts missing medals take turns instead of one bout repeating.
+  const short = { '1-1': 3, '1-2': 1, '1-3': 5, '1-4': 1, '1-5': 1 };
+  assert.deepEqual([0, 1, 2, 3].map((r) => nextBout(short, true, r)?.id), ['1-1', '1-2', '1-3', '1-4'], 'missing-medal bouts rotate (seven medals: the Iron Circuit is still shut)');
 }
 
 // 33. The type loop: each type beats one and loses to one; balance and mirrors are even.

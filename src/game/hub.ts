@@ -244,14 +244,14 @@ export class Hub {
         tomorrow,
         stamps: progress.stamps,
         nextGlow: next,
-        map: boardMap(progress.bouts),
+        map: boardMap(progress.bouts, progress.matches),
         gilded: progress.isUnlocked('ledger:gold') || progress.level >= MAX_LEVEL,
         code: echoCode(encodeBuild(build)),
         history: [
           (() => {
             // A pinned arena is free play: say so, or PLAY and the map disagree.
             if (progress.arenaPin) return `free play in ${progress.arenaPin} (pinned)`;
-            const next = nextBout(progress.bouts);
+            const next = nextBout(progress.bouts, progress.matches % 2 === 0, progress.matches);
             return next ? `next bout ${next.id}: ${next.rival}` : 'every bout won';
           })(),
           `${medalCount(progress.bouts)}/${BOUTS.length * 3} medals`,
@@ -822,8 +822,9 @@ function shown(o: Object3D): boolean {
 }
 
 /** The Circuit Map's chapter in play (the next bout's, or the last one when all are won), for the board. */
-function boardMap(rec: BoutRecord): BoardMap {
-  const next = nextBout(rec);
+function boardMap(rec: BoutRecord, matches: number): BoardMap {
+  // The same pick the match makes (medal bouts take turns by matches played).
+  const next = nextBout(rec, matches % 2 === 0, matches);
   const chapter = next?.chapter ?? CHAPTERS.length;
   return {
     chapter: CHAPTERS[chapter - 1].name,
