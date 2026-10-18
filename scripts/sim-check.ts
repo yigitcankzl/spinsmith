@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
@@ -295,6 +295,14 @@ TUNING.grace = 0;
   second.launch(0, 0, 0, 0, 0.8, 1);
   second.sinceDash = 1;
   assert.equal(grooveArena.dashShape(second), false, 'the same groove cannot kick a second top');
+
+  const gustArena = arenaWith({ floor: 'flat', pockets: [], rails: [] });
+  const crossed = new Top(ATTACK);
+  const missed = new Top(DEFENSE);
+  crossed.launch(0, 0, 0, 0, 0.8, 1);
+  missed.launch(0, gustArena.radius, 0, 0, 0.8, -1);
+  assert.equal(palmGust(gustArena, [crossed, missed], -0.11, 0, 0.11, 0, 1), 1, 'an open-palm sweep affects only tops crossed by its path');
+  assert.ok(crossed.vx > 0.1 && missed.vx === 0, 'Forge Gust pushes in the physical sweep direction without becoming arena-wide magic');
 }
 
 // Hand-tool geometry stays deterministic and allocation-free for the live gesture loop.

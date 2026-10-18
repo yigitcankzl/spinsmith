@@ -1,6 +1,6 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
-// Other modes: single-rip, dual-rip, finger-groove, rim-spring, palm-forge, outer-ring, arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
+// Other modes: single-rip, dual-rip, finger-groove, rim-spring, palm-brace, palm-gust, palm-gust-left, palm-forge, outer-ring, arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
   let target = null;
   for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
@@ -25,7 +25,8 @@ export default async function run({ page, frame }) {
       window.__game.openForge();
       await sleep(1200);
     }
-    if (check === 'palm-brace') game.progress.matches = Math.max(2, game.progress.matches);
+    const gustCheck = check === 'palm-gust' || check === 'palm-gust-left';
+    if (check === 'palm-brace' || gustCheck || check === 'rim-spring') game.progress.matches = Math.max(2, game.progress.matches);
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
     if (launchCheck && drive.state().phase !== 'ready') {
@@ -33,7 +34,7 @@ export default async function run({ page, frame }) {
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
     }
     if (launchCheck) window.__game.deckChoice = 0;
-    if (check === 'outer-ring' || check === 'finger-groove' || check.startsWith('arena-morph')) {
+    if (check === 'outer-ring' || check === 'finger-groove' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
@@ -42,7 +43,7 @@ export default async function run({ page, frame }) {
     }
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
     // not spend most of its timeout waiting for the opening clock to reach the normal 2.5 s gate.
-    if ((check === 'finger-groove' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
+    if ((check === 'finger-groove' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
       window.__game.elapsed = Math.max(window.__game.elapsed, 2.7);
       window.__game.charges.charges = 3;
       drive.key('KeyU');
@@ -73,6 +74,10 @@ export default async function run({ page, frame }) {
       const top = before.rival_top.alive ? before.rival_top : before.mine;
       const angle = Math.atan2(top.z, top.x) * 180 / Math.PI;
       action = drive.rimSpring({ angle, pull: 0.045, side: 'right' });
+    } else if (gustCheck) {
+      if (before.phase !== 'fight') throw new Error('palm-gust check requires a fight');
+      stateKey = 'palmGust';
+      action = drive.palmGust({ angle: 0, side: check === 'palm-gust-left' ? 'left' : 'right' });
     } else if (check === 'palm-forge') {
       if (before.phase !== 'forge') throw new Error('palm-forge check requires the forge');
       stateKey = 'palmForge';
@@ -132,6 +137,7 @@ export default async function run({ page, frame }) {
       else if (stateKey === 'morph') sawTransient ||= !!current.morph && (Math.abs(current.morph.scaleX - 1) > 0.015 || Math.abs(current.morph.scaleZ - 1) > 0.015 || Math.abs(current.morph.tilt) > 0.01);
       else if (launchCheck) sawTransient ||= current.phase === 'fight';
       else if (stateKey === 'groove') sawTransient ||= (current.grooves?.length ?? 0) > 0;
+      else if (stateKey === 'palmGust') sawTransient ||= (current.palmGust?.count ?? 0) > (before.palmGust?.count ?? 0);
       else if (stateKey && current[stateKey]) sawTransient = true;
       peakCharges = Math.min(peakCharges, current.charges);
       await sleep(16);

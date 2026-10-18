@@ -248,6 +248,22 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
     case 'rim':
       if (![ev.sx, ev.sz, ev.x, ev.z, ev.f].every(num)) return null;
       return { kind: 'rim', sx: pos(ev.sx), sz: pos(ev.sz), x: pos(ev.x), z: pos(ev.z), f: clamp(ev.f, 0, 1.5) };
+    case 'gust': {
+      if (![ev.sx, ev.sz, ev.ex, ev.ez, ev.f].every(num)) return null;
+      const sx = pos(ev.sx);
+      const sz = pos(ev.sz);
+      let ex = pos(ev.ex);
+      let ez = pos(ev.ez);
+      const dx = ex - sx;
+      const dz = ez - sz;
+      const length = Math.hypot(dx, dz);
+      const max = radius * 1.5;
+      if (length > max) {
+        ex = sx + dx * (max / length);
+        ez = sz + dz * (max / length);
+      }
+      return { kind: 'gust', sx, sz, ex, ez, f: clamp(ev.f, 0, 1.5) };
+    }
     case 'cup':
       if (!num(ev.x) || !num(ev.z)) return null;
       return { kind: 'cup', x: pos(ev.x), z: pos(ev.z) };

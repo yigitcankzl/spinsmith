@@ -29,7 +29,8 @@ export type GuestEvent =
   | { kind: 'sling'; px: number; pz: number }
   | { kind: 'forge'; action: string; pull: number; twist: number; tilt: number; sign: number; sx?: number; sz?: number; force?: number }
   | { kind: 'strike'; x: number; z: number; seal?: string }
-  | { kind: 'rim'; sx: number; sz: number; x: number; z: number; f: number };
+  | { kind: 'rim'; sx: number; sz: number; x: number; z: number; f: number }
+  | { kind: 'gust'; sx: number; sz: number; ex: number; ez: number; f: number };
 
 export interface SnapshotMsg {
   type: 'snapshot';

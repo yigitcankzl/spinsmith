@@ -91,6 +91,11 @@ interface Game {
   /** Hand-first combat state exposed for deterministic emulator captures. */
   overforgeMode?: string;
   palmBraceActive?: boolean;
+  palmGustTime?: number;
+  palmGustCooldown?: number;
+  palmGustCount?: number;
+  palmGustSide?: Side | null;
+  palmGustDirection?: { x: number; y: number };
   bracedLaunch?: boolean;
   palmLauncherSide?: Side | null;
   palmLauncherDebug?: string;
@@ -410,6 +415,13 @@ export function installDriver() {
         rimExperiment: !!g.rimExperiment,
         overforge: g.overforgeMode ?? 'idle',
         palmBrace: !!g.palmBraceActive,
+        palmGust: {
+          active: (g.palmGustTime ?? 0) > 0,
+          cooldown: +(g.palmGustCooldown ?? 0).toFixed(2),
+          count: g.palmGustCount ?? 0,
+          side: g.palmGustSide ?? null,
+          direction: [+(g.palmGustDirection?.x ?? 0).toFixed(2), +(g.palmGustDirection?.y ?? 0).toFixed(2)],
+        },
         bracedLaunch: !!g.bracedLaunch,
         palmLauncher: g.palmLauncherSide ?? null,
         palmLauncherDebug: g.palmLauncherDebug ?? '',
@@ -835,6 +847,25 @@ export function installDriver() {
       await glide(side, 'pinch', at, 0.22, 0);
       await wait(hold);
       await park(side);
+    },
+
+    /** Sweep a relaxed open palm across the inner bowl so the real gesture drives Forge Gust. */
+    async palmGust(opts: { angle?: number; side?: Side } = {}) {
+      const { angle = 0, side = 'right' } = opts;
+      if (game().phase !== 'fight') throw new Error('Forge Gust only exists during a fight');
+      const a = (angle * Math.PI) / 180;
+      const r = game().arena.radius * 0.58;
+      const start = local(-Math.cos(a) * r, -Math.sin(a) * r, 0.065);
+      const end = local(Math.cos(a) * r, Math.sin(a) * r, 0.065);
+      const before = game().palmGustCount ?? 0;
+      await setPinch(side, false);
+      await glide(side, 'palm', above(start, 0.07), 0.28, 0);
+      await glide(side, 'palm', start, 0.18, 0);
+      await glide(side, 'palm', end, 0.32, 0, 'linear');
+      await wait(0.35);
+      await glide(side, 'palm', above(end, 0.08), 0.18, 0);
+      await park(side);
+      if ((game().palmGustCount ?? 0) <= before) throw new Error('open-palm sweep did not trigger Forge Gust');
     },
 
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */

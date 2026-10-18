@@ -1092,6 +1092,39 @@ export function springRim(arena: Arena, tops: readonly Top[], sx: number, sz: nu
   return hits;
 }
 
+/**
+ * A fast open-palm sweep pushes only tops crossed by the hand's path. It is directional rather
+ * than an arena-wide spell: timing and the physical sweep line decide what moves.
+ */
+export function palmGust(arena: Arena, tops: readonly Top[], sx: number, sz: number, ex: number, ez: number, strength = 1) {
+  const dx = ex - sx;
+  const dz = ez - sz;
+  const length = Math.hypot(dx, dz);
+  if (length < 1e-5) return 0;
+  const nx = dx / length;
+  const nz = dz / length;
+  const reach = Math.max(arena.radius * 0.46, 0.065);
+  let hits = 0;
+  for (const top of tops) {
+    if (!top.alive) continue;
+    const along = Math.max(0, Math.min(1, ((top.x - sx) * dx + (top.z - sz) * dz) / (length * length)));
+    const px = sx + dx * along;
+    const pz = sz + dz * along;
+    const gap = Math.hypot(top.x - px, top.z - pz);
+    if (gap > reach) continue;
+    const falloff = 1 - gap / reach;
+    const impulse = (0.075 + 0.055 * Math.max(0, Math.min(1.5, strength))) * (0.45 + falloff * 0.55);
+    top.vx += nx * impulse;
+    top.vz += nz * impulse;
+    top.kick = Math.min(1, top.kick + impulse * 2.2);
+    top.kickX = nx;
+    top.kickZ = nz;
+    top.charging = 0;
+    hits++;
+  }
+  return hits;
+}
+
 /** The palm-authored spatial target shared by simulation and presentation. */
 export function sealTarget(arena: Arena, mine: Top, rival: Top, seal: Seal, ox = 0, oz = 0) {
   const palmAngle = Math.atan2(oz, ox);
