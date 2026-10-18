@@ -83,10 +83,12 @@ an arena. First to 3 heat wins a match.
   0.19 shows shrunk to home size; when a match starts it opens out to full size and slides back,
   so its near rim stays where a small arena's is. On a real table it is shrunk (to 70% at most)
   until it stays on the wood.
-- **Fifteen built-in arenas** (`src/game/arenas.ts`) that together use every knob: the six
+- **Twenty built-in arenas** (`src/game/arenas.ts`) that together use every knob: the six
   classics (Forge Bowl, Ember Ring, Zero-G Dish, Clockwork Spire, Frost Oval, Sumo Square) and
   Titan Crater, Twin Basins, Ripple Pool, Colossus Bowl, Neon Speedway, Orbit Foundry, Glacier
-  Steps, Meteor Pit and Grand Anvil, opened by level. The rotation picks the arena. `npm run report:arenas` simulates every
+  Steps, Meteor Pit, Grand Anvil, Crucible Gate (one wide mouth fed by rails), Sentinel Gates
+  (a bumper guarding every pit), Bellows (a rocking dish, then closing embers), Gear Rink (ice
+  with long end rails) and Ridge Raceway (a ridge, rails and a vortex), opened by level. The rotation picks the arena. `npm run report:arenas` simulates every
   type matchup on every arena and reports round length, knockouts and type balance.
 - **Build your top from parts** (`src/game/parts.ts`):
   a Ring (contact style and mass: Striker, Hook, Anvil, Halo, Saw, Cog, Gale, Bulwark), a Core (height and
@@ -96,7 +98,10 @@ an arena. First to 3 heat wins a match.
   slopes, upper rings lift tops over walls, opposite spins pass spin from the faster top to
   the slower (Cog rings much more), same spins grind each other down, tips dash on rails by
   their gear, Saw rings chip toward a shatter. The classic Striker (attack), Anvil (defense)
-  and Halo (stamina) are presets in a rock-paper-scissors loop. Your top is warm colored,
+  and Halo (stamina) are presets in a rock-paper-scissors loop; a build whose two strongest
+  stats are within 10 points is a balance top. Named builds from the same parts give each
+  style an identity: Ember Comet (attack), Long Ember (stamina), Twin Gear (left-spin balance),
+  Saw Wraith (attack) and Low Tide (defense). Your top is warm colored,
   the opponent's cool teal; each rival keeps its build and spin for the whole match (see Smith levels).
 - **Forge, by hand** (`src/game/forge.ts`): pinch the small anvil and
   the arena turns into the forge: its floor sinks, an anvil rises at the near third of the bowl

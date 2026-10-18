@@ -4,9 +4,11 @@
  * measured from what a round or match already reports. No three.js or DOM here.
  */
 import type { ArenaLayout } from './layout.ts';
+import type { Role } from './parts.ts';
 
 export type Goal = 'rampKO' | 'deskKO' | 'burst' | 'wellSpin' | 'role' | 'perfect' | 'sweep' | 'ownArena';
-export type Role = 'attack' | 'defense' | 'stamina';
+/** The kind of top a 'role' order asks for (balance tops exist, but orders still ask for one of the classic three). */
+export type { Role } from './parts.ts';
 
 export interface Order {
   /** Local date, YYYY-MM-DD. */
@@ -76,7 +78,7 @@ export function canKnockOut(a: ArenaLayout): boolean {
   return a.pockets.length > 0 || a.wall !== 'high';
 }
 
-const ROLE_WORD: Record<Role, string> = { attack: 'an attack', defense: 'a defense', stamina: 'a stamina' };
+const ROLE_WORD: Record<Role, string> = { attack: 'an attack', defense: 'a defense', stamina: 'a stamina', balance: 'a balance' };
 
 /** Today's order for this player; deterministic for a date and context. */
 export function dailyOrder(date: string, ctx: OrderContext): Order {

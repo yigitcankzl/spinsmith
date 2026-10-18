@@ -8,7 +8,7 @@ import { ARENAS } from '../src/game/arenas.ts';
 import { cloneLayout, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { SHAPING, ShapingCharges, STRIKE_BAR, StrikeBar } from '../src/game/shaping.ts';
-import { CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, xpToNext } from '../src/game/progress.ts';
+import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, xpToNext } from '../src/game/progress.ts';
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
@@ -19,7 +19,7 @@ import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
-import { allBuilds, CORES, EMBLEM_COLORS, PRESETS, RIVALS, specFromBuild, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
+import { allBuilds, BALANCE_GAP, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
@@ -441,6 +441,50 @@ TUNING.grace = 0;
   idle.state = 'toppled';
   solo(rails, t, 0.05);
   assert.equal(t.sinceDash > 50, true, 'a gearless tip must not dash');
+}
+
+// 9b. Named builds and the balance type: a build whose two strongest of attack, defense and
+// stamina are within BALANCE_GAP is a balance top; the classics keep their types; named builds
+// are legal, made of real parts and play the role they are named for.
+{
+  assert.equal(roleOf(ATTACK), 'attack');
+  assert.equal(roleOf(DEFENSE), 'defense');
+  assert.equal(roleOf(STAMINA), 'stamina');
+  for (const b of allBuilds()) {
+    const st = statsOf(specFromBuild(b));
+    const [top, second] = [st.attack, st.defense, st.stamina].sort((p, q) => q - p);
+    assert.equal(roleOf(specFromBuild(b)) === 'balance', top - second <= BALANCE_GAP, `${buildName(b)}: balance means a gap of ${BALANCE_GAP} or less (${top} vs ${second})`);
+  }
+  const roles = new Set(allBuilds().map((b) => roleOf(specFromBuild(b))));
+  assert.deepEqual([...roles].sort(), ['attack', 'balance', 'defense', 'stamina'], 'every role has builds');
+  const names = new Set<string>();
+  for (const n of NAMED_BUILDS) {
+    assert.ok(!names.has(n.name), `${n.name} is named once`);
+    names.add(n.name);
+    assert.ok(!/bey|xtreme|blade|ratchet|driver|layer|stadium|let it rip/i.test(`${n.name} ${n.blurb}`), `${n.name} uses original words`);
+    assert.ok(weightOf(n.build) <= WEIGHT_LIMIT, `${n.name} is over the weight limit (${weightOf(n.build)} g)`);
+    assert.ok(allBuilds().some((b) => b.ring === n.build.ring && b.core === n.build.core && b.tip === n.build.tip), `${n.name} is a legal build`);
+    assert.equal(roleOf(specFromBuild(n.build)), n.role, `${n.name} should be a ${n.role} top`);
+    assert.ok(!PRESETS.some((p) => p.name === n.name), `${n.name} is not a preset name`);
+  }
+}
+
+// 9c. The added arenas: valid, opened by a level of their own, and knockouts happen on them.
+{
+  for (const name of ['Crucible Gate', 'Gear Rink', 'Sentinel Gates', 'Bellows', 'Ridge Raceway']) {
+    const a = ARENAS.find((x) => x.name === name);
+    assert.ok(a, `${name} is a built-in arena`);
+    assert.equal(validate(a), null, `${name}: ${validate(a)}`);
+    assert.ok(a.rule, `${name} has a rule`);
+    assert.ok(canKnockOut(a), `${name} can knock out`);
+    const r = reportArena(a, 3);
+    assert.ok(r.knockout > 0, `${name}: knockouts happen`);
+    assert.ok(r.median > 8 && r.median < 30, `${name}: rounds last a while (${r.median.toFixed(1)} s)`);
+    const levels = Object.entries(ARENA_UNLOCKS).filter(([, k]) => k === `arena:${name}`).map(([lv]) => Number(lv));
+    assert.equal(levels.length, 1, `${name} opens at one level`);
+    assert.ok(!String(LEVEL_UNLOCKS[levels[0]] ?? '').startsWith('arena:'), `${name} does not share Lv ${levels[0]} with another arena`);
+  }
+  assert.equal(new Set(ARENAS.map((a) => a.name)).size, ARENAS.length, 'arena names are unique');
 }
 
 // 10. Progression: levels open their unlocks, deeds open theirs, nothing else opens.

@@ -246,6 +246,18 @@ export const PRESETS: { name: string; build: TopBuild }[] = [
   { name: 'Halo', build: { ring: 'halo', core: 'bolt', tip: 'pin', spin: 1, color: 0xe8661c } },
 ];
 
+/**
+ * Named builds: tops with an identity, made only from existing parts. Kept apart from PRESETS
+ * (the three classics the simulation's types and the showcase are built from).
+ */
+export const NAMED_BUILDS: { name: string; role: Role; blurb: string; build: TopBuild }[] = [
+  { name: 'Ember Comet', role: 'attack', blurb: 'A light upper on a low core: streaks in and lifts tops off the rim', build: { ring: 'gale', core: 'stub', tip: 'spur', spin: 1, color: 0xff7a1a } },
+  { name: 'Long Ember', role: 'stamina', blurb: 'Rim mass on a locked core and a still tip: the last glow in the forge', build: { ring: 'halo', core: 'spindle', tip: 'pin', spin: 1, color: 0xffb347 } },
+  { name: 'Twin Gear', role: 'balance', blurb: 'Left-spin teeth that sit and wait: right spinners grind their spin into it', build: { ring: 'cog', core: 'spindle', tip: 'pin', spin: -1, color: 0xc9a227 } },
+  { name: 'Saw Wraith', role: 'attack', blurb: 'Six teeth slung low on a fast tip: every pass chips toward a shatter', build: { ring: 'saw', core: 'stub', tip: 'chisel', spin: 1, color: 0xd94a2b } },
+  { name: 'Low Tide', role: 'defense', blurb: 'All weight, slung low on a slow drift: the hits wash over it', build: { ring: 'anvil', core: 'stub', tip: 'bead', spin: 1, color: 0x8a5a3c } },
+];
+
 export const ringOf = (b: TopBuild) => RINGS.find((r) => r.id === b.ring) ?? RINGS[0];
 export const coreOf = (b: TopBuild) => CORES.find((c) => c.id === b.core) ?? CORES[1];
 export const tipOf = (b: TopBuild) => TIPS.find((t) => t.id === b.tip) ?? TIPS[0];
@@ -304,11 +316,18 @@ export function statsOf(s: TopSpec): TopStats {
   };
 }
 
-/** The role a build leans toward, from its strongest of attack, defense and stamina. */
-export function roleOf(s: TopSpec): 'attack' | 'defense' | 'stamina' {
+/** What kind of top a build is: one of the three classic types, or a balance top that leans on none. */
+export type Role = 'attack' | 'defense' | 'stamina' | 'balance';
+
+/** A build is a balance top when its two strongest of attack, defense and stamina are this close (stat points). */
+export const BALANCE_GAP = 10;
+
+/** The role a build leans toward: its strongest of attack, defense and stamina, or 'balance' when the top two are within BALANCE_GAP. */
+export function roleOf(s: TopSpec): Role {
   const st = statsOf(s);
-  if (st.attack >= st.defense && st.attack >= st.stamina) return 'attack';
-  return st.defense >= st.stamina ? 'defense' : 'stamina';
+  // Stable sort: on a tie, attack before defense before stamina (as before balance existed).
+  const ranked = (['attack', 'defense', 'stamina'] as const).map((k) => ({ k, v: st[k] })).sort((p, q) => q.v - p.v);
+  return ranked[0].v - ranked[1].v <= BALANCE_GAP ? 'balance' : ranked[0].k;
 }
 
 /** Every build under the weight limit. */
