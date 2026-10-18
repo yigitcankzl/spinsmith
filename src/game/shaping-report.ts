@@ -4,7 +4,7 @@
  */
 import { rimRadius } from './layout.ts';
 import { ARENAS } from './arenas.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
 import { SHAPE_SIZE, ShapingCharges, StrikeBar, behindOn } from './shaping.ts';
 
@@ -338,8 +338,8 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
     if (t > 5 && a.alive && b.alive && a.spin < 0.6 * b.spin) behind = true;
     const clash = step(arena, a, b);
     if (clash) {
-      charges.clash(clash.strength, t);
-      rivalCharges.clash(clash.strength, t);
+      if (clash.shapeOwner?.startsWith('me')) charges.clash(clash.strength, t);
+      if (clash.shapeOwner?.startsWith('rival')) rivalCharges.clash(clash.strength, t);
       bar.clash(clash.strength, t, lagging);
       rivalBar.clash(clash.strength, t, false);
     }
@@ -368,7 +368,7 @@ export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: P
         for (let i = 0; i < roundsPerPair; i++) {
           const pa = 0.5 + launchRnd() * 0.5, pb = 0.5 + launchRnd() * 0.5;
           const da = LAUNCH_TILT + (launchRnd() - 0.5) * 0.6, db = LAUNCH_TILT + (launchRnd() - 0.5) * 0.6;
-          const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa), sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
+          const sa = launchSpeed(pa), sb = launchSpeed(pb);
           // Half the rounds from the other side and spin, so the shaper has no side advantage.
           const side = i % 2 === 0 ? 1 : -1;
           const setup: Setup = {

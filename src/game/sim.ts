@@ -16,6 +16,7 @@ import {
 import { ARENAS } from './arenas.ts';
 import { PRESETS, specFromBuild } from './parts.ts';
 import { SHAPE_SIZE } from './shaping.ts';
+import { launchSpeedScale, launchSpinScale, MATCH_POINT_TARGET, suddenDeathPocketHalf, suddenDeathProgress } from './gameplay-rules.ts';
 
 /** Floor dips toward a pocket over this outer band of the radius. */
 const POCKET_BAND = 0.25;
@@ -90,7 +91,7 @@ export const SLING_SPEED = 0.45;
  * emptier keeps rounds long enough (docs: shaping report targets).
  */
 export function launchSpin(power: number): number {
-  return 0.62 + 0.36 * power;
+  return launchSpinScale(power);
 }
 /** A cup lets go after this long if nothing rolled in (s). */
 export const CUP_HOLD = 2;
@@ -122,7 +123,7 @@ export const TUNING = {
   /** Seconds a player's ramp or well stays at full strength before it starts to relax. */
   shapeHold: 2.5,
   /** Seconds after the launch during which pockets and walls hold every top (no instant finishes). */
-  grace: 2.5,
+  grace: 1.8,
   /** Hot metal: the strike throws a top this much further at full burst damage (docs/DUEL-DESIGN.md). Clashes are not
    * scaled: that tipped the type loop toward attack. */
   hot: 0.6,
@@ -145,7 +146,7 @@ const LIFT_TIME = 0.4;
 const LIFT_ESCAPE = 0.7;
 /** Opposite spins exchange spin on contact (the faster feeds the slower); grind does it harder. */
 const SPIN_SHARE = 0.03;
-const GRIND_SHARE = 0.12;
+const GRIND_SHARE = 0.17;
 /** Same-direction rims grind against each other: extra recoil and spin lost. */
 const SAME_SPIN_RECOIL = 1.25;
 const SAME_SPIN_COST = 0.012;
@@ -159,6 +160,10 @@ const TOPPLE_SPIN = 0.06;
 export const TIME_LIMIT = 45;
 /** Launch speed (m/s) at full power. */
 export const LAUNCH_SPEED = 0.5;
+/** Launch speed from rip power, shared by the live game and every balance report. */
+export function launchSpeed(power: number): number {
+  return LAUNCH_SPEED * launchSpeedScale(power);
+}
 /**
  * Launches leave at this angle (radians) off straight-at-center, in the orbit direction, so tops
  * spiral into the bowl like a real angled launch instead of meeting head-on in the first half second.
@@ -206,6 +211,11 @@ export class Arena {
     if (!this.layout.shrink || this.elapsed < start) return 1;
     const k = Math.min(1, (this.elapsed - start) / SHRINK_TIME);
     return 1 - (1 - SHRINK_MIN) * k;
+  }
+
+  /** Late-round pressure, 0 before 15 s and 1 once the arena is fully opened. */
+  get pressure(): number {
+    return suddenDeathProgress(this.elapsed);
   }
 
   /** True when (x, z) is inside the rim. */
@@ -264,7 +274,8 @@ export class Arena {
     const angle = Math.atan2(z, x);
     let dip = 0;
     for (const p of this.layout.pockets) {
-      const d = Math.abs(Math.atan2(Math.sin(angle - p.angle), Math.cos(angle - p.angle))) / (p.half * 1.6);
+      const half = suddenDeathPocketHalf(p.half, this.elapsed);
+      const d = Math.abs(Math.atan2(Math.sin(angle - p.angle), Math.cos(angle - p.angle))) / (half * 1.6);
       if (d < 1) dip = Math.max(dip, (1 - d * d) * ((n - (1 - POCKET_BAND)) / POCKET_BAND));
     }
     return -POCKET_DEPTH * dip;
@@ -662,6 +673,8 @@ export interface Clash {
   hammer?: boolean;
   /** A charge rebounded off a Ward in this clash. */
   parry?: boolean;
+  /** Shape whose slope fed this meeting, used to refund only the player who authored it. */
+  shapeOwner?: string;
   /** stepN only: the indices of the two tops that met. */
   a?: number;
   b?: number;
@@ -772,6 +785,15 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
         t.vx += (fx - t.vx) * g;
         t.vz += (fz - t.vz) * g;
       }
+    }
+    // Pressure physically flattens the outside of the bowl and opens the exits. A mild radial
+    // drift becomes decisive over the final six seconds, converting passive spin-outs into aimed
+    // pocket/ring finishes without teleporting either top.
+    const pressure = arena.pressure;
+    if (pressure > 0) {
+      const outward = pressure * pressure * 1.6 * dt;
+      t.vx += (t.x / r) * outward;
+      t.vz += (t.z / r) * outward;
     }
   }
   // Attack types hunt the opponent: their heading turns toward it.
@@ -1256,17 +1278,18 @@ function wall(arena: Arena, t: Top) {
   const nx = normalTmp.x;
   const nz = normalTmp.z;
   const outward = t.vx * nx + t.vz * nz;
-  const pocket = pocketAt(L, angle);
+  const pocket = L.pockets.find((p) => Math.abs(Math.atan2(Math.sin(angle - p.angle), Math.cos(angle - p.angle))) < suddenDeathPocketHalf(p.half, arena.elapsed)) ?? null;
   const ease = t.lifted > 0 ? LIFT_ESCAPE : 1;
+  const pressureEscape = 1 - arena.pressure * 0.22;
   // Opening grace: right after the launch the rim holds everything, so no round is decided by
   // the first collision before anyone can read it.
-  if (open && pocket && outward > TUNING.pocket * ease) {
+  if (open && pocket && outward > TUNING.pocket * ease * pressureEscape) {
     t.state = 'out';
     t.finish = 'pocket';
     t.pocketPoints = pocket.points;
     return;
   }
-  if (open && outward > WALL_ESCAPE[L.wall] * ease) {
+  if (open && outward > WALL_ESCAPE[L.wall] * ease * pressureEscape) {
     t.state = 'out';
     t.finish = 'over';
     return;
@@ -1324,7 +1347,10 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   if (closing <= 0) return null;
   // Equal-mass bounce plus a kick from the spinning rims, scaled by each side's punch/knockback.
   const same = a.hand === b.hand;
-  const impulse = ((1 + TUNING.restitution) / 2) * closing + TUNING.recoil * (a.spin + b.spin) * 0.5 * (same ? SAME_SPIN_RECOIL : 1);
+  // Tracking and fixed-step noise should not turn a grazing touch into a different round. Tiny
+  // closing speeds ease in quadratically; intentional hits retain their full response.
+  const stableClosing = closing < 0.09 ? (closing * closing) / 0.09 : closing;
+  const impulse = ((1 + TUNING.restitution) / 2) * stableClosing + TUNING.recoil * (a.spin + b.spin) * 0.5 * (same ? SAME_SPIN_RECOIL : 1);
   // The lower top hits under the taller one: the taller takes extra knockback and tilt.
   const gap = Math.max(-1, Math.min(1, (a.spec.height - b.spec.height) / HEIGHT_GAP));
   const liftA = gap > 0 ? gap * HEIGHT_LIFT : 0;
@@ -1391,20 +1417,34 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   const burstOpen = !arena || arena.elapsed >= arena.grace;
   if (burstOpen && a.damage >= 1) burstApart(a);
   if (burstOpen && b.damage >= 1) burstApart(b);
-  return { x: clashX, z: clashZ, strength: Math.min(1, impulse * 1.6), hammer: hitA > 1 || hitB > 1, parry: parryA > 1 || parryB > 1 };
+  let shapeOwner: string | undefined;
+  if (arena) {
+    let influence = 0;
+    for (const s of arena.shapes) {
+      const sigma = s.sigma ?? (s.kind === 'ramp' ? RAMP_SIGMA : WELL_SIGMA);
+      const da = Math.hypot(a.x - s.x, a.z - s.z);
+      const db = Math.hypot(b.x - s.x, b.z - s.z);
+      const k = Arena.strength(s) * Math.max(0, 1 - Math.min(da, db) / (sigma * 1.45));
+      if (k > influence) {
+        influence = k;
+        shapeOwner = s.owner;
+      }
+    }
+  }
+  return { x: clashX, z: clashZ, strength: Math.min(1, impulse * 1.6), hammer: hitA > 1 || hitB > 1, parry: parryA > 1 || parryB > 1, ...(shapeOwner ? { shapeOwner } : {}) };
 }
 
 /** Points the winner scores: the pocket's value, 2 for over the wall or a burst, 1 out of spin. */
 /** Heat to win a match: first to this many. */
-export const MATCH_HEAT = 3;
+export const MATCH_HEAT = MATCH_POINT_TARGET;
 
 /**
- * Heat the winner scores: 1 for outlasting the other top, 2 for any knockout (into a slag pit,
- * thrown over the wall, or shattered). A thrown top that also leaves the detected real desk adds
- * one room-aware bonus heat. Every pit is worth the same.
+ * Heat the winner scores: 1 for outlasting the other top, 2 for a wall/burst knockout, and the
+ * authored pocket value (the glowing Crucible mouth is 3). A thrown top that also leaves the
+ * detected real desk adds one room-aware bonus heat.
  */
 export function finishPoints(loser: Top, tutorial = false, deskKo = false): number {
-  const base = tutorial || loser.finish === 'spin' || loser.finish === null ? 1 : 2;
+  const base = tutorial || loser.finish === 'spin' || loser.finish === null ? 1 : loser.finish === 'pocket' ? loser.pocketPoints : 2;
   return base + (deskKo && loser.finish === 'over' ? 1 : 0);
 }
 
@@ -1415,8 +1455,11 @@ export function finishPoints(loser: Top, tutorial = false, deskKo = false): numb
 export function verdict(a: Top, b: Top, elapsed: number): -1 | 0 | 1 | 2 {
   if (a.alive && b.alive && elapsed < TIME_LIMIT) return 0;
   if (a.alive !== b.alive) return a.alive ? 1 : -1;
-  if (a.spin === b.spin) return 2;
-  return a.spin > b.spin ? 1 : -1;
+  if (a.spin !== b.spin) return a.spin > b.spin ? 1 : -1;
+  if (a.damage !== b.damage) return a.damage < b.damage ? 1 : -1;
+  // Final deterministic tie-break: the top closer to the safe middle takes the round. Exact
+  // mirrored states favour the first seat instead of forcing another long replay.
+  return Math.hypot(a.x, a.z) <= Math.hypot(b.x, b.z) ? 1 : -1;
 }
 
 /** True when a crowded round is over: at most one top still in play, or the time limit is reached. */

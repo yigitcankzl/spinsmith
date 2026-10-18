@@ -386,3 +386,8 @@ export const ARENAS: ArenaLayout[] = [
     shrink: false,
   },
 ];
+
+// Every walled arena has one clearly hotter Crucible pocket. Its thicker glowing lip is already
+// rendered from Pocket.points; making only the first mouth worth three creates an aimable comeback
+// route without adding another control or UI mode.
+for (const arena of ARENAS) if (arena.pockets[0]) arena.pockets[0].points = 3;

@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { rankingN, roundOverN, stepN, sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { rankingN, roundOverN, stepN, sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
@@ -103,7 +103,7 @@ TUNING.grace = 0;
   assert.ok(a.x > 0.03, 'a top beside a bump must slide away from it');
 }
 
-// 3b. The core move: a bump raised behind a top in front of a pocket drops it in (2 points).
+// 3b. The core move: a bump behind a top drops it into the glowing 3-point pocket.
 {
   const arena = new Arena();
   const a = new Top(STAMINA);
@@ -117,7 +117,7 @@ TUNING.grace = 0;
     step(arena, a, idle);
   }
   assert.equal(a.finish, 'pocket', `a bump behind a top facing a pocket must drop it in, got ${a.state}/${a.finish}`);
-  assert.equal(finishPoints(a), 2);
+  assert.equal(finishPoints(a), 3);
 }
 
 // 3c. The wall: a slow top driven into the rim away from pockets and rails bounces back in.
@@ -165,7 +165,7 @@ TUNING.grace = 0;
   assert.ok(arena.height(0, 0) < 0.003, 'bump should be mostly gone after 3 s');
 }
 
-// 5. Verdict rules: one alive wins; both out -> more spin wins; exact tie -> replay.
+// 5. Verdict rules: one alive wins; both out -> more spin wins; exact spin ties use damage/position.
 {
   const a = new Top(DEFENSE);
   const b = new Top(STAMINA);
@@ -177,7 +177,7 @@ TUNING.grace = 0;
   b.spin = 0.2;
   assert.equal(verdict(a, b, 1), 1);
   b.spin = 0.3;
-  assert.equal(verdict(a, b, 1), 2);
+  assert.equal(verdict(a, b, 1), 1);
   b.finish = 'spin';
   assert.equal(finishPoints(b), 1);
 }
@@ -283,10 +283,10 @@ TUNING.grace = GRACE;
       // Launched the way the game launches: angled into the orbit, with some aim spread.
       const da = LAUNCH_TILT + (rnd() - 0.5) * 0.6;
       const db = LAUNCH_TILT + (rnd() - 0.5) * 0.6;
-      const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa);
-      const sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
-      a.launch(0, 0.108, Math.sin(da) * sa, -Math.cos(da) * sa, 0.55 + 0.45 * pa, 1);
-      b.launch(0, -0.108, -Math.sin(db) * sb, Math.cos(db) * sb, 0.55 + 0.45 * pb, -1);
+      const sa = launchSpeed(pa);
+      const sb = launchSpeed(pb);
+      a.launch(0, 0.108, Math.sin(da) * sa, -Math.cos(da) * sa, launchSpin(pa), 1);
+      b.launch(0, -0.108, -Math.sin(db) * sb, Math.cos(db) * sb, launchSpin(pb), -1);
       let t = 0;
       while (verdict(a, b, t) === 0) {
         step(arena, a, b);
@@ -337,22 +337,23 @@ TUNING.grace = 0;
     assert.equal(fast.finish, 'over', 'no wall: leaving the edge is a ring-out');
   }
 
-  // Every knockout is worth 2 heat, whatever pit it went into (even an old save's 3-point one).
+  // The highlighted Crucible pocket keeps its authored 3-point comeback value.
   {
     const arena = arenaWith({ pockets: [{ angle: Math.PI / 2, half: 0.3, points: 3 }], rails: [] });
     const t = new Top(STAMINA);
     t.launch(0, 0.05, 0, 0.6, 1, 1);
     solo(arena, t, 1);
     assert.equal(t.finish, 'pocket');
-    assert.equal(finishPoints(t), 2);
+    assert.equal(finishPoints(t), 3);
   }
 
   // Embers drain spin outside the shrinking safe zone.
   {
     const calm = new Top(STAMINA);
     const burned = new Top(STAMINA);
-    const a1 = arenaWith({ shrink: false });
-    const a2 = arenaWith({ shrink: true });
+    // High closed walls isolate ember drain from the separate late-round pressure rule.
+    const a1 = arenaWith({ shrink: false, wall: 'high', pockets: [], rails: [] });
+    const a2 = arenaWith({ shrink: true, wall: 'high', pockets: [], rails: [] });
     a1.elapsed = a2.elapsed = 30;
     calm.launch(0.12, 0, 0, 0.2, 1, 1);
     burned.launch(0.12, 0, 0, 0.2, 1, 1);
@@ -664,13 +665,13 @@ TUNING.grace = 0;
 }
 
 // 13. Original vocabulary and heat scoring: no numbered cores or borrowed tip names; outlasting
-// scores 1 heat, every knockout 2, a real-desk KO adds 1, first to 3; every built-in pit is worth the same.
+// scores 1 heat, ordinary knockouts 2, one highlighted pocket 3, a real-desk KO adds 1, first to 4.
 {
   const borrowed = ['Flat', 'Rush', 'Taper', 'Ball', 'Needle', 'Orb'];
   for (const c of CORES) assert.ok(!/^\d+-\d+$/.test(c.name), `core ${c.id} needs a name, not a number`);
   for (const t of TIPS) assert.ok(!borrowed.includes(t.name), `tip ${t.id} needs an original name`);
   for (const p of PRESETS) assert.ok(!borrowed.includes(p.name), `preset ${p.name} needs an original name`);
-  assert.equal(MATCH_HEAT, 3);
+  assert.equal(MATCH_HEAT, 4);
   const t = new Top(ATTACK);
   for (const [finish, heat] of [['spin', 1], ['over', 2], ['pocket', 2], ['burst', 2]] as const) {
     t.finish = finish;
@@ -678,7 +679,11 @@ TUNING.grace = 0;
     assert.equal(finishPoints(t, true), 1, `${finish} should score one tutorial heat`);
     assert.equal(finishPoints(t, false, finish === 'over'), heat + (finish === 'over' ? 1 : 0), 'only a thrown top can earn the desk bonus');
   }
-  for (const a of ARENAS) for (const p of a.pockets) assert.equal(p.points, 2, `${a.name}: every pit is worth 2`);
+  for (const a of ARENAS) {
+    if (!a.pockets.length) continue;
+    assert.equal(a.pockets.filter((p) => p.points === 3).length, 1, `${a.name}: exactly one pocket is the 3-point target`);
+    assert.ok(a.pockets.slice(1).every((p) => p.points === 2), `${a.name}: other pockets stay worth 2`);
+  }
 }
 
 // 14. Placement: the arena goes a reach ahead whichever way the head faces, turned to face it,
@@ -1406,8 +1411,8 @@ assert.equal(edgeOf('defense', 'defense'), 0);
         const pb = 0.6 + ((k * 3) % 5) * 0.08;
         const da = LAUNCH_TILT + ((k % 3) - 1) * 0.25;
         const db = LAUNCH_TILT + (((k + 1) % 3) - 1) * 0.25;
-        const sa = LAUNCH_SPEED * (0.5 + 0.5 * pa);
-        const sb = LAUNCH_SPEED * (0.5 + 0.5 * pb);
+        const sa = launchSpeed(pa);
+        const sb = launchSpeed(pb);
         a.launch(0, spawn, Math.sin(da) * sa, -Math.cos(da) * sa, launchSpin(pa), 1);
         b.launch(0, -spawn, Math.sin(db) * sb * rival.build.spin, Math.cos(db) * sb, launchSpin(pb), rival.build.spin);
         let t = 0;
@@ -1455,7 +1460,7 @@ assert.equal(edgeOf('defense', 'defense'), 0);
           const x = Math.cos(ang) * spawn;
           const z = Math.sin(ang) * spawn;
           const p = 0.65 + ((k + i) % 4) * 0.08;
-          const sp = LAUNCH_SPEED * (0.5 + 0.5 * p);
+          const sp = launchSpeed(p);
           const dir = Math.atan2(-x, -z) + LAUNCH_TILT;
           const hand = i === 0 ? mySpin : foes[i - 1].spin;
           t.launch(x, z, Math.sin(dir) * sp, Math.cos(dir) * sp, launchSpin(p), hand);

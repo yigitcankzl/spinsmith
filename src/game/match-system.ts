@@ -13,7 +13,7 @@ import { forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -50,6 +50,7 @@ import type { OnlineLink } from './online.js';
 import type { GuestEvent, PackedShape, Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from './campaign.js';
 import type { Bout } from './campaign.js';
+import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
@@ -627,6 +628,8 @@ export class MatchSystem extends createSystem({
   private myPoints = 0;
   private theirPoints = 0;
   private elapsed = 0;
+  private pressureShown = false;
+  private strikeWindowShown = false;
   private accumulator = 0;
   private resultTimer = 0;
   private time = 0;
@@ -747,6 +750,10 @@ export class MatchSystem extends createSystem({
   private replayedOnce = false;
   private rivalHeld = 0;
   private holdSaid = false;
+  private rivalFeinting = false;
+  private rivalFeintUsed = false;
+  private rivalTellDuration = TELL_TIME;
+  private rivalBraceShown = false;
   private strikeTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.strikePress), right: new TableTouch(TUNE.strikePress) };
   /** When the bar last became full: the strike arms half a second later (a hand already resting there is not a strike). */
   private fullSince = -1;
@@ -3882,7 +3889,7 @@ export class MatchSystem extends createSystem({
     }
     if (this.phase === 'result') this.toReady();
     const braced = this.bracedLaunch;
-    const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
+    const speed = launchSpeed(power);
     const perfect = power >= PERFECT;
     const beatError = this.ripBeatAt < 0 ? Infinity : Math.abs(this.time - this.ripBeatAt);
     const timingHelp = braced ? 1.25 : 1;
@@ -3994,8 +4001,12 @@ export class MatchSystem extends createSystem({
       : !this.demo && this.progress.matches < 3 ? LESSON_GRACE : TUNING.grace;
     const aiPower = this.rivalLaunchPower;
     this.rivalHeld = 0;
+    this.rivalFeinting = false;
+    this.rivalFeintUsed = false;
+    this.rivalTellDuration = TELL_TIME;
+    this.rivalBraceShown = false;
     const aiAim = this.rivalLaunchAim;
-    const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
+    const aiSpeed = launchSpeed(aiPower);
     // From its spot this round, toward the middle, angled into its orbit.
     const aiDir = aiAim + LAUNCH_TILT * th;
     // Online: the guest's own launch spot and pull direction, when it picked them (checked: inside
@@ -4015,6 +4026,8 @@ export class MatchSystem extends createSystem({
     this.phase = 'fight';
     this.markFirstFive(3);
     this.elapsed = 0;
+    this.pressureShown = false;
+    this.strikeWindowShown = false;
     this.lastHardHit = -1;
     this.accumulator = 0;
     this.clashes = 0;
@@ -4133,7 +4146,7 @@ export class MatchSystem extends createSystem({
       }
       for (const top of guest ? [] : this.tops) {
         if (!top.alive) continue;
-        const impulse = arenaForgeImpulse(action, gesture, top.x, top.z, this.arena.radius, this.arenaMorphShove.x, this.arenaMorphShove.z, force);
+        const impulse = arenaForgeImpulse(action, gesture, top.x, top.z, this.arena.radius, this.arenaMorphShove.x, this.arenaMorphShove.z, force * (top === this.mine ? 0.4 : 1));
         const ix = impulse.x;
         const iz = impulse.z;
         top.vx += ix;
@@ -4613,12 +4626,21 @@ export class MatchSystem extends createSystem({
       return;
     }
     const full = this.forgeBar.full && this.elapsed >= TUNING.grace && !this.demo;
+    if (!full) this.strikeWindowShown = false;
     if (full && !this.barWasFull) {
       playBarFull();
       this.fullSince = this.elapsed;
       if (!this.photo) this.stamp.show('ULTIMATE READY', SEAL_NAMES[this.myBuild.seal ?? 'anvil'].toUpperCase(), 'mine', 0.8, 1.15);
     }
     this.barWasFull = full;
+    const rivalAtRim = this.theirs.alive && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) >= 0.68;
+    if (full && rivalAtRim && !this.strikeWindowShown && this.labelTimer <= 0) {
+      this.strikeWindowShown = true;
+      this.label.set('RIM OPEN · STRIKE NOW\nSTAMP ACROSS FROM THE RIVAL');
+      this.labelTimer = 1.4;
+      this.stamp.show('STRIKE WINDOW', 'RIVAL EXPOSED AT THE RIM', 'mine', 0.6);
+      playTick();
+    }
     // The hint stays until the first strike lands (the first session's ramp hint goes first).
     if (full && !this.struckOnce && !this.demo && this.progress.guide !== 'bump' && this.labelTimer <= 0) {
       this.strikeTaught = true;
@@ -4766,21 +4788,23 @@ export class MatchSystem extends createSystem({
     const them = this.theirs;
     if (this.tellAt < 0) {
       if (!them.alive || !this.mine.alive) return;
-      // A mind game: once you know the tells, a rival with its move ready waits while your strike is
-      // ready too (up to RIVAL_HOLD s), so striking early wastes the answer and holding it is a choice.
-      if (this.tellTaught && this.rivalBar.full && this.forgeBar.full && this.rivalHeld < RIVAL_HOLD) {
-        if (this.rivalHeld === 0 && !this.holdSaid) {
-          this.holdSaid = true;
-          this.label.set('RIVAL IS WAITING\nHOLD YOUR ULTIMATE');
-          this.labelTimer = 2.5;
-        }
-        this.rivalHeld += STEP;
+      // Skilled rivals read a ready strike once per round and show a short fake wind-up. Spending
+      // into it still lands the seal, but does not earn an interrupt/refund; holding reveals it.
+      if (this.tellTaught && this.rivalBar.full && this.forgeBar.full && !this.rivalFeintUsed && this.rivalLaunchPower >= 0.62) {
+        this.rivalFeintUsed = true;
+        this.rivalFeinting = true;
+        this.rivalTellDuration = 0.5;
+        this.tellAt = this.elapsed + this.rivalTellDuration;
+        them.tell = this.rivalTellDuration;
+        this.stamp.show('RIVAL FEINT?', 'READ THE WIND-UP', 'rival', 0.45);
+        playTell();
         return;
       }
       if (!this.rivalBar.spend(this.elapsed, TUNING.grace + 2)) return;
       this.rivalHeld = 0;
-      this.tellAt = this.elapsed + TELL_TIME;
-      them.tell = TELL_TIME;
+      this.rivalTellDuration = Math.max(0.88, TELL_TIME - Math.max(0, this.rivalLaunchPower - 0.55) * 0.7);
+      this.tellAt = this.elapsed + this.rivalTellDuration;
+      them.tell = this.rivalTellDuration;
       playTell();
       this.stamp.show(`${this.rival.move.toUpperCase()}!`, `${this.rival.name} winds up`, 'rival', 0.7);
       {
@@ -4802,10 +4826,11 @@ export class MatchSystem extends createSystem({
       // Cut short by the strike (doStrike says so).
       this.tellAt = -1;
       this.lane.visible = false;
+      this.rivalFeinting = false;
       return;
     }
     them.tell = this.tellAt - this.elapsed;
-    this.drawLane(1 - them.tell / TELL_TIME);
+    this.drawLane(1 - them.tell / this.rivalTellDuration);
     // The tell: the rival flashes and rings spread under it.
     // Three flashes a second at most (WCAG 2.3.1), none with flashes off.
     if (Math.floor(this.elapsed * 3) !== Math.floor((this.elapsed - STEP) * 3)) this.theirView.flash();
@@ -4814,6 +4839,12 @@ export class MatchSystem extends createSystem({
     them.tell = 0;
     this.tellAt = -1;
     this.lane.visible = false;
+    if (this.rivalFeinting) {
+      this.rivalFeinting = false;
+      this.label.set('FEINT!\nREAL MOVE STILL READY');
+      this.labelTimer = 0.9;
+      return;
+    }
     if (!them.alive) return;
     if (!rivalMove(this.arena, them, this.mine, this.rival.move)) {
       // Held in your cup: the move fizzles.
@@ -5065,7 +5096,8 @@ export class MatchSystem extends createSystem({
     this.beginUltimateCue(seal, ox, oz);
     this.roomImprints.record(seal, Math.atan2(oz, ox));
     // The Ward is a parry, not an interrupt: the move still comes, and a charge rebounds off it.
-    const cut = this.tellAt >= 0 && this.theirs.tell > 0 && seal !== 'ward';
+    const cut = this.tellAt >= 0 && this.theirs.tell > 0 && seal !== 'ward' && !this.rivalFeinting;
+    const perfectInterrupt = cut && this.theirs.tell <= PERFECT_INTERRUPT_WINDOW;
     // Cups and slings let go first, so none is left holding forever.
     for (const s of ['left', 'right'] as const) {
       this.endSling(s, false);
@@ -5080,8 +5112,14 @@ export class MatchSystem extends createSystem({
     this.struckOnce = true;
     if (cut) {
       this.tellAt = -1;
-      this.label.set('INTERRUPTED!');
-      this.stamp.show('INTERRUPTED!', '', 'mine', 0.6);
+      if (perfectInterrupt) {
+        this.forgeBar.value = Math.max(this.forgeBar.value, 0.5);
+        this.theirs.vx *= 0.35;
+        this.theirs.vz *= 0.35;
+        this.theirs.kick = Math.max(this.theirs.kick, 0.8);
+      }
+      this.label.set(perfectInterrupt ? 'PERFECT INTERRUPT!\nHALF BAR REFUNDED' : 'INTERRUPTED!');
+      this.stamp.show(perfectInterrupt ? 'PERFECT INTERRUPT!' : 'INTERRUPTED!', perfectInterrupt ? 'HALF BAR REFUNDED' : '', 'mine', 0.6);
       this.featDone('interrupt');
       this.labelTimer = 1.2;
       if (import.meta.env.DEV) console.log('[TELL] interrupted');
@@ -5747,10 +5785,25 @@ export class MatchSystem extends createSystem({
       this.accumulator -= STEP;
       steps++;
       this.elapsed += STEP;
+      if (!this.pressureShown && this.elapsed >= SUDDEN_DEATH_AT) {
+        this.pressureShown = true;
+        this.label.set('PRESSURE!\nPOCKETS OPEN · OUTER RIM HEATS');
+        this.labelTimer = 1.8;
+        this.stamp.show('PRESSURE!', 'POCKETS ARE OPENING', 'neutral', 0.75, 1.1);
+        playTell();
+      }
       const mineVx = this.mine.vx;
       const mineVz = this.mine.vz;
       const rivalVx = this.theirs.vx;
       const rivalVz = this.theirs.vz;
+      const rivalReadsThreat = this.rivalLaunchPower >= 0.7 && (this.forgeBar.full || this.arenaMorphing || !!this.rimPulls.left || !!this.rimPulls.right);
+      if (rivalReadsThreat && this.theirs.alive) {
+        this.theirs.rushing = Math.max(this.theirs.rushing, 0.14);
+        if (!this.rivalBraceShown) {
+          this.rivalBraceShown = true;
+          this.stamp.show('RIVAL READ', 'BRACING FOR YOUR FORGE', 'rival', 0.5);
+        }
+      }
       const openingDx = this.theirs.x - this.mine.x;
       const openingDz = this.theirs.z - this.mine.z;
       let braced = false;
@@ -5839,8 +5892,9 @@ export class MatchSystem extends createSystem({
       this.botShaping();
       if (clash) {
         this.clashes++;
-        this.charges.clash(clash.strength, this.elapsed);
-        this.rivalCharges.clash(clash.strength, this.elapsed);
+        const owner = clash.shapeOwner ?? '';
+        if (owner === 'left' || owner === 'right' || owner === 'left-cup' || owner === 'right-cup') this.charges.clash(clash.strength, this.elapsed);
+        if (owner.startsWith('rival') || owner.startsWith('bot')) this.rivalCharges.clash(clash.strength, this.elapsed);
         const y = this.arena.height(clash.x, clash.z);
         this.sparks.burst(clash.x, y, clash.z, clash.strength);
         if (clash.strength > HARD_HIT && this.elapsed - this.lastHardHit > HIT_STOP_GAP) {
@@ -5955,6 +6009,7 @@ export class MatchSystem extends createSystem({
       this.barPoints = [this.myPoints, this.theirPoints];
       const score = `Heat ${this.myPoints} - ${this.theirPoints}`;
       const decided = this.myPoints >= MATCH_HEAT || this.theirPoints >= MATCH_HEAT;
+      if (!decided && loser.finish === 'spin') this.resultTimer = 1.15;
       this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
       if (deskKo) this.matchLog.rounds[this.matchLog.rounds.length - 1] = 'DESK KO';
       if (decided) {
@@ -6670,7 +6725,7 @@ export class MatchSystem extends createSystem({
       const x = Math.cos(angle) * this.SPAWN;
       const z = Math.sin(angle) * this.SPAWN;
       const power = 0.7 + Math.random() * 0.25;
-      const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
+      const speed = launchSpeed(power);
       const dir = Math.atan2(-x, -z) + (Math.random() - 0.5) * 0.3 + LAUNCH_TILT * t.hand;
       t.launch(x, z, Math.sin(dir) * speed, Math.cos(dir) * speed, launchSpin(power), t.hand);
     });

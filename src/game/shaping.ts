@@ -1,3 +1,5 @@
+import { SHAPE_CHARGE_REFILL_SECONDS, STRIKE_START } from './gameplay-rules.ts';
+
 /**
  * The arena-shaping economy: three charges make reshaping the main combat rhythm; a solid clash
  * refills one, and a quick passive refill keeps a player sculpting instead of spectating. A rapid
@@ -6,7 +8,7 @@
 export const SHAPING = {
   charges: 3,
   /** Seconds for the passive refill of one charge. */
-  refill: 4,
+  refill: SHAPE_CHARGE_REFILL_SECONDS,
   /** A clash at least this strong (0..1) refills a charge, at most once per clashGap seconds. */
   clashMin: 0.45,
   clashGap: 1,
@@ -103,7 +105,7 @@ export class StrikeBar {
   private lastClash = -99;
 
   /** Each round starts with the bar this full, so the strike comes in time to matter. */
-  static readonly START = 0.2;
+  static readonly START = STRIKE_START;
 
   reset() {
     this.value = StrikeBar.START;

@@ -1846,6 +1846,7 @@ export class ArenaView {
     const pos = this.geo.attributes.position as BufferAttribute;
     const L = arena.layout;
     const safe = arena.safe;
+    const pressure = arena.pressure;
     for (let r = 0; r <= this.rings; r++) {
       const n = r / this.rings;
       const count = r === 0 ? 1 : this.segs;
@@ -1885,6 +1886,12 @@ export class ArenaView {
         if (dip > 0) this.tmp.lerp(this.pit, Math.min(1, dip) * 0.8);
         // Embers: outside the shrinking safe zone the floor glows, pulsing.
         if (n > safe) this.tmp.lerp(this.ember, 0.45 + 0.15 * Math.sin(this.time * 6));
+        // After 15 s the outside band heats and opens. This is the visible clock for sudden death:
+        // players see danger moving inward before a wider pocket or lower effective rim ends it.
+        if (pressure > 0 && n > 0.74 - pressure * 0.08) {
+          const band = Math.min(1, (n - (0.74 - pressure * 0.08)) / 0.2);
+          this.tmp.lerp(this.ember, pressure * band * (0.22 + 0.09 * Math.sin(this.time * 7)));
+        }
         this.colors[i * 3] = this.tmp.r;
         this.colors[i * 3 + 1] = this.tmp.g;
         this.colors[i * 3 + 2] = this.tmp.b;
