@@ -69,7 +69,8 @@ export class RoomImprints {
     color: 0xffffff,
     vertexColors: true,
     transparent: true,
-    opacity: 1,
+    // Cooled embers, not live sparks: at full strength the cracks read as rays shooting off the arena.
+    opacity: 0.4,
     depthWrite: false,
     side: DoubleSide,
     blending: AdditiveBlending,
