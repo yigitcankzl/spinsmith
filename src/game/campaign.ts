@@ -47,7 +47,7 @@ export const BOUTS: Bout[] = [
   b('1-4', 'Rim Raider', 'Twin Basins', 0.22, 'Jab the floor for a cup, then sling', 'Two basins split the floor', ['wellSpin', 'sweep']),
   b('1-5', 'Iron Keep', 'Sumo Square', 0.3, 'Everything you learned, against a wall', 'Ramps barely move it: tilt it or strike it', ['burst', 'sweep']),
   b('2-1', 'Leech', 'Crucible Gate', 0.25, 'Match its spin or lose yours', 'One wide mouth: forge it in', ['forgeKO', 'perfect']),
-  b('2-2', 'Hookjaw', 'Clockwork Spire', 0.33, 'Its lift throws low tops over low walls', 'It lifts you over low walls', ['rampKO', 'sweep']),
+  b('2-2', 'Hookjaw', 'Clockwork Spire', 0.33, 'A tall Stilt core rides over its lift', 'It lifts you over low walls', ['rampKO', 'sweep']),
   b('2-3', 'Leech', 'Frost Oval', 0.42, 'Ice: every ramp throws farther', 'Your top slides too', ['strikeKO', 'burst']),
   b('2-4', 'Hookjaw', 'Neon Speedway', 0.5, 'Rails: geared tips dash', 'It shapes the floor now, as you do', ['forgeKO', 'sweep']),
   b('2-5', 'Sawtooth', 'Meteor Pit', 0.6, 'Keep your top whole', 'Every hit chips you toward a shatter', ['burst', 'perfect']),
