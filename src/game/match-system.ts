@@ -1577,6 +1577,15 @@ export class MatchSystem extends createSystem({
     return [Math.cos(this.rivalAngle) * this.SPAWN, Math.sin(this.rivalAngle) * this.SPAWN];
   }
 
+  /** A campaign boss one round from defeat: rips at least 0.85 and shapes the floor twice as often. */
+  private bossRage() {
+    return !!this.bout?.boss && this.myPoints >= MATCH_HEAT - 1;
+  }
+
+  private shapeGap() {
+    return this.bossRage() ? RIVAL_SHAPE_GAP / 2 : RIVAL_SHAPE_GAP;
+  }
+
   /** Fix the rival's rip before the player chooses a lane, then show that promise on the floor. */
   private planRivalLaunch() {
     // A bout sets the rival's skill by where it sits on the map; free play keeps the level-based one.
@@ -1610,6 +1619,7 @@ export class MatchSystem extends createSystem({
       this.rivalLaunchAim = memory.zone === 'ambush' ? -Math.sign(memory.x || 1) * 0.24 : memory.zone === 'edge' ? Math.sign(memory.x || 1) * 0.16 : 0;
     }
     // A friend's echo rips the way they did in that round (the next round still to be launched).
+    if (this.bossRage()) this.rivalLaunchPower = Math.max(0.85, this.rivalLaunchPower);
     const echoRip = this.rivalEcho?.rips[this.echoRec.rips.length];
     if (echoRip) {
       this.rivalLaunchPower = echoRip.power;
@@ -3329,6 +3339,8 @@ export class MatchSystem extends createSystem({
       const point = MATCH_HEAT - 1;
       const word = this.myPoints >= point && this.theirPoints >= point ? 'FINAL ROUND' : this.myPoints >= point || this.theirPoints >= point ? 'MATCH POINT' : `ROUND ${this.round + 1}`;
       this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
+      // A boss one round from defeat finds its second wind: it says so, then fights harder.
+      if (this.bossRage()) this.stamp.later('SECOND WIND', `${this.rival.name.toUpperCase()} WILL NOT FALL QUIETLY`, 'rival', 1.1, 1.2);
       playGong();
       if (this.rivalRead) {
         this.label.set(`${this.rivalRead}\nIts cyan line has changed`);
@@ -5134,7 +5146,7 @@ export class MatchSystem extends createSystem({
   private rivalShaping() {
     if (this.demo || this.online?.peer || !this.theirs.alive || !(this.bout ? this.bout.shapes : this.rival.level >= 6)) return;
     this.rivalCharges.update(STEP);
-    if (this.elapsed - this.rivalShapeAt >= RIVAL_SHAPE_GAP && this.rivalNeedsDeskGuard()) {
+    if (this.elapsed - this.rivalShapeAt >= this.shapeGap() && this.rivalNeedsDeskGuard()) {
       const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
       if (f) {
         const offset = 0.012 * (this.arena.radius / 0.17);
@@ -5154,7 +5166,7 @@ export class MatchSystem extends createSystem({
     const r = Math.hypot(me.x, me.z);
     const nr = normRadius(this.arena.layout, me.x, me.z);
     const activeBand = this.rival.move === 'quake' ? 0.32 : this.rival.move === 'pull' ? 0.45 : 0.6;
-    if (!me.alive || nr < activeBand || r < 1e-3 || this.elapsed - this.rivalShapeAt < RIVAL_SHAPE_GAP) return;
+    if (!me.alive || nr < activeBand || r < 1e-3 || this.elapsed - this.rivalShapeAt < this.shapeGap()) return;
     const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
     if (!f) return;
     let dx = me.x / r;
