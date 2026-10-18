@@ -47,7 +47,7 @@ import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from './arena
 import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 import { linkFromAddress } from './online.js';
 import type { OnlineLink } from './online.js';
-import type { GuestEvent, PackedShape } from './net.js';
+import type { GuestEvent, PackedShape, Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalsFrom, nextBout, nextGate } from './campaign.js';
 import type { Bout } from './campaign.js';
 
@@ -432,6 +432,8 @@ export class MatchSystem extends createSystem({
   private forgeGhost = new GhostHand();
   /** The rival's cyan projection: it authors the telegraphed launch and arena moves. */
   private rivalGhost = new GhostHand(0x9cecff, 0x4fd1ff);
+  /** Online: the other smith's second hand (the rival ghost shows the first). */
+  private netGhost = new GhostHand(0x9cecff, 0x4fd1ff);
   private rivalGhostKeys: number[][] = [[0, 0, 0, 0, 0], [1, 0, 0, 0, 0]];
   private rivalGhostFor = 0;
   /** Big stamped words over the arena: rounds, finishes, the rip. */
@@ -919,6 +921,7 @@ export class MatchSystem extends createSystem({
       this.ghost.root,
       this.forgeGhost.root,
       this.rivalGhost.root,
+      this.netGhost.root,
       this.portal,
       this.portalCore,
       ...this.palmPrints,
@@ -1658,11 +1661,40 @@ export class MatchSystem extends createSystem({
   }
 
   private updateRivalGhost(dt: number) {
+    if (this.online?.peer) {
+      this.updateNetHands(dt);
+      return;
+    }
+    this.netGhost.hide();
     const opening = (this.phase === 'ready' || this.phase === 'pulling') && !this.demo;
     if (opening || this.rivalGhostFor > 0) {
       this.rivalGhost.play(this.rivalGhostKeys, dt);
       if (!opening) this.rivalGhostFor = Math.max(0, this.rivalGhostFor - dt);
     } else this.rivalGhost.hide();
+  }
+
+  /**
+   * Online: your hands go to the other table and theirs come here, live, as the two ghost hands on
+   * the far side (turned half round: their near side is your far side). Stale hands fade out.
+   */
+  private updateNetHands(dt: number) {
+    const link = this.online!;
+    link.tick();
+    const mine = (h: HandState): Vec3 | null => {
+      if (!h.tracked) return null;
+      const v = this.stage.worldToLocal(this.handAt.copy(h.pinch));
+      return [v.x, v.y, v.z];
+    };
+    link.sendHands(mine(this.hands.left), mine(this.hands.right), this.hands.left.pinching, this.hands.right.pinching);
+    const m = link.hands.latest;
+    const fresh = !!m && performance.now() - link.handsAt < 500;
+    const show = (g: GhostHand, v: Vec3 | null | undefined, pinch: boolean | undefined) => {
+      if (!fresh || !v) return g.hide();
+      const key = [0, -v[0], v[1], -v[2], pinch ? 1 : 0];
+      g.play([key, [1, key[1], key[2], key[3], key[4]]], dt);
+    };
+    show(this.rivalGhost, m?.l, m?.lp);
+    show(this.netGhost, m?.r, m?.rp);
   }
 
   /** Shows the rival physically authoring a move instead of explaining it with another card. */

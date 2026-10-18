@@ -5,8 +5,8 @@
  * Opened from the address: ?online=host makes a room and shows its code, ?online=CODE joins one;
  * &net=bc keeps it inside one browser (two tabs) for testing. No three.js here.
  */
-import { BroadcastChannelTransport, EventReceiver, EventSender, isRoomCode, NET_VERSION, newRoomCode, SnapshotBuffer, SnapshotEncoder, SNAPSHOT_HZ, TrysteroTransport } from './net.ts';
-import type { GuestEvent, NetMsg, PackedShape, TopLike, Transport } from './net.ts';
+import { BroadcastChannelTransport, EventReceiver, HandsReceiver, EventSender, isRoomCode, NET_VERSION, newRoomCode, SnapshotBuffer, SnapshotEncoder, SNAPSHOT_HZ, TrysteroTransport } from './net.ts';
+import type { GuestEvent, NetMsg, PackedShape, TopLike, Transport, Vec3 } from './net.ts';
 import type { FloorShape } from './sim.ts';
 
 export type Role = 'host' | 'guest';
@@ -29,6 +29,11 @@ export class OnlineLink {
   private sender: EventSender | null = null;
   private receiver: EventReceiver | null = null;
   private lastSnap = -1e9;
+  /** The other smith's hands, latest wins (arena-local, in their frame), and when they came. */
+  readonly hands = new HandsReceiver();
+  handsAt = -1e9;
+  private handsSeq = 0;
+  private lastHands = -1e9;
 
   constructor(
     readonly role: Role,
@@ -70,6 +75,9 @@ export class OnlineLink {
       }
     } else if (m.type === 'event' && this.receiver) this.receiver.receive(m);
     else if (m.type === 'ack' && this.sender) this.sender.ack(m.seq);
+    else if (m.type === 'hands') {
+      if (this.hands.receive(m)) this.handsAt = now;
+    }
     else if (m.type === 'snapshot' && this.role === 'guest') {
       this.buffer.push(m, now);
       if (this.buffer.shapesVersion !== this.shapesVersion) {
@@ -87,6 +95,15 @@ export class OnlineLink {
   /** Guest: one thing the hands did, resent until the host has it. */
   sendEvent(ev: GuestEvent) {
     this.sender?.push(ev, performance.now());
+  }
+
+  /** Both sides: your hands' pinch points (arena-local, your frame) at most 20 times a second, so the other table sees them. */
+  sendHands(l: Vec3 | null, r: Vec3 | null, lp: boolean, rp: boolean) {
+    const now = performance.now();
+    if (!this.peer || now - this.lastHands < 50) return;
+    this.lastHands = now;
+    const q = (v: Vec3 | null): Vec3 | null => (v ? [Math.round(v[0] * 1e4) / 1e4, Math.round(v[1] * 1e4) / 1e4, Math.round(v[2] * 1e4) / 1e4] : null);
+    this.transport.send({ type: 'hands', seq: ++this.handsSeq, l: q(l), r: q(r), lp, rp });
   }
 
   /** Every frame: resends what is unacknowledged. */

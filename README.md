@@ -188,7 +188,8 @@ an arena. First to 3 heat wins a match.
   `?online=host` and the card shows a five-letter room code; a friend on another headset opens
   `?online=CODE`. The host's game runs the only simulation: it waits for both rips, applies the
   guest's ramps and arena forges from the far side, and sends both tops and the floor 30 times a
-  second; the guest sees the fight turned half round, so their own top is near them. Signalling
+  second; the guest sees the fight turned half round, so their own top is near them. Each smith's
+  hands reach the other table live (20 times a second) as two ghost hands on the far side. Signalling
   goes over public WebRTC relays (Trystero, loaded only when a room is opened) with public STUN
   only, so some strict networks will not connect, and it says so. Tested with two browser
   windows (`&net=bc`) and a node loopback with 200 ms round trips and 5% loss
