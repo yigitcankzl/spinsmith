@@ -26,6 +26,8 @@ export interface Bout {
   lesson: string;
   twist: string;
   medals: [Medal, Medal];
+  /** A crowded bout: these tops join (rivals or named smiths' builds), and the last top spinning takes the heat. */
+  crowd?: string[];
 }
 
 export const CHAPTERS = [
@@ -48,7 +50,7 @@ export const BOUTS: Bout[] = [
   b('1-5', 'Iron Keep', 'Sumo Square', 0.3, 'Everything you learned, against a wall', 'Ramps barely move it: tilt it or strike it', ['burst', 'sweep']),
   b('2-1', 'Leech', 'Crucible Gate', 0.25, 'Match its spin or lose yours', 'One wide mouth: forge it in', ['forgeKO', 'perfect']),
   b('2-2', 'Hookjaw', 'Clockwork Spire', 0.33, 'A tall Stilt core rides over its lift', 'It lifts you over low walls', ['rampKO', 'sweep']),
-  b('2-3', 'Leech', 'Frost Oval', 0.42, 'Ice: every ramp throws farther', 'Your top slides too', ['strikeKO', 'burst']),
+  b('2-3', 'Leech', 'Frost Oval', 0.42, 'Three tops on ice: let them hit each other', 'Saw Wraith joins the fight', ['strikeKO', 'sweep'], { crowd: ['Saw Wraith'] }),
   b('2-4', 'Hookjaw', 'Neon Speedway', 0.5, 'Rails: geared tips dash', 'It shapes the floor now, as you do', ['forgeKO', 'sweep']),
   b('2-5', 'Sawtooth', 'Meteor Pit', 0.6, 'Keep your top whole', 'Every hit chips you toward a shatter', ['burst', 'perfect']),
   b('3-1', 'Iron Keep', 'Colossus Bowl', 0.55, 'Iron Keep returns, in a bigger bowl', 'More room to drift, farther to the pits', ['forgeKO', 'sweep']),

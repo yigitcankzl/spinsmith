@@ -2793,7 +2793,10 @@ export class MatchSystem extends createSystem({
     // A brawl is free play: no bout, no order; a friend's challenge and the first session stay duels.
     this.clearBrawl();
     const seats = again ? lastSeats : this.seats;
-    if (seats > 2 && (again || !rival) && !friend && !this.online && this.progress.guide === 'done') {
+    const crowd = this.bout?.crowd;
+    // A crowded bout brings its own tops; otherwise the pegs' brawl is free play (no bout).
+    if (crowd?.length && !this.online) this.setupBrawl(crowd.length, crowd);
+    else if (seats > 2 && (again || !rival) && !friend && !this.online && this.progress.guide === 'done') {
       this.bout = null;
       this.setupBrawl(seats - 2);
     }
@@ -3411,7 +3414,7 @@ export class MatchSystem extends createSystem({
       // A bout after the first match names its lesson and twist, and the medals still to earn.
       const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
       const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
-      const line = this.extras.length ? `Brawl with ${this.brawlNames.length > 1 ? `${this.brawlNames.slice(0, -1).join(', ')} and ${this.brawlNames[this.brawlNames.length - 1]}` : this.brawlNames[0]}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
+      const line = this.extras.length && bout ? `${bout.lesson}\nLast top spinning takes the heat` : this.extras.length ? `Brawl with ${this.brawlNames.length > 1 ? `${this.brawlNames.slice(0, -1).join(', ')} and ${this.brawlNames[this.brawlNames.length - 1]}` : this.brawlNames[0]}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
       // The type loop, read before the rip: whose top counters whose.
       const edge = this.progress.guide === 'done' ? edgeOf(roleOf(specFromBuild(this.myBuild)), roleOf(specFromBuild(this.rival.build))) : 0;
       const read = edge > 0 ? ' · you counter it' : edge < 0 ? ' · it counters you' : '';
@@ -6441,11 +6444,13 @@ export class MatchSystem extends createSystem({
   }
 
   /** Seats the brawl's bots: other rivals' tops, each in its own color, spread round the sides. */
-  private setupBrawl(n: number) {
-    // Other rivals you have met and the named smiths' tops (parts.ts NAMED_BUILDS), shuffled.
+  private setupBrawl(n: number, names?: string[]) {
+    // A bout names its crowd; otherwise other rivals you have met and the named smiths' tops (parts.ts NAMED_BUILDS), shuffled.
+    const all = [...RIVALS, ...NAMED_BUILDS].map((r) => ({ name: r.name, build: r.build }));
     const met = RIVALS.filter((r) => r.name !== this.rival.name && r.level <= this.progress.level);
     const pool = [...met, ...NAMED_BUILDS].map((r) => ({ name: r.name, build: r.build }));
-    const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, n);
+    const named = names?.map((x) => all.find((r) => r.name === x)).filter((r): r is (typeof all)[0] => !!r);
+    const picks = named?.length ? named.slice(0, n) : [...pool].sort(() => Math.random() - 0.5).slice(0, n);
     this.brawlNames = picks.map((r) => r.name);
     picks.forEach((r, i) => {
       const color = BRAWL_COLORS[i];

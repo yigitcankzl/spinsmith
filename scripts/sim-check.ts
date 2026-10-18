@@ -1289,6 +1289,7 @@ TUNING.grace = 0;
     assert.ok(arena, `bout ${b.id} arena ${b.arena} exists`);
     for (const m of b.medals) if (m === 'rampKO' || m === 'forgeKO' || m === 'edgeKO') assert.ok(canKnockOut(arena!), `bout ${b.id}'s ${m} medal is possible in ${b.arena}`);
     assert.ok(b.skill >= 0 && b.skill <= 1, `bout ${b.id} skill in range`);
+    for (const c of b.crowd ?? []) assert.ok([...RIVALS, ...NAMED_BUILDS].some((r) => r.name === c), `bout ${b.id}'s crowd top ${c} exists`);
   }
   assert.equal(BOUTS.length, CHAPTERS.length * 5, 'five bouts a chapter');
   for (let c = 1; c <= CHAPTERS.length; c++) {
