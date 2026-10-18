@@ -9,7 +9,7 @@ Goal: turn Spinsmith from a deep systems sandbox into a finished game that can w
   - an online duel (beta, WebRTC), host-authoritative, with live ghost hands, input validation and two-window tests.
 - **More and better content:** a 4th type (Balance) with a counter loop shown on the intro card, a defense signature (center brace), 5 named builds, 2 new rivals (Comet, Gearwright) and 5 new arenas (20 total).
 - **Feel and look:** medal stamps the moment they are earned, brawl callouts, hums and trails for every top, a compact match bar, warm forge-steel plates, scorched (not glowing) desk cracks.
-- **Accessibility:** one-hand forge, high-contrast team rings, refused moves said in words, gestures with either hand.
+- **Accessibility:** one-hand forge, high-contrast team rings, every sound with a visual twin, gestures with either hand, a left-handed mirrored layout (`?lefty`).
 - **Quality gates:**
   - five code-review agents and a player-journey soft-lock audit, every finding fixed or noted;
   - a README audit against the code;
