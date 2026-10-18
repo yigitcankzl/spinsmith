@@ -142,6 +142,10 @@ IWER two windows after the fix: the guest's top equals the host's rival top, the
 
 IWER: MENU in ready → "Leave this match?" → hub; the online round regression passes. Not changed on purpose: the ramp lesson can still be skipped through the anvil (harmless; changing the guide flow is riskier). |
 
+| c6c71ae, e4a741e, 5a73fc0 | An online duel never pulls a host or guest out of the forge or workshop (it starts when they are home). MENU while aiming waits until after the first session. |
+
+**Emulator note (06:15):** after several capture-rig restarts, the hand driver's single-hand rip and ramp stopped registering in IWER: "rip did not build enough motion". Forge and strike still worked. The same probe fails identically on commit 1b5c00e, which passed this exact probe at 05:25, so this is emulator or driver state, not a code regression. Restarting the dev server, resetting the device and clearing the saved arena pose did not clear it. Re-check the first session after a fresh browser profile.
+
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes, and the interaction notes are updated.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
