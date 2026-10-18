@@ -19,6 +19,10 @@ Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming,
    your palm down for the Anvil Strike.
 5. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
 
+**If something goes wrong:** no table found → the arena stands on a floating tray (it says so);
+hands not tracked → keep them in view, a held move waits 0.28 s before it cancels; a refused
+move says why on the card ("No charge yet", "Strike not ready").
+
 ## Modes, and where to find them in the headset
 
 | Mode | How to reach it |
@@ -28,7 +32,7 @@ Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming,
 | **Pass and play** on one headset | After a duel, pinch PASS: the next person fights that top and its recorded hands. |
 | **Daily Smith Order** | Point at the board over the arena and pinch. About every other day it chases a medal you left on the map, and playing it counts for that bout. |
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
-| **Online duel (beta)** between two headsets | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE`. |
+| **Online duel (beta)**, tested in two browser windows | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE`. |
 | **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |
 | **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed), One hand (forge with one hand) and High contrast. |
 
@@ -158,11 +162,10 @@ an arena. First to 3 heat wins a match.
   the rival out is the early way to it. Locked parts and arenas show dark with how they are earned. A match is
   against one rival that keeps its build and spin for every round (Rim Raider, Iron
   Keep and Drifter at first; Leech, Hookjaw, Sawtooth, Bastion, Comet and Gearwright join with levels, announced as
-  NEW RIVAL). Rivals come as a ladder, **the circuits**: the Cinder Circuit (Drifter, Rim Raider,
-  then its champion Iron Keep), the Iron Circuit (Leech, Hookjaw, champion Sawtooth) and the
-  Crown (Bastion); the next bout is the first rival you have not beaten, and beating a champion
-  clears its circuit. Each rival has a title and lines: "VS DRIFTER · Cinder Circuit · bout 1 of 3"
-  is stamped as the match starts, with its intro line, and it has a word for you when the match ends. In the campaign the bout sets how hard a rival rips (see the Circuit Map); in free play higher levels make rivals rip harder and aim steadier. Never
+  NEW RIVAL). After the first session the Circuit Map (below) picks who you face; free play (a
+  pinned arena, a brawl, or the map won) picks among the rivals you have met. Each rival has a
+  title and lines: "VS LEECH · Iron Circuit · BOUT 2-1" is stamped as the match starts, with its
+  intro line, and it has a word for you when the match ends. In the campaign the bout sets how hard a rival rips (see the Circuit Map); in free play higher levels make rivals rip harder and aim steadier. Never
   stronger in stats.
   After a round the match bar shows the XP earned and the level bar; a level-up rings and
   throws sparks, and each unlock spins over the arena. Your level and rank sit on the near rim.
@@ -206,8 +209,8 @@ an arena. First to 3 heat wins a match.
   arena and one way of winning (ramp them out, shatter them, outlast them from your cup, win
   with a given kind of top, with a white-hot pull, without giving up heat, on your own arena). Pinch the
   board to play it; doing it strikes a stamp into the ledger (stamps 5, 10 and 15 earn emblem
-  glows). Missed days cost nothing. The board also shows the seven rivals as medallions with
-  three notches each: beaten, knocked out, beaten by your own ramp, cup or sling. The last three tops
+  glows). Missed days cost nothing. The board's back (a pinch on the level plate) shows the
+  current chapter of the Circuit Map as medallions with three medal notches each. The last three tops
   that won a match stand as champions on the left rim with their record; pinch one to make it
   your top again. The hosted build has a web app manifest, so it can be added to the Quest
   library.
