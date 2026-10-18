@@ -131,6 +131,17 @@ IWER two windows after the fix: the guest's top equals the host's rival top, the
 
 | 944be20, 6bef129 | The level plate names a crowded bout even with the pegs up; the board says "free play in X (pinned)" when an arena is pinned, so PLAY and the map agree. |
 
+| 5cb2e59 | **Player-journey audit fixes** (soft-lock review agent):
+- MENU shows while aiming, and the result holds while leaving is confirmed;
+- online: a sent rip waits in ready (it was re-sent every frame), mid-fight rips are ignored, a start that arrives during placement is deferred, and `?online=` on a new headset joins after the first session;
+- recentring keeps the match-over screen;
+- the first-session rematch counts as 1-1, and a rematch keeps a friend's echo;
+- a new smith gets all lessons and closes the room;
+- the one-hand lesson text is right;
+- missing-medal bouts take turns, and a boss won without enough medals says what is missing.
+
+IWER: MENU in ready → "Leave this match?" → hub; the online round regression passes. Not changed on purpose: the ramp lesson can still be skipped through the anvil (harmless; changing the guide flow is riskier). |
+
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes, and the interaction notes are updated.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
