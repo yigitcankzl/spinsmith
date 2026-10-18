@@ -4,6 +4,7 @@
  * jittery loopback link (200 ms RTT, +-30 ms, 5% loss); the guest's interpolated view must stay
  * on the curves, survive an outage, and every guest event must be applied exactly once, in order.
  */
+import { clampGuestSpot, guestPointsBefore } from '../src/game/online.ts';
 import assert from 'node:assert/strict';
 import {
   EventReceiver, EventSender, HandsReceiver, isRoomCode, loopbackPair, mirror, newRoomCode, parseMsg, prng,
@@ -184,3 +185,19 @@ function curve(i: 0 | 1, tMs: number): TopLike {
 }
 
 console.log('net check: OK');
+
+// Online helpers that live in the game: the guest's checked launch spot and the guest's score sync.
+{
+  assert.deepEqual(clampGuestSpot([0.05, -0.1], 0, 0.1, 0.136, 0.05), [0.05, -0.1], 'a fair guest spot stands');
+  const far = clampGuestSpot([0, -1], 0, 0.1, 0.136, 0.05)!;
+  assert.ok(Math.abs(Math.hypot(far[0], far[1]) - 0.136) < 1e-9, 'a spot past the launch ring is pulled in');
+  const near = clampGuestSpot([0.01, 0.1], 0, 0.1, 0.136, 0.05)!;
+  assert.ok(Math.hypot(near[0] - 0, near[1] - 0.1) >= 0.05 - 1e-9, 'a spot on top of the host is pushed clear');
+  assert.equal(clampGuestSpot([NaN, 0], 0, 0.1, 0.136, 0.05), null, 'nonsense is refused');
+  // Host heat [host, guest] after the round; the guest stands so that adding its points lands there.
+  assert.deepEqual(guestPointsBefore([1, 3], 1, 2), [1, 1], 'guest won 2: it stood at 1 before, host at 1');
+  assert.deepEqual(guestPointsBefore([3, 1], -1, 2), [1, 1], 'guest lost 2: host stood at 1 before');
+  assert.deepEqual(guestPointsBefore([2, 2], 2, 0), [2, 2], 'a draw changes nothing');
+  console.log('online helpers: ok');
+}
+

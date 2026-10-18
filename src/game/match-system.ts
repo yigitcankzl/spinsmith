@@ -45,7 +45,7 @@ import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from './arena-forge.js';
 import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
-import { linkFromAddress } from './online.js';
+import { clampGuestSpot, guestPointsBefore, linkFromAddress } from './online.js';
 import type { OnlineLink } from './online.js';
 import type { GuestEvent, PackedShape, Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from './campaign.js';
@@ -6301,11 +6301,7 @@ export class MatchSystem extends createSystem({
       const loser = v === 1 ? this.theirs : this.mine;
       if (v !== 2 && !loser.finish) loser.finish = 'spin';
       // Take the host's heat (seen from this side), less the points finish() is about to add.
-      if (v !== 2) {
-        const points = finishPoints(loser, this.progress.matches === 0, false);
-        this.myPoints = heat[1] - (v === 1 ? points : 0);
-        this.theirPoints = heat[0] - (v === -1 ? points : 0);
-      }
+      if (v !== 2) [this.myPoints, this.theirPoints] = guestPointsBefore(heat, v, finishPoints(loser, this.progress.matches === 0, false));
       this.finish(v);
     };
     link.onLeft = () => {
@@ -6324,18 +6320,7 @@ export class MatchSystem extends createSystem({
 
   /** Host: a guest's launch spot, kept finite, inside the launch ring and LAUNCH_GAP clear of yours. */
   private guestSpot(at: [number, number], sx: number, sz: number): [number, number] {
-    let [x, z] = at;
-    if (!Number.isFinite(x) || !Number.isFinite(z)) return this.rivalSpot();
-    const max = LAUNCH_MAX_N * this.arena.radius;
-    const r = Math.hypot(x, z);
-    if (r > max) [x, z] = [(x / r) * max, (z / r) * max];
-    const gap = Math.hypot(x - sx, z - sz);
-    if (gap < LAUNCH_GAP) {
-      const ux = gap > 1e-6 ? (x - sx) / gap : 0;
-      const uz = gap > 1e-6 ? (z - sz) / gap : -1;
-      [x, z] = [sx + ux * LAUNCH_GAP, sz + uz * LAUNCH_GAP];
-    }
-    return [x, z];
+    return clampGuestSpot(at, sx, sz, LAUNCH_MAX_N * this.arena.radius, LAUNCH_GAP) ?? this.rivalSpot();
   }
 
   /**

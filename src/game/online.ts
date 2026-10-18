@@ -35,13 +35,18 @@ export class OnlineLink {
   private handsSeq = 0;
   private lastHands = -1e9;
 
-  constructor(
-    readonly role: Role,
-    readonly code: string,
-    readonly transport: Transport,
-    private readonly build: string,
-    private readonly name: string,
-  ) {
+  readonly role: Role;
+  readonly code: string;
+  readonly transport: Transport;
+  private readonly build: string;
+  private readonly name: string;
+
+  constructor(role: Role, code: string, transport: Transport, build: string, name: string) {
+    this.role = role;
+    this.code = code;
+    this.transport = transport;
+    this.build = build;
+    this.name = name;
     const send = (m: NetMsg) => transport.send(m);
     if (role === 'guest') this.sender = new EventSender(send);
     else this.receiver = new EventReceiver((ev) => this.onEvent?.(ev), send);
@@ -163,4 +168,31 @@ export function linkFromAddress(search: string, build: string, name: string): On
   // The host waits for a friend for up to ten minutes; a guest gives up on a dead code after 30 s.
   const transport = q.get('net') === 'bc' ? new BroadcastChannelTransport(code) : new TrysteroTransport(code, host ? 600_000 : 30_000);
   return new OnlineLink(host ? 'host' : 'guest', code, transport, build, name);
+}
+
+/**
+ * Host: a guest's launch spot, kept finite, inside the launch ring (max) and `gap` clear of the
+ * host's own spot; null when it is not a number at all.
+ */
+export function clampGuestSpot(at: [number, number], sx: number, sz: number, max: number, gap: number): [number, number] | null {
+  let [x, z] = at;
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+  const r = Math.hypot(x, z);
+  if (r > max) [x, z] = [(x / r) * max, (z / r) * max];
+  const d = Math.hypot(x - sx, z - sz);
+  if (d < gap) {
+    const ux = d > 1e-6 ? (x - sx) / d : 0;
+    const uz = d > 1e-6 ? (z - sz) / d : -1;
+    [x, z] = [sx + ux * gap, sz + uz * gap];
+  }
+  return [x, z];
+}
+
+/**
+ * Guest: the score to stand at before finish() adds this round's points, so it ends equal to the
+ * host's post-round heat seen from this side. v: 1 the guest won the round, -1 lost, 2 a draw.
+ */
+export function guestPointsBefore(heat: [number, number], v: 1 | -1 | 2, points: number): [number, number] {
+  if (v === 2) return [heat[1], heat[0]];
+  return [heat[1] - (v === 1 ? points : 0), heat[0] - (v === -1 ? points : 0)];
 }
