@@ -1,6 +1,23 @@
 # Night sprint — 2026-10-18 03:00–08:00 (Istanbul)
 Goal: turn Spinsmith from a deep systems sandbox into a finished game that can win Meta VR Start 2026. That means a campaign with levels, more and better tops and arenas, 2–4 players, better feel and look, and strength in every award. Codex is finishing WOW-PLAN.md; this sprint builds on top of its commits and does not revert them.
 
+## At a glance (for the morning)
+- **New game structure:** the Circuit Map campaign has 15 bouts in 3 chapters. Each bout has a lesson, a twist and medals; there are bosses with a second wind, two crowded bouts and a finale. Medals gate the chapters, difficulty follows the map, and daily orders chase missing medals.
+- **2–4 players:**
+  - brawls of 3 or 4 tops with bots that ramp;
+  - PASS (pass and play with the recorded hands);
+  - an online duel (beta, WebRTC), host-authoritative, with live ghost hands, input validation and two-window tests.
+- **More and better content:** a 4th type (Balance) with a counter loop shown on the intro card, a defense signature (center brace), 5 named builds, 2 new rivals (Comet, Gearwright) and 5 new arenas (20 total).
+- **Feel and look:** medal stamps the moment they are earned, brawl callouts, hums and trails for every top, a compact match bar, warm forge-steel plates, scorched (not glowing) desk cracks.
+- **Accessibility:** one-hand forge, high-contrast team rings, refused moves said in words, gestures with either hand.
+- **Quality gates:**
+  - five code-review agents and a player-journey soft-lock audit, every finding fixed or noted;
+  - a README audit against the code;
+  - `check:sim` now proves every bout can be countered, and that crowded bouts can be won;
+  - `check:sim-n` and `check:net` were added.
+- **Still open:** Quest device test, the video, guest cups and slings online, captions and left-hand layout, hosting (last step).
+- **State at 08:00:** see the end of this file. Every check passes, and the tree is clean.
+
 ## Research (4 read-only agents, 03:10–03:25)
 ### Rules (Devpost rules, FAQ, special awards; unchanged since Oct 7)
 - Stage One is pass/fail fit. Stage Two scores Innovation, Experience Design, Technical and Polish at 25% each. Judges play on Quest 3/3S. Limit one prize per entry (the highest value).
@@ -49,7 +66,7 @@ Sources: Nintendo kishōtenketsu, GDC boss design, flow channel, sawtooth diffic
 - **Decision and order:**
   1. **3–4 top free-for-all with bots.** This is the base for everything else, and judges can try it with one headset.
   2. **Party pass-and-play.** Each human's last turn replays as an echo with ghost hands while the headset holder fights live; empty seats are bots.
-  3. **Online 1v1 (beta).** Host-authoritative, 30 Hz snapshots, guest sends events, Trystero torrent (~23 KB gz). No TURN, so about 10–20% of pairs can't connect; show that honestly.
+  3. **Online 1v1 (beta).** Host-authoritative, 30 Hz snapshots, guest sends events, Trystero (as built: Nostr-relay signalling, 27.5 KB gz lazy chunk; the torrent strategy is a separate package in 0.26). No TURN, so about 10–20% of pairs can't connect; show that honestly.
 - **Testing:** node N-top determinism/ranking checks, a loopback transport with latency and loss, and two IWER tabs over BroadcastChannel.
 
 ## Night order
