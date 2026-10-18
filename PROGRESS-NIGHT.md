@@ -190,7 +190,7 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 
 | 5587d93 | Seventh (last) review: `endOnline` no longer redraws home itself. That redraw had wiped the "left" and "no one connected" cards and could save a new smith's order from the old smith's arenas; the callers now redraw, then speak. The cord tone is silenced on a remote launch and while waiting for the peer. |
 
-| (this) | **Online cups and slings:** the guest's cup is held on the host (it catches, then lets go after the hold); the guest's sling sends its pull and the host slings the caught top, snapped toward a pit. Both are sanitised. IWER, two windows: the cup event made a host cup that caught a top, and the sling event slung it ("THEIR SLING"). |
+| aaabc31, 0e0055c | **Online cups and slings:** the guest's cup is held on the host (it catches, then lets go after the hold); the guest's sling sends its pull and the host slings the caught top, snapped toward a pit. Both are sanitised. IWER, two windows: the cup event made a host cup that caught a top, and the sling event slung it ("THEIR SLING"). After the eighth review, snapshots also mark a cup that holds a top: the guest grabs only that, re-syncs the trap state, and the host's hold restarts at the catch. |
 
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
@@ -243,7 +243,7 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
 ## State at the end of the night (07:10)
 - **Checks:** `tsc --noEmit`, `check:sim`, `check:sim-n`, `check:net`, `build` and `public-release-check` all pass. `report:tops` and `report:arenas` show no warnings.
 - **Render budget (IWER, per eye):** hub about 70–107 depending on what is shown, duel fight about 91, 4-top brawl about 124 (target ≤150).
-- **History:** 103 commits on master since Codex's last (6d7bea6), all authored by Yiğitcan Kızıl, none with a Co-Authored-By or Claude line. Nothing is pushed; pushing is left to you.
+- **History:** 110+ commits on master since Codex's last (6d7bea6), all authored by Yiğitcan Kızıl, none with a Co-Authored-By or Claude line. Nothing is pushed; pushing is left to you.
 - **Workspace:** the tree is clean; worktrees and branches from the night are merged and deleted. The emulator is on the `?demo` save and the dev server is running.
 - **Local only:** `docs/SUBMISSION.md` (updated description and testing card) and the stills in `artifacts/capture/`.
 
