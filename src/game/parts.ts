@@ -330,6 +330,12 @@ export function roleOf(s: TopSpec): Role {
   return ranked[0].v - ranked[1].v <= BALANCE_GAP ? 'balance' : ranked[0].k;
 }
 
+/** The type loop: attack beats stamina, stamina beats defense, defense beats attack; balance meets all evenly. 1: a has the edge. */
+export function edgeOf(a: Role, b: Role): 1 | 0 | -1 {
+  const beats: Partial<Record<Role, Role>> = { attack: 'stamina', stamina: 'defense', defense: 'attack' };
+  return beats[a] === b ? 1 : beats[b] === a ? -1 : 0;
+}
+
 /** Every build under the weight limit. */
 export function allBuilds(): TopBuild[] {
   const out: TopBuild[] = [];

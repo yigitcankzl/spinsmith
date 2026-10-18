@@ -19,7 +19,7 @@ import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
-import { allBuilds, BALANCE_GAP, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
+import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
@@ -1341,5 +1341,13 @@ TUNING.grace = 0;
   for (const b of BOUTS) all[b.id] = 1;
   assert.ok(nextBout(all, true) && nextBout(all, false) === null, 'with the map won, medal turns alternate with free play');
 }
+
+// 33. The type loop: each type beats one and loses to one; balance and mirrors are even.
+assert.equal(edgeOf('attack', 'stamina'), 1);
+assert.equal(edgeOf('stamina', 'defense'), 1);
+assert.equal(edgeOf('defense', 'attack'), 1);
+assert.equal(edgeOf('stamina', 'attack'), -1);
+assert.equal(edgeOf('balance', 'attack'), 0);
+assert.equal(edgeOf('defense', 'defense'), 0);
 
 console.log('sim-check: all passed');

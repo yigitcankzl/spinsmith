@@ -30,7 +30,7 @@ import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
-import { allBuilds, buildName, NAMED_BUILDS, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, edgeOf, NAMED_BUILDS, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, mergeByMaterial, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
@@ -2474,7 +2474,10 @@ export class MatchSystem extends createSystem({
   private boutText(name: string) {
     const b = this.nextBoutPick;
     if (this.seats > 2) return ' · brawl';
-    if (b && b.rival === name) return ` · ${b.boss ? `${b.id} boss` : `bout ${b.id}`}`;
+    if (b && b.rival === name) {
+      const medals = [1, 2, 4].filter((m) => (this.progress.bouts[b.id] ?? 0) & m).length;
+      return ` · ${b.boss ? `${b.id} boss` : `bout ${b.id}`} (${medals}/3 medals)`;
+    }
     const c = circuitOf(name);
     if (!c || this.progress.marksOf(name) & MARK.beaten) return '';
     return ` · ${c.circuit} ${c.champion ? 'champion' : `${c.bout}/${c.of}`}`;
@@ -3331,7 +3334,10 @@ export class MatchSystem extends createSystem({
       const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
       const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
       const line = this.extras.length ? `Brawl with ${this.brawlNames.join(' and ')}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
-      this.label.set(`${this.rival.name}, ${this.rival.title}\n${line}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
+      // The type loop, read before the rip: whose top counters whose.
+      const edge = this.progress.guide === 'done' ? edgeOf(roleOf(specFromBuild(this.myBuild)), roleOf(specFromBuild(this.rival.build))) : 0;
+      const read = edge > 0 ? ' · you counter it' : edge < 0 ? ' · it counters you' : '';
+      this.label.set(`${this.rival.name}, ${this.rival.title}${read}\n${line}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
     }
     else {
       this.label.set('');
