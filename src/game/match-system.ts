@@ -5018,7 +5018,7 @@ export class MatchSystem extends createSystem({
       if (c && this.arena.shapes.includes(c.shape)) this.arena.free(c.shape);
     }
     // Online guest: the host strikes for you (an Anvil Strike from your side); the snapshot shows it.
-    if (this.online?.role === 'guest' && this.online.peer) this.online.sendEvent({ kind: 'strike', x: -ox, z: -oz });
+    if (this.online?.role === 'guest' && this.online.peer) this.online.sendEvent({ kind: 'strike', x: -ox, z: -oz, seal });
     else sealStrike(this.arena, this.mine, this.theirs, seal, ox, oz);
     this.shockAt.x = ox;
     this.shockAt.z = oz;
@@ -6295,12 +6295,13 @@ export class MatchSystem extends createSystem({
       this.rivalShapeKind = 'RAMP';
       playThock();
     } else if (ev.kind === 'strike') {
-      // The guest's palm comes down: an Anvil Strike centred where they slapped, their top the striker.
-      sealStrike(this.arena, this.theirs, this.mine, 'anvil', ev.x, ev.z);
+      // The guest's palm comes down: their seal (Anvil when unknown), centred where they slapped, their top the striker.
+      const seal = (SEALS as readonly string[]).includes(ev.seal ?? '') ? (ev.seal as Seal) : 'anvil';
+      sealStrike(this.arena, this.theirs, this.mine, seal, ev.x, ev.z);
       const y = this.arena.height(ev.x, ev.z);
       this.impacts.shock(ev.x, y, ev.z, 1, TEAM_RIVAL);
       this.sparks.burst(ev.x, y, ev.z, 1);
-      this.stamp.show('THEIR ANVIL STRIKE', 'live hands', 'rival', 0.9);
+      this.stamp.show(`THEIR ${SEAL_NAMES[seal].toUpperCase()}`, 'live hands', 'rival', 0.9);
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = 'STRIKE';
       this.hitStop = Math.max(this.hitStop, 0.12);
