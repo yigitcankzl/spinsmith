@@ -55,8 +55,7 @@ an arena. First to 3 heat wins a match.
   room's Space Setup labelling a table or desk. Depth occlusion, persistent-anchor stability and
   gaze input have only been exercised in IWSDK's browser emulator (IWER). The online duel has
   been run between two browser windows, not two headsets; an online guest's cups and slings are not
-  carried yet. Brawl bots fight with the simulation's own
-  seeking (they do not shape the floor).
+  carried yet.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
   slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
@@ -186,7 +185,8 @@ an arena. First to 3 heat wins a match.
 - **Brawls, three or four tops** (`stepN` in `src/game/sim.ts`): the brass pegs beside the level
   plate set how many tops share the next match. Two is a duel; three or four is a brawl where the
   extra seats are other rivals' and named smiths' tops (in green and violet), every pair can
-  collide, and the last top spinning takes the heat, scored on the foe that went out last.
+  collide, and the last top spinning takes the heat, scored on the foe that went out last. Bots
+  raise a ramp inside their nearest foe every few seconds, aimed at the rim.
   Brawls are free play (no bout, order or challenge). `npm run check:sim-n` checks that the N-top
   step with two tops matches the duel step exactly, that crowded rounds always end and that they
   replay identically.

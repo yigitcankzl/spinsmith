@@ -860,6 +860,8 @@ export class MatchSystem extends createSystem({
   private brawlNames: string[] = [];
   /** Bots already called out this round. */
   private brawlOut = new Set<Top>();
+  /** When each brawl bot next raises a ramp (fight time). */
+  private botShapeAt = [0, 0];
   /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
   private online: OnlineLink | null = null;
   private netRip: { power: number; aim: number; at?: [number, number]; dir?: [number, number] } | null = null;
@@ -3310,6 +3312,7 @@ export class MatchSystem extends createSystem({
       t.finish = null;
     }
     this.brawlOut.clear();
+    this.botShapeAt = [TUNING.grace + 1 + Math.random() * 2, TUNING.grace + 2 + Math.random() * 2];
     this.oneHandAt = -1;
     this.trails.clear();
     this.impacts.clear();
@@ -5763,6 +5766,7 @@ export class MatchSystem extends createSystem({
       }
       this.charges.update(STEP);
       this.rivalShaping();
+      this.botShaping();
       if (clash) {
         this.clashes++;
         this.charges.clash(clash.strength, this.elapsed);
@@ -6503,6 +6507,38 @@ export class MatchSystem extends createSystem({
       const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
       const dir = Math.atan2(-x, -z) + (Math.random() - 0.5) * 0.3 + LAUNCH_TILT * t.hand;
       t.launch(x, z, Math.sin(dir) * speed, Math.cos(dir) * speed, launchSpin(power), t.hand);
+    });
+  }
+
+  /**
+   * Brawl bots shape the floor too: every few seconds each raises a ramp just inside its nearest
+   * foe, aimed at the rim (one ramp a bot; a new one replaces it). Nothing during the opening grace.
+   */
+  private botShaping() {
+    if (!this.extras.length || this.elapsed < TUNING.grace) return;
+    this.extras.forEach((bot, i) => {
+      if (!bot.alive || this.elapsed < this.botShapeAt[i]) return;
+      this.botShapeAt[i] = this.elapsed + 3.5 + Math.random() * 2;
+      let foe: Top | null = null;
+      let best = Infinity;
+      for (const t of this.tops) {
+        if (t === bot || !t.alive) continue;
+        const d = Math.hypot(t.x - bot.x, t.z - bot.z);
+        if (d < best) {
+          best = d;
+          foe = t;
+        }
+      }
+      if (!foe) return;
+      const r = Math.hypot(foe.x, foe.z) || 1;
+      const dx = foe.x / r;
+      const dz = foe.z / r;
+      const offset = 0.012 * (this.arena.radius / 0.17);
+      const x = foe.x - dx * offset;
+      const z = foe.z - dz * offset;
+      this.arena.addShape('ramp', x, z, SHAPE_SIZE.ramp * 0.75, `bot${i}`, dx, dz, RIVAL_RAMP_SIGMA);
+      this.impacts.shock(x, this.arena.height(x, z), z, 0.35, BRAWL_COLORS[i]);
+      playThock(x, z);
     });
   }
 

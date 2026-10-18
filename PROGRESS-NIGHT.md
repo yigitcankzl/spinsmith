@@ -157,7 +157,7 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
   - not tested across the internet or between two headsets;
   - no TURN server;
   - (fixed) a host's workshop arena is sent whole and validated on the guest.
-- **Brawl:** bots play the sim's seek only (no floor shaping or tells); the knockout replay is skipped in brawls (its buffer holds two tops).
+- **Brawl:** bots raise ramps but have no tells or ultimates; the knockout replay is skipped in brawls (its buffer holds two tops).
 - **Campaign:** the map is a re-skinned board (no diorama); no EX remixes; the medal reveal is one stamp.
 - **Content skipped:** the Rack tip (the Tips drawer already holds six parts, and tip meshes are keyed in visuals.ts).
 - **Accessibility not done:** captions for sound cues and a left-hand mirror.
