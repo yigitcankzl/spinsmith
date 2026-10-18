@@ -33,7 +33,7 @@ export const BLUEPRINT_AT: Spot = { x: 0.08, y: 0, z: 0.185 };
 /** The comfort dial (sound, flashes, the strike's gesture), between the dock and the level plate. */
 export const COMFORT_AT: Spot = { x: -0.075, y: 0, z: 0.2 };
 /** The brawl pegs: how many tops share the next match (two to four). */
-export const BRAWL_AT: Spot = { x: 0.2, y: 0, z: 0.085 };
+export const BRAWL_AT: Spot = { x: -0.052, y: 0, z: 0.19 };
 /** The forge: where your top stands on the anvil, and the part tray: an arc of this radius around it, spanning this angle toward the player. */
 export const WORK: Spot = { x: 0, y: 0.07, z: 0.06 };
 export const TRAY = { r: 0.11, y: 0.035, gap: 0.047 };

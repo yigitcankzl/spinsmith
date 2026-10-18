@@ -512,9 +512,11 @@ export class Hub {
     pegs.add(new Mesh(new BoxGeometry(0.05, 0.003, 0.014).translate(0, 0.0015, 0), BRASS));
     const home = new Vector3(BRAWL_AT.x, TABLE_Y, BRAWL_AT.z);
     pegs.position.copy(home);
+    // A short column running away from you between the comfort dial and the level plate; your peg is nearest.
+    pegs.rotation.y = Math.PI / 2;
     this.brawlPegs = pegs;
     this.root.add(pegs);
-    const name = this.label('BRAWL', this.root, BRAWL_AT.x, BRAWL_AT.z + 0.03);
+    const name = this.label('BRAWL', this.root, BRAWL_AT.x, BRAWL_AT.z + 0.035);
     name.position.y += TABLE_Y;
     this.items.push({ action: { kind: 'brawl' }, carry: false, model: pegs, home, name, quiet: true });
   }
