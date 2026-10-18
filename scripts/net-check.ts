@@ -228,3 +228,10 @@ console.log('net check: OK');
   console.log('snapshot check: ok');
 }
 
+// A launch direction is normalised, never clamped like a place; a bad event never jams the queue.
+{
+  const r = sanitizeGuestEvent({ kind: 'rip', power: 0.8, aim: 0, steep: 0, twist: 0, dir: [0.6, 0.8] as [number, number] }, 0.17, 0.6)!;
+  assert.ok(r.kind === 'rip' && Math.abs(r.dir![0] - 0.6) < 1e-9 && Math.abs(r.dir![1] - 0.8) < 1e-9, 'a steep pull keeps its direction');
+}
+console.log('direction check: ok');
+

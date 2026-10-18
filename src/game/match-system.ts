@@ -1842,8 +1842,9 @@ export class MatchSystem extends createSystem({
     this.bout = null;
     // ?online=… on a new headset waits for the first session; once it is over the room opens.
     if (!this.online && !this.onlineTried && this.progress.guide === 'done' && new URLSearchParams(location.search).has('online')) queueMicrotask(() => this.openOnline());
-    const home = this.afterHome;
-    this.afterHome = null;
+    // Whatever waited for placement or for home (an online duel) starts now, on any path home.
+    const home = this.afterHome ?? this.afterPlace;
+    this.afterHome = this.afterPlace = null;
     if (home && this.online?.peer) queueMicrotask(home);
     this.hub.setBrawl(this.seats, this.online?.role === 'host' && !this.online.peer);
     this.phase = 'hub';
@@ -2924,10 +2925,6 @@ export class MatchSystem extends createSystem({
   private place() {
     this.placeRoot();
     this.toHub();
-    // An online match that arrived while the arena was still being placed starts now.
-    const after = this.afterPlace;
-    this.afterPlace = null;
-    after?.();
 
     if (!this.onTable) {
       // No table found (or none labelled one): say so once the title is gone, then the first
@@ -6242,7 +6239,7 @@ export class MatchSystem extends createSystem({
         };
         // Never pull the host out of the forge or the workshop (unsaved work): start when they are home.
         if (this.phase === 'placing') this.afterPlace = start;
-        else if (this.phase === 'build' || this.phase === 'forge') {
+        else if (this.phase === 'build' || this.phase === 'forge' || this.demo) {
           this.afterHome = start;
           say(`${link.peerName || 'A smith'} joined\nThe duel starts when you are home`);
         } else start();
@@ -6255,7 +6252,7 @@ export class MatchSystem extends createSystem({
         };
         return;
       }
-      if (round < 0 && (this.phase === 'build' || this.phase === 'forge')) {
+      if (round < 0 && (this.phase === 'build' || this.phase === 'forge' || this.demo)) {
         this.afterHome = () => {
           if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout);
         };
@@ -6295,6 +6292,10 @@ export class MatchSystem extends createSystem({
         this.startMatch(this.remoteRival());
         return;
       }
+      // The host has launched: whatever this side is doing with the cord, its sent rip is the one that flies.
+      this.puller = null;
+      this.cord.set(null);
+      this.chargeRing.visible = false;
       this.netGo = true;
       const [power, aim, from, dir, steep] = this.netPending ?? [0.75, 0, null, null, 0];
       this.launch(power, aim, from, dir, steep);
@@ -6345,6 +6346,7 @@ export class MatchSystem extends createSystem({
   /** Online: your rip is sent and held; drop the cord and wait in ready (MENU is there) until the other side rips. */
   private waitForPeer() {
     this.puller = null;
+    this.chargeRing.visible = false;
     this.cord.set(null);
     this.phase = 'ready';
   }
@@ -6361,6 +6363,7 @@ export class MatchSystem extends createSystem({
     this.netPending = null;
     this.netShapes.clear();
     this.hub.setBrawl(this.seats);
+    if (this.phase === 'hub') this.toHub();
   }
 
   /** The other smith's top, as a rival for the online duel. */
@@ -6380,7 +6383,8 @@ export class MatchSystem extends createSystem({
       // A rip that arrives mid-fight belongs to no round: the next one starts from a fresh rip.
       if (this.phase === 'fight') return;
       this.netRip = { power: ev.power, aim: ev.aim, ...(ev.at ? { at: ev.at } : {}), ...(ev.dir ? { dir: ev.dir } : {}) };
-      if (this.netPending) {
+      // Only from ready: a host mid-pull finishes their own new rip, which then finds this one waiting.
+      if (this.netPending && this.phase === 'ready') {
         const [power, aim, from, dir, steep] = this.netPending;
         this.netGo = true;
         this.launch(power, aim, from, dir, steep);

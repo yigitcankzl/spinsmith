@@ -318,9 +318,11 @@ export class EventReceiver {
   receive(msg: EventMsg): void {
     // Only a short window ahead is held: a peer skipping sequence numbers cannot grow this without bound.
     if (Number.isInteger(msg.seq) && msg.seq > this.applied && msg.seq <= this.applied + 256) this.early.set(msg.seq, msg.ev);
-    for (let ev = this.early.get(this.applied + 1); ev; ev = this.early.get(this.applied + 1)) {
+    // An empty slot still counts (a bad event is skipped, never a jam for the ones behind it).
+    while (this.early.has(this.applied + 1)) {
+      const ev = this.early.get(this.applied + 1);
       this.early.delete(++this.applied);
-      this.apply(ev, this.applied);
+      if (ev) this.apply(ev, this.applied);
     }
     this.send({ type: 'ack', seq: this.applied });
   }

@@ -219,7 +219,9 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
     case 'rip': {
       if (!num(ev.power) || !num(ev.aim)) return null;
       const at = pair(ev.at);
-      const dir = pair(ev.dir);
+      // A direction, not a place: normalised, never clamped to the arena.
+      const d = Array.isArray(ev.dir) && ev.dir.length >= 2 && num(ev.dir[0]) && num(ev.dir[1]) ? Math.hypot(ev.dir[0], ev.dir[1]) : 0;
+      const dir: [number, number] | undefined = d > 1e-6 ? [ev.dir![0] / d, ev.dir![1] / d] : undefined;
       return { kind: 'rip', power: clamp(ev.power, 0, 1), aim: clamp(ev.aim, -maxAim, maxAim), steep: num(ev.steep) ? clamp(ev.steep, 0, 1) : 0, twist: num(ev.twist) ? clamp(ev.twist, -1, 1) : 0, ...(at ? { at } : {}), ...(dir ? { dir } : {}) };
     }
     case 'ramp':
