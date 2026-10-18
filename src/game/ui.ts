@@ -32,8 +32,8 @@ export const GUIDE = 0xffd23a;
 /** Cyan belongs to the rival; neutral UI accents use steel. */
 export const CYAN = '#4fd1ff';
 export const STEEL = '#c9d3e0';
-export const TEXT = '#eef3fa';
-export const TEXT_DIM = '#8f9bb0';
+export const TEXT = '#f6f1e8';
+export const TEXT_DIM = '#b4ab9d';
 
 /**
  * The type scale: four sizes as angular size in dmm (1 dmm is 1 mm seen from 1 m), so a role
@@ -201,8 +201,9 @@ export function metalPlate(g: CanvasRenderingContext2D, w: number, h: number, ri
   g.clearRect(0, 0, w, h);
   chamfer(g, 2, 2, w - 4, h - 4, c);
   const body = g.createLinearGradient(0, 0, 0, h);
-  body.addColorStop(0, '#3a3f48');
-  body.addColorStop(1, '#23272e');
+  // Blackened forge steel, warm rather than slate: the plates belong to the smithy, not a sci-fi HUD.
+  body.addColorStop(0, '#3a3530');
+  body.addColorStop(1, '#201c19');
   g.fillStyle = body;
   g.fill();
   g.save();
