@@ -2180,6 +2180,8 @@ export class MatchSystem extends createSystem({
 
   /** A knockout your move caused plays again on the table, slowly (a pinch skips it). */
   private startReplay() {
+    // The replay buffer holds the duel's two tops; a brawl knockout would replay the wrong pair.
+    if (this.extras.length) return;
     const n = this.replayCount;
     if (n < 30) return;
     const frames = new Float32Array(n * REC);
