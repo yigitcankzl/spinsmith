@@ -99,6 +99,7 @@ export class OnlineLink {
       if (this.hands.receive(m)) this.handsAt = now;
     }
     else if (m.type === 'snapshot' && this.role === 'guest') {
+      if (!validSnapshot(m)) return;
       this.buffer.push(m, now);
       if (this.buffer.shapesVersion !== this.shapesVersion) {
         this.shapesVersion = this.buffer.shapesVersion;
@@ -239,4 +240,12 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
     default:
       return null;
   }
+}
+
+/** Guest: a host snapshot is used only when every number in it is finite (a bad packet never reaches the view). */
+export function validSnapshot(m: { t: unknown; seq: unknown; tops: unknown; tilt: unknown; shapes?: unknown }): boolean {
+  const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
+  const nums = (a: unknown, n: number) => Array.isArray(a) && a.length >= n && a.slice(0, n).every(num);
+  if (!num(m.t) || !num(m.seq) || !Array.isArray(m.tops) || m.tops.length < 2 || !m.tops.every((t) => nums(t, 10)) || !nums(m.tilt, 2)) return false;
+  return m.shapes === undefined || (Array.isArray(m.shapes) && m.shapes.every((p) => nums(p, 7)));
 }

@@ -4,7 +4,7 @@
  * jittery loopback link (200 ms RTT, +-30 ms, 5% loss); the guest's interpolated view must stay
  * on the curves, survive an outage, and every guest event must be applied exactly once, in order.
  */
-import { clampGuestSpot, guestPointsBefore, sanitizeGuestEvent } from '../src/game/online.ts';
+import { clampGuestSpot, guestPointsBefore, sanitizeGuestEvent, validSnapshot } from '../src/game/online.ts';
 import assert from 'node:assert/strict';
 import {
   EventReceiver, EventSender, HandsReceiver, isRoomCode, loopbackPair, mirror, newRoomCode, parseMsg, prng,
@@ -216,5 +216,15 @@ console.log('net check: OK');
   assert.ok(st.kind === 'strike' && !('seal' in st), 'unknown seal falls back to Anvil');
   assert.equal(sanitizeGuestEvent({ kind: 'teleport' } as unknown as Parameters<typeof sanitizeGuestEvent>[0], R, 0.6), null, 'unknown kinds are dropped');
   console.log('guest event sanitizer: ok');
+}
+
+// The guest's side of the boundary: only finite snapshots reach the view.
+{
+  const top = [0, 0.1, 0, 0, 1, 0, 0, 0, 0, 0];
+  assert.ok(validSnapshot({ t: 1, seq: 1, tops: [top, top], tilt: [0, 0] }), 'a sound snapshot passes');
+  assert.ok(!validSnapshot({ t: 1, seq: 1, tops: [top, [NaN, ...top.slice(1)]], tilt: [0, 0] }), 'a NaN top is refused');
+  assert.ok(!validSnapshot({ t: 1, seq: 1, tops: [top], tilt: [0, 0] }), 'a missing top is refused');
+  assert.ok(!validSnapshot({ t: 1, seq: 1, tops: [top, top], tilt: [0, 0], shapes: [[1, 0, 'x']] }), 'a broken shape is refused');
+  console.log('snapshot check: ok');
 }
 
