@@ -2079,6 +2079,8 @@ export class MatchSystem extends createSystem({
       playLevelUp();
       console.log('[HUB] new smith');
       this.toHub();
+      this.label.set('New smith\nProgress reset: the first match starts here');
+      this.labelTimer = 3;
     } else if (action.kind === 'locked') {
       this.label.set(action.text);
       this.labelTimer = 2;
@@ -4364,12 +4366,13 @@ export class MatchSystem extends createSystem({
     const minimum = 0.012 * (this.arena.radius / 0.17);
     if (pull < minimum) {
       playLocked();
+      this.stamp.show('NO SPRING', 'PULL THE RIM INWARD', 'neutral', 0.4);
       if (import.meta.env.DEV) console.log(`[RIM] ignored: inward pull ${pull.toFixed(3)}`);
       return;
     }
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (!f) {
-      playLocked();
+      this.locked('No charge yet\nCharges refill in a moment');
       return;
     }
     this.recordIntervention();
@@ -5622,6 +5625,8 @@ export class MatchSystem extends createSystem({
       this.outerRailHead.visible = false;
       this.outerRailGeometry.setDrawRange(0, 0);
       playLocked();
+      this.label.set('Dropped it\nPinch the top again');
+      this.labelTimer = 1.6;
       return true;
     }
     const l = this.root.worldToLocal(this.local.copy(h.pinch));
@@ -6378,7 +6383,11 @@ export class MatchSystem extends createSystem({
    */
   private locked(why: string) {
     playLocked();
-    if (this.labelTimer > 0 || this.time - this.lockedSaidAt < 2) return;
+    // The card is busy (or just said it): a short stamp carries the same news, never sound alone.
+    if (this.labelTimer > 0 || this.time - this.lockedSaidAt < 2) {
+      this.stamp.show(why.split('\n')[0].toUpperCase(), '', 'neutral', 0.35);
+      return;
+    }
     this.lockedSaidAt = this.time;
     this.label.set(why);
     this.labelTimer = 1.4;
