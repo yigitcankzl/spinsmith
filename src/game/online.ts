@@ -8,6 +8,7 @@
 import { BroadcastChannelTransport, EventReceiver, HandsReceiver, EventSender, isRoomCode, NET_VERSION, newRoomCode, SnapshotBuffer, SnapshotEncoder, SNAPSHOT_HZ, TrysteroTransport } from './net.ts';
 import type { GuestEvent, NetMsg, PackedShape, TopLike, Transport, Vec3 } from './net.ts';
 import type { FloorShape } from './sim.ts';
+import { GROOVE_MAX_LENGTH } from './hand-tools.ts';
 
 export type Role = 'host' | 'guest';
 
@@ -229,6 +230,21 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
     case 'ramp':
       if (![ev.x, ev.z, ev.dx, ev.dz].every(num)) return null;
       return { kind: 'ramp', x: pos(ev.x), z: pos(ev.z), dx: clamp(ev.dx, -1, 1), dz: clamp(ev.dz, -1, 1) };
+    case 'groove': {
+      if (![ev.sx, ev.sz, ev.ex, ev.ez].every(num)) return null;
+      const sx = pos(ev.sx);
+      const sz = pos(ev.sz);
+      let ex = pos(ev.ex);
+      let ez = pos(ev.ez);
+      const dx = ex - sx;
+      const dz = ez - sz;
+      const length = Math.hypot(dx, dz);
+      if (length > GROOVE_MAX_LENGTH) {
+        ex = sx + dx * (GROOVE_MAX_LENGTH / length);
+        ez = sz + dz * (GROOVE_MAX_LENGTH / length);
+      }
+      return { kind: 'groove', sx, sz, ex, ez };
+    }
     case 'rim':
       if (![ev.sx, ev.sz, ev.x, ev.z, ev.f].every(num)) return null;
       return { kind: 'rim', sx: pos(ev.sx), sz: pos(ev.sz), x: pos(ev.x), z: pos(ev.z), f: clamp(ev.f, 0, 1.5) };

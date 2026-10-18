@@ -704,6 +704,13 @@ export class TopView {
     this.deskSpin = Math.max(this.deskSpin, 0.32);
     return true;
   }
+  /** Keeps a rescued desk top visibly seated on the player's palm (stage-local coordinates). */
+  carryRescue(at: Vector3) {
+    if (this.outT < 0 || !this.landed || this.offDesk) return;
+    this.throwPos.copy(at);
+    this.throwVel.set(0, 0, 0);
+    this.deskSpin = Math.max(this.deskSpin, 0.32);
+  }
   private fallX = 1;
   private fallZ = 0;
   /** Everything drawn of the top (halo, blur disc, edge, parts), scaled up in a fight and punched by hits. */
@@ -2657,7 +2664,7 @@ export class Pillar {
 
 /** What a shape mark draws: a live shape or a ghost of one being made. */
 export interface ShapeMarkSpec {
-  kind: 'ramp' | 'well';
+  kind: 'ramp' | 'well' | 'groove';
   x: number;
   z: number;
   dx: number;
@@ -2667,6 +2674,8 @@ export interface ShapeMarkSpec {
   ghost: boolean;
   /** Its footprint, when not the kind's default. */
   sigma?: number;
+  /** Fingertip groove length (m); absent for point shapes. */
+  length?: number;
 }
 
 /**
@@ -2676,7 +2685,7 @@ export interface ShapeMarkSpec {
  */
 export class ShapeMarks {
   readonly root = new Group();
-  private marks: { group: Group; rings: Mesh[]; chevron: Mesh; mats: MeshBasicMaterial[] }[] = [];
+  private marks: { group: Group; rings: Mesh[]; chevron: Mesh; lane: Mesh; mats: MeshBasicMaterial[] }[] = [];
 
   constructor(color: number, count = 4) {
     const ring = new RingGeometry(0.94, 1, 48).rotateX(-Math.PI / 2);
@@ -2685,7 +2694,7 @@ export class ShapeMarks {
       const group = new Group();
       // Depth-tested (pulled forward a little so the floor under a shape never hides them), so a
       // real hand over the arena (the hand occluder writes depth) covers the marks, as it should.
-      const mats = [0, 1, 2, 3].map(() => new MeshBasicMaterial({ color, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      const mats = [0, 1, 2, 3, 4].map(() => new MeshBasicMaterial({ color, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
       const rings = [0, 1, 2].map((k) => {
         const m = new Mesh(ring, mats[k]);
         m.renderOrder = 20;
@@ -2693,9 +2702,11 @@ export class ShapeMarks {
       });
       const ch = new Mesh(chevron, mats[3]);
       ch.renderOrder = 21;
-      group.add(...rings, ch);
+      const lane = new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mats[4]);
+      lane.renderOrder = 20;
+      group.add(...rings, lane, ch);
       group.visible = false;
-      this.marks.push({ group, rings, chevron: ch, mats });
+      this.marks.push({ group, rings, chevron: ch, lane, mats });
       this.root.add(group);
     }
   }
@@ -2711,16 +2722,23 @@ export class ShapeMarks {
       m.group.position.set(s.x, height(s.x, s.z) + 0.003, s.z);
       const radii = s.kind === 'ramp' ? [0.6, 1.1, 1.6] : [0.5, 1, 1.5];
       m.rings.forEach((r, k) => {
+        r.visible = s.kind !== 'groove';
         r.scale.setScalar(sigma * radii[k] * shrink);
         m.mats[k].opacity = (s.ghost ? 0.35 + 0.15 * Math.sin(time * 8) : 0.85) * (1 - k * 0.25) * Math.max(0.2, s.strength);
       });
-      m.chevron.visible = s.kind === 'ramp';
-      if (s.kind === 'ramp') {
+      m.lane.visible = s.kind === 'groove';
+      if (s.kind === 'groove') {
+        m.group.rotation.y = Math.atan2(s.dx, s.dz);
+        m.lane.scale.set(Math.max(0.008, sigma * 0.7), 1, Math.max(0.001, (s.length ?? 0.001) * shrink));
+        m.mats[4].opacity = (s.ghost ? 0.4 + 0.25 * Math.sin(time * 10) : 0.75) * Math.max(0.2, s.strength);
+      } else m.group.rotation.y = 0;
+      m.chevron.visible = s.kind === 'ramp' || s.kind === 'groove';
+      if (s.kind === 'ramp' || s.kind === 'groove') {
         // The arrow runs out along the push, again and again: this is which way it throws.
         const run = (time * 1.6) % 1;
-        const d = sigma * (0.4 + 1.1 * run);
-        m.chevron.position.set(s.dx * d, 0.002, s.dz * d);
-        m.chevron.rotation.y = Math.atan2(s.dx, s.dz);
+        const d = s.kind === 'groove' ? ((s.length ?? 0) * (run - 0.5)) : sigma * (0.4 + 1.1 * run);
+        m.chevron.position.set(s.kind === 'groove' ? 0 : s.dx * d, 0.002, s.kind === 'groove' ? d : s.dz * d);
+        m.chevron.rotation.y = s.kind === 'groove' ? 0 : Math.atan2(s.dx, s.dz);
         m.chevron.scale.set(1.6, 0.35, 1.6);
         m.mats[3].opacity = (s.ghost ? 0.6 : 0.95 * s.strength) * Math.sin(run * Math.PI);
       }

@@ -8,7 +8,7 @@
 import type { MessageAction, Room } from 'trystero';
 import type { Finish, FloorShape, Outcome } from './sim.ts';
 
-export const NET_VERSION = 2;
+export const NET_VERSION = 3;
 export const APP_ID = 'spinsmith-duel-v1';
 export const SNAPSHOT_HZ = 30;
 
@@ -18,12 +18,13 @@ export const SNAPSHOT_HZ = 30;
 export type Vec3 = [number, number, number];
 /** x, z, vx, vz, spin, angle, wobble, damage, state index, finish index. */
 export type PackedTop = [number, number, number, number, number, number, number, number, number, number];
-/** id, kind index, x, z, dx, dz, amp, owner. */
-export type PackedShape = [number, number, number, number, number, number, number, string];
+/** id, kind index, x, z, dx, dz, amp, owner, optional line length. */
+export type PackedShape = [number, number, number, number, number, number, number, string, number?];
 
 export type GuestEvent =
   | { kind: 'rip'; power: number; aim: number; steep: number; twist: number; build?: string; at?: [number, number]; dir?: [number, number] }
   | { kind: 'ramp'; x: number; z: number; dx: number; dz: number }
+  | { kind: 'groove'; sx: number; sz: number; ex: number; ez: number }
   | { kind: 'cup'; x: number; z: number }
   | { kind: 'sling'; px: number; pz: number }
   | { kind: 'forge'; action: string; pull: number; twist: number; tilt: number; sign: number; sx?: number; sz?: number; force?: number }
@@ -92,7 +93,7 @@ export function helloCompatible(msg: NetMsg): boolean {
 
 export const STATES: Outcome[] = ['spinning', 'out', 'toppled'];
 export const FINISHES: Finish[] = [null, 'pocket', 'over', 'burst', 'spin'];
-export const SHAPE_KINDS = ['ramp', 'well', 'cup'] as const;
+export const SHAPE_KINDS = ['ramp', 'well', 'cup', 'groove'] as const;
 
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 const r3 = (v: number) => Math.round(v * 1e3) / 1e3;
@@ -159,8 +160,8 @@ export class SnapshotEncoder {
     let id = this.ids.get(s);
     if (!id) this.ids.set(s, (id = this.nextId++));
     // 3: a cup holding a top (the guest may only sling a cup that has caught one).
-    const kind = s.trap ? (s.caught ? 3 : 2) : s.kind === 'well' ? 1 : 0;
-    return [id, kind, r4(s.x), r4(s.z), r3(s.dx), r3(s.dz), r4(s.amp), s.owner];
+    const kind = s.trap ? (s.caught ? 3 : 2) : s.kind === 'groove' ? 4 : s.kind === 'well' ? 1 : 0;
+    return [id, kind, r4(s.x), r4(s.z), r3(s.dx), r3(s.dz), r4(s.amp), s.owner, s.length === undefined ? undefined : r4(s.length)];
   }
 }
 

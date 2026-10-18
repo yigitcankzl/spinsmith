@@ -51,6 +51,7 @@ import type { GuestEvent, PackedShape, Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from './campaign.js';
 import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
+import { clampedGrooveX, clampedGrooveZ, grooveLength, GROOVE_MIN_LENGTH, PALM_CATCH_RADIUS } from './hand-tools.js';
 import { brawlModeName, targetWinner } from './brawl.js';
 import type { BrawlMode } from './brawl.js';
 
@@ -662,6 +663,10 @@ export class MatchSystem extends createSystem({
   private lastPull = 0;
   /** The free hand may hold the launcher steady while the other hand rips. */
   private bracedLaunch = false;
+  /** Open palm currently carrying the launch cradle; the opposite hand owns the rip cord. */
+  private palmLauncherSide: Side | null = null;
+  /** Dev-driver reason string for a missed palm-launch probe. */
+  private palmLauncherDebug = 'idle';
   private launcherBrace = (() => {
     const g = new Group();
     const metal = new MeshBasicMaterial({ color: 0xffa23f, transparent: true, opacity: 0.72, blending: AdditiveBlending, depthWrite: false });
@@ -691,8 +696,9 @@ export class MatchSystem extends createSystem({
     { visible: false },
   ));
   /** Real-table second chance: a rail drawn from a thrown top back into the arena. */
-  private outerRingState: 'idle' | 'rescue' | 'rail' | 'returned' | 'failed' = 'idle';
+  private outerRingState: 'idle' | 'rescue' | 'palm' | 'returned' | 'failed' = 'idle';
   private outerRingUsed = false;
+  private outerRingCompleted = false;
   private outerRingLeft = 0;
   private outerRingSpin = 0;
   private outerRailSide: Side | null = null;
@@ -737,6 +743,8 @@ export class MatchSystem extends createSystem({
   private gazeAssist = { active: false, target: '' };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
   private pressing: Record<Side, boolean> = { left: false, right: false };
+  /** An open fingertip touching and sliding across the floor; it becomes a one-use groove on lift. */
+  private grooving: Record<Side, { sx: number; sz: number; x: number; z: number; active: boolean } | null> = { left: null, right: null };
   /** Each hand's fingertip height last frame (arena-local), and when it last set a ramp. */
   private tipY: Record<Side, number> = { left: 0, right: 0 };
   private tipDown: Record<Side, number> = { left: 0, right: 0 };
@@ -1528,7 +1536,7 @@ export class MatchSystem extends createSystem({
         break;
       case 'fight':
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
-        if (!this.deskVerdict && this.outerRingState !== 'rescue' && this.outerRingState !== 'rail') {
+        if (!this.deskVerdict && this.outerRingState !== 'rescue' && this.outerRingState !== 'palm') {
           this.updateStrike(dt);
           this.updateKnuckleKnock(dt);
           if (!this.updateArenaMorph(dt)) {
@@ -3560,6 +3568,7 @@ export class MatchSystem extends createSystem({
     this.phase = 'ready';
     this.markFirstFive(2);
     this.outerRingState = 'idle';
+    this.outerRingCompleted = false;
     this.deskVerdict = null;
     this.deskKoScored = false;
     this.setDeskKoStage(0);
@@ -3617,6 +3626,7 @@ export class MatchSystem extends createSystem({
     const [rx, rz] = this.rivalSpot();
     this.launchFrom = null;
     this.launchPreviewSide = null;
+    this.palmLauncherSide = null;
     this.launchZoneKind = 'neutral';
     this.launchArenaKind = 'standard';
     this.launchTwist = this.devLaunchTwist = 0;
@@ -3760,15 +3770,29 @@ export class MatchSystem extends createSystem({
    * the same frame (the emulator's click does), the hand closer to the arena wins.
    */
   private updateReadyPinch() {
+    this.palmLauncherDebug = 'entered';
     // After the deciding round the result card leads back home, not into another round.
-    if (this.matchOver) return;
+    if (this.matchOver) {
+      this.palmLauncherDebug = 'match-over';
+      return;
+    }
     // Not while the arena is still opening out under the hand.
-    if (!this.sizeSettled) return;
+    if (!this.sizeSettled) {
+      this.palmLauncherDebug = 'size-moving';
+      return;
+    }
     let pick: Side | null = null;
     let best = Infinity;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
       if (!h.tracked || !h.justPinched) continue;
+      // A single tracked hand must still be able to launch. If the hand that was previewing as the
+      // open-palm support pinches, release that role and treat the same gesture as the normal cord
+      // grab; with two hands, the untouched palm remains the natural support path.
+      if (this.palmLauncherSide === side) {
+        this.palmLauncherSide = null;
+        this.launcherBrace.visible = false;
+      }
       const d = h.pinch.distanceTo(this.root.position);
       if (d < best && d < LAUNCH_REACH) {
         best = d;
@@ -3777,19 +3801,49 @@ export class MatchSystem extends createSystem({
     }
     if (!pick) {
       if (this.phase === 'ready') {
+        this.palmLauncherDebug = 'scanning';
         this.launchPreviewSide = null;
         let hover: Side | null = null;
         let hoverDistance = Infinity;
+        // Once an open palm has accepted the cradle, keep it while the other hand approaches the
+        // cord. Without this latch, whichever hand got one centimetre closer would steal the top.
+        const latched = this.palmLauncherSide;
+        if (latched) {
+          const h = this.hands[latched];
+          const palm = this.p.copy(h.wrist).lerp(h.index, 0.5);
+          if (h.tracked && !h.pinching && palm.distanceTo(this.root.position) < LAUNCH_REACH && this.previewLaunch(palm)) hover = latched;
+          else this.palmLauncherSide = null;
+        }
         for (const side of ['left', 'right'] as const) {
+          if (hover) break;
           const h = this.hands[side];
-          const d = h.index.distanceTo(this.root.position);
+          if (!h.tracked || h.pinching) continue;
+          const palm = this.p.copy(h.wrist).lerp(h.index, 0.5);
+          const d = palm.distanceTo(this.root.position);
           if (h.tracked && !h.pinching && d < hoverDistance && d < LAUNCH_REACH) {
             hover = side;
             hoverDistance = d;
           }
         }
-        if (hover && this.previewLaunch(this.hands[hover].index)) this.launchPreviewSide = hover;
-        else this.launchGhost.visible = this.launchMarker.visible = false;
+        let palmShown = false;
+        if (hover) {
+          const h = this.hands[hover];
+          const palm = this.p.copy(h.wrist).lerp(h.index, 0.5);
+          if (this.previewLaunch(palm)) {
+            this.launchPreviewSide = hover;
+            this.palmLauncherSide = hover;
+            this.launcherBrace.visible = !this.photo;
+            this.launcherBrace.position.set(this.launchFrom!.x, this.arena.height(this.launchFrom!.x, this.launchFrom!.z) + 0.004, this.launchFrom!.z);
+            palmShown = true;
+            this.palmLauncherDebug = hover === 'left' ? 'active-left' : 'active-right';
+            if (this.progress.guide === 'done' && !this.entrance && !this.stamp.mesh.visible) this.label.set('PALM LAUNCHER READY\nOTHER HAND: PINCH + PULL');
+          }
+        }
+        if (!palmShown) {
+          this.palmLauncherDebug = hover ? 'preview-rejected' : 'no-open-hand';
+          this.launchGhost.visible = this.launchMarker.visible = false;
+          this.launcherBrace.visible = false;
+        }
       }
       return;
     }
@@ -3801,7 +3855,7 @@ export class MatchSystem extends createSystem({
       return;
     }
     // Lock the point shown before the pinch; if this hand never previewed one, try its index now.
-    if (this.launchPreviewSide !== pick && !this.previewLaunch(h.index)) {
+    if (!this.palmLauncherSide && this.launchPreviewSide !== pick && !this.previewLaunch(h.index)) {
       this.launchFrom = null;
       this.mine.x = 0;
       this.mine.z = this.SPAWN;
@@ -3839,7 +3893,7 @@ export class MatchSystem extends createSystem({
       this.launcherBrace.visible = false;
       return;
     }
-    const supportSide: Side = this.puller === 'left' ? 'right' : 'left';
+    const supportSide: Side = this.palmLauncherSide ?? (this.puller === 'left' ? 'right' : 'left');
     const h = this.hands[supportSide];
     this.root.localToWorld(this.p.set(this.mine.x, this.arena.height(this.mine.x, this.mine.z) + 0.025, this.mine.z));
     const palm = this.handAt.copy(h.wrist).lerp(h.index, 0.5);
@@ -4526,6 +4580,7 @@ export class MatchSystem extends createSystem({
         if ((this.shapeLost[side] += this.frameDt) < HAND_LOSS_GRACE) continue;
         this.shapeLost[side] = 0;
         this.shaping[side] = null;
+        this.grooving[side] = null;
         this.rimPulls[side] = null;
         this.pressing[side] = false;
         this.endSling(side, false);
@@ -4536,6 +4591,7 @@ export class MatchSystem extends createSystem({
       this.shapeLost[side] = 0;
       const l = this.toLocal(h.pinch);
       if (h.pinching) {
+        this.grooving[side] = null;
         // Keep the fingertip's height current while pinching, so letting go is not read as a fast press.
         // Its own vector: toLocal() reuses one, and `l` (the pinch) is still in use below.
         this.tipY[side] = this.root.worldToLocal(this.handAt.copy(h.index)).y;
@@ -4657,6 +4713,27 @@ export class MatchSystem extends createSystem({
       const raw = ((this.tipY[side] - tip.y) * ARENA_SCALE) / Math.max(1e-3, this.frameDt);
       this.tipY[side] = tip.y;
       const down = (this.tipDown[side] += (raw - this.tipDown[side]) * (1 - Math.exp(-this.frameDt / 0.08)));
+      // Direct touch has a second, deliberately different verb: slide the open index finger along
+      // the floor, then lift. A stationary downward jab remains a Cup, so the gestures do not race.
+      const touching = open && this.arena.inside(tip.x, tip.z) && depth > -0.012 && depth < 0.024;
+      let groove = this.grooving[side];
+      if (touching && !groove && !this.pressing[side]) {
+        groove = this.grooving[side] = { sx: tip.x, sz: tip.z, x: tip.x, z: tip.z, active: false };
+      }
+      if (touching && groove) {
+        groove.x = clampedGrooveX(groove.sx, groove.sz, tip.x, tip.z);
+        groove.z = clampedGrooveZ(groove.sx, groove.sz, tip.x, tip.z);
+        if (grooveLength(groove.sx, groove.sz, groove.x, groove.z) >= GROOVE_MIN_LENGTH * 0.45) groove.active = true;
+        if (groove.active) {
+          this.pressing[side] = false;
+          continue;
+        }
+      } else if (groove) {
+        this.grooving[side] = null;
+        if (groove.active && grooveLength(groove.sx, groove.sz, groove.x, groove.z) >= GROOVE_MIN_LENGTH) {
+          this.makeGroove(side, groove.sx, groove.sz, groove.x, groove.z);
+        }
+      }
       if (depth > 0.004 && !this.pressing[side] && open) {
         this.pressing[side] = true;
         // With the strike armed, a palm coming down outside the rim is a slap, not a cup at the edge.
@@ -4678,7 +4755,10 @@ export class MatchSystem extends createSystem({
               target = top;
             }
           }
-          if (target) this.makeCup(side, target.x, target.z);
+          if (target) {
+            this.grooving[side] = null;
+            this.makeCup(side, target.x, target.z);
+          }
           else {
             this.stamp.show('NO CATCH', 'PRESS BESIDE A TOP', 'neutral', 0.4);
             playLocked();
@@ -5642,6 +5722,34 @@ export class MatchSystem extends createSystem({
     return shape;
   }
 
+  /** Commits a direct-touch route. The first top to cross it takes the drawn direction. */
+  private makeGroove(side: Side, sx: number, sz: number, ex: number, ez: number): FloorShape | null {
+    const f = this.charges.spend(this.elapsed, TUNING.grace);
+    if (!f) {
+      this.locked('No charge yet\nA groove needs one charge');
+      return null;
+    }
+    if (this.online?.role === 'guest' && this.online.peer) {
+      this.online.sendEvent({ kind: 'groove', sx: -sx, sz: -sz, ex: -ex, ez: -ez });
+      this.recordIntervention();
+      this.lastShape = { t: this.elapsed, kind: 'groove' };
+      return null;
+    }
+    const shape = this.arena.addGroove(sx, sz, ex, ez, side);
+    if (!shape) return null;
+    // Strain shortens the visual/physical channel rather than making its direction ambiguous.
+    shape.amp *= f;
+    this.recordIntervention();
+    this.lastShape = { t: this.elapsed, kind: 'groove' };
+    this.progress.advance('match');
+    this.impacts.shock(ex, this.arena.height(ex, ez), ez, 0.5, 0xffc066);
+    this.sparks.embers(ex, this.arena.height(ex, ez) + 0.004, ez, 6, 0.4, 0.04, 1);
+    this.stamp.show('GROOVE CUT!', 'FIRST TOP ACROSS RIDES IT', 'mine', 0.55);
+    playThock(ex, ez);
+    if (import.meta.env.DEV) console.log(`[GROOVE] ${side} ${sx.toFixed(3)},${sz.toFixed(3)} -> ${ex.toFixed(3)},${ez.toFixed(3)}`);
+    return shape;
+  }
+
   /**
    * Predicts whether the rival's present line is carrying it toward a dangerous part of the real
    * table. On success deskAvoidX/Z point back toward safe wood for the visible defensive ramp.
@@ -5742,16 +5850,41 @@ export class MatchSystem extends createSystem({
     if (fight) {
       for (const s of this.arena.shapes) {
         const m = this.specAt(n++);
-        Object.assign(m, { kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false, sigma: s.sigma });
+        m.kind = s.kind;
+        m.x = s.x;
+        m.z = s.z;
+        m.dx = s.dx;
+        m.dz = s.dz;
+        m.strength = Arena.strength(s);
+        m.ghost = false;
+        m.sigma = s.sigma;
+        m.length = s.length;
         (s.owner.startsWith('rival') || s.owner.startsWith('bot') ? theirs : mine).push(m);
       }
       for (const side of ['left', 'right'] as const) {
         const d = this.shaping[side];
-        if (d && !d.shape) mine.push(Object.assign(this.specAt(n++), { kind: 'ramp', x: d.x, z: d.z, dx: d.dx, dz: d.dz, strength: 1, ghost: true, sigma: undefined }));
+        if (d && !d.shape) mine.push(Object.assign(this.specAt(n++), { kind: 'ramp', x: d.x, z: d.z, dx: d.dx, dz: d.dz, strength: 1, ghost: true, sigma: undefined, length: undefined }));
+        const g = this.grooving[side];
+        if (g?.active) {
+          const dx = g.x - g.sx;
+          const dz = g.z - g.sz;
+          const length = Math.hypot(dx, dz);
+          const m = this.specAt(n++);
+          m.kind = 'groove';
+          m.x = (g.sx + g.x) * 0.5;
+          m.z = (g.sz + g.z) * 0.5;
+          m.dx = length > 1e-6 ? dx / length : 0;
+          m.dz = length > 1e-6 ? dz / length : 1;
+          m.strength = 1;
+          m.ghost = true;
+          m.sigma = undefined;
+          m.length = length;
+          mine.push(m);
+        }
       }
       if (this.devRampSince >= 0 && this.gazeHit.ok) {
         const r = Math.hypot(this.gazeHit.x, this.gazeHit.z) || 1;
-        mine.push(Object.assign(this.specAt(n++), { kind: 'ramp', x: this.gazeHit.x, z: this.gazeHit.z, dx: this.gazeHit.x / r, dz: this.gazeHit.z / r, strength: this.devRampAmp() / SHAPE_SIZE.ramp, ghost: true, sigma: undefined }));
+        mine.push(Object.assign(this.specAt(n++), { kind: 'ramp', x: this.gazeHit.x, z: this.gazeHit.z, dx: this.gazeHit.x / r, dz: this.gazeHit.z / r, strength: this.devRampAmp() / SHAPE_SIZE.ramp, ghost: true, sigma: undefined, length: undefined }));
       }
     }
     this.rivalMarks.show(theirs, this.heightAt, this.time);
@@ -5761,13 +5894,20 @@ export class MatchSystem extends createSystem({
     for (const s of this.arena.shapes) {
       if (Arena.strength(s) < 0.3) continue;
       for (const t of this.tops) {
-        if (!t.alive || Math.hypot(t.x - s.x, t.z - s.z) > (s.kind === 'ramp' ? 0.036 : 0.026)) continue;
+        const rx = t.x - s.x;
+        const rz = t.z - s.z;
+        const grooveAlong = rx * s.dx + rz * s.dz;
+        const grooveAcross = Math.abs(rx * -s.dz + rz * s.dx);
+        const touching = s.kind === 'groove'
+          ? Math.abs(grooveAlong) <= (s.length ?? 0) * 0.5 + 0.012 && grooveAcross <= (s.sigma ?? 0.018)
+          : Math.hypot(rx, rz) <= (s.kind === 'ramp' ? 0.036 : 0.026);
+        if (!t.alive || !touching) continue;
         let hit = this.crunched.get(s);
         if (!hit) this.crunched.set(s, (hit = new Set()));
         if (hit.has(t)) continue;
         hit.add(t);
         playShapeHit(s.kind, t.x, t.z);
-        const authored = s.owner === 'left' || s.owner === 'right' || s.owner === 'left-cup' || s.owner === 'right-cup';
+        const authored = s.owner === 'left' || s.owner === 'right' || s.owner === 'left-cup' || s.owner === 'right-cup' || s.owner === 'left-groove' || s.owner === 'right-groove';
         this.impacts.hit(t.x, this.arena.height(t.x, t.z), t.z, authored ? 0.8 : 0.45);
         this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, authored ? 0.7 : 0.35);
         if (authored && t === this.theirs && !this.rewardedShapes.has(s)) {
@@ -5777,7 +5917,7 @@ export class MatchSystem extends createSystem({
           this.accumulator = 0;
           const charge = this.charges.reward();
           this.forgeBar.value = Math.min(1, this.forgeBar.value + 0.12);
-          this.stamp.show(`${s.kind === 'well' ? 'CUP' : 'RAMP'} → IMPACT`, `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`, 'mine', 0.5, 1.05);
+          this.stamp.show(`${s.kind === 'well' ? 'CUP' : s.kind === 'groove' ? 'GROOVE' : 'RAMP'} → ${s.kind === 'groove' ? 'DASH' : 'IMPACT'}`, `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`, 'mine', 0.5, 1.05);
         }
       }
     }
@@ -5847,8 +5987,8 @@ export class MatchSystem extends createSystem({
     this.outerRail.visible = true;
     this.outerRailHead.visible = false;
     (this.outerRailMesh.material as MeshBasicMaterial).opacity = 0.86;
-    this.stamp.show('OUTER RING!', 'YOUR TABLE IS THE ARENA', 'mine', 0.9, 1.2);
-    this.label.set('TOP ON THE TABLE\nPINCH IT · DRAW TO THE RIM');
+    this.stamp.show('PALM CATCH!', 'YOUR TABLE IS THE ARENA', 'mine', 0.9, 1.2);
+    this.label.set('TOP ON THE TABLE\nOPEN YOUR PALM UNDER IT · SWEEP IN');
     this.labelTimer = OUTER_RING_TIME;
     this.accumulator = 0;
     if (import.meta.env.DEV) console.log('[OUTER] rescue armed');
@@ -5907,6 +6047,7 @@ export class MatchSystem extends createSystem({
     me.finish = null;
     me.state = 'spinning';
     this.outerRingState = 'returned';
+    this.outerRingCompleted = true;
     this.recordIntervention();
     this.outerRingLeft = 1.2;
     this.outerRailSide = null;
@@ -5914,7 +6055,7 @@ export class MatchSystem extends createSystem({
     this.lastShape = { t: this.elapsed, kind: 'parry' };
     this.sparks.burst(me.x, this.arena.height(me.x, me.z), me.z, 1);
     this.impacts.shock(me.x, this.arena.height(me.x, me.z), me.z, 0.9, 0xff7a20);
-    this.stamp.show('FORGED RETURN!', 'BACK FROM YOUR TABLE', 'mine', 0.9, 1.2);
+    this.stamp.show('PALM RETURN!', 'CAUGHT ON YOUR REAL TABLE', 'mine', 0.9, 1.2);
     this.label.set('');
     this.labelTimer = 0;
     playDash(me.x);
@@ -5932,11 +6073,15 @@ export class MatchSystem extends createSystem({
       }
       return false;
     }
-    if (this.outerRingState !== 'rescue' && this.outerRingState !== 'rail') return false;
+    if (this.outerRingState !== 'rescue' && this.outerRingState !== 'palm') return false;
     this.outerRingLeft -= dt;
     this.myView.brakeForRescue(dt);
     const at = this.myView.rescueAt;
-    if (this.myView.offDesk || this.outerRingLeft <= 0 || (!at && this.myView.restingAt !== null)) {
+    // Before the catch, the real desk edge still decides the KO. Once the top is on a palm, that
+    // palm is its physical surface; the old ballistic view may continue past the desk edge for one
+    // frame, but it must no longer invalidate a successful catch.
+    const waitingForPalm = this.outerRingState === 'rescue';
+    if (this.outerRingLeft <= 0 || (waitingForPalm && (this.myView.offDesk || (!at && this.myView.restingAt !== null)))) {
       this.outerRingState = 'failed';
       this.outerRail.visible = false;
       this.label.set('TABLE EDGE KO\nTHE REAL EDGE ENDS THE ROUND');
@@ -5944,40 +6089,42 @@ export class MatchSystem extends createSystem({
       this.finish(-1);
       return true;
     }
-    // The top is still flying toward the table: keep the rescue clock visible, but wait for contact.
-    if (!at) return true;
-    this.stage.localToWorld(this.handAt.copy(at));
-    this.root.worldToLocal(this.outerRingAt.copy(this.handAt));
-    const angle = Math.atan2(this.outerRingAt.z, this.outerRingAt.x);
-    const rim = rimRadius(this.arena.layout, angle) * 0.9;
-    this.outerRingGoal.set(Math.cos(angle) * rim, -PEDESTAL / ARENA_SCALE + 0.003, Math.sin(angle) * rim);
-    if (this.outerRailSide === null) {
+    if (waitingForPalm) {
+      // The top is still flying toward the table: keep the rescue clock visible, but wait for contact.
+      if (!at) return true;
+      this.stage.localToWorld(this.handAt.copy(at));
+      this.root.worldToLocal(this.outerRingAt.copy(this.handAt));
+      const angle = Math.atan2(this.outerRingAt.z, this.outerRingAt.x);
+      const rim = rimRadius(this.arena.layout, angle) * 0.9;
+      this.outerRingGoal.set(Math.cos(angle) * rim, -PEDESTAL / ARENA_SCALE + 0.003, Math.sin(angle) * rim);
       for (const side of ['left', 'right'] as const) {
         const h = this.hands[side];
-        // Do not depend on one `justPinched` frame: a brief tracking loss or a slow IWER frame can
-        // swallow that edge while the fingers are visibly closed over the top.
-        if (!h.pinching) continue;
-        const catchDistance = h.pinch.distanceTo(this.handAt);
-        if (catchDistance > (import.meta.env.DEV ? 0.18 : 0.095)) {
+        if (!h.tracked || h.pinching || Math.abs(h.wrist.y - h.index.y) > 0.08) continue;
+        const palm = this.p.copy(h.wrist).lerp(h.index, 0.48);
+        const catchDistance = palm.distanceTo(this.handAt);
+        if (catchDistance > (import.meta.env.DEV ? PALM_CATCH_RADIUS * 1.8 : PALM_CATCH_RADIUS)) {
           if (import.meta.env.DEV) console.log(`[OUTER] ${side} catch missed by ${catchDistance.toFixed(3)} m`);
           continue;
         }
         this.outerRailSide = side;
-        this.outerRingState = 'rail';
+        this.outerRingState = 'palm';
         this.outerRailCount = 0;
         this.outerRailLength = 0;
         this.outerRailGeometry.setDrawRange(0, 0);
         this.appendOuterRail(this.outerRingAt.x, this.outerRingAt.z);
         playTick();
-        if (import.meta.env.DEV) console.log(`[OUTER] ${side} hand caught the top`);
+        this.label.set('CAUGHT!\nSWEEP YOUR OPEN PALM TO THE RIM');
+        if (import.meta.env.DEV) console.log(`[OUTER] ${side} open palm caught the top`);
         break;
       }
       return true;
     }
+    // From here on the open palm, rather than the old off-arena flight, owns the top.
+    if (this.outerRailSide === null) return true;
     const h = this.hands[this.outerRailSide];
     if (!h.tracked && (this.outerRailLost += dt) < HAND_LOSS_GRACE) return true;
     if (h.tracked) this.outerRailLost = 0;
-    if (!h.tracked || !h.pinching) {
+    if (!h.tracked || h.pinching) {
       this.outerRailLost = 0;
       this.outerRailSide = null;
       this.outerRingState = 'rescue';
@@ -5986,11 +6133,16 @@ export class MatchSystem extends createSystem({
       this.outerRailHead.visible = false;
       this.outerRailGeometry.setDrawRange(0, 0);
       playLocked();
-      this.label.set('Dropped it\nPinch the top again');
+      this.label.set('Dropped it\nOpen your palm under the top');
       this.labelTimer = Math.max(1.6, this.outerRingLeft);
       return true;
     }
-    const l = this.root.worldToLocal(this.local.copy(h.pinch));
+    const palmWorld = this.p.copy(h.wrist).lerp(h.index, 0.48);
+    this.stage.worldToLocal(this.handAt.copy(palmWorld));
+    this.myView.carryRescue(this.handAt);
+    this.stage.localToWorld(this.handAt);
+    const l = this.root.worldToLocal(this.local.copy(this.handAt));
+    this.outerRingAt.copy(l);
     if (ROOM.poly && insidePoly(ROOM.poly, l.x, l.z)) this.appendOuterRail(l.x, l.z);
     if (this.outerRailLength > 0.055 && normRadius(this.arena.layout, l.x, l.z) <= 0.94) this.completeOuterRing();
     return true;
@@ -6848,6 +7000,13 @@ export class MatchSystem extends createSystem({
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = 'RAMP';
       playThock();
+    } else if (ev.kind === 'groove') {
+      const shape = this.arena.addGroove(ev.sx, ev.sz, ev.ex, ev.ez, 'rival');
+      if (!shape) return;
+      this.rivalHandMove(ev.ex, ev.ez, shape.dx, shape.dz);
+      this.rivalShapeAt = this.elapsed;
+      this.rivalShapeKind = 'GROOVE';
+      playThock();
     } else if (ev.kind === 'cup') {
       // The guest's cup, held here for them: it catches the first top in, then lets go after the hold.
       if (this.netCup && this.arena.shapes.includes(this.netCup.shape)) this.arena.free(this.netCup.shape);
@@ -6962,21 +7121,21 @@ export class MatchSystem extends createSystem({
   private syncGuestShapes(packed: PackedShape[], dt: number) {
     const live = new Set<number>();
     const out: FloorShape[] = [];
-    for (const [id, kind, x, z, dx, dz, amp, owner] of packed) {
+    for (const [id, kind, x, z, dx, dz, amp, owner, length] of packed) {
       live.add(id);
       let shape = this.netShapes.get(id);
       // The host's 'rival' shapes are this guest's own; the host's hands' shapes are the rival's here.
-      const mine = owner === 'rival' || owner === 'rival-cup';
+      const mine = owner === 'rival' || owner === 'rival-cup' || owner === 'rival-groove';
       if (!shape) {
-        shape = { kind: kind === 0 ? 'ramp' : 'well', x, z, dx, dz, amp, age: 0, owner: mine ? 'left' : 'rival' };
+        shape = { kind: kind === 0 ? 'ramp' : kind === 4 ? 'groove' : 'well', x, z, dx, dz, amp, age: 0, owner: mine ? 'left' : 'rival', ...(length === undefined ? {} : { length }), ...(kind === 4 ? { boost: -1 } : {}) };
         this.netShapes.set(id, shape);
         this.arenaDirty = true;
-      } else if (shape.dx !== dx || shape.dz !== dz || shape.amp !== amp) {
-        Object.assign(shape, { x, z, dx, dz, amp });
+      } else if (shape.dx !== dx || shape.dz !== dz || shape.amp !== amp || shape.length !== length) {
+        Object.assign(shape, { x, z, dx, dz, amp, length });
         this.arenaDirty = true;
       }
       // A cup (2), or a cup holding a top (3), as the host says now: let go there, let go here.
-      const trap = kind >= 2;
+      const trap = kind === 2 || kind === 3;
       if (!!shape.trap !== trap) this.arenaDirty = true;
       shape.trap = shape.held = trap;
       // The top it holds: the one nearest the cup (this side only needs it for the sling cord).

@@ -16,6 +16,7 @@ import {
 import { ARENAS } from './arenas.ts';
 import { PRESETS, specFromBuild } from './parts.ts';
 import { SHAPE_SIZE } from './shaping.ts';
+import { GROOVE_RADIUS } from './hand-tools.ts';
 import { launchSpeedScale, launchSpinScale, MATCH_POINT_TARGET, suddenDeathPocketHalf, suddenDeathProgress } from './gameplay-rules.ts';
 
 /** Floor dips toward a pocket over this outer band of the radius. */
@@ -339,6 +340,32 @@ export class Arena {
     return shape;
   }
 
+  /** A line scratched by an open fingertip. It guides exactly one crossing top, then relaxes. */
+  addGroove(sx: number, sz: number, ex: number, ez: number, owner: string): FloorShape | null {
+    const vx = ex - sx;
+    const vz = ez - sz;
+    const length = Math.hypot(vx, vz);
+    if (length < 1e-6) return null;
+    // One readable route per hand. Ramps and cups stay: the groove is a separate arena verb.
+    this.shapes = this.shapes.filter((s) => s.owner !== `${owner}-groove`);
+    const shape: FloorShape = {
+      kind: 'groove',
+      x: (sx + ex) * 0.5,
+      z: (sz + ez) * 0.5,
+      dx: vx / length,
+      dz: vz / length,
+      amp: 0.007,
+      age: 0,
+      owner: `${owner}-groove`,
+      sigma: GROOVE_RADIUS,
+      length,
+      // Negative means armed indefinitely; zero means the first crossing consumed it.
+      boost: -1,
+    };
+    this.shapes.push(shape);
+    return shape;
+  }
+
   /** Turns a live ramp to push another way (the hand still holding it drags its face round). */
   aimShape(shape: FloorShape, dx: number, dz: number) {
     const len = Math.hypot(dx, dz);
@@ -360,6 +387,15 @@ export class Arena {
       const k = s.amp * Arena.strength(s);
       const rx = x - s.x;
       const rz = z - s.z;
+      if (s.kind === 'groove') {
+        const half = (s.length ?? 0) * 0.5;
+        const along = Math.max(-half, Math.min(half, rx * s.dx + rz * s.dz));
+        const qx = rx - s.dx * along;
+        const qz = rz - s.dz * along;
+        const gs = s.sigma ?? GROOVE_RADIUS;
+        h -= k * Math.exp(-(qx * qx + qz * qz) / (gs * gs));
+        continue;
+      }
       if (s.kind === 'well') {
         const ws = s.sigma ?? WELL_SIGMA;
         h -= k * Math.exp(-(rx * rx + rz * rz) / (ws * ws));
@@ -448,9 +484,16 @@ export class Arena {
   dashShape(t: Top): boolean {
     if (!t.alive || t.sinceDash < 0.45) return false;
     for (const s of this.shapes) {
-      if (s.kind !== 'ramp' || !s.boost || s.boost <= 0) continue;
+      if ((s.kind !== 'ramp' && s.kind !== 'groove') || !s.boost) continue;
       const sigma = s.sigma ?? RAMP_SIGMA;
-      if (Math.hypot(t.x - s.x, t.z - s.z) > sigma * 0.72) continue;
+      const rx = t.x - s.x;
+      const rz = t.z - s.z;
+      if (s.kind === 'groove') {
+        const half = (s.length ?? 0) * 0.5;
+        const along = rx * s.dx + rz * s.dz;
+        const across = Math.abs(rx * -s.dz + rz * s.dx);
+        if (Math.abs(along) > half + sigma * 0.5 || across > sigma) continue;
+      } else if (Math.hypot(rx, rz) > sigma * 0.72) continue;
       const along = t.vx * s.dx + t.vz * s.dz;
       const add = Math.max(0.28, 0.82 - along);
       t.vx += s.dx * add;
@@ -460,6 +503,7 @@ export class Arena {
       t.kickZ = s.dz;
       t.sinceDash = 0;
       s.boost = 0;
+      if (s.kind === 'groove') s.age = Math.max(s.age, TUNING.shapeHold + SHAPE_RELAX_TAU * 0.6);
       return true;
     }
     return false;
@@ -475,7 +519,7 @@ export class Arena {
     if (this.shapes.length) {
       for (const s of this.shapes) {
         s.age += dt;
-        if (s.boost) s.boost = Math.max(0, s.boost - dt);
+        if (s.boost && s.boost > 0) s.boost = Math.max(0, s.boost - dt);
       }
       this.shapes = this.shapes.filter((s) => Arena.strength(s) > 0.03);
     }
@@ -546,7 +590,7 @@ export class Arena {
   }
 }
 
-export type ShapeKind = 'ramp' | 'well';
+export type ShapeKind = 'ramp' | 'well' | 'groove';
 
 /** A player-made shape on the floor: a ramp pushing toward (dx, dz), or a well. */
 export interface FloorShape {
@@ -567,6 +611,8 @@ export interface FloorShape {
   caught?: Top | null;
   /** Seconds left as a re-pinched dash rail; consumed by the first top crossing it. */
   boost?: number;
+  /** Length of a fingertip-drawn one-use groove, centred at x/z and pointing along dx/dz. */
+  length?: number;
 }
 
 function smoothstep(e0: number, e1: number, x: number) {

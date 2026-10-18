@@ -1015,12 +1015,12 @@ export function playThock(x = 0, z = 0) {
 }
 
 /** A top meets player-made terrain: ramps scrape upward, wells answer with a low metal knock. */
-export function playShapeHit(kind: 'ramp' | 'well', x = 0, z = 0) {
+export function playShapeHit(kind: 'ramp' | 'well' | 'groove', x = 0, z = 0) {
   at(
     x,
     () =>
       vary(0.05, () => {
-        if (kind === 'ramp') {
+        if (kind === 'ramp' || kind === 'groove') {
           crack(0.16, 0.004, 2800);
           hiss(0.14, 0.13, 850, 3600, 3);
           ring(steel('', 1750), 0.11, 1.08, 0.01, 0.05);
