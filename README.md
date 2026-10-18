@@ -314,6 +314,8 @@ an arena. First to 3 heat wins a match.
 npm install
 npm run dev          # dev server + managed Chromium with the Quest emulator (https://localhost:8081)
 npm run check:sim    # headless sanity check of the fight simulation
+npm run check:sim-n  # two-to-four-top simulation check
+npm run check:net    # online protocol check over a lossy loopback
 npm run report:arenas # how each built-in arena plays, by simulation
 npm run report:tops  # how every top build plays against the others, by simulation
 npm run typecheck
