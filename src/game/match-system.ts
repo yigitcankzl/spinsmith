@@ -852,6 +852,8 @@ export class MatchSystem extends createSystem({
   private extraViews: TopView[] = [];
   private brawlLoser: Top | null = null;
   private brawlNames: string[] = [];
+  /** Bots already called out this round. */
+  private brawlOut = new Set<Top>();
   /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
   private online: OnlineLink | null = null;
   private netRip: { power: number; aim: number } | null = null;
@@ -3200,6 +3202,7 @@ export class MatchSystem extends createSystem({
       t.state = 'out';
       t.finish = null;
     }
+    this.brawlOut.clear();
     this.oneHandAt = -1;
     this.trails.clear();
     this.impacts.clear();
@@ -5566,6 +5569,15 @@ export class MatchSystem extends createSystem({
         const clashes = stepN(this.arena, this.tops);
         clash = clashes.find((c) => c.a === 0 && c.b === 1) ?? null;
         for (const c of clashes) if (c !== clash) this.brawlClash(c);
+        this.tops.forEach((t, i) => {
+          if (i === 0 || t.alive || this.brawlOut.has(t)) return;
+          // A bot going out is its own beat: you need to know who is left.
+          this.brawlOut.add(t);
+          const left = this.tops.filter((x) => x.alive).length;
+          this.stamp.show(`${(i === 1 ? this.rival.name : this.brawlNames[i - 2]).toUpperCase()} OUT`, `${left} TOP${left === 1 ? '' : 'S'} LEFT`, 'neutral', 0.6);
+          this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.7);
+          playStamp();
+        });
       } else clash = step(this.arena, this.mine, this.theirs);
       this.record(clash);
       if (clash) this.openingClash(clash, mineVx, mineVz, rivalVx, rivalVz, openingDx, openingDz);
