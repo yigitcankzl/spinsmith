@@ -248,14 +248,14 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
 - **Accessibility:** sound cues are covered. An audit of every play*() call found five sound-only cues, and all are now paired with a stamp or card. Not done: a mirrored hub layout. Every gesture already works with either hand; only the dock and anvil sides are fixed.
 - **Capture rig:** after many automated probes the IWER rig drifted to controllers and the default pose. Re-run `scripts/capture/setup.sh restart` before shooting.
 
-## State at the end of the night (07:40)
+## State at the end of the night (07:45)
 - **Checks:** `tsc --noEmit`, `check:sim`, `check:sim-n`, `check:net`, `build` and `public-release-check` all pass. `report:tops` and `report:arenas` show no warnings.
 - **Render budget (IWER, per eye, measured at 07:39):** it depends on the arena.
   - Earlier arenas: duel about 91, 4-top brawl about 124.
   - **Forge Bowl** (Codex's richer hero shell): duel about 128. The 4-top brawl was about 151 at 07:39 and is **about 133 after 3c341f3** (brawl bots skip the team ring; their bodies are painted in their colour).
   - Hub: about 70–107.
   - **Next perf step, for headroom:** WOW-PLAN B3 (merge the arena's static parts) and B5 (instance the effect pools).
-- **History:** about 118 commits on master since Codex's last (6d7bea6), all authored by Yiğitcan Kızıl, none with a Co-Authored-By or Claude line. Nothing is pushed; pushing is left to you.
+- **History:** 123 commits on master since Codex's last (6d7bea6), all authored by Yiğitcan Kızıl, none with a Co-Authored-By or Claude line. Nothing is pushed; pushing is left to you.
 - **Workspace:** the tree is clean; worktrees and branches from the night are merged and deleted. The emulator is on the `?demo` save and the dev server is running.
 - **Local only:** `docs/SUBMISSION.md` (updated description and testing card) and the stills in `artifacts/capture/`.
 - **Last regression (07:20 and 07:37, IWER, error listener on):** bout 2-1 won → the map moves to 2-2; rematch keeps the bout; a 3-top brawl round; PASS → Challenger with the echo; online round plus guest cup and sling (07:18). No console errors.
