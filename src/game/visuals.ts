@@ -872,6 +872,10 @@ export class TopView {
       if (m.map && m.map !== EMBLEM && m.map !== SOFT_SHADOW) m.map.dispose();
       m.dispose();
     }
+    if (this.teamRing) {
+      this.teamRing.geometry.dispose();
+      (this.teamRing.material as Material).dispose();
+    }
     this.root.removeFromParent();
     this.shadow.removeFromParent();
     this.debris.removeFromParent();

@@ -5117,7 +5117,7 @@ export class MatchSystem extends createSystem({
 
   /** Rivals from level 6 shape the floor too; each move family uses its normal tactic, not one AI. */
   private rivalShaping() {
-    if (this.demo || this.online?.peer || !(this.bout ? this.bout.shapes : this.rival.level >= 6)) return;
+    if (this.demo || this.online?.peer || !this.theirs.alive || !(this.bout ? this.bout.shapes : this.rival.level >= 6)) return;
     this.rivalCharges.update(STEP);
     if (this.elapsed - this.rivalShapeAt >= RIVAL_SHAPE_GAP && this.rivalNeedsDeskGuard()) {
       const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
