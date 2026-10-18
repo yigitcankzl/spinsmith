@@ -14,6 +14,7 @@ export default async function run({ page, frame }) {
   const mode = process.env.HAND_CHECK ?? 'palm-brace';
   return target.evaluate(async (check) => {
     const drive = window.drive;
+    const game = window.__game;
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     // Every probe begins from the current XR hand rig. This also makes the script repeatable after
     // a session exit/re-entry, when IWER has rebuilt the joints behind the same window.drive object.
@@ -24,6 +25,8 @@ export default async function run({ page, frame }) {
       window.__game.openForge();
       await sleep(500);
     }
+    if (check === 'palm-brace') game.progress.matches = Math.max(2, game.progress.matches);
+    if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     if (check === 'dual-rip' && drive.state().phase !== 'ready') {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
@@ -130,7 +133,7 @@ export default async function run({ page, frame }) {
     for (let sample = 0; sample < 200 && !finished; sample++) await sleep(16);
     if (!finished) throw new Error(`${check} action did not settle`);
     if (failure) throw new Error(failure);
-    if ((stateKey === 'outerRing' || (stateKey === 'morph' && check !== 'arena-morph-cancel')) && !sawTransient) throw new Error(`${stateKey} never became visibly active`);
+    if (stateKey && check !== 'arena-morph-cancel' && !sawTransient) throw new Error(`${stateKey} never became visibly active`);
 
     const after = drive.state();
     if (check === 'arena-morph-cancel') {
