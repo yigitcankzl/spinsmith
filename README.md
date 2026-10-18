@@ -168,6 +168,15 @@ an arena. First to 3 heat wins a match.
 - **Pass and play:** when a duel ends, a PASS button joins MENU and REMATCH: the next person on
   the same headset fights the top just played and its recorded rips and forges (an echo, below),
   with a ghost hand from the far rim.
+- **Online duel (beta)** (`src/game/online.ts`, `src/game/net.ts`): open the game with
+  `?online=host` and the card shows a five-letter room code; a friend on another headset opens
+  `?online=CODE`. The host's game runs the only simulation: it waits for both rips, applies the
+  guest's ramps and arena forges from the far side, and sends both tops and the floor 30 times a
+  second; the guest sees the fight turned half round, so their own top is near them. Signalling
+  goes over public WebRTC relays (Trystero, loaded only when a room is opened) with public STUN
+  only, so some strict networks will not connect, and it says so. Tested with two browser
+  windows (`&net=bc`) and a node loopback with 200 ms round trips and 5% loss
+  (`npm run check:net`); not yet between two headsets.
 - **A reason to come back** (`src/game/orders.ts`, `src/game/board.ts`):
   once the first session is over, the Smith's board over the far rim shows **today's Smith
   Order**, made from the local date and what you have unlocked (the same all day): a rival, an
