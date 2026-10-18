@@ -123,6 +123,10 @@ IWER two windows after the fix: the guest's top equals the host's rival top, the
 | 0c7b02e, 661bde0 | **Crowded bouts:** 2-3 is three tops (Leech + Saw Wraith) and 3-3 is four tops (Gearwright + Twin Gear + Long Ember). Last top spinning wins, and the bout still counts. IWER: 2-3 starts with its crowd and its lesson. |
 | e4ec69e (removed later) | A debug-looking two-window online screenshot (controllers, gizmos) was added, then removed after the judge pass; re-shoot it in the capture rig with hands. |
 
+| fd21deb | Second judge pass. Scores rose in Experience 6→7, Polish 5→6, Social 5→6, Come Back 8→9, First Five 5→6 and Accessibility 5→6. The README's stale claims are fixed (the online row says "tested in two browser windows", the old circuit ladder text is gone, the board-back text is right), and there is an "If something goes wrong" box. |
+| 91102a1 | An online host's workshop arena goes to the guest whole, cloned and validated (untrusted input), instead of matching by name. |
+| 86a13b5 | Brawl bots raise a ramp inside their nearest foe every 3.5–5.5 s. IWER: bot ramps appear, the round ends normally, and there are no errors. |
+
 **First session, verified with real emulated gestures (IWER, fresh save):**
 - round 1, ramp → lastShape ramp;
 - round 2, the two-hand forge → squeeze (this was broken before d16e34d);
