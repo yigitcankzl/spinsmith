@@ -2516,11 +2516,13 @@ export class Impacts {
  */
 export class Trails {
   static readonly PER = 32;
+  /** Yours, the rival's, and a brawl's two extra seats (still one instanced draw). */
+  static readonly SIDES = 4;
   readonly mesh: InstancedMesh;
-  private age = new Float32Array(Trails.PER * 2).fill(9);
-  private size = new Float32Array(Trails.PER * 2);
-  private at = new Float32Array(Trails.PER * 2 * 3);
-  private next = [0, 0];
+  private age = new Float32Array(Trails.PER * Trails.SIDES).fill(9);
+  private size = new Float32Array(Trails.PER * Trails.SIDES);
+  private at = new Float32Array(Trails.PER * Trails.SIDES * 3);
+  private next = [0, 0, 0, 0];
   private newest = 9;
   private readonly m = new Matrix4();
   private readonly v = new Vector3();
@@ -2531,19 +2533,19 @@ export class Trails {
     this.mesh = new InstancedMesh(
       new PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
       new MeshBasicMaterial({ map: SOFT_SHADOW, transparent: true, blending: AdditiveBlending, depthWrite: false }),
-      Trails.PER * 2,
+      Trails.PER * Trails.SIDES,
     );
     this.mesh.frustumCulled = false;
     this.mesh.visible = false;
-    const colors = [new Color(0xff8a2a).multiplyScalar(0.9), new Color(0x4fd1ff).multiplyScalar(0.8)];
-    for (let i = 0; i < Trails.PER * 2; i++) {
-      this.mesh.setColorAt(i, colors[i < Trails.PER ? 0 : 1]);
+    const colors = [new Color(0xff8a2a).multiplyScalar(0.9), new Color(0x4fd1ff).multiplyScalar(0.8), new Color(0x6fd35a).multiplyScalar(0.8), new Color(0xb07cff).multiplyScalar(0.8)];
+    for (let i = 0; i < Trails.PER * Trails.SIDES; i++) {
+      this.mesh.setColorAt(i, colors[Math.floor(i / Trails.PER)]);
       this.mesh.setMatrixAt(i, this.m.makeScale(0, 0, 0));
     }
   }
 
-  /** A dot under top `side` (0 yours, 1 the rival's) moving at `speed` (arena units/s). */
-  drop(side: 0 | 1, x: number, y: number, z: number, speed: number) {
+  /** A dot under top `side` (0 yours, 1 the rival's, 2-3 a brawl's extra tops) moving at `speed` (arena units/s). */
+  drop(side: number, x: number, y: number, z: number, speed: number) {
     const i = side * Trails.PER + this.next[side];
     this.next[side] = (this.next[side] + 1) % Trails.PER;
     this.age[i] = 0;
@@ -2564,7 +2566,7 @@ export class Trails {
     this.newest += dt;
     this.mesh.visible = this.newest < 0.6;
     if (!this.mesh.visible) return;
-    for (let i = 0; i < Trails.PER * 2; i++) {
+    for (let i = 0; i < Trails.PER * Trails.SIDES; i++) {
       this.age[i] += dt;
       const k = Math.max(0, 1 - this.age[i] / 0.6);
       this.v.fromArray(this.at, i * 3);

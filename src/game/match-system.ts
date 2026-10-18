@@ -1545,7 +1545,7 @@ export class MatchSystem extends createSystem({
       this.trailT = 0;
       if (this.phase === 'fight') {
         this.tops.forEach((t, side) => {
-          if (side < 2 && t.state === 'spinning') this.trails.drop(side as 0 | 1, t.x, this.arena.height(t.x, t.z), t.z, Math.hypot(t.vx, t.vz));
+          if (side < 4 && t.state === 'spinning') this.trails.drop(side, t.x, this.arena.height(t.x, t.z), t.z, Math.hypot(t.vx, t.vz));
         });
       }
     }
