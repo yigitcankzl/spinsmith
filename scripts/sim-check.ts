@@ -24,6 +24,7 @@ import { rankingN, roundOverN, stepN, sealStrike, rivalMove, strike, TELL_TIME, 
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
+import { targetWinner } from '../src/game/brawl.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -1387,6 +1388,21 @@ assert.equal(edgeOf('defense', 'attack'), 1);
 assert.equal(edgeOf('stamina', 'attack'), -1);
 assert.equal(edgeOf('balance', 'attack'), 0);
 assert.equal(edgeOf('defense', 'defense'), 0);
+
+// 33b. Crowded target modes credit the last attacker, and the Crucible ignores ordinary pockets.
+{
+  const tops = [
+    { finish: null, pocketPoints: 2 },
+    { finish: 'pocket', pocketPoints: 2 },
+    { finish: null, pocketPoints: 2 },
+  ];
+  const hits = new Int8Array([-1, 0, 1]);
+  assert.deepEqual(targetWinner('pocket', tops, hits), { winner: 0, victim: 1 }, 'the top that sent a foe into a pocket wins King of the Pocket');
+  assert.equal(targetWinner('crucible', tops, hits), null, 'an ordinary pocket does not finish a Crucible race');
+  tops[1].pocketPoints = 3;
+  assert.deepEqual(targetWinner('crucible', tops, hits), { winner: 0, victim: 1 }, 'the three-heat pocket decides a Crucible race');
+  assert.equal(targetWinner('last', tops, hits), null, 'last-spin mode keeps the existing survival verdict');
+}
 
 // 34. Orders chase map medals: the first won bout missing an order-able medal, about every other day.
 {

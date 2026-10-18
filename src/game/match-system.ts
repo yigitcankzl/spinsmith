@@ -51,6 +51,8 @@ import type { GuestEvent, PackedShape, Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from './campaign.js';
 import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
+import { brawlModeName, targetWinner } from './brawl.js';
+import type { BrawlMode } from './brawl.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
@@ -878,6 +880,8 @@ export class MatchSystem extends createSystem({
   private nextBoutPick: Bout | null = null;
   /** Tops in the next match: 2 is a duel; 3 or 4 a brawl (bots fill the extra seats; the last top spinning takes the heat). */
   private seats = loadSeats();
+  private brawlMode: BrawlMode = loadBrawlMode();
+  private activeBrawlMode: BrawlMode = 'last';
   /** A brawl's extra tops and their views, and the foe that went out last in a won round. */
   private extras: Top[] = [];
   private extraViews: TopView[] = [];
@@ -885,6 +889,8 @@ export class MatchSystem extends createSystem({
   private brawlNames: string[] = [];
   /** Bots already called out this round. */
   private brawlOut = new Set<Top>();
+  /** For pocket-target brawls: victim index -> most recent top that hit it. */
+  private brawlLastHit = new Int8Array(4).fill(-1);
   /** When each brawl bot next raises a ramp (fight time). */
   private botShapeAt = [0, 0];
   /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
@@ -2063,7 +2069,7 @@ export class MatchSystem extends createSystem({
     } else if (action.kind === 'reset') {
       return;
     } else if (action.kind === 'brawl') {
-      // The pegs step: duel, 3-top brawl, 4-top brawl, an online room, and back to the duel.
+      // The pegs step through three genuinely different crowded rules before the online room.
       if (this.online?.peer) {
         this.label.set('In an online duel\nMENU ends it');
         this.labelTimer = 2.5;
@@ -2073,17 +2079,28 @@ export class MatchSystem extends createSystem({
       if (online) {
         this.endOnline();
         this.seats = 2;
+        this.brawlMode = 'last';
         this.toHub();
-      } else if (this.seats >= 4 && !this.online) {
+      } else if (this.brawlMode === 'crucible' && !this.online) {
         this.seats = 2;
         this.openOnline('host');
         this.hub.setBrawl(4, true);
         playTick();
         return;
-      } else this.seats = Math.min(4, this.seats + 1);
-      saveSeats(this.seats);
+      } else if (this.seats === 2) {
+        this.seats = 3;
+        this.brawlMode = 'last';
+      } else if (this.brawlMode === 'last' && this.seats === 3) this.seats = 4;
+      else if (this.brawlMode === 'last') {
+        this.seats = 3;
+        this.brawlMode = 'pocket';
+      } else {
+        this.seats = 4;
+        this.brawlMode = 'crucible';
+      }
+      saveBrawlSettings(this.seats, this.brawlMode);
       this.hub.setBrawl(this.seats);
-      this.label.set(this.seats === 2 ? 'Duel: you and one rival\nPinch the pegs for a brawl' : `Brawl: ${this.seats} tops\nLast top spinning takes the heat`);
+      this.label.set(this.seats === 2 ? 'Duel: you and one rival\nPinch the pegs for a brawl' : `${brawlModeName(this.brawlMode)} · ${this.seats} TOPS\n${this.brawlMode === 'pocket' ? 'First credited pocket wins' : this.brawlMode === 'crucible' ? 'First credited 3-heat pocket wins' : 'Last top spinning takes the heat'}`);
       this.labelTimer = 3;
       playTick();
     } else if (action.kind === 'comfort') {
@@ -2100,7 +2117,8 @@ export class MatchSystem extends createSystem({
       // A new player on a shared headset: progress, the saved top and built arenas are forgotten.
       this.progress.reset();
       this.seats = 2;
-      saveSeats(2);
+      this.brawlMode = 'last';
+      saveBrawlSettings(2, 'last');
       // A new smith gets every lesson again, and an open online room closes.
       this.morphedOnce = false;
       this.slungOnce = false;
@@ -2926,11 +2944,19 @@ export class MatchSystem extends createSystem({
     this.clearBrawl();
     const seats = again ? lastSeats : this.seats;
     const crowd = this.bout?.crowd;
+    this.activeBrawlMode = crowd?.length ? 'last' : this.brawlMode;
     // A crowded bout brings its own tops; otherwise the pegs' brawl is free play (no bout).
     if (crowd?.length && this.online) this.bout = null;
     else if (crowd?.length) this.setupBrawl(crowd.length, crowd);
     else if (seats > 2 && (again || !rival) && !friend && !this.online && this.progress.guide === 'done') {
       this.bout = null;
+      if (this.brawlMode === 'crucible' && !this.arena.layout.pockets.some((p) => (p.points ?? 2) >= 3)) {
+        const target = this.arenas.find((a) => a.pockets.some((p) => (p.points ?? 2) >= 3) && this.progress.isUnlocked(`arena:${a.name}`));
+        if (target) {
+          this.arenaIndex = this.arenas.indexOf(target);
+          this.setArena(target);
+        }
+      }
       this.setupBrawl(seats - 2);
     }
     this.progress.playedArena(this.arena.layout.name);
@@ -3443,6 +3469,7 @@ export class MatchSystem extends createSystem({
       t.finish = null;
     }
     this.brawlOut.clear();
+    this.brawlLastHit.fill(-1);
     this.botShapeAt = [TUNING.grace + 1 + Math.random() * 2, TUNING.grace + 2 + Math.random() * 2];
     this.oneHandAt = -1;
     this.trails.clear();
@@ -3550,7 +3577,8 @@ export class MatchSystem extends createSystem({
       const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
       const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
       const secret = bout && !bout.night && !this.progress.hasSecret(bout.id) ? `\nHidden shard: ${this.progress.secretCount}/${BOUTS.length}` : '';
-      const line = this.extras.length && bout ? `${bout.lesson}\nLast top spinning takes the heat${secret}` : this.extras.length ? `Brawl with ${this.brawlNames.length > 1 ? `${this.brawlNames.slice(0, -1).join(', ')} and ${this.brawlNames[this.brawlNames.length - 1]}` : this.brawlNames[0]}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}${secret}` : `${bout.lesson}\n${bout.twist}${secret}`) : this.rivalRead || watch;
+      const brawlRule = this.activeBrawlMode === 'pocket' ? 'First credited pocket wins' : this.activeBrawlMode === 'crucible' ? 'First credited 3-heat pocket wins' : 'Last top spinning takes the heat';
+      const line = this.extras.length && bout ? `${bout.lesson}\nLast top spinning takes the heat${secret}` : this.extras.length ? `Brawl with ${this.brawlNames.length > 1 ? `${this.brawlNames.slice(0, -1).join(', ')} and ${this.brawlNames[this.brawlNames.length - 1]}` : this.brawlNames[0]}\n${brawlModeName(this.activeBrawlMode)} · ${brawlRule}` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}${secret}` : `${bout.lesson}\n${bout.twist}${secret}`) : this.rivalRead || watch;
       // The type loop, read before the rip: whose top counters whose.
       const edge = this.progress.guide === 'done' ? edgeOf(roleOf(specFromBuild(this.myBuild)), roleOf(specFromBuild(this.rival.build))) : 0;
       const read = edge > 0 ? ' · you counter it' : edge < 0 ? ' · it counters you' : '';
@@ -6022,6 +6050,11 @@ export class MatchSystem extends createSystem({
       if (this.extras.length) {
         // A brawl: every pair can meet. The duel's own effects follow you and the rival; other meetings spark on their own.
         const clashes = stepN(this.arena, this.tops);
+        for (const meeting of clashes) {
+          if (meeting.a === undefined || meeting.b === undefined) continue;
+          this.brawlLastHit[meeting.a] = meeting.b;
+          this.brawlLastHit[meeting.b] = meeting.a;
+        }
         clash = clashes.find((c) => c.a === 0 && c.b === 1) ?? null;
         for (const c of clashes) if (c !== clash) this.brawlClash(c);
         this.tops.forEach((t, i) => {
@@ -6978,6 +7011,13 @@ export class MatchSystem extends createSystem({
   private brawlVerdict(): -1 | 0 | 1 {
     // Out while a foe still spins is a lost round; out in the same step as the last foe goes to the ranking (spin left).
     if (!this.mine.alive && this.tops.some((t, i) => i > 0 && t.alive)) return -1;
+    const target = targetWinner(this.activeBrawlMode, this.tops, this.brawlLastHit);
+    if (target) {
+      this.brawlLoser = this.tops[target.victim];
+      const word = this.activeBrawlMode === 'crucible' ? 'CRUCIBLE HIT!' : 'POCKET CROWN!';
+      this.stamp.show(word, target.winner === 0 ? 'YOUR HIT TOOK THE ROUND' : 'A RIVAL CLAIMED THE TARGET', target.winner === 0 ? 'mine' : 'rival', 0.8, 1.15);
+      return target.winner === 0 ? 1 : -1;
+    }
     if (!roundOverN(this.tops, this.elapsed)) return 0;
     const rank = rankingN(this.tops, this.elapsed);
     if (rank[0] !== 0) return -1;
@@ -7214,9 +7254,12 @@ const ONE_HAND_HOLD = 0.3;
 /** The brawl's extra tops: green and violet, apart from your orange and the rival's teal. */
 const BRAWL_COLORS = [0x6fd35a, 0xb07cff];
 const SEATS_KEY = 'spinsmith.seats.v1';
+const BRAWL_KEY = 'spinsmith.brawl.v1';
 
 function loadSeats(): number {
   try {
+    const saved = JSON.parse(localStorage.getItem(BRAWL_KEY) ?? 'null') as { seats?: number } | null;
+    if (saved?.seats && saved.seats >= 2 && saved.seats <= 4) return saved.seats;
     const n = Number(localStorage.getItem(SEATS_KEY));
     return n >= 2 && n <= 4 ? n : 2;
   } catch {
@@ -7224,9 +7267,20 @@ function loadSeats(): number {
   }
 }
 
-function saveSeats(n: number) {
+function loadBrawlMode(): BrawlMode {
   try {
-    localStorage.setItem(SEATS_KEY, String(n));
+    const saved = JSON.parse(localStorage.getItem(BRAWL_KEY) ?? 'null') as { mode?: string } | null;
+    return saved?.mode === 'pocket' || saved?.mode === 'crucible' ? saved.mode : 'last';
+  } catch {
+    return 'last';
+  }
+}
+
+function saveBrawlSettings(seats: number, mode: BrawlMode) {
+  try {
+    localStorage.setItem(BRAWL_KEY, JSON.stringify({ seats, mode }));
+    // Keep the old key for builds from before modes existed.
+    localStorage.setItem(SEATS_KEY, String(seats));
   } catch {
     // Not kept: the pegs still work for this session.
   }
