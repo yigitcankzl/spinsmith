@@ -1290,6 +1290,7 @@ TUNING.grace = 0;
     for (const m of b.medals) if (m === 'rampKO' || m === 'forgeKO' || m === 'edgeKO') assert.ok(canKnockOut(arena!), `bout ${b.id}'s ${m} medal is possible in ${b.arena}`);
     assert.ok(b.skill >= 0 && b.skill <= 1, `bout ${b.id} skill in range`);
     for (const c of b.crowd ?? []) assert.ok([...RIVALS, ...NAMED_BUILDS].some((r) => r.name === c), `bout ${b.id}'s crowd top ${c} exists`);
+    if (b.crowd) assert.ok(b.crowd.length <= 2 && new Set([b.rival, ...b.crowd]).size === b.crowd.length + 1, `bout ${b.id}'s crowd is at most two other tops`);
   }
   assert.equal(BOUTS.length, CHAPTERS.length * 5, 'five bouts a chapter');
   for (let c = 1; c <= CHAPTERS.length; c++) {

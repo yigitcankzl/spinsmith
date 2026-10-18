@@ -1990,9 +1990,12 @@ export class MatchSystem extends createSystem({
       this.orderMatch = true;
       // An order chasing a map medal plays that bout too: its medals and win count on the map.
       const bout = o.bout ? BOUTS.find((b) => b.id === o.bout) : null;
-      if (bout && !this.extras.length && !this.online && bout.arena === this.arena.layout.name && bout.rival === this.rival.name) {
+      if (bout && !this.online && bout.arena === this.arena.layout.name && bout.rival === this.rival.name) {
         this.bout = bout;
         this.boutEarned = 0;
+        // The bout as it is: a crowded one brings its crowd (and a pegs' brawl gives way to it).
+        this.clearBrawl();
+        if (bout.crowd?.length) this.setupBrawl(bout.crowd.length, bout.crowd);
       }
     } else if (action.kind === 'champion') {
       const c = this.progress.champions[action.index];
@@ -2797,7 +2800,8 @@ export class MatchSystem extends createSystem({
     const seats = again ? lastSeats : this.seats;
     const crowd = this.bout?.crowd;
     // A crowded bout brings its own tops; otherwise the pegs' brawl is free play (no bout).
-    if (crowd?.length && !this.online) this.setupBrawl(crowd.length, crowd);
+    if (crowd?.length && this.online) this.bout = null;
+    else if (crowd?.length) this.setupBrawl(crowd.length, crowd);
     else if (seats > 2 && (again || !rival) && !friend && !this.online && this.progress.guide === 'done') {
       this.bout = null;
       this.setupBrawl(seats - 2);
@@ -5326,7 +5330,7 @@ export class MatchSystem extends createSystem({
       for (const s of this.arena.shapes) {
         const m = this.specAt(n++);
         Object.assign(m, { kind: s.kind, x: s.x, z: s.z, dx: s.dx, dz: s.dz, strength: Arena.strength(s), ghost: false, sigma: s.sigma });
-        (s.owner === 'rival' ? theirs : mine).push(m);
+        (s.owner === 'rival' || s.owner.startsWith('bot') ? theirs : mine).push(m);
       }
       for (const side of ['left', 'right'] as const) {
         const d = this.shaping[side];
@@ -6208,6 +6212,8 @@ export class MatchSystem extends createSystem({
     link.onLaunch = (round, arena, layout) => {
       if (round < 0) {
         // A match begins: the host's arena (by name, or whole when it was built in the workshop), against the host's top.
+        // Home first: going home picks this device's own next bout and arena, which the host's replaces.
+        this.toHub();
         const index = this.arenas.findIndex((a) => a.name === arena);
         // Untrusted input: a layout that fails to clone or validate falls back to the name.
         let sent: ArenaLayout | null = null;
@@ -6217,12 +6223,23 @@ export class MatchSystem extends createSystem({
         } catch {
           sent = null;
         }
-        if (sent) this.setArena(sent);
-        else if (index >= 0) {
+        let placed = false;
+        if (sent) {
+          try {
+            this.setArena(sent);
+            placed = true;
+          } catch {
+            placed = false;
+          }
+        }
+        if (placed) {
+          // Kept: going home inside the session must not swap in the guest's own arena.
+          this.arenas = [...this.arenas.filter((a) => a.name !== sent!.name), sent!];
+          this.arenaIndex = this.arenas.length - 1;
+        } else if (index >= 0) {
           this.arenaIndex = index;
           this.setArena(this.arenas[index]);
         }
-        this.toHub();
         this.startMatch(this.remoteRival());
         return;
       }
