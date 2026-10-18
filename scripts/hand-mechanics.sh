@@ -175,6 +175,12 @@ reset_demo
 start_fight
 record 13-forge-gust \
   '["wait",0.5]' '["palmGust",{"angle":-12,"side":"left"}]' '["wait",2.4]'
+
+# 14 — Block an outward top with the palm, then return that exact force with the same hand.
+reset_demo
+start_fight
+record 14-counterflow \
+  '["wait",0.5]' '["counterflow",{"angle":0,"side":"right"}]' '["wait",2.8]'
 fi
 
 titles=(
@@ -191,6 +197,7 @@ titles=(
   "AVUC USTUNDE PARCA TAKMA"
   "SIKISTIRIP YERLESTIRME VE BOYUTLAMA"
   "AVUCLA FORGE GUST"
+  "COUNTERFLOW  KARSILA VE GERI YOLLA"
 )
 subs=(
   "Acik avuc rampayi tutar  diger el ipi ceker"
@@ -206,10 +213,11 @@ subs=(
   "Bir el topaci tasir  diger el gercek parcayi yerine oturtur"
   "Ayni pinch diliyle makine yerlestirilir ve arena genisletilir"
   "Acik avucun yonlu supurmesi yolundaki topaclari fiziksel olarak iter"
+  "Ayni avuc once duvar olur  sonra gelen kuvveti ucretsiz riposte olarak geri yollar"
 )
 
 files=()
-for i in $(seq 1 13); do
+for i in $(seq 1 14); do
   raw=$(find "$RAW" -maxdepth 1 -type f -name "$(printf '%02d' "$i")-*.mp4" -print -quit)
   if [ -z "$raw" ]; then echo "Missing raw clip $i" >&2; exit 1; fi
   name=$(basename "$raw")
