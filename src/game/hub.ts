@@ -563,7 +563,7 @@ export class Hub {
 
   /**
    * Your smith level on the plate beside the dock: level and rank, the bar toward the next level,
-   * where the level road leads next, and (after the first session) how the rivals' circuit stands.
+   * where the level road leads next, and (after the first session) the next bout on the Circuit Map.
    * The next match itself is PLAY's second line.
    */
   private drawRank(progress: Progress, nextMatch: string | null) {

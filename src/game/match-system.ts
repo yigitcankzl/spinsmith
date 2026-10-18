@@ -2563,7 +2563,7 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) console.log(`[FEAT] ${id}`);
   }
 
-  /** ' · Cinder Circuit champion' or ' · Cinder Circuit 2/3' for a rival not beaten yet; '' otherwise. */
+  /** The level plate's second word: ' · bout 2-1 (1/3 medals)', ' · 1-5 boss (…)', ' · brawl' or ' · free play'. */
   private boutText(name: string) {
     const b = this.nextBoutPick;
     // The pegs' brawl replaces a plain bout, but a crowded bout keeps its own crowd.
