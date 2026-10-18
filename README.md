@@ -1,22 +1,38 @@
 # SpinSmith
 
-A hands-first mixed reality spinning-top battler for Meta Quest, built with the
-Immersive Web SDK (IWSDK). Rip your top into an arena on your real table, then
-steer the fight by pulling ramps up out of the arena floor and pressing cups into it that catch a top for you to sling.
+**Rip a top onto your real table, then grab the arena's rim with both hands and bend the whole
+battlefield while the tops fight. Throw the rival off the real edge of your desk for a DESK KO.**
 
-Entry for the Meta VR Start Developer Competition 2026 (Gaming – New Experience).
-This README describes the playable build; private design research and capture evidence are not
-included in the publishable source tree or production artifact.
+A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with the Immersive
+Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming, New Experience).
 
-## Try it (judges)
+## Try it (judges): 90 seconds to the hero move
 
-1. Sit at a table on a Meta Quest 3 or 3S, hands free (no controllers), and open the hosted URL in the Quest Browser.
+1. Sit at a table with a Meta Quest 3 or 3S, hands free (no controllers), and open the hosted URL
+   in the Quest Browser.
 2. Press **ENTER** and allow spatial data. Look at the table and pinch, or press your palm on it:
-   the arena rises there. On later visits the anchored smithy returns to its saved place; without
-   a usable surface it falls back to a floating tray and says so.
-3. Pinch your top in its dock and drop it in the arena, then pinch near it, pull back and let go to rip it.
-4. In the fight, pinch the floor beside the rival: a ramp rises and throws it. The first match teaches one move per round: ramp, the two-hand arena forge, then the palm-slap ultimate. Cup and sling arrive on the first rematch.
-5. Add `?fresh` to start as a new player, or `?demo` for a level-8 smith with more unlocked. The brass dial on the near rim sets sound, flashes and a gentle press-and-hold strike.
+   the arena rises there. Without a usable surface it stands on a floating tray and says so.
+3. Pinch your top in its dock and drop it in the arena, then pinch near it, pull back and let go
+   to rip it.
+4. The first match teaches one move per round: pinch the floor for a ramp; then **grab the rim
+   with both hands and squeeze, stretch, twist or tilt** (the two-hand arena forge); then slap
+   your palm down for the Anvil Strike.
+5. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
+
+## Modes, and where to find them in the headset
+
+| Mode | How to reach it |
+|---|---|
+| **Circuit Map campaign:** 15 bouts, 3 chapters, 3 medals a bout | Automatic after the first match: PLAY starts the next bout. Pinch the level plate to see the map. |
+| **Brawl:** 3 or 4 tops, last one spinning wins | Pinch the brass pegs beside the level plate (2, 3, 4 tops), then PLAY. |
+| **Pass and play** on one headset | After a duel, pinch PASS: the next person fights that top and its recorded hands. |
+| **Daily Smith Order** | Point at the board over the arena and pinch. |
+| **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
+| **Online duel (beta)** between two headsets | Open `?online=host`, share the five-letter code; the friend opens `?online=CODE`. |
+| **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |
+| **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed) and One hand (forge with one hand). |
+
+All interactions are pinches, palm presses or grabs. Nothing needs a controller.
 
 ## How to play
 
