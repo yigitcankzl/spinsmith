@@ -13,7 +13,7 @@ import { forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, step, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -836,6 +836,12 @@ export class MatchSystem extends createSystem({
   private nextRival: Rival | null = null;
   /** The Circuit Map bout picked for the next match, and the one being played (campaign.ts), with its medal bits so far. */
   private nextBoutPick: Bout | null = null;
+  /** Tops in the next match: 2 is a duel; 3 or 4 a brawl (bots fill the extra seats; the last top spinning takes the heat). */
+  private seats = loadSeats();
+  /** A brawl's extra tops and their views, and the foe that went out last in a won round. */
+  private extras: Top[] = [];
+  private extraViews: TopView[] = [];
+  private brawlLoser: Top | null = null;
   private bout: Bout | null = null;
   private boutEarned = 0;
   /** This match as an echo for a friend's game: each rip and each two-hand forge (echo.ts). */
@@ -1454,7 +1460,7 @@ export class MatchSystem extends createSystem({
     this.player.head.getWorldPosition(this.head);
     this.player.head.getWorldDirection(this.fwd).negate();
     setAudioFrame(this.root.matrixWorld.elements, this.head, this.fwd);
-    this.tops.forEach((t, i) => this.hums[i].update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time, t.x, t.z));
+    this.tops.forEach((t, i) => this.hums[i]?.update(live && t.alive ? Math.max(0, t.spin) : 0, Math.hypot(t.vx, t.vz), t.wobble, this.time, t.x, t.z));
     this.sinceClashSound += dt;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
       const p = this.progress;
@@ -1479,6 +1485,11 @@ export class MatchSystem extends createSystem({
     this.myView.coast = this.theirView.coast = this.phase === 'result' && !this.replay;
     this.myView.sync(ga, this.arena, this.time, vdt);
     this.theirView.sync(gb, this.arena, this.time, vdt);
+    this.extraViews.forEach((v, i) => {
+      v.frozen = this.myView.frozen;
+      v.coast = this.myView.coast;
+      v.sync(this.extras[i], this.arena, this.time, vdt);
+    });
     this.updateEntrance(dt);
     this.sparks.rim = maxRim(this.arena.layout) + 0.01;
     this.sparks.update(vdt);
@@ -1490,7 +1501,7 @@ export class MatchSystem extends createSystem({
       this.trailT = 0;
       if (this.phase === 'fight') {
         this.tops.forEach((t, side) => {
-          if (t.state === 'spinning') this.trails.drop(side as 0 | 1, t.x, this.arena.height(t.x, t.z), t.z, Math.hypot(t.vx, t.vz));
+          if (side < 2 && t.state === 'spinning') this.trails.drop(side as 0 | 1, t.x, this.arena.height(t.x, t.z), t.z, Math.hypot(t.vx, t.vz));
         });
       }
     }
@@ -1721,6 +1732,8 @@ export class MatchSystem extends createSystem({
 
   /** Home: the arena waits with both tops; Play, Workshop, or switch arena. Pinching never launches here. */
   private toHub() {
+    this.clearBrawl();
+    this.hub.setBrawl(this.seats);
     this.phase = 'hub';
     this.markFirstFive(1);
     this.matchOver = false;
@@ -1882,6 +1895,13 @@ export class MatchSystem extends createSystem({
       this.labelTimer = 2.5;
     } else if (action.kind === 'reset') {
       return;
+    } else if (action.kind === 'brawl') {
+      this.seats = this.seats >= 4 ? 2 : this.seats + 1;
+      saveSeats(this.seats);
+      this.hub.setBrawl(this.seats);
+      this.label.set(this.seats === 2 ? 'Duel: you and one rival\nPinch the pegs for a brawl' : `Brawl: ${this.seats} tops\nLast top spinning takes the heat`);
+      this.labelTimer = 3;
+      playTick();
     } else if (action.kind === 'comfort') {
       const name = nextComfort();
       applySound();
@@ -2627,6 +2647,12 @@ export class MatchSystem extends createSystem({
     this.boutEarned = 0;
     this.nextRival = null;
     this.nextBoutPick = null;
+    // A brawl is free play: no bout, no order; a friend's challenge and the first session stay duels.
+    this.clearBrawl();
+    if (this.seats > 2 && !rival && !friend && this.progress.guide === 'done') {
+      this.bout = null;
+      this.setupBrawl(this.seats - 2);
+    }
     this.progress.playedArena(this.arena.layout.name);
     this.perfectInMatch = false;
     this.myPoints = 0;
@@ -3229,7 +3255,7 @@ export class MatchSystem extends createSystem({
       // A bout after the first match names its lesson and twist, and the medals still to earn.
       const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
       const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
-      const line = bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
+      const line = this.extras.length ? `Brawl: ${this.tops.length} tops. Last top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
       this.label.set(`${this.rival.name}, ${this.rival.title}\n${line}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
     }
     else {
@@ -3748,6 +3774,7 @@ export class MatchSystem extends createSystem({
     const [rx, rz] = this.rivalSpot();
     const inward = Math.atan2(-rx, -rz);
     this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, launchSpin(aiPower), th);
+    this.launchExtras();
     playTouchdown(rx, rz, 0.6 + 0.4 * aiPower);
     this.phase = 'fight';
     this.markFirstFive(3);
@@ -5407,7 +5434,13 @@ export class MatchSystem extends createSystem({
         this.stamp.show('PALM PARRY!', 'your hand became the wall', 'mine', 0.5);
         playThock();
       }
-      const clash = step(this.arena, this.mine, this.theirs);
+      let clash: Clash | null;
+      if (this.extras.length) {
+        // A brawl: every pair can meet. The duel's own effects follow you and the rival; other meetings spark on their own.
+        const clashes = stepN(this.arena, this.tops);
+        clash = clashes.find((c) => c.a === 0 && c.b === 1) ?? null;
+        for (const c of clashes) if (c !== clash) this.brawlClash(c);
+      } else clash = step(this.arena, this.mine, this.theirs);
       this.record(clash);
       if (clash) this.openingClash(clash, mineVx, mineVz, rivalVx, rivalVz, openingDx, openingDz);
       else if (this.firstClashPending && this.elapsed >= 1.4) {
@@ -5518,10 +5551,10 @@ export class MatchSystem extends createSystem({
         this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 0.8);
       }
       if (this.mine.state === 'out' && this.mine.finish === 'over' && this.beginOuterRing()) return;
-      const v = verdict(this.mine, this.theirs, this.elapsed);
+      const v = this.extras.length ? this.brawlVerdict() : verdict(this.mine, this.theirs, this.elapsed);
       if (v !== 0) {
         for (const t of this.tops) if (t.finish === 'burst') this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
-        if (v === 1 && this.beginDeskVerdict()) return;
+        if (v === 1 && !this.extras.length && this.beginDeskVerdict()) return;
         this.finish(v);
         return;
       }
@@ -5558,7 +5591,7 @@ export class MatchSystem extends createSystem({
     if (v === 2) {
       text = 'Draw\nReplay the round';
     } else {
-      const loser = v === 1 ? this.theirs : this.mine;
+      const loser = v === 1 ? this.brawlLoser ?? this.theirs : this.mine;
       // Tutorial finishes normally score one; the real desk edge remains an exceptional +1 rule.
       const points = finishPoints(loser, this.progress.matches === 0, deskKo && v === 1);
       this.lastRoundHeat = points;
@@ -5862,6 +5895,82 @@ export class MatchSystem extends createSystem({
     }
   }
 
+  /** Seats the brawl's bots: other rivals' tops, each in its own color, spread round the sides. */
+  private setupBrawl(n: number) {
+    const others = RIVALS.filter((r) => r.name !== this.rival.name);
+    const pool = others.filter((r) => r.level <= this.progress.level);
+    const from = pool.length >= n ? pool : others;
+    const picks = [...from].sort(() => Math.random() - 0.5).slice(0, n);
+    picks.forEach((r, i) => {
+      const color = BRAWL_COLORS[i];
+      const build = { ...r.build, color };
+      const top = new Top(specFromBuild(build));
+      top.hand = build.spin;
+      top.state = 'out';
+      const view = new TopView(build, color);
+      view.team(color, ringOf(build).radius);
+      view.root.name = `brawl-top-${i}`;
+      this.stage.add(view.root, view.shadowMesh, view.debris);
+      this.extras.push(top);
+      this.extraViews.push(view);
+      this.tops.push(top);
+    });
+    this.refreshDepthOcclusion();
+    if (import.meta.env.DEV) console.log(`[BRAWL] ${this.seats} tops: you, ${this.rival.name}, ${picks.map((r) => r.name).join(', ')}`);
+  }
+
+  private clearBrawl() {
+    for (const v of this.extraViews) {
+      v.root.removeFromParent();
+      v.shadowMesh.removeFromParent();
+      v.debris.removeFromParent();
+      v.dispose();
+    }
+    this.extras = [];
+    this.extraViews = [];
+    this.tops.length = 2;
+    this.brawlLoser = null;
+  }
+
+  /** The bots rip from the arena's sides at the same moment, toward the middle and into the orbit. */
+  private launchExtras() {
+    this.extras.forEach((t, i) => {
+      const angle = i === 0 ? 0 : Math.PI;
+      const x = Math.cos(angle) * this.SPAWN;
+      const z = Math.sin(angle) * this.SPAWN;
+      const power = 0.7 + Math.random() * 0.25;
+      const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
+      const dir = Math.atan2(-x, -z) + (Math.random() - 0.5) * 0.3 + LAUNCH_TILT * t.hand;
+      t.launch(x, z, Math.sin(dir) * speed, Math.cos(dir) * speed, launchSpin(power), t.hand);
+    });
+  }
+
+  /** A meeting in a brawl that is not you against the rival: sparks, both tops take it, a clash sound. */
+  private brawlClash(c: Clash) {
+    const y = this.arena.height(c.x, c.z);
+    this.sparks.burst(c.x, y, c.z, c.strength);
+    const views = [this.myView, this.theirView, ...this.extraViews];
+    for (const k of [c.a ?? 0, c.b ?? 1]) views[k]?.hit(c.strength * 0.8, c.x - this.tops[k].x, c.z - this.tops[k].z);
+    if (c.strength > HARD_HIT) this.impacts.hit(c.x, y, c.z, c.strength);
+    if (this.sinceClashSound > 0.06) {
+      playClash(c.strength, c.x);
+      this.sinceClashSound = 0;
+    }
+  }
+
+  /**
+   * A brawl round ends when your top is out (you lose it) or you are the last top spinning (you win
+   * it, scored on the foe that went out last). At the time cap the most spin wins.
+   */
+  private brawlVerdict(): -1 | 0 | 1 {
+    if (!this.mine.alive) return -1;
+    if (!roundOverN(this.tops, this.elapsed)) return 0;
+    const rank = rankingN(this.tops, this.elapsed);
+    if (rank[0] !== 0) return -1;
+    this.brawlLoser = this.tops[rank[1]];
+    return 1;
+  }
+
   /**
    * Medals earned in a bout this round build up through the match and are kept when it ends (won
    * or lost: a medal earned is earned). Each new one stamps in turn, then the map says what opened.
@@ -6061,4 +6170,25 @@ function unlockModel(key: string, arenas: ArenaLayout[]): Object3D {
   }
   for (const [, items] of ROWS) for (const item of items) if (itemKey(item) === key) return itemModel(item);
   return new Group();
+}
+
+/** The brawl's extra tops: green and violet, apart from your orange and the rival's teal. */
+const BRAWL_COLORS = [0x6fd35a, 0xb07cff];
+const SEATS_KEY = 'spinsmith.seats.v1';
+
+function loadSeats(): number {
+  try {
+    const n = Number(localStorage.getItem(SEATS_KEY));
+    return n >= 2 && n <= 4 ? n : 2;
+  } catch {
+    return 2;
+  }
+}
+
+function saveSeats(n: number) {
+  try {
+    localStorage.setItem(SEATS_KEY, String(n));
+  } catch {
+    // Not kept: the pegs still work for this session.
+  }
 }

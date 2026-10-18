@@ -51,7 +51,7 @@ import { SmithBoard } from './board.js';
 import { encodeBuild } from './challenge.js';
 import { ECHO_KEY } from './echo.js';
 import { popIn } from './rim.js';
-import { ARENA_SCALE, COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
+import { ARENA_SCALE, BRAWL_AT, COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
 import { FEATS, MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
@@ -75,9 +75,15 @@ export type HubAction =
   | { kind: 'champion'; index: number }
   | { kind: 'reset' }
   | { kind: 'comfort' }
+  | { kind: 'brawl' }
   | { kind: 'armReset' }
   | { kind: 'newSmith' }
   | { kind: 'locked'; text: string };
+
+/** Brawl pegs: unlit, lit for a bot, and the player's own peg. */
+const BRAWL_OFF = new MeshBasicMaterial({ color: 0x2c3138 });
+const BRAWL_ON = new MeshBasicMaterial({ color: 0x4fd1ff });
+const BRAWL_MINE = new MeshBasicMaterial({ color: 0xff8a2a });
 
 /** A hand lost this long (s) cancels a carry instead of dropping (same as the match's rip). */
 const HAND_LOSS_GRACE = 0.28;
@@ -174,6 +180,7 @@ export class Hub {
   /** The blueprint, its cradle and name: the workshop comes after the first match. */
   private blueprint = new Group();
   private comfortKnob = new Group();
+  private brawlPegs = new Group();
   /** Starting over: the hand holding the level plate and for how long, then a short window to confirm. */
   private hold: { hand: HandState; t: number } | null = null;
   private armed = 0;
@@ -195,6 +202,7 @@ export class Hub {
     this.buildStand();
     this.buildBlueprint();
     this.buildComfort();
+    this.buildBrawl();
     this.beacon.rotation.x = -Math.PI / 2;
     this.board.mesh.position.copy(BOARD_AT);
     this.board.mesh.rotation.x = -0.15;
@@ -268,7 +276,7 @@ export class Hub {
   photo() {
     this.photoMode = true;
     this.board.mesh.visible = false;
-    for (const it of this.items) if (it.action.kind === 'reset' || it.action.kind === 'comfort') it.model.visible = false;
+    for (const it of this.items) if (it.action.kind === 'reset' || it.action.kind === 'comfort' || it.action.kind === 'brawl') it.model.visible = false;
     this.beacon.visible = this.path.visible = false;
   }
   private photoMode = false;
@@ -488,6 +496,34 @@ export class Hub {
     const name = this.label('COMFORT', this.root, COMFORT_AT.x, COMFORT_AT.z + 0.03);
     name.position.y += TABLE_Y;
     this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, name, quiet: true });
+  }
+
+  /**
+   * The brawl pegs: four brass pegs in a row, one lit per top in the next match (two: a duel; three
+   * or four: a brawl where the last top spinning takes the heat). Each pinch adds a top, then wraps.
+   */
+  private buildBrawl() {
+    const pegs = new Group();
+    for (let i = 0; i < 4; i++) {
+      const peg = new Mesh(new CylinderGeometry(0.004, 0.005, 0.012, 12).translate(0, 0.006, 0), BRAWL_OFF);
+      peg.position.x = (i - 1.5) * 0.011;
+      pegs.add(peg);
+    }
+    pegs.add(new Mesh(new BoxGeometry(0.05, 0.003, 0.014).translate(0, 0.0015, 0), BRASS));
+    const home = new Vector3(BRAWL_AT.x, TABLE_Y, BRAWL_AT.z);
+    pegs.position.copy(home);
+    this.brawlPegs = pegs;
+    this.root.add(pegs);
+    const name = this.label('BRAWL', this.root, BRAWL_AT.x, BRAWL_AT.z + 0.03);
+    name.position.y += TABLE_Y;
+    this.items.push({ action: { kind: 'brawl' }, carry: false, model: pegs, home, name, quiet: true });
+  }
+
+  /** Lights one peg per top in the next match. */
+  setBrawl(tops: number) {
+    this.brawlPegs.children.forEach((peg, i) => {
+      if (i < 4) (peg as Mesh).material = i < tops ? (i === 0 ? BRAWL_MINE : BRAWL_ON) : BRAWL_OFF;
+    });
   }
 
   /** Turns the dial's notch to mode i of n. */

@@ -660,6 +660,9 @@ export interface Clash {
   hammer?: boolean;
   /** A charge rebounded off a Ward in this clash. */
   parry?: boolean;
+  /** stepN only: the indices of the two tops that met. */
+  a?: number;
+  b?: number;
 }
 
 const slopeTmp = { x: 0, z: 0 };
@@ -706,7 +709,7 @@ export function stepN(arena: Arena, tops: readonly Top[], dt = STEP): Clash[] {
       const b = tops[j];
       if (!a.alive || !b.alive) continue;
       const clash = collide(a, b, arena);
-      if (clash) clashes.push(clash);
+      if (clash) clashes.push({ ...clash, a: i, b: j });
       if (!a.alive && a.outAt < 0) a.outAt = arena.elapsed;
       if (!b.alive && b.outAt < 0) b.outAt = arena.elapsed;
     }

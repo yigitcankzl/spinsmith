@@ -55,7 +55,7 @@ function launchRing(arena: Arena, specs: TopSpec[], phase = 0): Top[] {
         const c1 = step(arenaA, a1, b1);
         const c2 = stepN(arenaB, pair2);
         assert.equal(c2.length, c1 ? 1 : 0, `${layout.name}: clash count differs at step ${s}`);
-        if (c1) assert.deepEqual(c2[0], c1, `${layout.name}: clash differs at step ${s}`);
+        if (c1) assert.deepEqual(c2[0], { ...c1, a: 0, b: 1 }, `${layout.name}: clash differs at step ${s}`);
         h1 = hash(h1, [a1, b1]);
         h2 = hash(h2, pair2);
         assert.equal(h2, h1, `${layout.name} run ${k}: stepN drifted from step at step ${s}`);
