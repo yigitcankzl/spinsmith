@@ -614,7 +614,7 @@ export class TrysteroTransport extends BaseTransport {
         void this.room?.leave();
         reject(new Error(why));
       };
-      const timer = setTimeout(() => fail(`no peer found in ${Math.round(timeoutMs / 1000)} s`), timeoutMs);
+      const timer = setTimeout(() => fail(`No one joined in ${Math.round(timeoutMs / 1000)} s`), timeoutMs);
       import('trystero')
         .then(({ joinRoom }) => {
           if (this.connectState !== 'joining') return;
@@ -643,7 +643,7 @@ export class TrysteroTransport extends BaseTransport {
           };
           this.setState('waiting');
         })
-        .catch((e: unknown) => fail(`could not load networking: ${e instanceof Error ? e.message : String(e)}`));
+        .catch((e: unknown) => fail(`Online is unavailable right now${e instanceof Error && e.message ? ` (${e.message.slice(0, 40)})` : ''}`));
     });
     this.ready.catch(() => {}); // callers that only watch connectState must not see an unhandled rejection
   }

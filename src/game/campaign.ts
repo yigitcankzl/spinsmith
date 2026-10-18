@@ -41,21 +41,21 @@ const b = (id: string, rival: string, arena: string, skill: number, lesson: stri
 };
 
 export const BOUTS: Bout[] = [
-  b('1-1', 'Drifter', 'Forge Bowl', 0, 'Rip, then pinch the floor for a ramp', 'It waits you out: throw it before it outlasts you', ['rampKO', 'perfect']),
-  b('1-2', 'Rim Raider', 'Ember Ring', 0.08, 'Grab the rim with both hands and forge the arena', 'It charges along the low rim', ['forgeKO', 'sweep']),
+  b('1-1', 'Drifter', 'Forge Bowl', 0, 'Rip, then pinch the floor for a ramp', 'It waits you out: ramp it out before it outlasts you', ['rampKO', 'perfect']),
+  b('1-2', 'Rim Raider', 'Ember Ring', 0.08, 'Grab the rim and forge the arena', 'It charges along the low rim', ['forgeKO', 'sweep']),
   b('1-3', 'Drifter', 'Zero-G Dish', 0.15, 'Slap your palm down: the Anvil Strike', 'No walls to hide behind', ['strikeKO', 'perfect']),
-  b('1-4', 'Rim Raider', 'Twin Basins', 0.22, 'Press a cup, then sling what it caught', 'Two basins split the floor', ['wellSpin', 'sweep']),
+  b('1-4', 'Rim Raider', 'Twin Basins', 0.22, 'Jab the floor for a cup, then sling', 'Two basins split the floor', ['wellSpin', 'sweep']),
   b('1-5', 'Iron Keep', 'Sumo Square', 0.3, 'Everything you learned, against a wall', 'Ramps barely move it: tilt it or strike it', ['burst', 'sweep']),
   b('2-1', 'Leech', 'Crucible Gate', 0.25, 'Match its spin or lose yours', 'One wide mouth: forge it in', ['forgeKO', 'perfect']),
-  b('2-2', 'Hookjaw', 'Clockwork Spire', 0.33, 'A tall top rides over a lift', 'It lifts you over low walls', ['rampKO', 'sweep']),
+  b('2-2', 'Hookjaw', 'Clockwork Spire', 0.33, 'Its lift throws low tops over low walls', 'It lifts you over low walls', ['rampKO', 'sweep']),
   b('2-3', 'Leech', 'Frost Oval', 0.42, 'Ice: every ramp throws farther', 'Your top slides too', ['strikeKO', 'burst']),
   b('2-4', 'Hookjaw', 'Neon Speedway', 0.5, 'Rails: geared tips dash', 'It shapes the floor now, as you do', ['forgeKO', 'sweep']),
   b('2-5', 'Sawtooth', 'Meteor Pit', 0.6, 'Keep your top whole', 'Every hit chips you toward a shatter', ['burst', 'perfect']),
-  b('3-1', 'Iron Keep', 'Colossus Bowl', 0.55, 'The champion returns, in a bigger bowl', 'More room to drift, farther to the pits', ['forgeKO', 'sweep']),
-  b('3-2', 'Comet', 'Titan Crater', 0.65, 'It never stops moving: meet it on the crater rim', 'The middle drops away under its lift', ['strikeKO', 'perfect']),
-  b('3-3', 'Gearwright', 'Sentinel Gates', 0.75, 'Match its spin, then aim between the guards', 'It grinds opposite spin and waits behind the bumpers', ['rampKO', 'burst']),
+  b('3-1', 'Iron Keep', 'Colossus Bowl', 0.55, 'Iron Keep returns, in a bigger bowl', 'More room to drift, farther to the pits', ['forgeKO', 'sweep']),
+  b('3-2', 'Comet', 'Titan Crater', 0.65, 'It never stops: catch it on the crater lip', 'The middle drops away under its lift', ['strikeKO', 'perfect']),
+  b('3-3', 'Gearwright', 'Sentinel Gates', 0.75, 'Match its spin, then aim between the guards', 'It grinds opposite spin behind the sentinels', ['rampKO', 'burst']),
   b('3-4', 'Bastion', 'Glacier Steps', 0.85, 'Tall and locked, on ice tiers', 'Low hits get under it', ['forgeKO', 'sweep']),
-  b('3-5', 'Bastion', 'Grand Anvil', 1, 'The Crown', 'Knock it off the edge to end it', ['edgeKO', 'sweep']),
+  b('3-5', 'Bastion', 'Grand Anvil', 1, 'Everything you know, one last time', 'Ring it out to end it', ['edgeKO', 'sweep']),
 ];
 
 /** Medal bits: 1 the win, 2 the first listed medal, 4 the second. */
@@ -64,7 +64,7 @@ export const MEDALS_PER_BOUT = 3;
 
 export const MEDAL_TEXT: Record<Medal, string> = {
   rampKO: 'Ramp it out',
-  forgeKO: 'Knock it out with an arena forge',
+  forgeKO: 'Forge the arena to knock it out',
   strikeKO: 'Knock it out with your strike',
   burst: 'Shatter it',
   perfect: 'Rip white hot',

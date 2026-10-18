@@ -315,7 +315,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // A flat ice rink with a long geared rail down each end: dashers race the ends, four small pits wait between.
     name: 'Gear Rink',
-    rule: 'Ice with long end rails: geared tips race, small pits between',
+    rule: 'Ice and long rails: geared tips race',
     theme: 'ice',
     radius: 0.18,
     shape: 'oval',
@@ -370,7 +370,7 @@ export const ARENAS: ArenaLayout[] = [
   {
     // A tornado ridge to race on, rails to dash along it and a vortex pulling the pack round.
     name: 'Ridge Raceway',
-    rule: 'Race the ridge: rails and a vortex keep everyone moving',
+    rule: 'Ridge, rails and a vortex: keep moving',
     theme: 'void',
     radius: 0.19,
     shape: 'circle',

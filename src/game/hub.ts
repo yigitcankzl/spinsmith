@@ -250,7 +250,7 @@ export class Hub {
         history: [
           (() => {
             const next = nextBout(progress.bouts);
-            return next ? `next bout ${next.id}: ${next.rival}` : 'the map is won';
+            return next ? `next bout ${next.id}: ${next.rival}` : 'every bout won';
           })(),
           `${medalCount(progress.bouts)}/${BOUTS.length * 3} medals`,
           champion ? `champion: ${buildName(champion.build)} ×${champion.wins}` : 'first champion awaits',

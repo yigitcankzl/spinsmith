@@ -95,7 +95,7 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
   // Every other day or so the order chases a medal you left on the map: a reason to go back to that bout.
   if (ctx.medal && next() < 0.5) {
     const m = ctx.medal;
-    return { date, rival: m.rival, arena: m.arena, goal: m.goal, text: `${orderText(m.rival)[m.goal]} (bout ${m.bout} medal)`, bout: m.bout };
+    return { date, rival: m.rival, arena: m.arena, goal: m.goal, text: `${orderText(m.rival)[m.goal]} · ${m.bout} medal`, bout: m.bout };
   }
   const rival = pick(ctx.rivals);
   const goals: Goal[] = ['rampKO', 'burst', 'role', 'perfect', 'sweep'];
@@ -115,12 +115,12 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
 /** What an order says for each goal. */
 function orderText(rival: string, role?: Role): Record<Goal, string> {
   return {
-    rampKO: `Ramp ${rival} out: into a slag pit or over the wall`,
+    rampKO: `Ramp ${rival} into a pit or over the wall`,
     deskKO: `Knock ${rival} off the real desk edge`,
     burst: `Shatter ${rival}`,
     wellSpin: `Outlast ${rival} from your cup`,
     role: `Beat ${rival} with ${ROLE_WORD[role ?? 'attack']} top`,
-    perfect: `Beat ${rival} with a white-hot pull in the match`,
+    perfect: `Beat ${rival} with a white-hot rip`,
     sweep: `Beat ${rival} without giving up heat`,
     ownArena: `Beat ${rival} on your own arena`,
   };

@@ -1361,7 +1361,7 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.visible = this.phase === 'result' && !this.demo;
     this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo && !(this.online?.role === 'guest' && this.online.peer);
     this.passButton.mesh.visible = this.rematchButton.mesh.visible && this.canPass();
-    if (this.passButton.mesh.visible && !this.passHinted && once('pass')) this.stamp.later('PASS', 'HAND THE HEADSET TO A FRIEND: THEY FIGHT YOUR TOP AND HANDS', 'neutral', 1.6, 1);
+    if (this.passButton.mesh.visible && !this.passHinted && once('pass')) this.stamp.later('PASS', 'A FRIEND FIGHTS YOUR TOP AND HANDS', 'neutral', 1.6, 1);
     this.passHinted ||= this.passButton.mesh.visible;
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
@@ -1872,7 +1872,7 @@ export class MatchSystem extends createSystem({
     this.label.set(this.guideNote());
     // Modes introduce themselves once, after three matches, so the first session stays one verb.
     if (this.progress.guide === 'done' && this.progress.matches >= 3 && !this.demo && once('brawl')) {
-      this.label.set('New: the brass pegs by your level plate\nPinch them for a 3- or 4-top brawl, or an online room');
+      this.label.set('New: the brass pegs by your level plate\nPinch: 3- or 4-top brawl, or online');
       this.labelTimer = 6;
     }
     // Notes hang over the far rim; the beacon marks the dock or the anvil. Once the Smith's board
@@ -2221,7 +2221,7 @@ export class MatchSystem extends createSystem({
       return;
     }
     // The REPLAY plate stays up for the whole replay (rewards queue behind it).
-    if (was < 0) this.stamp.show('REPLAY', 'pinch to skip', 'neutral', r.n / 120 / REPLAY_SPEED);
+    if (was < 0) this.stamp.show('REPLAY', 'PINCH TO SKIP', 'neutral', r.n / 120 / REPLAY_SPEED);
     const i = Math.floor(r.t * 120 * REPLAY_SPEED);
     if (i >= r.n + 100) {
       // The end: the real tops (out as they went) are drawn again.
@@ -3411,7 +3411,7 @@ export class MatchSystem extends createSystem({
       // A bout after the first match names its lesson and twist, and the medals still to earn.
       const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
       const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
-      const line = this.extras.length ? `Brawl with ${this.brawlNames.join(' and ')}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
+      const line = this.extras.length ? `Brawl with ${this.brawlNames.length > 1 ? `${this.brawlNames.slice(0, -1).join(', ')} and ${this.brawlNames[this.brawlNames.length - 1]}` : this.brawlNames[0]}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
       // The type loop, read before the rip: whose top counters whose.
       const edge = this.progress.guide === 'done' ? edgeOf(roleOf(specFromBuild(this.myBuild)), roleOf(specFromBuild(this.rival.build))) : 0;
       const read = edge > 0 ? ' · you counter it' : edge < 0 ? ' · it counters you' : '';
@@ -3429,7 +3429,7 @@ export class MatchSystem extends createSystem({
         this.label.set(this.bout.twist);
         this.labelTimer = 2.4;
       }
-      if (this.bossRage()) this.stamp.later('SECOND WIND', `${this.rival.name.toUpperCase()} WILL NOT FALL QUIETLY`, 'rival', 1.1, 1.2);
+      if (this.bossRage()) this.stamp.later('SECOND WIND', `${this.rival.name.toUpperCase()} WON'T GO QUIETLY`, 'rival', 1.1, 1.2);
       playGong();
       if (this.rivalRead) {
         this.label.set(`${this.rivalRead}\nIts cyan line has changed`);
@@ -6139,7 +6139,7 @@ export class MatchSystem extends createSystem({
     if (fresh & MARK.beaten && c?.champion) {
       // In a campaign bout the map says it (BOSS DOWN, a chapter opening, the finale); free play keeps this stamp.
       if (!this.bout) {
-        this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name} is beaten`, 'mine', 2.2, 1.5);
+        this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name.toUpperCase()} IS BEATEN`, 'mine', 2.2, 1.5);
         playLevelUp();
       }
       const feat = c.circuit.startsWith('Cinder') ? 'cinder' : c.circuit.startsWith('Iron') ? 'iron' : 'crown';
@@ -6189,7 +6189,7 @@ export class MatchSystem extends createSystem({
       this.labelTimer = hold;
     };
     // The room code stays up until someone joins.
-    say(link.role === 'host' ? `Online room ${link.code}\nA friend opens ?online=${link.code} · pinch the pegs to close` : `Joining room ${link.code}…`, 600);
+    say(link.role === 'host' ? `Online room ${link.code}\nFriend opens ?online=${link.code} · pegs close` : `Joining room ${link.code}…`, 600);
     link.onHello = () => {
       if (import.meta.env.DEV) console.log(`[ONLINE] ${link.role}: ${link.peerName} joined ${link.code}`);
       if (link.role === 'host') {
@@ -6287,7 +6287,7 @@ export class MatchSystem extends createSystem({
     const link = this.online!;
     const build = decodeBuild(link.peerBuild) ?? { ...PRESETS[0].build };
     const name = link.role === 'host' ? 'Guest' : 'Host';
-    return { name, move: 'charge', style: 'another smith, live', title: link.peerName || 'online', intro: 'Live from another table.', win: 'GG.', lose: 'GG.', tip: 'Read their ramps and forge first', build: { ...build, color: OPPONENT_COLOR }, level: 1 };
+    return { name, move: 'charge', style: 'another smith, live', title: link.peerName || 'online', intro: 'Live from another table.', win: 'GG.', lose: 'GG.', tip: 'Watch their ramps; forge before they do', build: { ...build, color: OPPONENT_COLOR }, level: 1 };
   }
 
   /** Host: what the guest's hands did, from the far side. */
@@ -6313,7 +6313,7 @@ export class MatchSystem extends createSystem({
       const hits = springRim(this.arena, this.tops, ev.sx, ev.sz, ev.x, ev.z, Math.max(0, Math.min(1.5, ev.f)));
       this.arenaView.flashRail(ev.sx, ev.sz);
       this.impacts.shock(ev.sx, this.arena.height(ev.sx, ev.sz), ev.sz, hits ? 0.75 : 0.35);
-      if (hits) this.stamp.show('THEIR RIM SPRING', 'live hands', 'rival', 0.6);
+      if (hits) this.stamp.show('THEIR RIM SPRING', 'LIVE HANDS', 'rival', 0.6);
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = 'RIM SPRING';
       playThock();
@@ -6324,7 +6324,7 @@ export class MatchSystem extends createSystem({
       const y = this.arena.height(ev.x, ev.z);
       this.impacts.shock(ev.x, y, ev.z, 1, TEAM_RIVAL);
       this.sparks.burst(ev.x, y, ev.z, 1);
-      this.stamp.show(`THEIR ${SEAL_NAMES[seal].toUpperCase()}`, 'live hands', 'rival', 0.9);
+      this.stamp.show(`THEIR ${SEAL_NAMES[seal].toUpperCase()}`, 'LIVE HANDS', 'rival', 0.9);
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = 'STRIKE';
       this.hitStop = Math.max(this.hitStop, 0.12);
@@ -6352,7 +6352,7 @@ export class MatchSystem extends createSystem({
       this.rivalHandMove(-g.x, -g.z, g.x / d, g.z / d);
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = action.toUpperCase();
-      this.stamp.show(`THEIR ${ARENA_FORGE_TITLE[action]}`, 'live hands', 'rival', 0.9);
+      this.stamp.show(`THEIR ${ARENA_FORGE_TITLE[action]}`, 'LIVE HANDS', 'rival', 0.9);
       this.impacts.shock(0, this.arena.height(0, 0), 0, 0.6);
       playThock();
     }
@@ -6435,7 +6435,7 @@ export class MatchSystem extends createSystem({
     } catch {
       return;
     }
-    this.stamp.later('PASS THE HEADSET', 'NEXT SMITH: BEAT THAT TOP AND THOSE HANDS', 'neutral', 1.6, 1.2);
+    this.stamp.later('PASS THE HEADSET', 'NEXT SMITH: BEAT THAT TOP', 'neutral', 1.6, 1.2);
     playStamp();
     this.startMatch();
   }
@@ -6551,7 +6551,7 @@ export class MatchSystem extends createSystem({
       const medals = medalCount(this.progress.bouts);
       this.stamp.later('THE CROWN IS YOURS', 'EVERY CIRCUIT CLEARED', 'mine', 2.4, 1.6);
       this.stamp.later('SPINSMITH', `${medals} OF ${BOUTS.length * 3} MEDALS`, 'mine', 2, 1.4);
-      this.levelUpText = `You took the Crown.\nThanks for playing. Medals, daily orders and brawls go on`;
+      this.levelUpText = `You took the Crown.\nThanks for playing. Medals, orders and brawls await`;
       this.celebrate = Math.max(this.celebrate, 4);
       playLevelUp();
     }
