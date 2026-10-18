@@ -169,6 +169,12 @@ reset_demo
 "$DRIVE" '["tap","workshop"]' '["wait",2.5]' '["tap","pieces"]' '["wait",0.8]' >/dev/null
 record 12-workshop-pinch-build \
   '["drag","bumper","arena_left"]' '["wait",0.8]' '["arenaResize"]' '["wait",2.4]'
+
+# 13 — A fast open-palm sweep crosses the bowl and physically redirects tops on its path.
+reset_demo
+start_fight
+record 13-forge-gust \
+  '["wait",0.5]' '["palmGust",{"angle":-12,"side":"left"}]' '["wait",2.4]'
 fi
 
 titles=(
@@ -184,6 +190,7 @@ titles=(
   "MUHUR BASMA ULTISI"
   "AVUC USTUNDE PARCA TAKMA"
   "SIKISTIRIP YERLESTIRME VE BOYUTLAMA"
+  "AVUCLA FORGE GUST"
 )
 subs=(
   "Acik avuc rampayi tutar  diger el ipi ceker"
@@ -198,10 +205,11 @@ subs=(
   "Yukselen muhur tutulup istenen noktaya fiziksel olarak basilir"
   "Bir el topaci tasir  diger el gercek parcayi yerine oturtur"
   "Ayni pinch diliyle makine yerlestirilir ve arena genisletilir"
+  "Acik avucun yonlu supurmesi yolundaki topaclari fiziksel olarak iter"
 )
 
 files=()
-for i in $(seq 1 12); do
+for i in $(seq 1 13); do
   raw=$(find "$RAW" -maxdepth 1 -type f -name "$(printf '%02d' "$i")-*.mp4" -print -quit)
   if [ -z "$raw" ]; then echo "Missing raw clip $i" >&2; exit 1; fi
   name=$(basename "$raw")
