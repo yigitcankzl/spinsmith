@@ -13,7 +13,7 @@ import { forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, palmBrace, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -1312,7 +1312,8 @@ export class MatchSystem extends createSystem({
     this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
-      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, ...this.deckButtons.map((b) => b.mesh), this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
+      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
+      for (const button of this.deckButtons) button.mesh.visible = false;
       this.hub.photo();
     }
     this.guardFrameRate(delta);
@@ -4179,10 +4180,13 @@ export class MatchSystem extends createSystem({
     if (dir) {
       const c = Math.cos(twist);
       const s = Math.sin(twist);
-      this.mine.launch(sx, sz, (dir.x * c - dir.z * s) * mySpeed, (dir.x * s + dir.z * c) * mySpeed, mySpin, mh);
+      const vx = dir.x * c - dir.z * s;
+      const vz = dir.x * s + dir.z * c;
+      const heading = stableHeading(Math.atan2(vx, vz));
+      this.mine.launch(sx, sz, Math.sin(heading) * mySpeed, Math.cos(heading) * mySpeed, mySpin, mh);
     }
     else {
-      const a = aim + LAUNCH_TILT * mh + twist;
+      const a = stableHeading(aim + LAUNCH_TILT * mh + twist);
       this.mine.launch(sx, sz, Math.sin(a) * mySpeed, -Math.cos(a) * mySpeed, mySpin, mh);
     }
     // Lock the blueprint to the actual post-bonus velocity, not the raw hand motion.
@@ -4229,7 +4233,7 @@ export class MatchSystem extends createSystem({
     const [rx, rz] = net?.role === 'host' && this.netRip?.at ? this.guestSpot(this.netRip.at, sx, sz) : this.rivalSpot();
     const inward = Math.atan2(-rx, -rz);
     const gd = net?.role === 'host' ? this.netRip?.dir : undefined;
-    const heading = gd && Number.isFinite(gd[0]) && Number.isFinite(gd[1]) && Math.hypot(gd[0], gd[1]) > 1e-6 ? Math.atan2(gd[0], gd[1]) + LAUNCH_TILT * th : inward + aiDir;
+    const heading = stableHeading(gd && Number.isFinite(gd[0]) && Number.isFinite(gd[1]) && Math.hypot(gd[0], gd[1]) > 1e-6 ? Math.atan2(gd[0], gd[1]) + LAUNCH_TILT * th : inward + aiDir);
     this.theirs.launch(rx, rz, Math.sin(heading) * aiSpeed, Math.cos(heading) * aiSpeed, launchSpin(aiPower), th);
     this.launchExtras();
     if (net?.role === 'host') {

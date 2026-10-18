@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { rankingN, roundOverN, stepN, sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
@@ -60,6 +60,13 @@ function fight(arena: Arena, a: Top, b: Top, bump?: (t: number) => void) {
 // the rules, so it is off for them and back on for the type loop.
 const GRACE = TUNING.grace;
 TUNING.grace = 0;
+
+// Committed aim ignores sub-degree hand jitter while retaining deliberate changes between slots.
+{
+  const held = stableHeading(0.21);
+  assert.equal(stableHeading(0.214), held, 'tiny tracking noise keeps the same launch heading');
+  assert.notEqual(stableHeading(0.21 + LAUNCH_HEADING_STEP), held, 'a deliberate heading step still changes aim');
+}
 
 // 1. A lone top launched toward the rim is pulled back by the bowl and eventually topples in place.
 {

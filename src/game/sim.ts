@@ -165,6 +165,15 @@ export function launchSpeed(power: number): number {
   return LAUNCH_SPEED * launchSpeedScale(power);
 }
 /**
+ * Hand tracking jitters by fractions of a degree even when the player is holding a steady line.
+ * Quantise only the committed launch heading (about 2.9 degree steps), so that invisible sensor
+ * noise cannot pick a different winner while every deliberate aim adjustment still matters.
+ */
+export const LAUNCH_HEADING_STEP = 0.05;
+export function stableHeading(angle: number): number {
+  return Math.round(angle / LAUNCH_HEADING_STEP) * LAUNCH_HEADING_STEP;
+}
+/**
  * Launches leave at this angle (radians) off straight-at-center, in the orbit direction, so tops
  * spiral into the bowl like a real angled launch instead of meeting head-on in the first half second.
  */
