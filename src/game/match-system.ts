@@ -6478,8 +6478,16 @@ export class MatchSystem extends createSystem({
    * or lost: a medal earned is earned). Each new one stamps in turn, then the map says what opened.
    */
   private trackBout(bout: Bout, event: Parameters<typeof medalsFrom>[1], matchOver: boolean, matchWon: boolean) {
-    this.boutEarned |= medalsFrom(bout, event, !!ROOM.poly);
-    if (!matchOver) return;
+    const earned = medalsFrom(bout, event, !!ROOM.poly);
+    // A medal earned mid-match is said at once (feedback while the move is fresh); the match end sums up.
+    const now = earned & ~1 & ~this.boutEarned & ~(this.progress.bouts[bout.id] ?? 0);
+    this.boutEarned |= earned;
+    if (!matchOver) {
+      bout.medals.forEach((m, i) => {
+        if (now & (2 << i)) this.stamp.later('MEDAL!', MEDAL_TEXT[m].toUpperCase(), 'mine', 1.1, 1.1);
+      });
+      return;
+    }
     const before = nextBout(this.progress.bouts);
     const { fresh, unlocked } = this.progress.recordBout(bout.id, this.boutEarned, matchWon);
     // One stamp for the bout (the queue keeps three; feats and levels share it), one for a new chapter.
