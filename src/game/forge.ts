@@ -234,7 +234,7 @@ export class Forge {
   private message = '';
   private heldPart: { item: Item; model: Object3D; hand: HandState; startAt: Vector3; from: Vector3; fly: number; lost: number } | null = null;
   /** The top in hand: the hand, and the hand's and top's orientations when it was picked up. */
-  private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion; lost: number } | null = null;
+  private heldTop: { hand: HandState; handQuat: Quaternion; topQuat: Quaternion; lost: number; palm: boolean } | null = null;
   /** A glowing three-jaw cradle makes the held hand read as a mobile workbench. */
   private palmCradle = (() => {
     const g = new Group();
@@ -406,6 +406,21 @@ export class Forge {
     // Nothing is picked until the forge has risen.
     if (this.opened < 1) return;
 
+    // An open palm under the display top is a physical inventory slot: the top settles into it,
+    // leaving the other hand free to pluck and fit parts. Pinch-grab remains as the one-hand fallback.
+    if (!this.heldTop && !this.heldPart) {
+      this.displayHolder.getWorldPosition(this.topAt);
+      for (const h of pointers) {
+        if (!h.tracked || h.pinching) continue;
+        const palm = this.palmAt(h, this.at);
+        if (palm.distanceTo(this.topAt) > (import.meta.env.DEV ? 0.14 : 0.09)) continue;
+        this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone(), lost: 0, palm: true };
+        playPick();
+        this.say('PALM WORKBENCH · keep this hand open, fit parts with the other');
+        break;
+      }
+    }
+
     // New pinches: a hand touching something goes first, then pointing rays (and the dev gaze).
     for (const touchOnly of [true, false]) {
       for (const h of pointers) {
@@ -504,7 +519,7 @@ export class Forge {
     if (target.kind === 'quench') return this.save();
     if (target.kind === 'top') {
       if (this.heldTop) return;
-      this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone(), lost: 0 };
+      this.heldTop = { hand: h, handQuat: h.rayQuat.clone(), topQuat: this.displayHolder.quaternion.clone(), lost: 0, palm: false };
       playPick();
       this.say('PALM FORGE · hold the top here, fit a part with your other hand');
       return;
@@ -538,7 +553,7 @@ export class Forge {
       return;
     }
     const h = held.hand;
-    const at = this.pointAt(h, this.at);
+    const at = held.palm ? this.palmAt(h, this.at).add(this.q.set(0, 0.025, 0)) : this.pointAt(h, this.at);
     this.root.worldToLocal(this.displayHolder.position.copy(at));
     // Turn with the hand: the hand's rotation since the pickup, applied to the top.
     this.quat.copy(h.rayQuat).multiply(this.q2.copy(held.handQuat).invert());
@@ -551,7 +566,8 @@ export class Forge {
     const pot = this.slots.find((s) => s.item.kind === 'color' && s.model.visible && !this.locked(s) && s.model.getWorldPosition(this.p).distanceTo(at) < DIP) ?? null;
     if (pot && pot !== this.dippedIn) this.fit(pot.item);
     this.dippedIn = pot;
-    if (h.pinching && h.tracked) {
+    const holding = held.palm ? h.tracked && !h.pinching && Math.abs(h.wrist.y - h.index.y) <= 0.1 : h.pinching && h.tracked;
+    if (holding) {
       held.lost = 0;
       return;
     }
@@ -623,6 +639,11 @@ export class Forge {
     // Along the ray, as far out as the anvil is.
     const d = this.q.distanceTo(h.rayOrigin);
     return out.copy(h.rayDir).multiplyScalar(d).add(h.rayOrigin);
+  }
+
+  /** World-space centre of the broad part of an open hand; writes into a reusable vector. */
+  private palmAt(h: HandState, out: Vector3): Vector3 {
+    return out.copy(h.wrist).lerp(h.index, 0.48);
   }
   /** The build with this item fitted, or null when the item does not change the build. */
   private withItem(item: Item): TopBuild | null {
