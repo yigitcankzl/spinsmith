@@ -4025,7 +4025,7 @@ export class MatchSystem extends createSystem({
       if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > 0.3) return false;
       // Starting the grab is free. The charge is committed only after a deliberate release.
       if (this.charges.charges < 1) {
-        this.locked('No charge yet\nThe pips on your hand refill');
+        this.locked('No charge yet\nCharges refill in a moment');
         return false;
       }
 
@@ -5177,12 +5177,12 @@ export class MatchSystem extends createSystem({
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (guest) {
       if (f) guest.sendEvent({ kind: 'ramp', x: -x, z: -z, dx: -dx, dz: -dz });
-      else this.locked('No charge yet\nThe pips on your hand refill');
+      else this.locked('No charge yet\nCharges refill in a moment');
       return null;
     }
     if (import.meta.env.DEV) console.log(`[SHAPE] ${kind} at ${x.toFixed(3)},${z.toFixed(3)} amp ${amp.toFixed(3)} factor ${f} charges ${this.charges.charges} t ${this.elapsed.toFixed(1)}`);
     if (!f) {
-      this.locked('No charge yet\nThe pips on your hand refill');
+      this.locked('No charge yet\nCharges refill in a moment');
       return null;
     }
     const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz, sigma);
