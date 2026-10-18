@@ -21,6 +21,8 @@ const BAR_X = 48;
 const BAR_W = 592;
 const BAR_Y = 118;
 const BAR_H = 56;
+/** In a fight the plate ends under the heat pips; the XP row (and the full height) is for results. */
+const FIGHT_H = 272;
 
 export class MatchBar {
   readonly mesh: Mesh;
@@ -38,6 +40,7 @@ export class MatchBar {
   private readonly low = new Color('#e0574a');
   private readonly white = new Color('#ffffff');
   private readonly k = pxPerM(CW, PW * SCALE * ARENA_SCALE);
+  private slab: Mesh;
 
   constructor() {
     this.canvas.width = CW;
@@ -45,7 +48,7 @@ export class MatchBar {
     this.tex = signTexture(this.canvas);
     this.mesh = new Mesh(new PlaneGeometry(PW, PH), new MeshBasicMaterial({ map: this.tex, transparent: true, depthWrite: false }));
     this.mesh.name = 'match-bar';
-    addSlab(this.mesh, PW, PH, 0.08, GLASS_DEPTH / (SCALE * ARENA_SCALE));
+    this.slab = addSlab(this.mesh, PW, PH, 0.08, GLASS_DEPTH / (SCALE * ARENA_SCALE));
     this.mesh.visible = false;
     const px = (x: number) => (x / CW - 0.5) * PW;
     const py = (y: number) => (0.5 - y / CH) * PH;
@@ -102,7 +105,12 @@ export class MatchBar {
     if (k.ready && k.my === myPoints && k.their === theirPoints && k.toWin === toWin && k.n0 === names[0] && k.n1 === names[1] && k.msg === message && k.show === xp.show && k.level === xp.level && k.fraction === fraction && k.gained === xp.gained) return;
     Object.assign(k, { ready: true, my: myPoints, their: theirPoints, toWin, n0: names[0], n1: names[1], msg: message, show: xp.show, level: xp.level, fraction, gained: xp.gained });
     const g = this.canvas.getContext('2d')!;
-    glass(g, CW, CH);
+    // A compact plate while the tops fight: no empty glass below the pips.
+    const h = xp.show ? CH : FIGHT_H;
+    g.clearRect(0, 0, CW, CH);
+    glass(g, CW, h);
+    this.slab.scale.y = h / CH;
+    this.slab.position.y = (PH / 2) * (1 - h / CH);
     // The scoreboard belongs to the same forged machine as the arena: a hot top seam, brass
     // corner fasteners and a stamped centre datum replace the anonymous floating-glass rectangle.
     const seam = g.createLinearGradient(80, 0, CW - 80, 0);
@@ -113,7 +121,7 @@ export class MatchBar {
     g.fillStyle = seam;
     g.fillRect(80, 13, CW - 160, 8);
     for (const x of [34, CW - 34]) {
-      for (const y of [34, CH - 34]) {
+      for (const y of [34, h - 34]) {
         g.beginPath();
         g.arc(x, y, 10, 0, Math.PI * 2);
         g.fillStyle = '#c99a50';
