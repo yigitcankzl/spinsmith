@@ -45,6 +45,9 @@ import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from './arena-forge.js';
 import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
+import { linkFromAddress } from './online.js';
+import type { OnlineLink } from './online.js';
+import type { GuestEvent, PackedShape } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalsFrom, nextBout, nextGate } from './campaign.js';
 import type { Bout } from './campaign.js';
 
@@ -849,6 +852,12 @@ export class MatchSystem extends createSystem({
   private extraViews: TopView[] = [];
   private brawlLoser: Top | null = null;
   private brawlNames: string[] = [];
+  /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
+  private online: OnlineLink | null = null;
+  private netRip: { power: number; aim: number } | null = null;
+  private netPending: Parameters<MatchSystem['launch']> | null = null;
+  private netGo = false;
+  private netShapes = new Map<number, FloorShape>();
   private bout: Bout | null = null;
   private boutEarned = 0;
   /** This match as an echo for a friend's game: each rip and each two-hand forge (echo.ts). */
@@ -988,6 +997,7 @@ export class MatchSystem extends createSystem({
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
+    this.openOnline();
     // A plate laid on the left of the near rim at the touch band's one pitch, like every sign you pinch.
     this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14);
     this.menuButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
@@ -1340,7 +1350,7 @@ export class MatchSystem extends createSystem({
     this.openingEcho.visible = launchPhase && !!this.lastOpeningTrace && this.lastOpeningTrace.rival === this.rival.name && this.lastOpeningTrace.arena === this.arena.layout.name && !this.demo;
     // Large near-rim actions only appear when play has stopped; during a fight the arena is the UI.
     this.menuButton.mesh.visible = this.phase === 'result' && !this.demo;
-    this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo;
+    this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo && this.online?.role !== 'guest';
     this.passButton.mesh.visible = this.rematchButton.mesh.visible && this.canPass();
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
@@ -2670,6 +2680,7 @@ export class MatchSystem extends createSystem({
       this.setupBrawl(this.seats - 2);
     }
     this.progress.playedArena(this.arena.layout.name);
+    if (this.online?.role === 'host' && this.online.peer) this.online.launched(-1, this.arena.layout.name);
     this.perfectInMatch = false;
     this.myPoints = 0;
     this.theirPoints = 0;
@@ -3672,6 +3683,27 @@ export class MatchSystem extends createSystem({
    * ahead, angled into its orbit); `steep` 0..1 trades launch speed for spin.
    */
   private launch(power: number, aim: number, from: { x: number; z: number } | null = null, dir: { x: number; z: number } | null = null, steep = 0) {
+    // Online: the guest only sends its rip and waits for the host's launch; the host waits for the guest's rip.
+    const net = this.online?.peer ? this.online : null;
+    if (net && !this.netGo) {
+      if (net.role === 'guest') {
+        net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist });
+        this.netPending = [power, aim, from, dir, steep];
+        this.label.set(`Ripped\nWaiting for ${net.peerName || 'the host'}`);
+        this.labelTimer = 0;
+        return;
+      }
+      if (!this.netRip) {
+        this.netPending = [power, aim, from, dir, steep];
+        this.label.set(`Ripped\nWaiting for ${net.peerName || 'your guest'} to rip`);
+        this.labelTimer = 0;
+        return;
+      }
+    }
+    if (net?.role === 'host' && this.netRip) {
+      this.rivalLaunchPower = this.netRip.power;
+      this.rivalLaunchAim = this.netRip.aim;
+    }
     if (this.phase === 'result') this.toReady();
     const braced = this.bracedLaunch;
     const speed = LAUNCH_SPEED * (0.5 + 0.5 * power);
@@ -3794,6 +3826,11 @@ export class MatchSystem extends createSystem({
     const inward = Math.atan2(-rx, -rz);
     this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, launchSpin(aiPower), th);
     this.launchExtras();
+    if (net?.role === 'host') {
+      net.launched(this.round, this.arena.layout.name);
+      this.netRip = null;
+    }
+    this.netPending = null;
     playTouchdown(rx, rz, 0.6 + 0.4 * aiPower);
     this.phase = 'fight';
     this.markFirstFive(3);
@@ -3909,7 +3946,12 @@ export class MatchSystem extends createSystem({
 
       const before = arenaForgeDanger(this.theirs.x, this.theirs.z, this.theirs.vx, this.theirs.vz, this.arena.radius)
         - arenaForgeDanger(this.mine.x, this.mine.z, this.mine.vx, this.mine.vz, this.arena.radius);
-      for (const top of this.tops) {
+      const guest = this.online?.role === 'guest' && this.online.peer ? this.online : null;
+      if (guest) {
+        const sign = action === 'twist' ? Math.sign(this.arenaMorphTwist) : action === 'tilt' ? Math.sign(this.arenaMorphShove.x) : 1;
+        guest.sendEvent({ kind: 'forge', action, pull: gesture.pull, twist: gesture.twist, tilt: gesture.tilt, sign: sign < 0 ? -1 : 1 });
+      }
+      for (const top of guest ? [] : this.tops) {
         if (!top.alive) continue;
         const impulse = arenaForgeImpulse(action, gesture, top.x, top.z, this.arena.radius, this.arenaMorphShove.x, this.arenaMorphShove.z, force);
         const ix = impulse.x;
@@ -4488,7 +4530,7 @@ export class MatchSystem extends createSystem({
    */
   private playEcho() {
     const echo = this.rivalEcho;
-    if (!echo || this.demo) return;
+    if (!echo || this.demo || this.online?.peer) return;
     const round = this.echoRec.rips.length - 1;
     const due = echo.forges.filter((f) => f.round === round);
     const f = due[this.echoPlayed];
@@ -4530,7 +4572,7 @@ export class MatchSystem extends createSystem({
   }
 
   private rivalTell(clash: number) {
-    if (this.demo || !this.taught('tells')) return;
+    if (this.demo || !this.taught('tells') || this.online?.peer) return;
     this.rivalBar.update(STEP, false);
     if (clash) this.rivalBar.clash(clash, this.elapsed, false);
     const them = this.theirs;
@@ -5002,6 +5044,11 @@ export class MatchSystem extends createSystem({
 
   /** Spends a charge and sets a shape (up to two live ramps per hand); without one, a dull clunk. */
   private makeShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0, sigma?: number): FloorShape | null {
+    // Online guest: the host makes the shape (in its own frame, turned half round); it comes back in a snapshot.
+    if (this.online?.role === 'guest' && this.online.peer) {
+      if (kind === 'ramp') this.online.sendEvent({ kind: 'ramp', x: -x, z: -z, dx: -dx, dz: -dz });
+      return null;
+    }
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (import.meta.env.DEV) console.log(`[SHAPE] ${kind} at ${x.toFixed(3)},${z.toFixed(3)} amp ${amp.toFixed(3)} factor ${f} charges ${this.charges.charges} t ${this.elapsed.toFixed(1)}`);
     if (!f) {
@@ -5050,7 +5097,7 @@ export class MatchSystem extends createSystem({
 
   /** Rivals from level 6 shape the floor too; each move family uses its normal tactic, not one AI. */
   private rivalShaping() {
-    if (this.demo || !(this.bout ? this.bout.shapes : this.rival.level >= 6)) return;
+    if (this.demo || this.online?.peer || !(this.bout ? this.bout.shapes : this.rival.level >= 6)) return;
     this.rivalCharges.update(STEP);
     if (this.elapsed - this.rivalShapeAt >= RIVAL_SHAPE_GAP && this.rivalNeedsDeskGuard()) {
       const f = this.rivalCharges.spend(this.elapsed, TUNING.grace);
@@ -5450,6 +5497,11 @@ export class MatchSystem extends createSystem({
   }
 
   private updateFight(dt: number) {
+    if (this.online?.role === 'guest' && this.online.peer) {
+      this.guestFight(dt);
+      return;
+    }
+    if (this.online?.role === 'host') this.online.snapshot(this.time * 1000, [this.mine, this.theirs], [this.arena.tiltX, this.arena.tiltZ], this.arena.shapes);
     if (this.updateDeskVerdict(dt)) return;
     if (this.updateOuterRing(dt)) return;
     // Hit stop: the simulation alone pauses for a moment after a hard hit; head tracking and
@@ -5616,6 +5668,10 @@ export class MatchSystem extends createSystem({
   }
 
   private finish(v: -1 | 1 | 2, deskKo = false) {
+    if (this.online?.role === 'host' && this.online.peer) {
+      this.online.snapshot(this.time * 1000, [this.mine, this.theirs], [this.arena.tiltX, this.arena.tiltZ], this.arena.shapes, true);
+      this.online.result(v, [this.myPoints, this.theirPoints]);
+    }
     this.phase = 'result';
     this.deskKoScored = deskKo;
     if (deskKo) this.setDeskKoStage(3);
@@ -5949,9 +6005,157 @@ export class MatchSystem extends createSystem({
     }
   }
 
+  /** Opens the online duel the address asks for (after the first session), and wires its messages. */
+  private openOnline() {
+    if (this.progress.guide !== 'done') return;
+    const link = linkFromAddress(location.search, encodeBuild(this.myBuild), buildName(this.myBuild));
+    if (!link) return;
+    this.online = link;
+    const say = (text: string, hold = 8) => {
+      this.label.set(text);
+      this.labelTimer = hold;
+    };
+    // The room code stays up until someone joins.
+    say(link.role === 'host' ? `Online room ${link.code}\nA friend opens ?online=${link.code}` : `Joining room ${link.code}…`, 600);
+    link.onHello = () => {
+      if (import.meta.env.DEV) console.log(`[ONLINE] ${link.role}: ${link.peerName} joined ${link.code}`);
+      if (link.role === 'host') {
+        this.toHub();
+        this.startMatch(this.remoteRival());
+      } else say(`In room ${link.code}\n${link.peerName} starts the match`);
+    };
+    link.onLaunch = (round, arena) => {
+      if (round < 0) {
+        // A match begins: the host's arena, against the host's top.
+        const index = this.arenas.findIndex((a) => a.name === arena);
+        if (index >= 0) {
+          this.arenaIndex = index;
+          this.setArena(this.arenas[index]);
+        }
+        this.toHub();
+        this.startMatch(this.remoteRival());
+        return;
+      }
+      this.netGo = true;
+      const [power, aim, from, dir, steep] = this.netPending ?? [0.75, 0, null, null, 0];
+      this.launch(power, aim, from, dir, steep);
+      this.netGo = false;
+    };
+    link.onEvent = (ev) => this.applyGuestEvent(ev);
+    link.onResult = (winner) => {
+      if (this.phase !== 'fight') return;
+      this.guestFight(0, true);
+      const v = winner === 2 ? 2 : winner === 1 ? -1 : 1;
+      const loser = v === 1 ? this.theirs : this.mine;
+      if (v !== 2 && !loser.finish) loser.finish = 'spin';
+      this.finish(v);
+    };
+    link.onLeft = () => say(`${link.peerName || 'Your opponent'} left\nThe online duel is over`);
+  }
+
+  /** The other smith's top, as a rival for the online duel. */
+  private remoteRival(): Rival {
+    const link = this.online!;
+    const build = decodeBuild(link.peerBuild) ?? { ...PRESETS[0].build };
+    const name = link.role === 'host' ? 'Guest' : 'Host';
+    return { name, move: 'charge', style: 'another smith, live', title: link.peerName || 'online', intro: 'Live from another table.', win: 'GG.', lose: 'GG.', tip: 'Read their ramps and forge first', build: { ...build, color: OPPONENT_COLOR }, level: 1 };
+  }
+
+  /** Host: what the guest's hands did, from the far side. */
+  private applyGuestEvent(ev: GuestEvent) {
+    if (ev.kind === 'rip') {
+      this.netRip = { power: ev.power, aim: ev.aim };
+      if (this.netPending && this.phase !== 'fight') {
+        const [power, aim, from, dir, steep] = this.netPending;
+        this.netGo = true;
+        this.launch(power, aim, from, dir, steep);
+        this.netGo = false;
+      }
+      return;
+    }
+    if (this.phase !== 'fight') return;
+    if (ev.kind === 'ramp') {
+      this.arena.addShape('ramp', ev.x, ev.z, SHAPE_SIZE.ramp, 'p2:right', ev.dx, ev.dz);
+      this.rivalHandMove(ev.x, ev.z, ev.dx, ev.dz);
+      this.rivalShapeAt = this.elapsed;
+      this.rivalShapeKind = 'RAMP';
+      playThock();
+    } else if (ev.kind === 'forge') {
+      const action = ev.action as ArenaForgeAction;
+      const gesture: ArenaForgeGesture = { pull: ev.pull, twist: ev.twist, tilt: ev.tilt };
+      for (const top of this.tops) {
+        if (!top.alive) continue;
+        const impulse = arenaForgeImpulse(action, gesture, top.x, top.z, this.arena.radius, -ev.sign, 0);
+        top.vx += impulse.x;
+        top.vz += impulse.z;
+        top.kick = Math.max(top.kick, 0.55);
+        top.kickX = impulse.x;
+        top.kickZ = impulse.z;
+      }
+      const [, g] = forgeGrips(this.arena.layout);
+      const d = Math.hypot(g.x, g.z) || 1;
+      this.rivalHandMove(-g.x, -g.z, g.x / d, g.z / d);
+      this.rivalShapeAt = this.elapsed;
+      this.rivalShapeKind = action.toUpperCase();
+      this.stamp.show(`THEIR ${ARENA_FORGE_TITLE[action]}`, 'live hands', 'rival', 0.9);
+      this.impacts.shock(0, this.arena.height(0, 0), 0, 0.6);
+      playThock();
+    }
+  }
+
+  /** Guest: the fight as the host's snapshots show it, turned half round so your top is near you. */
+  private guestFight(dt: number, newest = false) {
+    const link = this.online!;
+    link.tick();
+    const s = link.buffer.sample(performance.now() + (newest ? 10000 : 0));
+    // Snapshot time is the host's game clock (monotonic across rounds); the fight clock runs here.
+    this.elapsed += dt;
+    if (!s) return;
+    const put = (t: Top, p: (typeof s.tops)[0]) => {
+      t.x = -p.x;
+      t.z = -p.z;
+      t.vx = -p.vx;
+      t.vz = -p.vz;
+      t.spin = p.spin;
+      t.angle = p.angle;
+      t.wobble = p.wobble;
+      t.damage = p.damage;
+      t.state = p.state;
+      t.finish = p.finish;
+    };
+    put(this.mine, s.tops[1]);
+    put(this.theirs, s.tops[0]);
+    this.arena.tiltX = -s.tilt[0];
+    this.arena.tiltZ = -s.tilt[1];
+    this.syncGuestShapes(link.shapes, dt);
+  }
+
+  /** Guest: the host's floor shapes, turned half round; a shape keeps its age while it lasts. */
+  private syncGuestShapes(packed: PackedShape[], dt: number) {
+    const live = new Set<number>();
+    const out: FloorShape[] = [];
+    for (const [id, kind, x, z, dx, dz, amp, owner] of packed) {
+      live.add(id);
+      let shape = this.netShapes.get(id);
+      if (!shape) {
+        shape = { kind: kind === 0 ? 'ramp' : 'well', x: -x, z: -z, dx: -dx, dz: -dz, amp, age: 0, owner: `net:${owner}`, ...(kind === 2 ? { trap: true } : {}) };
+        this.netShapes.set(id, shape);
+        this.arenaDirty = true;
+      }
+      shape.age += dt;
+      out.push(shape);
+    }
+    for (const id of [...this.netShapes.keys()]) if (!live.has(id)) {
+      this.netShapes.delete(id);
+      this.arenaDirty = true;
+    }
+    this.arena.shapes = out;
+    if (dt > 0) this.arenaDirty = true;
+  }
+
   /** A duel just ended with your hands on record (the echo saved at match end): someone else can take the headset. */
   private canPass() {
-    if (this.extras.length || this.progress.guide !== 'done') return false;
+    if (this.extras.length || this.online || this.progress.guide !== 'done') return false;
     try {
       return !!localStorage.getItem(ECHO_KEY);
     } catch {
