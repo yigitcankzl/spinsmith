@@ -84,6 +84,8 @@ export type HubAction =
 const BRAWL_OFF = new MeshBasicMaterial({ color: 0x2c3138 });
 const BRAWL_ON = new MeshBasicMaterial({ color: 0x4fd1ff });
 const BRAWL_MINE = new MeshBasicMaterial({ color: 0xff8a2a });
+/** Every peg white-hot: an online room is open and waiting. */
+const BRAWL_ONLINE = new MeshBasicMaterial({ color: 0xfff1d6 });
 
 /** A hand lost this long (s) cancels a carry instead of dropping (same as the match's rip). */
 const HAND_LOSS_GRACE = 0.28;
@@ -522,9 +524,9 @@ export class Hub {
   }
 
   /** Lights one peg per top in the next match. */
-  setBrawl(tops: number) {
+  setBrawl(tops: number, online = false) {
     this.brawlPegs.children.forEach((peg, i) => {
-      if (i < 4) (peg as Mesh).material = i < tops ? (i === 0 ? BRAWL_MINE : BRAWL_ON) : BRAWL_OFF;
+      if (i < 4) (peg as Mesh).material = online ? BRAWL_ONLINE : i < tops ? (i === 0 ? BRAWL_MINE : BRAWL_ON) : BRAWL_OFF;
     });
   }
 

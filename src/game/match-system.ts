@@ -1768,7 +1768,7 @@ export class MatchSystem extends createSystem({
   private toHub() {
     this.clearBrawl();
     this.bout = null;
-    this.hub.setBrawl(this.seats);
+    this.hub.setBrawl(this.seats, this.online?.role === 'host' && !this.online.peer);
     this.phase = 'hub';
     this.markFirstFive(1);
     this.matchOver = false;
@@ -1932,7 +1932,19 @@ export class MatchSystem extends createSystem({
     } else if (action.kind === 'reset') {
       return;
     } else if (action.kind === 'brawl') {
-      this.seats = this.seats >= 4 ? 2 : this.seats + 1;
+      // The pegs step: duel, 3-top brawl, 4-top brawl, an online room, and back to the duel.
+      const online = this.online?.role === 'host' && !this.online.peer;
+      if (online) {
+        this.online!.close();
+        this.online = null;
+        this.seats = 2;
+      } else if (this.seats >= 4 && !this.online) {
+        this.seats = 2;
+        this.openOnline('host');
+        this.hub.setBrawl(4, true);
+        playTick();
+        return;
+      } else this.seats++;
       saveSeats(this.seats);
       this.hub.setBrawl(this.seats);
       this.label.set(this.seats === 2 ? 'Duel: you and one rival\nPinch the pegs for a brawl' : `Brawl: ${this.seats} tops\nLast top spinning takes the heat`);
@@ -6040,9 +6052,9 @@ export class MatchSystem extends createSystem({
   }
 
   /** Opens the online duel the address asks for (after the first session), and wires its messages. */
-  private openOnline() {
+  private openOnline(open?: 'host') {
     if (this.progress.guide !== 'done') return;
-    const link = linkFromAddress(location.search, encodeBuild(this.myBuild), buildName(this.myBuild));
+    const link = linkFromAddress(open ? '?online=host' : location.search, encodeBuild(this.myBuild), buildName(this.myBuild));
     if (!link) return;
     this.online = link;
     const say = (text: string, hold = 8) => {
@@ -6050,7 +6062,7 @@ export class MatchSystem extends createSystem({
       this.labelTimer = hold;
     };
     // The room code stays up until someone joins.
-    say(link.role === 'host' ? `Online room ${link.code}\nA friend opens ?online=${link.code}` : `Joining room ${link.code}…`, 600);
+    say(link.role === 'host' ? `Online room ${link.code}\nA friend opens ?online=${link.code} · pinch the pegs to close` : `Joining room ${link.code}…`, 600);
     link.onHello = () => {
       if (import.meta.env.DEV) console.log(`[ONLINE] ${link.role}: ${link.peerName} joined ${link.code}`);
       if (link.role === 'host') {
