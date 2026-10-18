@@ -75,14 +75,19 @@ export const RIVAL_UNLOCKS: Record<number, string> = {
 
 /** The newer arenas, opened beside a level's part or paint (the classics come with LEVEL_UNLOCKS). */
 export const ARENA_UNLOCKS: Record<number, string> = {
+  3: 'arena:Crucible Gate',
   5: 'arena:Twin Basins',
   6: 'arena:Ripple Pool',
   8: 'arena:Glacier Steps',
+  9: 'arena:Sentinel Gates',
   10: 'arena:Neon Speedway',
   12: 'arena:Colossus Bowl',
   14: 'arena:Meteor Pit',
   15: 'arena:Titan Crater',
+  16: 'arena:Bellows',
   17: 'arena:Orbit Foundry',
+  18: 'arena:Gear Rink',
+  19: 'arena:Ridge Raceway',
   20: 'arena:Grand Anvil',
 };
 
