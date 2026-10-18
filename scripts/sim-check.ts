@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { rankingN, roundOverN, stepN, sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
@@ -1423,6 +1423,47 @@ assert.equal(edgeOf('defense', 'defense'), 0);
     assert.ok(best >= 0.5, `bout ${bout.id}: some forgeable build beats ${bout.rival} in ${bout.arena} (best ${best.toFixed(2)})`);
   }
   console.log(`map counters: the hardest bout to counter is ${worstBout} (best build wins ${(worst * 100).toFixed(0)}% without hands)`);
+}
+
+// 36. Crowded bouts can be won too: against the bout's rival and its crowd together, some build is
+// the last top spinning well above a fair share (1 in 3 or 1 in 4), without hands.
+{
+  const candidates = [...PRESETS.map((p) => p.build), ...NAMED_BUILDS.map((n) => n.build), ...RIVALS.map((r) => r.build)];
+  const all = [...RIVALS, ...NAMED_BUILDS];
+  for (const bout of BOUTS.filter((b) => b.crowd?.length)) {
+    const layout = ARENAS.find((x) => x.name === bout.arena)!;
+    const foes = [bout.rival, ...bout.crowd!].map((n) => all.find((r) => r.name === n)!.build);
+    const arena = new Arena(layout);
+    const spawn = layout.shape === 'oval' ? layout.radius * 0.78 * 0.72 : layout.radius * 0.72;
+    const n = foes.length + 1;
+    let best = 0;
+    for (const build of candidates) {
+      let wins = 0;
+      const rounds = 8;
+      for (let k = 0; k < rounds; k++) {
+        arena.reset(layout);
+        const tops = [build, ...foes].map((b) => new Top(specFromBuild(b)));
+        tops.forEach((t, i) => {
+          const ang = Math.PI / 2 + (i * 2 * Math.PI) / n + k * 0.3;
+          const x = Math.cos(ang) * spawn;
+          const z = Math.sin(ang) * spawn;
+          const p = 0.65 + ((k + i) % 4) * 0.08;
+          const sp = LAUNCH_SPEED * (0.5 + 0.5 * p);
+          const dir = Math.atan2(-x, -z) + LAUNCH_TILT;
+          t.launch(x, z, Math.sin(dir) * sp, Math.cos(dir) * sp, launchSpin(p), i === 0 ? 1 : -1);
+        });
+        let t = 0;
+        while (!roundOverN(tops, t)) {
+          stepN(arena, tops);
+          t += STEP;
+        }
+        if (rankingN(tops, t)[0] === 0) wins++;
+      }
+      best = Math.max(best, wins / rounds);
+    }
+    assert.ok(best >= 1.5 / n, `crowded bout ${bout.id}: some build is last spinning ${(best * 100).toFixed(0)}% of rounds (fair share ${(100 / n).toFixed(0)}%)`);
+    console.log(`crowded bout ${bout.id}: best build last spinning ${(best * 100).toFixed(0)}% (fair share ${(100 / n).toFixed(0)}%)`);
+  }
 }
 
 console.log('sim-check: all passed');
