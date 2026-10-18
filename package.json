@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "check:sim": "node scripts/sim-check.ts",
     "check:sim-n": "node scripts/sim-n-check.ts",
+    "check:net": "node scripts/net-check.ts",
     "check:desk-ko": "bash scripts/check-desk-ko-hand.sh",
     "check:desk-guard": "npx @iwsdk/cli browser run scripts/check-desk-guard-probe.mjs --timeout 60000",
     "report:arenas": "node scripts/arena-report.ts",
@@ -33,11 +34,12 @@
     "@pmndrs/uikit": "^1.0.74",
     "@pmndrs/uikit-horizon": "^1.0.74",
     "@pmndrs/uikit-lucide": "^1.0.74",
-    "three": "npm:super-three@0.181.0"
+    "three": "npm:super-three@0.181.0",
+    "trystero": "^0.26.0"
   },
   "devDependencies": {
-    "@iwsdk/reference": "1.0.1",
     "@iwsdk/cli": "1.0.1",
+    "@iwsdk/reference": "1.0.1",
     "@iwsdk/vite-plugin-dev": "1.0.1",
     "@meta-quest/metavr": "^1.8.1",
     "@types/three": "^0.181.0",
