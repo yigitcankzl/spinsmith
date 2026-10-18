@@ -16,21 +16,21 @@ export class OnlineLink {
   peer = false;
   peerName = '';
   peerBuild = '';
-  readonly buffer = new SnapshotBuffer();
+  buffer = new SnapshotBuffer();
   /** The floor as the host last sent it (guest), with its version. */
   shapes: PackedShape[] = [];
   shapesVersion = -1;
   onHello: (() => void) | null = null;
   onEvent: ((ev: GuestEvent) => void) | null = null;
   onLaunch: ((round: number, arena: string) => void) | null = null;
-  onResult: ((winner: number) => void) | null = null;
+  onResult: ((winner: number, heat: [number, number]) => void) | null = null;
   onLeft: (() => void) | null = null;
   private encoder = new SnapshotEncoder();
   private sender: EventSender | null = null;
   private receiver: EventReceiver | null = null;
   private lastSnap = -1e9;
   /** The other smith's hands, latest wins (arena-local, in their frame), and when they came. */
-  readonly hands = new HandsReceiver();
+  hands = new HandsReceiver();
   handsAt = -1e9;
   private handsSeq = 0;
   private lastHands = -1e9;
@@ -56,6 +56,18 @@ export class OnlineLink {
     this.hello();
   }
 
+  /** Fresh counters, buffers and floor for a new peer. */
+  private reset() {
+    const send = (m: NetMsg) => this.transport.send(m);
+    if (this.role === 'guest') this.sender = new EventSender(send);
+    else this.receiver = new EventReceiver((ev) => this.onEvent?.(ev), send);
+    this.encoder = new SnapshotEncoder();
+    this.buffer = new SnapshotBuffer();
+    this.hands = new HandsReceiver();
+    this.shapes = [];
+    this.shapesVersion = -1;
+  }
+
   private hello() {
     this.transport.send({ type: 'hello', v: NET_VERSION, build: this.build, name: this.name });
   }
@@ -65,6 +77,8 @@ export class OnlineLink {
     if (m.type === 'hello') {
       if (m.v !== NET_VERSION) return;
       const fresh = !this.peer;
+      // A new peer numbers everything from 1 again: start the counters over for them.
+      if (fresh) this.reset();
       this.peer = true;
       this.peerName = m.name;
       this.peerBuild = m.build;
@@ -84,8 +98,11 @@ export class OnlineLink {
         this.shapesVersion = this.buffer.shapesVersion;
         this.shapes = this.buffer.shapes;
       }
-    } else if (m.type === 'start' && this.role === 'guest') this.onLaunch?.(m.round, m.arena);
-    else if (m.type === 'result' && this.role === 'guest') this.onResult?.(m.winner);
+    } else if (m.type === 'start' && this.role === 'guest') {
+      // A new round: last round's final positions must not show at its start.
+      if (m.round >= 0) this.buffer = new SnapshotBuffer();
+      this.onLaunch?.(m.round, m.arena);
+    } else if (m.type === 'result' && this.role === 'guest') this.onResult?.(m.winner, m.heat);
     else if (m.type === 'bye') {
       this.peer = false;
       this.onLeft?.();
