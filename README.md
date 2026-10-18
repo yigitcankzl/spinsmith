@@ -36,8 +36,10 @@ an arena. First to 3 heat wins a match.
   gaze input have only been exercised in IWSDK's browser emulator (IWER).
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
-  slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; and Assist (fights at
-  80% speed, calm).
+  slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
+  80% speed, calm); and One hand: hold the rim with one hand for a moment and a mirrored partner
+  appears on the far rim, so turning, pushing in or out and lifting that one hand twist, squeeze,
+  stretch and tilt the arena (calm).
 
 ## What is in the game
 
@@ -139,11 +141,33 @@ an arena. First to 3 heat wins a match.
   then its champion Iron Keep), the Iron Circuit (Leech, Hookjaw, champion Sawtooth) and the
   Crown (Bastion); the next bout is the first rival you have not beaten, and beating a champion
   clears its circuit. Each rival has a title and lines: "VS DRIFTER · Cinder Circuit · bout 1 of 3"
-  is stamped as the match starts, with its intro line, and it has a word for you when the match ends. Higher levels make rivals rip harder and aim steadier, never
+  is stamped as the match starts, with its intro line, and it has a word for you when the match ends. In the campaign the bout sets how hard a rival rips (see the Circuit Map); in free play higher levels make rivals rip harder and aim steadier. Never
   stronger in stats.
   After a round the match bar shows the XP earned and the level bar; a level-up rings and
   throws sparks, and each unlock spins over the arena. Your level and rank sit on the near rim.
   Progress is saved in the browser.
+- **The Circuit Map** (`src/game/campaign.ts`): after the first session the next match comes from
+  a campaign of fifteen bouts in three chapters (Cinder Circuit, Iron Circuit, The Crown). Each
+  bout fixes a rival and an arena, teaches one thing and twists it, and asks for two medals beyond
+  the win (ramp KO, forge KO, strike KO, shatter, white-hot rip, no heat lost, cup outlast, edge
+  KO). The fifth bout of each chapter is its boss. Rival skill follows the map, not your level:
+  it climbs through a chapter and dips at the next one's start, and two losses in a row on a
+  bout quietly ease it. A chapter opens with 8 or 18 medals and the previous boss beaten, so
+  skill stands in for grinding. The intro card names the bout's lesson and the medals still
+  open; medals are kept win or lose, stamped at the match's end; the board's back (a pinch on
+  the level plate) shows the chapter as five medallions. Pinning an arena in the workshop
+  switches to free play. Checked by `npm run check:sim` (every bout's rival and arena exist,
+  knockout medals only where a knockout is possible, the sawtooth, the gates and the save).
+- **Brawls, three or four tops** (`stepN` in `src/game/sim.ts`): the brass pegs beside the level
+  plate set how many tops share the next match. Two is a duel; three or four is a brawl where the
+  extra seats are other rivals' and named smiths' tops (in green and violet), every pair can
+  collide, and the last top spinning takes the heat, scored on the foe that went out last.
+  Brawls are free play (no bout, order or challenge). `npm run check:sim-n` checks that the N-top
+  step with two tops matches the duel step exactly, that crowded rounds always end and that they
+  replay identically.
+- **Pass and play:** when a duel ends, a PASS button joins MENU and REMATCH: the next person on
+  the same headset fights the top just played and its recorded rips and forges (an echo, below),
+  with a ghost hand from the far rim.
 - **A reason to come back** (`src/game/orders.ts`, `src/game/board.ts`):
   once the first session is over, the Smith's board over the far rim shows **today's Smith
   Order**, made from the local date and what you have unlocked (the same all day): a rival, an
