@@ -6073,6 +6073,11 @@ export class MatchSystem extends createSystem({
       this.finish(v);
     };
     link.onLeft = () => say(`${link.peerName || 'Your opponent'} left\nThe online duel is over`);
+    // WebRTC through public relays: a room nobody reaches, or a strict network, ends with a plain reason.
+    const t = link.transport as { onState?: (cb: (s: string) => void) => void; error?: string };
+    t.onState?.((state) => {
+      if (state === 'failed' && !link.peer) say(`Room ${link.code}: no one connected\n${t.error ?? 'Check the code, or try another network'}`, 12);
+    });
   }
 
   /** The other smith's top, as a rival for the online duel. */
