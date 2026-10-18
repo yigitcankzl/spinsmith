@@ -129,6 +129,16 @@ IWER two windows after the fix: the guest's top equals the host's rival top, the
 
 | a649199 | Fourth review agent. An order for a crowded bout brings its crowd; bot ramps show in the other side's colour. **Online:** the guest goes home *before* taking the host's arena, which fixes a mismatch that two windows sharing one save had hidden (verified: host Gear Rink → guest Gear Rink). |
 
+| 944be20, 6bef129 | The level plate names a crowded bout even with the pegs up; the board says "free play in X (pinned)" when an arena is pinned, so PLAY and the map agree. |
+
+**Local only (gitignored):**
+- `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes, and the interaction notes are updated.
+- `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
+
+**Checkpoint 05:58:**
+- `tsc`, `check:sim`, `check:sim-n`, `check:net`, `build` and `public-release-check` all pass.
+- 72 commits since Codex's last (6d7bea6); the tree is clean.
+
 **First session, verified with real emulated gestures (IWER, fresh save):**
 - round 1, ramp → lastShape ramp;
 - round 2, the two-hand forge → squeeze (this was broken before d16e34d);
