@@ -15,7 +15,7 @@ Goal: turn Spinsmith from a deep systems sandbox into a finished game that can w
   - a README audit against the code;
   - `check:sim` now proves every bout can be countered, and that crowded bouts can be won;
   - `check:sim-n` and `check:net` were added.
-- **Still open:** Quest device test, the edited video (raw IWER clip only, see below), hosting (last step). Every IWER render budget is under 150 per eye.
+- **Still open:** Quest device test, online between two real devices, the final edited video (a silent draft cut exists, see below), hosting (last step). Every IWER render budget is under 150 per eye.
 - **State at 08:00:** see the end of this file. Every check passes, and the tree is clean.
 
 ## Research (4 read-only agents, 03:10–03:25)
@@ -204,6 +204,8 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 | (07:50) | **Closer clip:** `brawl-close-iwer.mp4` in the same folder. The camera sits about 0.45 m from the arena (y 1.55, pitch -36). The four tops, sparks and the 4 LEFT bar fill the frame, and the IWER label is burned in. Use this one for the edit. Camera recipe for later shots: the arena stage sits at world (0, 1.25, -0.68) in a fight. |
 
 | (07:52) | **Online over the real network path:** `node scripts/net-live-check.mjs` (with the dev server running) starts two separate Chromium processes, joins one room through trystero's public Nostr relays, and opens a WebRTC data channel. Both sides connected in about 2.8 s and received each other's hello (two runs). This proves the real transport, not just BroadcastChannel. It does not prove NAT traversal between two homes (same machine, STUN only, no TURN). |
+
+| (07:55) | **Draft cut, not the submission video:** `~/Desktop/spinsmith-videos/night/DRAFT-cut-iwer.mp4` (22.5 s, silent). Six labelled IWER stills (hub, two-hand forge, DESK KO, map, crowded intro, brawl) run 2.5 s each, then the close brawl clip. Every frame carries the IWER label. Known gaps: no music, no titles, stills instead of motion for the hero verbs, and the last clip is in the grey IWER room rather than the CC0 backdrop. Re-shoot it with `scripts/capture/setup.sh` first. The real edit should follow the 60 s storyboard in WOW-PLAN.md. |
 
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
