@@ -137,7 +137,7 @@ IWER two windows after the fix: the guest's top equals the host's rival top, the
 | 50a3126, c74e44b | Brawl tops leave trails in their own colours (still one instanced draw); the knockout replay is skipped in brawls. |
 
 | 90c94d2, 7c6c7d4 | Copy pass by a review agent: stamp subs and card lines fit their slots, terms match the game, there is no "both hands" in the forge lesson (one-hand mode), the final bout has a real lesson, and online errors are in plain words. |
-| 0c7b02e, 661bde0 | **Crowded bouts:** 2-3 is three tops (Leech + Saw Wraith) and 3-3 is four tops (Gearwright + Twin Gear + Long Ember). Last top spinning wins, and the bout still counts. IWER: 2-3 starts with its crowd and its lesson. |
+| 0c7b02e, 661bde0 | **Crowded bouts:** 2-3 is three tops (Leech + Ember Comet; Saw Wraith was swapped out at fb4c984) and 3-3 is four tops (Gearwright + Twin Gear + Long Ember). Last top spinning wins, and the bout still counts. IWER: 2-3 starts with its crowd and its lesson. |
 | e4ec69e (removed later) | A debug-looking two-window online screenshot (controllers, gizmos) was added, then removed after the judge pass; re-shoot it in the capture rig with hands. |
 
 | fd21deb | Second judge pass. Scores rose in Experience 6→7, Polish 5→6, Social 5→6, Come Back 8→9, First Five 5→6 and Accessibility 5→6. The README's stale claims are fixed (the online row says "tested in two browser windows", the old circuit ladder text is gone, the board-back text is right), and there is an "If something goes wrong" box. |
@@ -173,9 +173,20 @@ IWER: MENU in ready → "Leave this match?" → hub; the online round regression
 | 9b40f60, 2c4b985 | The old circuit counts ("CINDER CIRCUIT 2/3") are gone from the plate and the intro: it is the bout, "brawl" or "free play". |
 
 | ec6e27d | README: one-hand gestures work with either hand (left-hand rip and ramp checked in IWER). |
-| 6125383, (next) | **No walls on the map** (sim-check 35/36): in every bout's arena some forgeable build beats the bout's rival at least half the time without hands (hardest: 2-2 at 70%). In the crowded bouts the best build is last spinning 88% (2-3, fair share 33%) and 75% (3-3, fair share 25%). |
+| 6125383, (next) | **No walls on the map** (sim-check 35/36): in every bout's arena some forgeable build beats the bout's rival at least half the time without hands (hardest: 2-2 at 70%). In the crowded bouts, using each top's own spin, the best build is last spinning 50% (2-3, fair share 33%) and 63% (3-3, fair share 25%). |
 
 Final smoke (IWER, 06:40): bout (2-1) and rematch (bout kept), PASS → Challenger with echo, brawl, and an online round, all with no console errors.
+
+| fb4c984 | Sixth review agent:
+- the guest's launch direction is normalised, not clamped as a position (which had bent steep pulls to 45°);
+- a deferred duel starts on any path home;
+- a workshop try-out is protected;
+- after a full clear, every missing-medal bout gets a turn;
+- the rip and cord races on both sides are closed;
+- the board redraws when a room closes;
+- the event receiver skips an empty slot.
+
+The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Online regression passes. |
 
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
