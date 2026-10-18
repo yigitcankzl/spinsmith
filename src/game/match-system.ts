@@ -858,7 +858,7 @@ export class MatchSystem extends createSystem({
   private brawlOut = new Set<Top>();
   /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
   private online: OnlineLink | null = null;
-  private netRip: { power: number; aim: number } | null = null;
+  private netRip: { power: number; aim: number; at?: [number, number] } | null = null;
   private netPending: Parameters<MatchSystem['launch']> | null = null;
   private netGo = false;
   private netShapes = new Map<number, FloorShape>();
@@ -3797,7 +3797,8 @@ export class MatchSystem extends createSystem({
     const net = this.online?.peer ? this.online : null;
     if (net && !this.netGo) {
       if (net.role === 'guest') {
-        net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist });
+        // The spot the guest picked (its own arena-local frame) goes in the host's frame: turned half round.
+        net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist, ...(from ? { at: [-from.x, -from.z] as [number, number] } : {}) });
         this.netPending = [power, aim, from, dir, steep];
         this.label.set(`Ripped\nWaiting for ${net.peerName || 'the host'}`);
         this.labelTimer = 0;
@@ -3932,7 +3933,8 @@ export class MatchSystem extends createSystem({
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
     // From its spot this round, toward the middle, angled into its orbit.
     const aiDir = aiAim + LAUNCH_TILT * th;
-    const [rx, rz] = this.rivalSpot();
+    // Online: the guest's own launch spot, when it picked one.
+    const [rx, rz] = net?.role === 'host' && this.netRip?.at ? this.netRip.at : this.rivalSpot();
     const inward = Math.atan2(-rx, -rz);
     this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, launchSpin(aiPower), th);
     this.launchExtras();
@@ -6230,7 +6232,7 @@ export class MatchSystem extends createSystem({
   /** Host: what the guest's hands did, from the far side. */
   private applyGuestEvent(ev: GuestEvent) {
     if (ev.kind === 'rip') {
-      this.netRip = { power: ev.power, aim: ev.aim };
+      this.netRip = { power: ev.power, aim: ev.aim, ...(ev.at ? { at: ev.at } : {}) };
       if (this.netPending && this.phase !== 'fight') {
         const [power, aim, from, dir, steep] = this.netPending;
         this.netGo = true;
