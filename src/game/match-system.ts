@@ -48,7 +48,7 @@ import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 import { linkFromAddress } from './online.js';
 import type { OnlineLink } from './online.js';
 import type { GuestEvent, PackedShape, Vec3 } from './net.js';
-import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalsFrom, nextBout, nextGate } from './campaign.js';
+import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalsFrom, nextBout, nextGate } from './campaign.js';
 import type { Bout } from './campaign.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
@@ -6101,9 +6101,15 @@ export class MatchSystem extends createSystem({
     // Beating a circuit's champion for the first time clears the circuit: a moment of its own.
     const c = circuitOf(this.rival.name);
     if (fresh & MARK.beaten && c?.champion) {
-      this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name} is beaten`, 'mine', 2.2, 1.5);
-      playLevelUp();
-      this.featDone(c.circuit.startsWith('Cinder') ? 'cinder' : c.circuit.startsWith('Iron') ? 'iron' : 'crown');
+      // In a campaign bout the map says it (BOSS DOWN, a chapter opening, the finale); free play keeps this stamp.
+      if (!this.bout) {
+        this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name} is beaten`, 'mine', 2.2, 1.5);
+        playLevelUp();
+      }
+      const feat = c.circuit.startsWith('Cinder') ? 'cinder' : c.circuit.startsWith('Iron') ? 'iron' : 'crown';
+      if (this.bout) {
+        if (!this.demo) this.progress.feat(feat);
+      } else this.featDone(feat);
     }
     if (matchWon) this.progress.recordChampion(this.myBuild);
     const event = {
@@ -6456,6 +6462,15 @@ export class MatchSystem extends createSystem({
       const word = fresh & 1 ? (bout.boss ? 'BOSS DOWN!' : 'BOUT WON!') : 'MEDAL!';
       this.stamp.later(word, `${bout.id} · ${have}/3 MEDALS${got.length ? ` · ${got.join(' · ')}` : ''}`, 'mine', 1.6, fresh & 1 && bout.boss ? 1.5 : 1.2);
       playStamp();
+    }
+    // The campaign's end: the last boss beaten for the first time is the game's finale.
+    if (fresh & 1 && bout === BOUTS[BOUTS.length - 1]) {
+      const medals = medalCount(this.progress.bouts);
+      this.stamp.later('THE CROWN IS YOURS', 'EVERY CIRCUIT CLEARED', 'mine', 2.4, 1.6);
+      this.stamp.later('SPINSMITH', `${medals} OF ${BOUTS.length * 3} MEDALS`, 'mine', 2, 1.4);
+      this.levelUpText = `You took the Crown.\nThanks for playing. Medals, daily orders and brawls go on`;
+      this.celebrate = Math.max(this.celebrate, 4);
+      playLevelUp();
     }
     const after = nextBout(this.progress.bouts);
     if (after && before && after.chapter > before.chapter) {
