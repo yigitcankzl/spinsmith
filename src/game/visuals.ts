@@ -2801,6 +2801,11 @@ export class Stamp {
   }
 
   /** Stamps after whatever shows now (and after anything stamped in the same frame). */
+  /** A stamp is showing now (a minor note should not cut it). */
+  get busy() {
+    return this.t >= 0;
+  }
+
   later(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1, size = 1) {
     // At most three wait: a pile of rewards is not a sequence anyone reads.
     if (this.queue.length < 3) this.queue.push([word, sub, side, hold, size]);

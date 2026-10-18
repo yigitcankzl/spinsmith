@@ -496,12 +496,12 @@ export class Hub {
     blueprint.add(roll, band);
     const holder = new Group();
     holder.add(blueprint);
-    blueprint.rotation.y = -0.5;
+    blueprint.rotation.y = -0.5 * SIDE;
     const home = new Vector3(BLUEPRINT_AT.x, TABLE_Y + 0.0075 + 0.012, BLUEPRINT_AT.z);
     holder.position.copy(home);
     const cradle = new Mesh(bevelBox(0.04, 0.012, 0.016, 0.0015).translate(0, 0.006, 0), GRAPHITE);
     cradle.position.set(BLUEPRINT_AT.x, TABLE_Y, BLUEPRINT_AT.z);
-    cradle.rotation.y = -0.5;
+    cradle.rotation.y = -0.5 * SIDE;
     this.blueprint.add(cradle, holder);
     this.root.add(this.blueprint);
     // On the table in front of the roll, between the level plate and the anvil's name.
@@ -570,7 +570,7 @@ export class Hub {
     const body = new Group();
     const model = anvilModel();
     model.scale.setScalar(RIM_SCALE);
-    model.rotation.y = -0.6;
+    model.rotation.y = -0.6 * SIDE;
     body.add(model);
     this.anvil.add(body);
     const name = this.label('FORGE', this.anvil, 0, SIGN_AHEAD);
@@ -667,7 +667,7 @@ export class Hub {
       holder.add(stand, view.root);
       const name = tag(`${c.wins} WIN${c.wins === 1 ? '' : 'S'}`, 0.05, 0.6);
       // Lying on the table toward the arena's middle, at the touch band's pitch.
-      name.position.set(holder.position.x + 0.035, TABLE_Y + SIGN_Y, holder.position.z);
+      name.position.set(holder.position.x + 0.035 * SIDE, TABLE_Y + SIGN_Y, holder.position.z);
       name.rotation.x = -SIGN_TILT;
       this.labels.push(name);
       this.champions.add(holder, name);

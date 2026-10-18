@@ -707,6 +707,7 @@ export class MatchSystem extends createSystem({
   private oneHandPinch = new Vector3();
   private oneHandAt = -1;
   private lockedSaidAt = -9;
+  private lockedAt = -9;
   private passHinted = false;
   private arenaMorphShove = { x: 0, z: 0, t: 0 };
   private gazeAssist = { active: false, target: '' };
@@ -4366,7 +4367,7 @@ export class MatchSystem extends createSystem({
     const minimum = 0.012 * (this.arena.radius / 0.17);
     if (pull < minimum) {
       playLocked();
-      this.stamp.show('NO SPRING', 'PULL THE RIM INWARD', 'neutral', 0.4);
+      if (!this.stamp.busy) this.stamp.show('NO SPRING', 'PULL THE RIM INWARD', 'neutral', 0.4);
       if (import.meta.env.DEV) console.log(`[RIM] ignored: inward pull ${pull.toFixed(3)}`);
       return;
     }
@@ -5626,7 +5627,7 @@ export class MatchSystem extends createSystem({
       this.outerRailGeometry.setDrawRange(0, 0);
       playLocked();
       this.label.set('Dropped it\nPinch the top again');
-      this.labelTimer = 1.6;
+      this.labelTimer = Math.max(1.6, this.outerRingLeft);
       return true;
     }
     const l = this.root.worldToLocal(this.local.copy(h.pinch));
@@ -6382,10 +6383,14 @@ export class MatchSystem extends createSystem({
    * without sound), unless the card is already saying something.
    */
   private locked(why: string) {
+    // A held refusal repeats every frame: say it at most every 0.6 s.
+    if (this.time - this.lockedAt < 0.6) return;
+    this.lockedAt = this.time;
     playLocked();
-    // The card is busy (or just said it): a short stamp carries the same news, never sound alone.
+    // The card is busy (or just said it): a short stamp carries the same news (never over a stamp
+    // already showing), never sound alone.
     if (this.labelTimer > 0 || this.time - this.lockedSaidAt < 2) {
-      this.stamp.show(why.split('\n')[0].toUpperCase(), '', 'neutral', 0.35);
+      if (!this.stamp.busy) this.stamp.show(why.split('\n')[0].toUpperCase(), '', 'neutral', 0.35);
       return;
     }
     this.lockedSaidAt = this.time;
