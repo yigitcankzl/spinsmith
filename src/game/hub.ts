@@ -245,9 +245,14 @@ export class Hub {
         map: boardMap(progress.bouts),
         gilded: progress.isUnlocked('ledger:gold') || progress.level >= MAX_LEVEL,
         code: echoCode(encodeBuild(build)),
-        history: champion
-          ? `${progress.matches} matches · latest champion: ${buildName(champion.build)} ×${champion.wins}`
-          : `${progress.matches} matches · first champion awaits`,
+        history: [
+          (() => {
+            const next = nextBout(progress.bouts);
+            return next ? `next bout ${next.id}: ${next.rival}` : 'the map is won';
+          })(),
+          `${medalCount(progress.bouts)}/${BOUTS.length * 3} medals`,
+          champion ? `champion: ${buildName(champion.build)} ×${champion.wins}` : 'first champion awaits',
+        ].join(' · '),
         feats: progress.feats.size,
         featsOf: Object.keys(FEATS).length,
       };
