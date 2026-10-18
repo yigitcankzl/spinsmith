@@ -230,6 +230,8 @@ export class Hub {
     this.beacon.visible = progress.guide !== 'done';
     this.pathOn = progress.guide === 'launch' || progress.guide === 'bump' || progress.guide === 'match';
     this.teaching = progress.guide !== 'done';
+    // The brawl pegs wait until the first session is over: one top and one verb first.
+    this.brawlPegs.visible = !this.teaching;
     // The board and the champions come once the first session is over.
     this.board.mesh.visible = !this.teaching;
     this.champions.visible = !this.teaching;
