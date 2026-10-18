@@ -117,7 +117,9 @@ an arena. First to 3 heat wins a match.
   the slower (Cog rings much more), same spins grind each other down, tips dash on rails by
   their gear, Saw rings chip toward a shatter. The classic Striker (attack), Anvil (defense)
   and Halo (stamina) are presets in a rock-paper-scissors loop; a build whose two strongest
-  stats are within 10 points is a balance top. Named builds from the same parts give each
+  stats are within 10 points is a balance top. A defense top braces when it holds the middle (15%
+  less knockback in the arena's inner half), so dragging it to the rim is how to beat it. The intro
+  card says who counters whom. Named builds from the same parts give each
   style an identity: Ember Comet (attack), Long Ember (stamina), Twin Gear (left-spin balance),
   Saw Wraith (attack) and Low Tide (defense). Your top is warm colored,
   the opponent's cool teal; each rival keeps its build and spin for the whole match (see Smith levels).

@@ -537,6 +537,8 @@ export interface TopSpec {
   punch: number;
   /** How much a hit moves it. */
   knockback: number;
+  /** Defense types' signature: knockback taken while inside the arena's inner half (1: none). */
+  centerBrace?: number;
   /** Spin lost per second while just spinning. */
   spinDrain: number;
   /** Sideways curving from the tip. */
@@ -1339,8 +1341,11 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   // Only a deliberate charge through the guarded sector rebounds; an ordinary rail dash does not.
   const parryA = guardedB && a.charging > 0 ? WARD_PARRY : 1;
   const parryB = guardedA && b.charging > 0 ? WARD_PARRY : 1;
-  const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA) * braceA * parryA;
-  const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB) * braceB * parryB;
+  // A defense top holding the middle digs in (its signature); dragged to the rim it is a top like any other.
+  const holdA = a.spec.centerBrace && arena && Math.hypot(a.x, a.z) < arena.radius * 0.5 ? a.spec.centerBrace : 1;
+  const holdB = b.spec.centerBrace && arena && Math.hypot(b.x, b.z) < arena.radius * 0.5 ? b.spec.centerBrace : 1;
+  const ja = impulse * b.spec.punch * a.spec.knockback * (1 + liftA) * braceA * parryA * holdA;
+  const jb = impulse * a.spec.punch * b.spec.knockback * (1 + liftB) * braceB * parryB * holdB;
   a.vx -= nx * ja;
   a.vz -= nz * ja;
   b.vx += nx * jb;

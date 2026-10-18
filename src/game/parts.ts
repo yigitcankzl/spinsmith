@@ -276,7 +276,7 @@ export function specFromBuild(b: TopBuild): TopSpec {
   const ring = ringOf(b);
   const core = coreOf(b);
   const tip = tipOf(b);
-  return {
+  const spec: TopSpec = {
     name: buildName(b),
     radius: ring.radius,
     punch: ring.punch * core.punch,
@@ -294,7 +294,13 @@ export function specFromBuild(b: TopBuild): TopSpec {
     gear: tip.gear,
     chip: ring.chip,
   };
+  // Type signatures: a defense top braces in the middle.
+  if (roleOf(spec) === 'defense') spec.centerBrace = CENTER_BRACE;
+  return spec;
 }
+
+/** Knockback a defense top takes while holding the arena's inner half. */
+export const CENTER_BRACE = 0.85;
 
 /** Box-style stats, 0..100, for the bars in the forge. */
 export interface TopStats {
