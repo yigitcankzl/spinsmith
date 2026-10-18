@@ -1,6 +1,6 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
-// Other modes: dual-rip, rim-spring, palm-forge, outer-ring, arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
+// Other modes: single-rip, dual-rip, finger-groove, rim-spring, palm-forge, outer-ring, arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
   let target = null;
   for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
@@ -19,19 +19,21 @@ export default async function run({ page, frame }) {
     // Every probe begins from the current XR hand rig. This also makes the script repeatable after
     // a session exit/re-entry, when IWER has rebuilt the joints behind the same window.drive object.
     drive.rest();
-    if (check === 'palm-forge' && drive.state().phase === 'hub') {
+    if (check === 'palm-forge' && drive.state().phase !== 'forge') {
       // The normal anvil remains the production path. Opening directly here keeps this probe
       // independent from tutorial locks and tests only the two-hand assembly interaction.
       window.__game.openForge();
-      await sleep(500);
+      await sleep(1200);
     }
     if (check === 'palm-brace') game.progress.matches = Math.max(2, game.progress.matches);
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
-    if (check === 'dual-rip' && drive.state().phase !== 'ready') {
+    const launchCheck = check === 'single-rip' || check === 'dual-rip';
+    if (launchCheck && drive.state().phase !== 'ready') {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
     }
-    if (check === 'outer-ring' || check.startsWith('arena-morph')) {
+    if (launchCheck) window.__game.deckChoice = 0;
+    if (check === 'outer-ring' || check === 'finger-groove' || check.startsWith('arena-morph')) {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
@@ -40,7 +42,7 @@ export default async function run({ page, frame }) {
     }
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
     // not spend most of its timeout waiting for the opening clock to reach the normal 2.5 s gate.
-    if (check.startsWith('arena-morph') && drive.state().phase === 'fight') {
+    if ((check === 'finger-groove' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
       window.__game.elapsed = Math.max(window.__game.elapsed, 2.7);
       window.__game.charges.charges = 3;
       drive.key('KeyU');
@@ -62,6 +64,10 @@ export default async function run({ page, frame }) {
       if (before.phase !== 'ready') throw new Error('dual-rip check requires the launch phase');
       stateKey = 'bracedLaunch';
       action = drive.dualRip({ power: 0.88, aim: 0, side: 'right' });
+    } else if (check === 'single-rip') {
+      if (before.phase !== 'ready') throw new Error('single-rip check requires the launch phase');
+      stateKey = 'oneHandLaunch';
+      action = drive.rip({ power: 0.88, aim: 0, side: 'right' });
     } else if (check === 'rim-spring') {
       if (before.phase !== 'fight') throw new Error('rim-spring check requires a fight');
       const top = before.rival_top.alive ? before.rival_top : before.mine;
@@ -70,12 +76,17 @@ export default async function run({ page, frame }) {
     } else if (check === 'palm-forge') {
       if (before.phase !== 'forge') throw new Error('palm-forge check requires the forge');
       stateKey = 'palmForge';
-      // Striker is always available, so the carry check is independent from account unlocks.
-      action = drive.palmForge('Striker', 'left');
+      const part = ['Spur', 'Chisel', 'Striker', 'Bolt', 'Awl', 'Dome', 'Pin', 'Bead'].find((name) => before.targets?.[name]);
+      if (!part) throw new Error(`no visible forge part: ${Object.keys(before.targets ?? {}).join(', ')}`);
+      action = drive.palmForge(part, 'left');
     } else if (check === 'outer-ring') {
       if (before.phase !== 'fight') throw new Error('outer-ring check requires a fight');
       stateKey = 'outerRing';
       action = drive.outerRingReturn('right');
+    } else if (check === 'finger-groove') {
+      if (before.phase !== 'fight') throw new Error('finger-groove check requires a fight');
+      stateKey = 'groove';
+      action = drive.groove({ side: 'right' });
     } else if (check === 'arena-morph-tutorial') {
       const g = window.__game;
       g.progress.matches = 0;
@@ -117,16 +128,17 @@ export default async function run({ page, frame }) {
     let peakCharges = before.charges;
     for (let sample = 0; sample < 700 && !finished; sample++) {
       const current = drive.state();
-      if (stateKey === 'outerRing') sawTransient ||= current.outerRing?.state === 'rail' || current.outerRing?.state === 'returned';
+      if (stateKey === 'outerRing') sawTransient ||= current.outerRing?.state === 'palm' || current.outerRing?.state === 'returned';
       else if (stateKey === 'morph') sawTransient ||= !!current.morph && (Math.abs(current.morph.scaleX - 1) > 0.015 || Math.abs(current.morph.scaleZ - 1) > 0.015 || Math.abs(current.morph.tilt) > 0.01);
-      else if (check === 'dual-rip') sawTransient ||= current.phase === 'fight';
+      else if (launchCheck) sawTransient ||= current.phase === 'fight';
+      else if (stateKey === 'groove') sawTransient ||= (current.grooves?.length ?? 0) > 0;
       else if (stateKey && current[stateKey]) sawTransient = true;
       peakCharges = Math.min(peakCharges, current.charges);
       await sleep(16);
     }
     // A very slow headless IWER may finish the launch but never advance the cosmetic hand-parking
     // tween. The gameplay transition is the proof; do not leave the browser command queued forever.
-    if (!finished && check === 'dual-rip' && drive.state().phase === 'fight') {
+    if (!finished && launchCheck && drive.state().phase === 'fight') {
       drive.rest();
       finished = true;
     }

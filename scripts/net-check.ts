@@ -216,6 +216,9 @@ console.log('net check: OK');
   assert.ok(f.kind === 'forge' && f.tilt === 0.12 && f.force === 1.5, 'forge strength is capped');
   const st = sanitizeGuestEvent({ kind: 'strike', x: 0, z: 0, seal: 'nuke' }, R, 0.6)!;
   assert.ok(st.kind === 'strike' && !('seal' in st), 'unknown seal falls back to Anvil');
+  const groove = sanitizeGuestEvent({ kind: 'groove', sx: -9, sz: 0, ex: 9, ez: 0 }, R, 0.6)!;
+  assert.ok(groove.kind === 'groove' && groove.sx === -R * 1.5 && Math.hypot(groove.ex - groove.sx, groove.ez - groove.sz) <= 0.16001, 'a remote groove stays inside physical reach and production hand length');
+  assert.equal(sanitizeGuestEvent({ kind: 'groove', sx: 0, sz: 0, ex: NaN, ez: 0 }, R, 0.6), null, 'a malformed groove is dropped');
   assert.equal(sanitizeGuestEvent({ kind: 'teleport' } as unknown as Parameters<typeof sanitizeGuestEvent>[0], R, 0.6), null, 'unknown kinds are dropped');
   console.log('guest event sanitizer: ok');
 }

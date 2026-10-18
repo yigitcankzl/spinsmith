@@ -16,7 +16,7 @@ import type { ArenaLayout } from './game/layout.js';
 import { forgeGrips } from './game/reach.js';
 
 type Side = 'left' | 'right';
-type Point = 'pinch' | 'index' | 'low';
+type Point = 'pinch' | 'index' | 'low' | 'palm';
 type SlapAim = number | 'rival' | 'mine' | 'opposite-rival';
 
 interface EmuVec {
@@ -30,6 +30,8 @@ interface EmuHand {
   poseId: string;
   updatePinchValue(v: number): void;
   setPinchValueImmediate?(v: number): void;
+  updateTargetRaySpace?(): void;
+  updateHandPose?(): void;
   onFrameStart(frame: unknown): void;
 }
 interface EmuHandle {
@@ -41,6 +43,7 @@ interface Hand {
   pinching: boolean;
   pinch: Vector3;
   index: Vector3;
+  wrist: Vector3;
   low: number;
 }
 /** The game's fields the driver reads (MatchSystem, exposed as window.__game in dev). */
@@ -51,7 +54,7 @@ interface Game {
   player: { localToWorld(v: Vector3): Vector3; worldToLocal(v: Vector3): Vector3 };
   root: { position: Vector3; localToWorld(v: Vector3): Vector3; worldToLocal(v: Vector3): Vector3 };
   rootK: number;
-  arena: { radius: number; layout: ArenaLayout & { name?: string }; height(x: number, z: number): number; floorHeight(n: number): number };
+  arena: { radius: number; layout: ArenaLayout & { name?: string }; height(x: number, z: number): number; floorHeight(n: number): number; shapes: { kind: string; boost?: number; length?: number }[] };
   mine: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
   theirs: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string };
   myPoints: number;
@@ -89,9 +92,12 @@ interface Game {
   overforgeMode?: string;
   palmBraceActive?: boolean;
   bracedLaunch?: boolean;
+  palmLauncherSide?: Side | null;
+  palmLauncherDebug?: string;
   palmForgeActive?: boolean;
   /** Competition-feature state exposed for repeatable emulator proof. */
-  outerRingState?: 'idle' | 'rescue' | 'rail' | 'returned' | 'failed';
+  outerRingState?: 'idle' | 'rescue' | 'palm' | 'returned' | 'failed';
+  outerRingCompleted?: boolean;
   outerRingLeft?: number;
   outerRingAt?: Vector3;
   outerRingGoal?: Vector3;
@@ -131,7 +137,12 @@ const PEDESTAL = 0.08;
 const ARENA_SCALE = 2.4;
 
 export function installDriver() {
-  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand> }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
+  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand>; primaryInputMode: 'controller' | 'hand' }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; __spinDriveGeneration?: number; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
+  // Vite HMR re-evaluates this module without cancelling requestAnimationFrame callbacks created by
+  // the previous copy. Give the newest driver sole ownership so an old closure cannot keep writing
+  // a parked pose over a fresh test after a source edit.
+  const generation = (w.__spinDriveGeneration ?? 0) + 1;
+  w.__spinDriveGeneration = generation;
   const goals: Record<Side, Goal | null> = { left: null, right: null };
   /** Where each held hand's steered point should be now. */
   const aim: Record<Side, { point: Point; at: Vector3 } | null> = { left: null, right: null };
@@ -155,6 +166,7 @@ export function installDriver() {
   const measured = (side: Side, point: Point, out: Vector3) => {
     const h = game().hands[side];
     if (point === 'pinch') return out.copy(h.pinch);
+    if (point === 'palm') return out.copy(h.wrist).lerp(h.index, 0.48);
     out.copy(h.index);
     if (point === 'low') out.y = h.low;
     return out;
@@ -179,7 +191,7 @@ export function installDriver() {
       }
     }
     // What the game saw last frame: each point's offset from the root, per pinch state.
-    for (const pt of ['pinch', 'index', 'low'] as const) {
+    for (const pt of ['pinch', 'index', 'low', 'palm'] as const) {
       const o = offsets[side][lastPinch[side] > 0.5 ? 1 : 0];
       if (!o[pt]) measured(side, pt, (o[pt] = new Vector3())).sub(lastRoot[side]);
     }
@@ -199,6 +211,12 @@ export function installDriver() {
     lastRoot[side].copy(root);
     const local = game().player.worldToLocal(v.copy(root));
     hand.position.set(local.x, local.y, local.z);
+    // `position` is only IWER's public input value; its XRSpace matrix is normally copied in
+    // onFrameStart. Browser-run automation and the renderer can use different RAF turns, so sync
+    // that public value immediately as well. Otherwise the debug handle moves while WebXR keeps
+    // reporting the previous hand pose until the command has already finished.
+    hand.updateTargetRaySpace?.();
+    hand.updateHandPose?.();
     // IWER's visible handle is its pose authority and normally copies back into the input every
     // frame. Move it too, otherwise the UI can overwrite an automated hand before the game reads it.
     const handle = w.transformHandles?.get(side);
@@ -211,27 +229,46 @@ export function installDriver() {
   };
 
   const hook = () => {
+    if (!w.IWER_DEVICE) throw new Error('no emulator (IWER_DEVICE)');
+    // IWER starts every new immersive session in controller mode. The driver animates tracked
+    // hands, so explicitly make those the active WebXR input sources instead of moving an input
+    // object the app is not currently reading.
+    w.IWER_DEVICE.primaryInputMode = 'hand';
     if (hooked) return;
-    const dev = w.IWER_DEVICE;
-    if (!dev) throw new Error('no emulator (IWER_DEVICE)');
     hooked = true;
     // IWER may replace a hand's onFrameStart callback when an immersive session settles. Drive
     // the public hand state from the page's frame clock instead; IWER consumes it on its next XR
     // frame, and a gesture can no longer stall halfway through after that callback is replaced.
     const ensureHook = (side: Side) => {
+      const dev = w.IWER_DEVICE;
+      if (!dev) return;
       const hand = dev.hands[side];
-      const current = hand.onFrameStart as EmuHand['onFrameStart'] & { __spinDrive?: boolean };
-      if (current.__spinDrive) return;
-      const original = current.bind(hand);
+      type DriveFrameStart = EmuHand['onFrameStart'] & { __spinDriveGeneration?: number; __spinDriveOriginal?: EmuHand['onFrameStart'] };
+      const current = hand.onFrameStart as DriveFrameStart;
+      if (current.__spinDriveGeneration === generation) return;
+      const base = current.__spinDriveOriginal ?? current;
+      const original = base.bind(hand);
       const wrapped = ((frame: unknown) => {
-        frameHook(side, hand, false);
+        // IWER first copies its visible transform handle into the input. Apply the automated pose
+        // afterwards so it is the value the XR frame consumes; doing this in the opposite order
+        // leaves the visible hand permanently parked at IWER's default pose.
         original(frame);
-      }) as EmuHand['onFrameStart'] & { __spinDrive?: boolean };
-      wrapped.__spinDrive = true;
+        frameHook(side, hand, false);
+      }) as DriveFrameStart;
+      wrapped.__spinDriveGeneration = generation;
+      wrapped.__spinDriveOriginal = base;
       hand.onFrameStart = wrapped;
     };
     const tick = () => {
-      if (!hooked) return;
+      if (!hooked || w.__spinDriveGeneration !== generation) return;
+      // Entering XR again can replace IWER_DEVICE and its hand objects. Resolve it every frame;
+      // retaining the first session's device makes a probe animate a dead rig while the visible
+      // hands stay parked.
+      const dev = w.IWER_DEVICE;
+      if (!dev) {
+        requestAnimationFrame(tick);
+        return;
+      }
       for (const side of ['left', 'right'] as const) {
         ensureHook(side);
         frameHook(side, dev.hands[side]);
@@ -374,9 +411,12 @@ export function installDriver() {
         overforge: g.overforgeMode ?? 'idle',
         palmBrace: !!g.palmBraceActive,
         bracedLaunch: !!g.bracedLaunch,
+        palmLauncher: g.palmLauncherSide ?? null,
+        palmLauncherDebug: g.palmLauncherDebug ?? '',
         palmForge: !!g.palmForgeActive,
         outerRing: {
           state: g.outerRingState ?? 'idle',
+          completed: !!g.outerRingCompleted,
           left: +(g.outerRingLeft ?? 0).toFixed(2),
           at: g.outerRingAt?.toArray().map((n) => +n.toFixed(3)) ?? null,
           goal: g.outerRingGoal?.toArray().map((n) => +n.toFixed(3)) ?? null,
@@ -396,6 +436,7 @@ export function installDriver() {
         mine: top(g.mine),
         rival_top: top(g.theirs),
         cups: { left: !!g.cups.left, right: !!g.cups.right, holding: !!(g.cups.left?.caught || g.cups.right?.caught) },
+        grooves: g.arena.shapes.filter((s) => s.kind === 'groove').map((s) => ({ length: +(s.length ?? 0).toFixed(3), armed: s.boost !== 0 })),
         hands: { left: { tracked: g.hands.left.tracked, pinching: g.hands.left.pinching }, right: { tracked: g.hands.right.tracked, pinching: g.hands.right.pinching } },
         targets,
       };
@@ -428,7 +469,7 @@ export function installDriver() {
       await park(side);
     },
 
-    /** Hold the top in one hand and fit a visible drawer part with the other. */
+    /** Seat the top on one open palm and fit a visible drawer part with the other hand. */
     async palmForge(part: string, topSide: Side = 'left') {
       const g = game();
       if (g.phase !== 'forge') throw new Error('Palm Forge only exists in the forge');
@@ -436,10 +477,11 @@ export function installDriver() {
       const top = named('top');
       const piece = named(part);
       const palm = g.root.localToWorld(new Vector3(topSide === 'left' ? -0.065 : 0.065, 0.09, 0.105));
-      await glide(topSide, 'pinch', above(top, 0.06), 0.3, 0);
-      await glide(topSide, 'pinch', top, 0.16, 0);
-      await setPinch(topSide, true);
-      await glide(topSide, 'pinch', palm, 0.4);
+      await setPinch(topSide, false);
+      await glide(topSide, 'index', above(top, 0.05), 0.3, 0);
+      await glide(topSide, 'index', top, 0.2, 0);
+      await wait(0.2);
+      await glide(topSide, 'index', palm, 0.4, 0);
       await glide(partSide, 'pinch', above(piece, 0.05), 0.3, 0);
       await glide(partSide, 'pinch', piece, 0.15, 0);
       await setPinch(partSide, true);
@@ -447,7 +489,6 @@ export function installDriver() {
       await glide(partSide, 'pinch', palm, 0.2);
       await setPinch(partSide, false);
       await wait(0.3);
-      await setPinch(topSide, false);
       await Promise.all([park(topSide), park(partSide)]);
     },
 
@@ -487,7 +528,21 @@ export function installDriver() {
         // Recompute world positions: the arena can still be completing its match-size slide during
         // a rival entrance, and a retry must follow its settled location.
         const start = local(at.x, at.z, 0.02);
-        if (brace) await glide(support, 'pinch', local(at.x, at.z, 0.045), 0.35, 0);
+        if (brace) {
+          // The game seats the launcher under the palm midpoint, while the driver steers a named
+          // joint. Offset the index target by the measured index-to-palm vector so the broad palm,
+          // not a fingertip or an abstract pinch point, lands on the top.
+          const h = g.hands[support];
+          const palmNow = h.wrist.clone().lerp(h.index, 0.5);
+          const indexTarget = local(at.x, at.z, 0.035).add(h.index.clone().sub(palmNow));
+          await glide(support, 'index', indexTarget, 0.35, 0);
+          for (let i = 0; i < 40 && g.palmLauncherSide !== support; i++) await wait(0.025);
+          if (g.palmLauncherSide !== support) {
+            const got = g.root.worldToLocal(g.hands[support].wrist.clone().lerp(g.hands[support].index, 0.5));
+            const want = g.root.worldToLocal(local(at.x, at.z, 0.035));
+            throw new Error(`open support palm did not accept the launcher (got ${got.toArray().map((n) => n.toFixed(3))}, want ${want.toArray().map((n) => n.toFixed(3))}, phase ${g.phase}, settled ${g.sizeSettled}, entrance ${!!g.entrance}, reason ${g.palmLauncherDebug ?? 'unknown'})`);
+          }
+        }
         const toward = g.root.localToWorld(new Vector3(0, 0, 1)).sub(g.root.position).setY(0).normalize();
         toward.applyAxisAngle(new Vector3(0, 1, 0), (-aim * Math.PI) / 180);
         const pull = toward.multiplyScalar(len * Math.cos((steep * Math.PI) / 2));
@@ -545,6 +600,24 @@ export function installDriver() {
       await setPinch(side, false);
       await glide(side, 'pinch', above(drag, 0.08), 0.2, 0);
       await park(side);
+    },
+
+    /** Draws a one-use directional groove with an open index finger, then lifts to commit it. */
+    async groove(opts: { at?: { x: number; z: number }; angle?: number; length?: number; side?: Side } = {}) {
+      const { at = { x: -0.045, z: 0.02 }, angle = 15, length = 0.105, side = 'right' } = opts;
+      const a = (angle * Math.PI) / 180;
+      const end = { x: at.x + Math.cos(a) * length, z: at.z + Math.sin(a) * length };
+      const before = game().arena.shapes.filter((s) => s.kind === 'groove').length;
+      const startWorld = local(at.x, at.z, -0.002);
+      const endWorld = local(end.x, end.z, -0.002);
+      await setPinch(side, false);
+      await glide(side, 'index', above(startWorld, 0.07), 0.25, 0);
+      await glide(side, 'index', startWorld, 0.18, 0);
+      await glide(side, 'index', endWorld, 0.55, 0, 'linear');
+      await glide(side, 'index', above(endWorld, 0.08), 0.18, 0);
+      await park(side);
+      const after = game().arena.shapes.filter((s) => s.kind === 'groove').length;
+      if (after <= before) throw new Error('fingertip groove did not commit');
     },
 
     /** Pinch a rim sector, pull its spring rail toward the middle, then release. */
@@ -607,7 +680,7 @@ export function installDriver() {
       await Promise.all([park('left'), park('right')]);
     },
 
-    /** Competition hero move: throw your top onto the desk, catch it, and draw a return rail. */
+    /** Competition hero move: throw your top onto the desk, catch it on an open palm, and sweep in. */
     async outerRingReturn(side: Side = 'right') {
       const g = game();
       if (g.phase !== 'fight') throw new Error('Outer Ring requires a fight');
@@ -617,17 +690,20 @@ export function installDriver() {
       if (g.outerRingState !== 'rescue' || !g.outerRingAt || !g.outerRingGoal) throw new Error(`Outer Ring did not arm (${g.outerRingState ?? 'unknown'})`);
       const start = g.root.localToWorld(g.outerRingAt.clone());
       const goal = g.root.localToWorld(g.outerRingGoal.clone());
-      await glide(side, 'pinch', above(start, 0.05), 0.22, 0);
-      // Follow the slowly drifting desk top until the fingers close; a frozen target makes the
-      // capture miss at low emulator frame rates even though the recorded hand looks on target.
-      await glide(side, 'pinch', () => g.root.localToWorld(g.outerRingAt!.clone()), 0.18, 0);
-      await setPinch(side, true);
-      await glide(side, 'pinch', goal, 0.65, pinchNow[side], 'linear');
-      for (let i = 0; i < 180 && String(g.outerRingState) !== 'returned'; i++) await wait(0.016);
       await setPinch(side, false);
-      await glide(side, 'pinch', above(goal, 0.08), 0.2, 0);
+      await glide(side, 'palm', above(start, 0.04), 0.22, 0);
+      // Follow the drifting desk top with relaxed fingers; the game's palm midpoint, not a pinch,
+      // performs the catch. The wider dev tolerance covers IWER's generic open-hand proportions.
+      await glide(side, 'palm', () => g.root.localToWorld(g.outerRingAt!.clone()), 0.22, 0);
+      await glide(side, 'palm', goal, 0.65, 0, 'linear');
+      for (let i = 0; i < 180 && String(g.outerRingState) !== 'returned'; i++) await wait(0.016);
+      const returned = !!g.outerRingCompleted || String(g.outerRingState) === 'returned';
+      await glide(side, 'palm', above(goal, 0.08), 0.2, 0);
       await park(side);
-      if (String(g.outerRingState) !== 'returned') throw new Error(`Outer Ring ended ${g.outerRingState ?? 'unknown'}`);
+      // The visible return state intentionally fades back to idle after 1.2 game seconds. On a
+      // slow headless run that fade can finish while the hand is merely parking, so remember the
+      // successful transition rather than requiring a transient cosmetic state after cleanup.
+      if (!returned) throw new Error(`Outer Ring ended ${g.outerRingState ?? 'unknown'}`);
     },
 
     /** A cup: a fingertip pressed down into the floor (fast enough to count), then lifted. at: 'rival' | 'mine' | {x, z}. */

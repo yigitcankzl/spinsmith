@@ -25,6 +25,7 @@ import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
 import { targetWinner } from '../src/game/brawl.ts';
+import { clampedGrooveX, clampedGrooveZ, grooveLength, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -280,6 +281,30 @@ TUNING.grace = 0;
   runner.launch(0, 0, 0.12, 0, 0.8, 1);
   assert.equal(dashArena.dashShape(runner), true, 'a top on a live dash rail is claimed');
   assert.ok(runner.sinceDash < 0.2 && runner.vx > 0.4, 'a re-pinched ramp becomes a one-top dash rail');
+
+  const grooveArena = arenaWith({ floor: 'flat', pockets: [], rails: [] });
+  const groove = grooveArena.addGroove(-0.06, 0, 0.06, 0, 'left');
+  assert.ok(groove && groove.kind === 'groove' && groove.length! > 0.11, 'a fingertip stroke authors one directional line');
+  assert.ok(grooveArena.shapesHeight(0, 0) < -0.004 && Math.abs(grooveArena.shapesHeight(0, 0.06)) < 0.001, 'the line is a narrow physical channel');
+  const rider = new Top(ATTACK);
+  rider.launch(0, 0, 0, 0, 0.8, 1);
+  rider.sinceDash = 1;
+  assert.equal(grooveArena.dashShape(rider), true, 'the first top to touch a groove takes its direction');
+  assert.ok(rider.vx > 0.5 && groove!.boost === 0, 'a groove gives one strong directional kick, then is spent');
+  const second = new Top(ATTACK);
+  second.launch(0, 0, 0, 0, 0.8, 1);
+  second.sinceDash = 1;
+  assert.equal(grooveArena.dashShape(second), false, 'the same groove cannot kick a second top');
+}
+
+// Hand-tool geometry stays deterministic and allocation-free for the live gesture loop.
+{
+  const px = palmCenterX(-0.04, 0.06);
+  const pz = palmCenterZ(0.02, 0.08);
+  assert.ok(palmCatchDistance(px, pz, px + 0.02, pz) < 0.021, 'an open palm catch uses its broad centre');
+  const x = clampedGrooveX(0, 0, 1, 1);
+  const z = clampedGrooveZ(0, 0, 1, 1);
+  assert.ok(Math.abs(grooveLength(0, 0, x, z) - GROOVE_MAX_LENGTH) < 1e-9, 'a traced groove is capped to seated reach');
 }
 
 TUNING.grace = GRACE;
