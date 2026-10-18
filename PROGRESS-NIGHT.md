@@ -194,9 +194,11 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 
 | c569ea3 | The board's map names the medals the next bout still asks for (unless the next chapter is short of medals, which is shown instead). |
 
-| (latest) | **Sound has a visual twin:** an agent audited every play*() call in match-system and found five sound-only cues (rejected rim spring, a spring without a charge, a busy-card refusal, a dropped rescue rail, the new-smith reset). All five now show a stamp or card. |
+| 04c7e3a | **Sound has a visual twin:** an agent audited every play*() call in match-system and found five sound-only cues (rejected rim spring, a spring without a charge, a busy-card refusal, a dropped rescue rail, the new-smith reset). All five now show a stamp or card. |
 
-| (latest) | **Left-handed layout:** `?lefty` (kept; `?lefty=0` to undo) mirrors the near-rim stations (dock, anvil, blueprint, dial, pegs, champions). Distances mirror, so reach is unchanged. IWER: dock at +0.123, anvil at -0.123, and a screenshot shows the swapped sides. |
+| 70bfc84 | **Left-handed layout:** `?lefty` (kept; `?lefty=0` to undo) mirrors the near-rim stations (dock, anvil, blueprint, dial, pegs, champions). Distances mirror, so reach is unchanged. IWER: dock at +0.123, anvil at -0.123, and a screenshot shows the swapped sides. |
+
+| 064a388 | Ninth review: refusals held every frame are throttled to one every 0.6 s and never cut a stamp already showing (NO SPRING too); a dropped rescue rail keeps the rescue card; with `?lefty` the anvil, blueprint and champion tags face and sit mirrored. Smoke: a full crowded bout 2-3 with forced refusals, no errors. |
 
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
@@ -246,11 +248,11 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
 - **Accessibility:** sound cues are covered. An audit of every play*() call found five sound-only cues, and all are now paired with a stamp or card. Not done: a mirrored hub layout. Every gesture already works with either hand; only the dock and anvil sides are fixed.
 - **Capture rig:** after many automated probes the IWER rig drifted to controllers and the default pose. Re-run `scripts/capture/setup.sh restart` before shooting.
 
-## State at the end of the night (07:20)
+## State at the end of the night (07:40)
 - **Checks:** `tsc --noEmit`, `check:sim`, `check:sim-n`, `check:net`, `build` and `public-release-check` all pass. `report:tops` and `report:arenas` show no warnings.
 - **Render budget (IWER, per eye):** hub about 70–107 depending on what is shown, duel fight about 91, 4-top brawl about 124 (target ≤150).
 - **History:** about 110 commits on master since Codex's last (6d7bea6), all authored by Yiğitcan Kızıl, none with a Co-Authored-By or Claude line. Nothing is pushed; pushing is left to you.
 - **Workspace:** the tree is clean; worktrees and branches from the night are merged and deleted. The emulator is on the `?demo` save and the dev server is running.
 - **Local only:** `docs/SUBMISSION.md` (updated description and testing card) and the stills in `artifacts/capture/`.
-- **Last regression (07:20, IWER, error listener on):** bout 2-1 won → the map moves to 2-2; rematch keeps the bout; a 3-top brawl round; PASS → Challenger with the echo; online round plus guest cup and sling (07:18). No console errors.
+- **Last regression (07:20 and 07:37, IWER, error listener on):** bout 2-1 won → the map moves to 2-2; rematch keeps the bout; a 3-top brawl round; PASS → Challenger with the echo; online round plus guest cup and sling (07:18). No console errors.
 
