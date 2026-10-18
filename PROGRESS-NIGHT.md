@@ -15,7 +15,7 @@ Goal: turn Spinsmith from a deep systems sandbox into a finished game that can w
   - a README audit against the code;
   - `check:sim` now proves every bout can be countered, and that crowded bouts can be won;
   - `check:sim-n` and `check:net` were added.
-- **Still open:** Quest device test, the video, hosting (last step). Every IWER render budget is under 150 per eye.
+- **Still open:** Quest device test, the edited video (raw IWER clip only, see below), hosting (last step). Every IWER render budget is under 150 per eye.
 - **State at 08:00:** see the end of this file. Every check passes, and the tree is clean.
 
 ## Research (4 read-only agents, 03:10–03:25)
@@ -199,6 +199,8 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 | 70bfc84 | **Left-handed layout:** `?lefty` (kept; `?lefty=0` to undo) mirrors the near-rim stations (dock, anvil, blueprint, dial, pegs, champions). Distances mirror, so reach is unchanged. IWER: dock at +0.123, anvil at -0.123, and a screenshot shows the swapped sides. |
 
 | 064a388 | Ninth review: refusals held every frame are throttled to one every 0.6 s and never cut a stamp already showing (NO SPRING too); a dropped rescue rail keeps the rescue card; with `?lefty` the anvil, blueprint and champion tags face and sit mirrored. Smoke: a full crowded bout 2-3 with forced refusals, no errors. |
+
+| (07:48) | **Raw video clip, not a trailer:** `~/Desktop/spinsmith-videos/night/brawl-four-tops-iwer.mp4` (7.4 s, 1080p, outside the repo) records a 4-top brawl round on Forge Bowl through the keyboard rip, with "IWER EMULATOR · NO HEADSET FOOTAGE" burned in. It has the grey IWER room and a distant camera. It is material for the edit, not the submission video. |
 
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
