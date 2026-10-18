@@ -280,6 +280,8 @@ export class Progress {
   /** The Circuit Map: medal bits per bout id (campaign.ts), and losses in a row per bout. */
   bouts: BoutRecord = {};
   boutLosses: Record<string, number> = {};
+  /** One hidden forge shard lives in each campaign bout. All fifteen open the Night Circuit. */
+  private secrets = new Set<string>();
   private readonly storage: Storage | null;
 
   constructor(storage: Storage | null = null) {
@@ -287,7 +289,7 @@ export class Progress {
     try {
       const raw = storage?.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; openings?: Record<string, OpeningMemory>; scars?: Record<string, TopScars>; champions?: Champion[]; deskTrophies?: DeskTrophy[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[]; bouts?: BoutRecord; boutLosses?: Record<string, number> };
+        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; openings?: Record<string, OpeningMemory>; scars?: Record<string, TopScars>; champions?: Champion[]; deskTrophies?: DeskTrophy[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[]; bouts?: BoutRecord; boutLosses?: Record<string, number>; secrets?: string[] };
         this.matches = s.matches ?? 0;
         // Saves from before the guide existed skip it.
         this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
@@ -316,6 +318,7 @@ export class Progress {
         this.wonIn = new Set(s.wonIn ?? []);
         for (const [id, m] of Object.entries(s.bouts ?? {})) if (BOUTS.some((x) => x.id === id)) this.bouts[id] = (m | 0) & 7;
         this.boutLosses = { ...(s.boutLosses ?? {}) };
+        for (const id of s.secrets ?? []) if (BOUTS.some((x) => x.id === id)) this.secrets.add(id);
         // Saves from before the Circuit Map: a circuit already cleared (its champion beaten) counts as
         // its chapter won with one medal a bout, so a veteran is not sent back to the first bout.
         if (!s.bouts && this.matches > 0) {
@@ -543,6 +546,27 @@ export class Progress {
     return { fresh, unlocked: out.unlocked };
   }
 
+  hasSecret(id: string) {
+    return this.secrets.has(id);
+  }
+
+  get secretCount() {
+    return this.secrets.size;
+  }
+
+  /** The hard remix opens only after the Crown and every hidden shard are both earned. */
+  get nightUnlocked() {
+    return this.secrets.size === BOUTS.length && BOUTS.every((b) => ((this.bouts[b.id] ?? 0) & 1) !== 0);
+  }
+
+  /** Claims a bout's single hidden shard. Returns false for an invalid or already claimed id. */
+  collectSecret(id: string): boolean {
+    if (this.secrets.has(id) || !BOUTS.some((b) => b.id === id)) return false;
+    this.secrets.add(id);
+    this.save();
+    return true;
+  }
+
   /** Pins an arena for every match (null: back to the rotation). */
   pinArena(name: string | null) {
     this.arenaPin = name;
@@ -572,6 +596,7 @@ export class Progress {
     this.wonIn = new Set();
     this.bouts = {};
     this.boutLosses = {};
+    this.secrets.clear();
     this.save();
   }
 
@@ -586,7 +611,7 @@ export class Progress {
     try {
       this.storage?.setItem(
         KEY,
-        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, openings: this.openings, scars: this.scars, champions: this.champions, deskTrophies: this.deskTrophies, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn], bouts: this.bouts, boutLosses: this.boutLosses }),
+        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, openings: this.openings, scars: this.scars, champions: this.champions, deskTrophies: this.deskTrophies, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn], bouts: this.bouts, boutLosses: this.boutLosses, secrets: [...this.secrets] }),
       );
     } catch {
       // Storage full or blocked (a private window): progress lives for this session only.

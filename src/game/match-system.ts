@@ -1,4 +1,4 @@
-import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
@@ -48,7 +48,7 @@ import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 import { clampGuestSpot, guestPointsBefore, linkFromAddress, sanitizeGuestEvent } from './online.js';
 import type { OnlineLink } from './online.js';
 import type { GuestEvent, PackedShape, Vec3 } from './net.js';
-import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from './campaign.js';
+import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from './campaign.js';
 import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
 
@@ -579,6 +579,17 @@ export class MatchSystem extends createSystem({
   private handMarks = (['left', 'right'] as const).map(() =>
     Object.assign(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, depthWrite: false })), { visible: false }),
   );
+  /** One hand-sized hidden shard per campaign bout; pinch it to keep it between sessions. */
+  private secretRelic = (() => {
+    const g = new Group();
+    const glow = new MeshBasicMaterial({ color: 0xb875ff, transparent: true, opacity: 0.9, blending: AdditiveBlending, depthWrite: false });
+    const core = new Mesh(new OctahedronGeometry(0.011, 0), glow);
+    const halo = new Mesh(new TorusGeometry(0.018, 0.0015, 6, 28), glow);
+    halo.rotation.x = Math.PI / 2;
+    g.add(core, halo);
+    g.visible = false;
+    return g;
+  })();
   /** Plays one quiet tick when a hand first enters the arena's actionable near-surface band. */
   private handHover: Record<Side, boolean> = { left: false, right: false };
   private handHoverClaim: Record<Side, '' | 'RAMP' | 'RIM' | 'CATCH' | 'SLING'> = { left: '', right: '' };
@@ -955,6 +966,7 @@ export class MatchSystem extends createSystem({
       ...this.palmPrints,
       ...this.scorches,
       ...this.handMarks,
+      this.secretRelic,
       this.lane,
       this.ultimateArenaFx,
       this.ultimatePath,
@@ -1294,6 +1306,7 @@ export class MatchSystem extends createSystem({
     this.updateCountdown(Math.min(delta, 0.1));
     this.updatePrints(Math.min(delta, 0.1));
     this.updateHandMarks();
+    this.updateSecretRelic(Math.min(delta, 0.1));
     this.updatePinchRings();
     if (this.sealPop.visible) {
       const t = (this.sealPop.userData.t += Math.min(delta, 0.1));
@@ -1632,7 +1645,7 @@ export class MatchSystem extends createSystem({
   }
 
   private shapeGap() {
-    return this.bossRage() ? RIVAL_SHAPE_GAP / 2 : RIVAL_SHAPE_GAP;
+    return this.bout?.night ? RIVAL_SHAPE_GAP * 0.55 : this.bossRage() ? RIVAL_SHAPE_GAP / 2 : RIVAL_SHAPE_GAP;
   }
 
   /** Fix the rival's rip before the player chooses a lane, then show that promise on the floor. */
@@ -1783,14 +1796,22 @@ export class MatchSystem extends createSystem({
     const pin = this.progress.arenaPin;
     if (!this.nextRival) {
       // With every bout won, the map offers a missing medal every other match; the rotation gets the rest.
-      const bout = pin ? null : nextBout(this.progress.bouts, this.progress.matches % 2 === 0, this.progress.matches);
+      let bout = pin ? null : nextBout(this.progress.bouts, this.progress.matches % 2 === 0, this.progress.matches);
+      if (!bout && !pin && this.progress.nightUnlocked) {
+        const baseIndex = this.progress.matches % BOUTS.length;
+        const base = BOUTS[baseIndex];
+        // Every pass moves the same rival to another chapter's arena, so Night is a remix rather
+        // than the campaign with larger numbers.
+        const arena = BOUTS[(baseIndex + 5 + Math.floor(this.progress.matches / BOUTS.length)) % BOUTS.length].arena;
+        bout = nightBout(base, arena);
+      }
       const rival = bout && RIVALS.find((r) => r.name === bout.rival);
       const index = bout ? this.arenas.findIndex((a) => a.name === bout.arena) : -1;
       if (bout && rival && index >= 0) {
         this.nextBoutPick = bout;
         this.nextRival = rival;
         this.arenaIndex = index;
-        if (import.meta.env.DEV) console.log(`[MATCH] next: bout ${bout.id} ${rival.name} in ${bout.arena}`);
+        if (import.meta.env.DEV) console.log(`[MATCH] next: ${bout.night ? 'night ' : ''}bout ${bout.id} ${rival.name} in ${bout.arena}`);
         return;
       }
       this.nextBoutPick = null;
@@ -2479,6 +2500,45 @@ export class MatchSystem extends createSystem({
         mat.opacity = 0.45 * k;
       }
     });
+  }
+
+  /** Keeps the current bout's one hidden shard inside reach and lets either pinch claim it. */
+  private updateSecretRelic(dt: number) {
+    const bout = this.bout;
+    const canFind = !!bout && !bout.night && !this.progress.hasSecret(bout.id) && !this.demo && !this.photo && (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight');
+    this.secretRelic.visible = canFind;
+    if (!canFind || !bout) return;
+    const index = Math.max(0, BOUTS.findIndex((b) => b.id === bout.id));
+    // The irrational turn keeps each shard in a different corner while staying inside the 60 cm
+    // seated play radius. It floats above the authored floor, never inside a wall or pocket.
+    const angle = index * 2.399963 + 0.42;
+    const r = rimRadius(this.arena.layout, angle) * (0.48 + (index % 3) * 0.055);
+    const x = Math.cos(angle) * r;
+    const z = Math.sin(angle) * r;
+    this.secretRelic.position.set(x, this.arena.height(x, z) + 0.025 + Math.sin(this.time * 2.8) * 0.003, z);
+    this.secretRelic.rotation.y += dt * 2.2;
+    this.secretRelic.rotation.z += dt * 0.8;
+    const pulse = 0.9 + 0.12 * Math.sin(this.time * 5);
+    this.secretRelic.scale.setScalar(pulse);
+    for (const side of ['left', 'right'] as const) {
+      const hand = this.hands[side];
+      if (!hand.tracked || !hand.justPinched) continue;
+      const at = this.root.worldToLocal(this.handAt.copy(hand.pinch));
+      if (at.distanceTo(this.secretRelic.position) > 0.05) continue;
+      if (!this.progress.collectSecret(bout.id)) return;
+      this.secretRelic.visible = false;
+      this.sparks.embers(x, this.arena.height(x, z) + 0.02, z, 18, 0.75, 0.08, 1);
+      if (this.progress.nightUnlocked) {
+        this.stamp.show('NIGHT CIRCUIT OPEN!', '15/15 SHARDS · HARD REMIXES UNLOCKED', 'mine', 2, 1.45);
+        this.label.set('The Crown is dark again.\nNight rivals reshape every arena.');
+        this.labelTimer = 3;
+        playLevelUp();
+      } else {
+        this.stamp.show('HIDDEN SHARD!', `${this.progress.secretCount}/${BOUTS.length} FOUND`, 'mine', 1.15, 1.15);
+        playUnlock();
+      }
+      return;
+    }
   }
 
   /** A scorch where a thrown top hit the desk: ember-bright, cooling to a faint mark for the match. */
@@ -3480,7 +3540,7 @@ export class MatchSystem extends createSystem({
       // The rival arrives: a portal burns open beyond the far rim and its top arcs in; VS as it lands.
       const vs = `VS ${this.rival.name.toUpperCase()}`;
       const bout = this.bout;
-      const sub = bout ? `${CHAPTERS[bout.chapter - 1].name} · ${bout.boss ? 'BOSS' : `BOUT ${bout.id}`}` : this.rival.title;
+      const sub = bout ? bout.night ? `NIGHT CIRCUIT · REMIX ${bout.id}` : `${CHAPTERS[bout.chapter - 1].name} · ${bout.boss ? 'BOSS' : `BOUT ${bout.id}`}` : this.rival.title;
       if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
       else if (!this.introDone) this.entrance = { t: 0, vs, sub, champion: bout ? bout.boss : !!c?.champion };
       this.introDone = true;
@@ -3489,7 +3549,8 @@ export class MatchSystem extends createSystem({
       // A bout after the first match names its lesson and twist, and the medals still to earn.
       const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
       const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
-      const line = this.extras.length && bout ? `${bout.lesson}\nLast top spinning takes the heat` : this.extras.length ? `Brawl with ${this.brawlNames.length > 1 ? `${this.brawlNames.slice(0, -1).join(', ')} and ${this.brawlNames[this.brawlNames.length - 1]}` : this.brawlNames[0]}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
+      const secret = bout && !bout.night && !this.progress.hasSecret(bout.id) ? `\nHidden shard: ${this.progress.secretCount}/${BOUTS.length}` : '';
+      const line = this.extras.length && bout ? `${bout.lesson}\nLast top spinning takes the heat${secret}` : this.extras.length ? `Brawl with ${this.brawlNames.length > 1 ? `${this.brawlNames.slice(0, -1).join(', ')} and ${this.brawlNames[this.brawlNames.length - 1]}` : this.brawlNames[0]}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}${secret}` : `${bout.lesson}\n${bout.twist}${secret}`) : this.rivalRead || watch;
       // The type loop, read before the rip: whose top counters whose.
       const edge = this.progress.guide === 'done' ? edgeOf(roleOf(specFromBuild(this.myBuild)), roleOf(specFromBuild(this.rival.build))) : 0;
       const read = edge > 0 ? ' · you counter it' : edge < 0 ? ' · it counters you' : '';

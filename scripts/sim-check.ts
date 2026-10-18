@@ -22,7 +22,7 @@ import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { rankingN, roundOverN, stepN, sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
-import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
+import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
 
 const FORGE = ARENAS[0];
@@ -1364,6 +1364,20 @@ TUNING.grace = 0;
   won['1-2'] = 1;
   won['2-4'] = 1;
   assert.deepEqual([0, 2].map((m) => nextBout(won, true, m)?.id), ['1-2', '2-4'], 'after a full clear both missing bouts come up');
+
+  // One persistent hidden shard per bout opens a harder, arena-shifted remix only after the Crown.
+  const secretStore = new Map<string, string>();
+  const secretStorage = { getItem: (k: string) => secretStore.get(k) ?? null, setItem: (k: string, v: string) => void secretStore.set(k, v) };
+  const seeker = new Progress(secretStorage);
+  assert.equal(seeker.collectSecret('not-a-bout'), false, 'invented shards are rejected');
+  for (const b of BOUTS) seeker.recordBout(b.id, 1, true);
+  for (const b of BOUTS.slice(0, -1)) assert.equal(seeker.collectSecret(b.id), true);
+  assert.equal(seeker.nightUnlocked, false, 'fourteen shards are not the Night Circuit');
+  assert.equal(seeker.collectSecret(BOUTS.at(-1)!.id), true);
+  assert.ok(seeker.nightUnlocked && new Progress(secretStorage).nightUnlocked, 'the Crown plus all shards persistently opens Night');
+  assert.equal(seeker.collectSecret(BOUTS[0].id), false, 'a shard is collectible once');
+  const remix = nightBout(BOUTS[0], BOUTS[5].arena);
+  assert.ok(remix.night && remix.shapes && remix.skill > BOUTS[0].skill && remix.arena !== BOUTS[0].arena, 'Night remixes arena, skill and rival shaping');
 }
 
 // 33. The type loop: each type beats one and loses to one; balance and mirrors are even.

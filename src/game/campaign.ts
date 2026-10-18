@@ -28,6 +28,8 @@ export interface Bout {
   medals: [Medal, Medal];
   /** A crowded bout: these tops join (rivals or named smiths' builds), and the last top spinning takes the heat. */
   crowd?: string[];
+  /** A post-Crown hard remix: same opponent, a shifted arena and full arena-shaping AI. */
+  night?: boolean;
 }
 
 export const CHAPTERS = [
@@ -147,6 +149,19 @@ function chapterName(c: number): string {
 /** The rival's skill this bout, eased after two losses in a row. */
 export function boutSkill(bout: Bout, losses: number): number {
   return Math.max(0, bout.skill - (losses >= 2 ? 0.15 : 0));
+}
+
+/** Remixes a cleared bout into the post-Crown Night Circuit without creating a second save map. */
+export function nightBout(base: Bout, arena: string): Bout {
+  return {
+    ...base,
+    arena,
+    skill: Math.min(1, base.skill + 0.18),
+    shapes: true,
+    lesson: `Night ${base.id}: ${base.lesson}`,
+    twist: 'Faster rival · every arena tool is live',
+    night: true,
+  };
 }
 
 /** Did this round or match earn the medal? `table`: a real table edge exists (else edgeKO is any ring-out). */
