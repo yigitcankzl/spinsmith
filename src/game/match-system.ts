@@ -3396,6 +3396,11 @@ export class MatchSystem extends createSystem({
       const word = this.myPoints >= point && this.theirPoints >= point ? 'FINAL ROUND' : this.myPoints >= point || this.theirPoints >= point ? 'MATCH POINT' : `ROUND ${this.round + 1}`;
       this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
       // A boss one round from defeat finds its second wind: it says so, then fights harder.
+      // A bout's twist is said once, as its second round starts (the intro card names its lesson).
+      if (this.bout && this.round === 1 && !this.rivalRead) {
+        this.label.set(this.bout.twist);
+        this.labelTimer = 2.4;
+      }
       if (this.bossRage()) this.stamp.later('SECOND WIND', `${this.rival.name.toUpperCase()} WILL NOT FALL QUIETLY`, 'rival', 1.1, 1.2);
       playGong();
       if (this.rivalRead) {
