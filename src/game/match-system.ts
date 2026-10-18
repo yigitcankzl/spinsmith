@@ -704,6 +704,7 @@ export class MatchSystem extends createSystem({
   private oneHand: { side: Side; y: number } | null = null;
   private oneHandPinch = new Vector3();
   private oneHandAt = -1;
+  private lockedSaidAt = -9;
   private arenaMorphShove = { x: 0, z: 0, t: 0 };
   private gazeAssist = { active: false, target: '' };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
@@ -4024,7 +4025,7 @@ export class MatchSystem extends createSystem({
       if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > 0.3) return false;
       // Starting the grab is free. The charge is committed only after a deliberate release.
       if (this.charges.charges < 1) {
-        playLocked();
+        this.locked('No charge yet\nThe pips on your hand refill');
         return false;
       }
 
@@ -4599,7 +4600,7 @@ export class MatchSystem extends createSystem({
       if (!armed) {
         if (import.meta.env.DEV) console.log(`[STRIKE] pressed with the bar at ${Math.round(this.forgeBar.value * 100)}%`);
         // Not full yet: a dull clunk says so (once the strike is taught).
-        if (this.taught('strike')) playLocked();
+        if (this.taught('strike')) this.locked(`Strike not ready\nThe bar on your hand is ${Math.round(this.forgeBar.value * 100)}% full`);
         continue;
       }
       // The shockwave starts on the rim beside the palm; the palm leaves a molten print on the desk.
@@ -5176,12 +5177,12 @@ export class MatchSystem extends createSystem({
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (guest) {
       if (f) guest.sendEvent({ kind: 'ramp', x: -x, z: -z, dx: -dx, dz: -dz });
-      else playLocked();
+      else this.locked('No charge yet\nThe pips on your hand refill');
       return null;
     }
     if (import.meta.env.DEV) console.log(`[SHAPE] ${kind} at ${x.toFixed(3)},${z.toFixed(3)} amp ${amp.toFixed(3)} factor ${f} charges ${this.charges.charges} t ${this.elapsed.toFixed(1)}`);
     if (!f) {
-      playLocked();
+      this.locked('No charge yet\nThe pips on your hand refill');
       return null;
     }
     const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz, sigma);
@@ -6233,6 +6234,18 @@ export class MatchSystem extends createSystem({
       [x, z] = [sx + ux * LAUNCH_GAP, sz + uz * LAUNCH_GAP];
     }
     return [x, z];
+  }
+
+  /**
+   * A refused move: the dull clunk, and the same news in words on the card (for anyone who plays
+   * without sound), unless the card is already saying something.
+   */
+  private locked(why: string) {
+    playLocked();
+    if (this.labelTimer > 0 || this.time - this.lockedSaidAt < 2) return;
+    this.lockedSaidAt = this.time;
+    this.label.set(why);
+    this.labelTimer = 1.4;
   }
 
   /** Closes the online duel and returns to offline play (the pegs light for the seats again). */
