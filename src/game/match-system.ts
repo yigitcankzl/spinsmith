@@ -2572,9 +2572,8 @@ export class MatchSystem extends createSystem({
       const medals = [1, 2, 4].filter((m) => (this.progress.bouts[b.id] ?? 0) & m).length;
       return ` · ${b.boss ? `${b.id} boss` : `bout ${b.id}`} (${medals}/3 medals)`;
     }
-    const c = circuitOf(name);
-    if (!c || this.progress.marksOf(name) & MARK.beaten) return '';
-    return ` · ${c.circuit} ${c.champion ? 'champion' : `${c.bout}/${c.of}`}`;
+    // Outside the map (a pinned arena, the map won) the match is free play; the old circuit count no longer applies.
+    return this.progress.guide === 'done' ? ' · free play' : '';
   }
 
   /** A friend's top from a challenge code (?vs=CODE), as a rival for one match; null when none waits. */
@@ -3438,7 +3437,7 @@ export class MatchSystem extends createSystem({
       // The rival arrives: a portal burns open beyond the far rim and its top arcs in; VS as it lands.
       const vs = `VS ${this.rival.name.toUpperCase()}`;
       const bout = this.bout;
-      const sub = bout ? `${CHAPTERS[bout.chapter - 1].name} · ${bout.boss ? 'BOSS' : `BOUT ${bout.id}`}` : c ? `${c.circuit} · ${c.champion ? 'CHAMPION' : `bout ${c.bout} of ${c.of}`}` : this.rival.title;
+      const sub = bout ? `${CHAPTERS[bout.chapter - 1].name} · ${bout.boss ? 'BOSS' : `BOUT ${bout.id}`}` : this.rival.title;
       if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
       else if (!this.introDone) this.entrance = { t: 0, vs, sub, champion: bout ? bout.boss : !!c?.champion };
       this.introDone = true;
