@@ -237,10 +237,10 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
 - **Brawl:** bots raise ramps but have no tells or ultimates; the knockout replay is skipped in brawls (its buffer holds two tops).
 - **Campaign:** the map is a re-skinned board (no diorama); no EX remixes; the medal reveal is one stamp.
 - **Content skipped:** the Rack tip (the Tips drawer already holds six parts, and tip meshes are keyed in visuals.ts).
-- **Accessibility not done:** captions for sound cues and a left-hand mirror.
+- **Accessibility not done:** captions for sound cues (most cues already have a stamp: tells, round, ultimate ready, refused moves) and a mirrored hub layout. Every gesture already works with either hand; only the dock and anvil sides are fixed.
 - **Capture rig:** after many automated probes the IWER rig drifted to controllers and the default pose. Re-run `scripts/capture/setup.sh restart` before shooting.
 
-## State at the end of the night (07:10)
+## State at the end of the night (07:20)
 - **Checks:** `tsc --noEmit`, `check:sim`, `check:sim-n`, `check:net`, `build` and `public-release-check` all pass. `report:tops` and `report:arenas` show no warnings.
 - **Render budget (IWER, per eye):** hub about 70–107 depending on what is shown, duel fight about 91, 4-top brawl about 124 (target ≤150).
 - **History:** 110+ commits on master since Codex's last (6d7bea6), all authored by Yiğitcan Kızıl, none with a Co-Authored-By or Claude line. Nothing is pushed; pushing is left to you.
