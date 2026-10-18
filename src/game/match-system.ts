@@ -870,6 +870,8 @@ export class MatchSystem extends createSystem({
   private netShapes = new Map<number, FloorShape>();
   /** Something that must wait for the arena to be placed (an online match starting). */
   private afterPlace: (() => void) | null = null;
+  /** Something that waits until the player is home (an online duel while they forge or build). */
+  private afterHome: (() => void) | null = null;
   /** The address's online room was opened (it waits for the first session to end). */
   private onlineTried = false;
   private bout: Bout | null = null;
@@ -1839,6 +1841,9 @@ export class MatchSystem extends createSystem({
     this.bout = null;
     // ?online=… on a new headset waits for the first session; once it is over the room opens.
     if (!this.online && !this.onlineTried && this.progress.guide === 'done' && new URLSearchParams(location.search).has('online')) queueMicrotask(() => this.openOnline());
+    const home = this.afterHome;
+    this.afterHome = null;
+    if (home && this.online?.peer) queueMicrotask(home);
     this.hub.setBrawl(this.seats, this.online?.role === 'host' && !this.online.peer);
     this.phase = 'hub';
     this.markFirstFive(1);
@@ -6231,8 +6236,12 @@ export class MatchSystem extends createSystem({
           this.toHub();
           this.startMatch(this.remoteRival());
         };
+        // Never pull the host out of the forge or the workshop (unsaved work): start when they are home.
         if (this.phase === 'placing') this.afterPlace = start;
-        else start();
+        else if (this.phase === 'build' || this.phase === 'forge') {
+          this.afterHome = start;
+          say(`${link.peerName || 'A smith'} joined\nThe duel starts when you are home`);
+        } else start();
       } else say(`In room ${link.code}\n${link.peerName} starts the match`);
     };
     link.onLaunch = (round, arena, layout) => {
