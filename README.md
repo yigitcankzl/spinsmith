@@ -345,6 +345,8 @@ own rays rarely line up with what you are looking at.
 | `A` | Show the next arena, locked or not (home) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Shatter the opponent now (during a fight) |
+| `1`-`6` | Pick a strike seal (during a fight; outside a fight, hold 1 / 2 with the mouse to move a hand) |
+| `G` | Force the rival's charge (during a fight) |
 | `O` | Throw the opponent over the wall now (during a fight) |
 | `H` | A match against Hookjaw, a rival that ramps you out (home, ready or result) |
 | `` ` `` | Start over as a new player: clears progress and the saved top, reloads |
