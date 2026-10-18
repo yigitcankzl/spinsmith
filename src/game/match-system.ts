@@ -707,6 +707,7 @@ export class MatchSystem extends createSystem({
   private oneHandPinch = new Vector3();
   private oneHandAt = -1;
   private lockedSaidAt = -9;
+  private passHinted = false;
   private arenaMorphShove = { x: 0, z: 0, t: 0 };
   private gazeAssist = { active: false, target: '' };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
@@ -1360,6 +1361,8 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.visible = this.phase === 'result' && !this.demo;
     this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo && !(this.online?.role === 'guest' && this.online.peer);
     this.passButton.mesh.visible = this.rematchButton.mesh.visible && this.canPass();
+    if (this.passButton.mesh.visible && !this.passHinted && once('pass')) this.stamp.later('PASS', 'HAND THE HEADSET TO A FRIEND: THEY FIGHT YOUR TOP AND HANDS', 'neutral', 1.6, 1);
+    this.passHinted ||= this.passButton.mesh.visible;
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
       this.overforgeSeal.visible = false;
@@ -1867,6 +1870,11 @@ export class MatchSystem extends createSystem({
     this.bar.mesh.visible = false;
     // The first session says where to reach next.
     this.label.set(this.guideNote());
+    // Modes introduce themselves once, after three matches, so the first session stays one verb.
+    if (this.progress.guide === 'done' && this.progress.matches >= 3 && !this.demo && once('brawl')) {
+      this.label.set('New: the brass pegs by your level plate\nPinch them for a 3- or 4-top brawl, or an online room');
+      this.labelTimer = 6;
+    }
     // Notes hang over the far rim; the beacon marks the dock or the anvil. Once the Smith's board
     // hangs there, they move up over it.
     this.label.mesh.position.set(LABEL_AT.x, this.progress.guide === 'done' ? HOME_NOTE_Y : LABEL_AT.y, LABEL_AT.z);
@@ -6750,5 +6758,17 @@ function saveSeats(n: number) {
     localStorage.setItem(SEATS_KEY, String(n));
   } catch {
     // Not kept: the pegs still work for this session.
+  }
+}
+
+/** True the first time a one-off hint is asked for on this device (kept in localStorage). */
+function once(hint: string): boolean {
+  try {
+    const key = `spinsmith.hint.${hint}`;
+    if (localStorage.getItem(key)) return false;
+    localStorage.setItem(key, '1');
+    return true;
+  } catch {
+    return false;
   }
 }
