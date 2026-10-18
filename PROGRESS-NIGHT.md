@@ -127,6 +127,8 @@ IWER two windows after the fix: the guest's top equals the host's rival top, the
 | 91102a1 | An online host's workshop arena goes to the guest whole, cloned and validated (untrusted input), instead of matching by name. |
 | 86a13b5 | Brawl bots raise a ramp inside their nearest foe every 3.5–5.5 s. IWER: bot ramps appear, the round ends normally, and there are no errors. |
 
+| a649199 | Fourth review agent. An order for a crowded bout brings its crowd; bot ramps show in the other side's colour. **Online:** the guest goes home *before* taking the host's arena, which fixes a mismatch that two windows sharing one save had hidden (verified: host Gear Rink → guest Gear Rink). |
+
 **First session, verified with real emulated gestures (IWER, fresh save):**
 - round 1, ramp → lastShape ramp;
 - round 2, the two-hand forge → squeeze (this was broken before d16e34d);

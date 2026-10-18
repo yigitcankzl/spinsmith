@@ -2547,7 +2547,8 @@ export class MatchSystem extends createSystem({
   /** ' · Cinder Circuit champion' or ' · Cinder Circuit 2/3' for a rival not beaten yet; '' otherwise. */
   private boutText(name: string) {
     const b = this.nextBoutPick;
-    if (this.seats > 2) return ' · brawl';
+    // The pegs' brawl replaces a plain bout, but a crowded bout keeps its own crowd.
+    if (this.seats > 2 && !b?.crowd?.length) return ' · brawl';
     if (b && b.rival === name) {
       const medals = [1, 2, 4].filter((m) => (this.progress.bouts[b.id] ?? 0) & m).length;
       return ` · ${b.boss ? `${b.id} boss` : `bout ${b.id}`} (${medals}/3 medals)`;
