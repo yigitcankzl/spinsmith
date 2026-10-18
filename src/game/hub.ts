@@ -183,6 +183,8 @@ export class Hub {
   private blueprint = new Group();
   private comfortKnob = new Group();
   private brawlPegs = new Group();
+  /** An open online room waiting for a friend: its code leads the board's history line. */
+  roomCode: string | null = null;
   /** Starting over: the hand holding the level plate and for how long, then a short window to confirm. */
   private hold: { hand: HandState; t: number } | null = null;
   private armed = 0;
@@ -249,6 +251,7 @@ export class Hub {
         code: echoCode(encodeBuild(build)),
         history: [
           (() => {
+            if (this.roomCode) return `online room ${this.roomCode}: a friend opens ?online=${this.roomCode}`;
             // A pinned arena is free play: say so, or PLAY and the map disagree.
             if (progress.arenaPin) return `free play in ${progress.arenaPin} (pinned)`;
             const next = nextBout(progress.bouts, progress.matches % 2 === 0, progress.matches);

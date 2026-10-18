@@ -2032,9 +2032,9 @@ export class MatchSystem extends createSystem({
       }
       const online = this.online?.role === 'host';
       if (online) {
-        this.online!.close();
-        this.online = null;
+        this.endOnline();
         this.seats = 2;
+        this.toHub();
       } else if (this.seats >= 4 && !this.online) {
         this.seats = 2;
         this.openOnline('host');
@@ -6228,9 +6228,12 @@ export class MatchSystem extends createSystem({
       this.label.set(text);
       this.labelTimer = hold;
     };
-    // The room code stays up until someone joins.
+    // The room code stays up until someone joins (on the card now, and on the board's front while home).
+    this.hub.roomCode = link.role === 'host' ? link.code : null;
+    if (this.phase === 'hub') this.toHub();
     say(link.role === 'host' ? `Online room ${link.code}\nFriend opens ?online=${link.code} · pegs close` : `Joining room ${link.code}…`, 600);
     link.onHello = () => {
+      this.hub.roomCode = null;
       if (import.meta.env.DEV) console.log(`[ONLINE] ${link.role}: ${link.peerName} joined ${link.code}`);
       if (link.role === 'host') {
         const start = () => {
@@ -6351,6 +6354,7 @@ export class MatchSystem extends createSystem({
   private endOnline() {
     // Whatever waited for the other smith (placement, home) is void with them gone.
     this.afterPlace = this.afterHome = null;
+    this.hub.roomCode = null;
     if (!this.online) return;
     this.online.close();
     this.online = null;
