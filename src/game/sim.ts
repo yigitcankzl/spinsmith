@@ -301,7 +301,9 @@ export class Arena {
    * a readable history; cups and AI shapes still replace their own previous shape.
    */
   addShape(kind: ShapeKind, x: number, z: number, amp: number, owner: string, dx = 0, dz = 0, sigma?: number): FloorShape {
-    const persistentRamp = kind === 'ramp' && (owner === 'left' || owner === 'right');
+    // A hand owns 'left' or 'right'; seat-prefixed hands ('p2:left') in a crowded arena count too.
+    const hand = owner.slice(owner.lastIndexOf(':') + 1);
+    const persistentRamp = kind === 'ramp' && (hand === 'left' || hand === 'right');
     if (persistentRamp) {
       const owned = this.shapes.filter((s) => s.owner === owner && s.kind === 'ramp');
       if (owned.length >= 2) {
@@ -422,8 +424,9 @@ export class Arena {
     cup.age = Math.max(cup.age, TUNING.shapeHold);
   }
 
-  /** Per-step arena update: shapes relax, the dish rocks under the tops' weight. */
-  update(dt: number, a: Top, b: Top) {
+  /** Per-step arena update: shapes relax, the dish rocks under the tops' weight (two tops, or a list). */
+  update(dt: number, a: Top | readonly Top[], b?: Top) {
+    const tops = Array.isArray(a) ? (a as readonly Top[]) : b ? [a as Top, b] : [a as Top];
     this.elapsed += dt;
     this.orbitT += dt;
     const k = Math.exp(-dt / RELAX_TAU);
@@ -436,8 +439,15 @@ export class Arena {
     if (this.layout.tilt > 0 || this.shove || Math.abs(this.tiltX) + Math.abs(this.tiltZ) > 1e-5) {
       // The dish dips toward where the spinning tops are (rotation about x tips +z down, and so on);
       // a Tilt strike dips it toward the palm.
-      const wx = ((a.alive ? a.x : 0) + (b.alive ? b.x : 0)) / this.radius;
-      const wz = ((a.alive ? a.z : 0) + (b.alive ? b.z : 0)) / this.radius;
+      // Summed in order from 0, so two tops give exactly the old (a + b) sum.
+      let sumX = 0;
+      let sumZ = 0;
+      for (const t of tops) {
+        sumX += t.alive ? t.x : 0;
+        sumZ += t.alive ? t.z : 0;
+      }
+      const wx = sumX / this.radius;
+      const wz = sumZ / this.radius;
       const sx = this.shove ? this.shove.z * TILT.shove : 0;
       const sz = this.shove ? -this.shove.x * TILT.shove : 0;
       const targetX = Math.max(-1, Math.min(1, wz * TILT_WEIGHT * 0.5)) * this.layout.tilt + sx;
@@ -623,6 +633,8 @@ export class Top {
   pocketPoints = 2;
   /** Sign of the curving direction (tops spin opposite ways). */
   hand = 1;
+  /** Fight time it stopped spinning in a stepN round (-1: still in, or ended outside stepN). Ranks a crowded round. */
+  outAt = -1;
 
   spec: TopSpec;
 
@@ -631,7 +643,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sinceWall: 99, sincePad: 99, tell: 0, rushing: 0, charging: 0, chargeAngle: 0, hammer: 0, hammerX: 0, hammerZ: 0, guard: 0, guardAngle: 0, anchor: 0, damage: 0, pocketPoints: 2, finish: null, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sinceWall: 99, sincePad: 99, tell: 0, rushing: 0, charging: 0, chargeAngle: 0, hammer: 0, hammerX: 0, hammerZ: 0, guard: 0, guardAngle: 0, anchor: 0, damage: 0, pocketPoints: 2, finish: null, outAt: -1, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -659,6 +671,47 @@ export function step(arena: Arena, a: Top, b: Top, dt = STEP): Clash | null {
   advance(arena, a, b, dt);
   advance(arena, b, a, dt);
   return a.alive && b.alive ? collide(a, b, arena) : null;
+}
+
+/**
+ * Advances a crowded arena (2-4 tops, free-for-all) one fixed step. Each top seeks its nearest live
+ * foe at the moment it moves (so two tops move exactly as in step), then every live pair collides
+ * once, in index order (0-1, 0-2, ..., 1-2, ...). Returns this step's clashes.
+ */
+export function stepN(arena: Arena, tops: readonly Top[], dt = STEP): Clash[] {
+  arena.update(dt, tops);
+  const n = tops.length;
+  for (let i = 0; i < n; i++) {
+    const t = tops[i];
+    if (!t.alive) continue;
+    // With no live foe the seek target is a dead one (or the top itself): advance then skips seeking.
+    let target: Top = n > 1 ? tops[(i + 1) % n] : t;
+    let best = Infinity;
+    for (let j = 0; j < n; j++) {
+      const o = tops[j];
+      if (j === i || !o.alive) continue;
+      const d = Math.hypot(o.x - t.x, o.z - t.z);
+      if (d < best) {
+        best = d;
+        target = o;
+      }
+    }
+    advance(arena, t, target, dt);
+    if (!t.alive) t.outAt = arena.elapsed;
+  }
+  const clashes: Clash[] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const a = tops[i];
+      const b = tops[j];
+      if (!a.alive || !b.alive) continue;
+      const clash = collide(a, b, arena);
+      if (clash) clashes.push(clash);
+      if (!a.alive && a.outAt < 0) a.outAt = arena.elapsed;
+      if (!b.alive && b.outAt < 0) b.outAt = arena.elapsed;
+    }
+  }
+  return clashes;
 }
 
 function advance(arena: Arena, t: Top, other: Top, dt: number) {
@@ -717,7 +770,7 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
     }
   }
   // Attack types hunt the opponent: their heading turns toward it.
-  if (s.seek > 0 && other.alive) {
+  if (s.seek > 0 && other !== t && other.alive) {
     const dx = other.x - t.x;
     const dz = other.z - t.z;
     const d = Math.hypot(dx, dz) || 1;
@@ -1356,4 +1409,30 @@ export function verdict(a: Top, b: Top, elapsed: number): -1 | 0 | 1 | 2 {
   if (a.alive !== b.alive) return a.alive ? 1 : -1;
   if (a.spin === b.spin) return 2;
   return a.spin > b.spin ? 1 : -1;
+}
+
+/** True when a crowded round is over: at most one top still in play, or the time limit is reached. */
+export function roundOverN(tops: readonly Top[], elapsed: number): boolean {
+  let live = 0;
+  for (const t of tops) if (t.alive) live++;
+  return live <= 1 || elapsed >= TIME_LIMIT;
+}
+
+/**
+ * Finishing order of a crowded round as indices, winner first. Mirrors verdict: tops still in play
+ * rank above those out, and among them (the time limit) more remaining spin is better. Tops that are
+ * out rank by how long they lasted in stepN (outAt), then by remaining spin. An exact tie keeps the
+ * lower index first (verdict would call a two-top tie a replay; check that before ranking).
+ */
+export function rankingN(tops: readonly Top[], elapsed: number): number[] {
+  void elapsed; // the order itself does not depend on the clock; roundOverN says when it is final
+  const order = tops.map((_, i) => i);
+  return order.sort((i, j) => {
+    const a = tops[i];
+    const b = tops[j];
+    if (a.alive !== b.alive) return a.alive ? -1 : 1;
+    if (!a.alive && a.outAt !== b.outAt) return b.outAt - a.outAt;
+    if (a.spin !== b.spin) return b.spin - a.spin;
+    return i - j;
+  });
 }
