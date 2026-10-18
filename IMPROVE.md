@@ -1,5 +1,7 @@
 # SpinSmith competition sprint — verified 2026-10-17
 
+> Superseded for the night of 2026-10-18 by `PROGRESS-NIGHT.md` (campaign, brawls, pass and play, online beta, accessibility modes, reviews and the honest remaining list).
+
 This is the current source of truth after reconciling six review agents with the code. Constraints:
 no Quest is available, public hosting happens after the game is locked, and emulated evidence must
 always be labelled as IWER footage.
