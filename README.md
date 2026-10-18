@@ -208,7 +208,8 @@ an arena. First to 3 heat wins a match.
   with a given kind of top, with a white-hot pull, without giving up heat, on your own arena). Pinch the
   board to play it; doing it strikes a stamp into the ledger (stamps 5, 10 and 15 earn emblem
   glows). Missed days cost nothing. The board's back (a pinch on the level plate) shows the
-  current chapter of the Circuit Map as medallions with three medal notches each. The last three tops
+  current chapter of the Circuit Map as medallions with three medal notches each, and the medals
+  the next bout still asks for. The last three tops
   that won a match stand as champions on the left rim with their record; pinch one to make it
   your top again. The hosted build has a web app manifest, so it should be installable to the Quest
   library (not yet tried on a headset).

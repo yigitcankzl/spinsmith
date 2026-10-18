@@ -192,6 +192,8 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 
 | aaabc31, 0e0055c | **Online cups and slings:** the guest's cup is held on the host (it catches, then lets go after the hold); the guest's sling sends its pull and the host slings the caught top, snapped toward a pit. Both are sanitised. IWER, two windows: the cup event made a host cup that caught a top, and the sling event slung it ("THEIR SLING"). After the eighth review, snapshots also mark a cup that holds a top: the guest grabs only that, re-syncs the trap state, and the host's hold restarts at the catch. |
 
+| c569ea3 | The board's map names the medals the next bout still asks for (unless the next chapter is short of medals, which is shown instead). |
+
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
@@ -246,5 +248,5 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
 - **History:** about 110 commits on master since Codex's last (6d7bea6), all authored by Yiğitcan Kızıl, none with a Co-Authored-By or Claude line. Nothing is pushed; pushing is left to you.
 - **Workspace:** the tree is clean; worktrees and branches from the night are merged and deleted. The emulator is on the `?demo` save and the dev server is running.
 - **Local only:** `docs/SUBMISSION.md` (updated description and testing card) and the stills in `artifacts/capture/`.
-- **Last regression (07:24, IWER, error listener on):** bout 2-1 won → the map moves to 2-2; rematch keeps the bout; a 3-top brawl round; PASS → Challenger with the echo; online round plus guest cup and sling (07:18). No console errors.
+- **Last regression (07:20, IWER, error listener on):** bout 2-1 won → the map moves to 2-2; rematch keeps the bout; a 3-top brawl round; PASS → Challenger with the echo; online round plus guest cup and sling (07:18). No console errors.
 
