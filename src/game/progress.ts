@@ -314,6 +314,12 @@ export class Progress {
         this.wonIn = new Set(s.wonIn ?? []);
         for (const [id, m] of Object.entries(s.bouts ?? {})) if (BOUTS.some((x) => x.id === id)) this.bouts[id] = (m | 0) & 7;
         this.boutLosses = { ...(s.boutLosses ?? {}) };
+        // Saves from before the Circuit Map: a circuit already cleared (its champion beaten) counts as
+        // its chapter won with one medal a bout, so a veteran is not sent back to the first bout.
+        if (!s.bouts && this.matches > 0) {
+          const cleared: [number, string][] = [[1, 'Iron Keep'], [2, 'Sawtooth'], [3, 'Bastion']];
+          for (const [chapter, champion] of cleared) if ((this.marks[champion] ?? 0) & MARK.beaten) for (const b of BOUTS) if (b.chapter === chapter) this.bouts[b.id] = 3;
+        }
       }
     } catch {
       // A broken save starts over.

@@ -1331,6 +1331,15 @@ TUNING.grace = 0;
   const q = new Progress(st);
   q.recordBout('1-1', 3, true);
   assert.equal(new Progress(st).bouts['1-1'], 3, 'bout medals reload');
+  // A save from before the Circuit Map that cleared the Cinder Circuit keeps that chapter won.
+  const old = new Map<string, string>([['spinsmith.progress.v1', JSON.stringify({ level: 12, xp: 0, unlocked: [], quests: [], matches: 40, guide: 'done', marks: { 'Iron Keep': MARK.beaten } })]]);
+  const vet = new Progress({ getItem: (k) => old.get(k) ?? null, setItem: (k, v) => void old.set(k, v) });
+  assert.equal(nextBout(vet.bouts)?.id, '2-1', 'a veteran who beat Iron Keep starts the map at 2-1');
+  assert.equal(new Progress(null).bouts['1-1'], undefined, 'a new save seeds nothing');
+  // Every bout won: missing medals share matches with free play.
+  const all: Record<string, number> = {};
+  for (const b of BOUTS) all[b.id] = 1;
+  assert.ok(nextBout(all, true) && nextBout(all, false) === null, 'with the map won, medal turns alternate with free play');
 }
 
 console.log('sim-check: all passed');

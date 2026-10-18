@@ -110,9 +110,11 @@ export function boutOpen(bout: Bout, rec: BoutRecord): boolean {
   return !prev || prev.chapter !== bout.chapter || ((rec[prev.id] ?? 0) & WIN) !== 0;
 }
 
-/** The bout the map offers next: the first open one not won yet, else the first open one missing a medal, else null. */
-export function nextBout(rec: BoutRecord): Bout | null {
+/** The bout the map offers next: the first open one not won yet, else the first open one missing a medal (when it is a medal turn), else null. */
+export function nextBout(rec: BoutRecord, medalTurn = true): Bout | null {
   const open = BOUTS.filter((x) => boutOpen(x, rec));
+  // Once every bout is won, medal hunting shares the matches with free play.
+  if (!medalTurn && BOUTS.every((x) => (rec[x.id] ?? 0) & WIN)) return null;
   return open.find((x) => !((rec[x.id] ?? 0) & WIN)) ?? open.find((x) => (rec[x.id] ?? 0) !== 7) ?? null;
 }
 

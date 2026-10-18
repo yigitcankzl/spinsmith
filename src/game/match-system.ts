@@ -1423,7 +1423,7 @@ export class MatchSystem extends createSystem({
         // Leaving a match takes two pinches on Menu within 3 s (a stray pinch never ends it).
         const resultAction = this.pickButton(this.matchOver ? [this.menuButton, this.rematchButton, ...(this.canPass() ? [this.passButton] : [])] : [this.menuButton]);
         if (resultAction === 'rematch') {
-          this.startMatch(this.rival);
+          this.startMatch(this.rival, true);
           break;
         }
         if (resultAction === 'pass') {
@@ -1680,12 +1680,19 @@ export class MatchSystem extends createSystem({
   private prepareNext() {
     if (this.progress.guide !== 'done') {
       this.nextRival = null;
+      this.nextBoutPick = null;
       return;
+    }
+    // A pinned arena is free play: a bout queued before the pin gives way.
+    if (this.progress.arenaPin && this.nextBoutPick) {
+      this.nextBoutPick = null;
+      this.nextRival = null;
     }
     // The Circuit Map picks rival and arena, unless an arena is pinned (free play) or it is all won.
     const pin = this.progress.arenaPin;
     if (!this.nextRival) {
-      const bout = pin ? null : nextBout(this.progress.bouts);
+      // With every bout won, the map offers a missing medal every other match; the rotation gets the rest.
+      const bout = pin ? null : nextBout(this.progress.bouts, this.progress.matches % 2 === 0);
       const rival = bout && RIVALS.find((r) => r.name === bout.rival);
       const index = bout ? this.arenas.findIndex((a) => a.name === bout.arena) : -1;
       if (bout && rival && index >= 0) {
@@ -1758,6 +1765,7 @@ export class MatchSystem extends createSystem({
   /** Home: the arena waits with both tops; Play, Workshop, or switch arena. Pinching never launches here. */
   private toHub() {
     this.clearBrawl();
+    this.bout = null;
     this.hub.setBrawl(this.seats);
     this.phase = 'hub';
     this.markFirstFive(1);
@@ -1888,7 +1896,7 @@ export class MatchSystem extends createSystem({
       // The first session's rematch is against the same rival.
       const rematch = this.progress.guide === 'rematch';
       if (rematch) this.progress.advance('done');
-      this.startMatch(rematch ? this.rival : undefined);
+      this.startMatch(rematch ? this.rival : undefined, rematch);
     } else if (action.kind === 'forge') {
       this.hub.hide();
       this.openForge();
@@ -1941,6 +1949,8 @@ export class MatchSystem extends createSystem({
     } else if (action.kind === 'newSmith') {
       // A new player on a shared headset: progress, the saved top and built arenas are forgotten.
       this.progress.reset();
+      this.seats = 2;
+      saveSeats(2);
       for (const k of SAVE_KEYS) if (k !== 'spinsmith.progress.v1') localStorage.removeItem(k);
       this.myBuild = this.forge.allowed({ ...PRESETS[0].build });
       this.arenas = [...ARENAS];
@@ -2439,6 +2449,7 @@ export class MatchSystem extends createSystem({
   /** ' · Cinder Circuit champion' or ' · Cinder Circuit 2/3' for a rival not beaten yet; '' otherwise. */
   private boutText(name: string) {
     const b = this.nextBoutPick;
+    if (this.seats > 2) return ' · brawl';
     if (b && b.rival === name) return ` · ${b.boss ? `${b.id} boss` : `bout ${b.id}`}`;
     const c = circuitOf(name);
     if (!c || this.progress.marksOf(name) & MARK.beaten) return '';
@@ -2656,7 +2667,10 @@ export class MatchSystem extends createSystem({
    * A new match from anywhere (home, the workshop's Save & play, the dev key): every other
    * place closes, a rival is picked, the score and this round's builds are fresh.
    */
-  private startMatch(rival?: Rival) {
+  /** `again`: a rematch, which keeps the bout (or the brawl) it repeats. */
+  private startMatch(rival?: Rival, again = false) {
+    const last = again ? this.bout : null;
+    const lastSeats = again ? this.tops.length : 2;
     this.hub.hide();
     this.builder.close();
     this.forge.close();
@@ -2668,16 +2682,17 @@ export class MatchSystem extends createSystem({
     const friend = !rival && this.progress.guide === 'done' ? this.challenger() : null;
     this.rival = rival ?? friend ?? this.nextRival ?? this.pickRival();
     // A campaign bout: the planned one, or the first match (the first bout's rival in its arena).
-    const planned = this.nextBoutPick ?? (this.progress.guide !== 'done' ? BOUTS[0] : null);
-    this.bout = !friend && !rival && planned && planned.rival === this.rival.name && planned.arena === this.arena.layout.name ? planned : null;
+    const planned = last ?? this.nextBoutPick ?? (this.progress.guide !== 'done' ? BOUTS[0] : null);
+    this.bout = !friend && (again || !rival) && planned && planned.rival === this.rival.name && planned.arena === this.arena.layout.name ? planned : null;
     this.boutEarned = 0;
     this.nextRival = null;
     this.nextBoutPick = null;
     // A brawl is free play: no bout, no order; a friend's challenge and the first session stay duels.
     this.clearBrawl();
-    if (this.seats > 2 && !rival && !friend && this.progress.guide === 'done') {
+    const seats = again ? lastSeats : this.seats;
+    if (seats > 2 && (again || !rival) && !friend && !this.online && this.progress.guide === 'done') {
       this.bout = null;
-      this.setupBrawl(this.seats - 2);
+      this.setupBrawl(seats - 2);
     }
     this.progress.playedArena(this.arena.layout.name);
     if (this.online?.role === 'host' && this.online.peer) this.online.launched(-1, this.arena.layout.name);
@@ -3181,6 +3196,11 @@ export class MatchSystem extends createSystem({
   }
 
   private toReady() {
+    for (const t of this.extras) {
+      t.state = 'out';
+      t.finish = null;
+    }
+    this.oneHandAt = -1;
     this.trails.clear();
     this.impacts.clear();
     if (this.phase === 'placing') return;
@@ -4228,7 +4248,7 @@ export class MatchSystem extends createSystem({
       const free = side === 'left' ? right : left;
       // Held in wall-clock time: a hit-stop freezes the fight clock, not the hand.
       if (this.oneHandAt < 0) this.oneHandAt = this.time;
-      if (free.pinching || this.time - this.oneHandAt < ONE_HAND_HOLD) return null;
+      if (free.pinching || this.time - this.oneHandAt < ONE_HAND_HOLD || this.charges.charges < 1) return null;
       this.oneHandAt = -1;
       const real = side === 'left' ? left : right;
       this.oneHand = { side, y: this.root.worldToLocal(this.handAt.copy(real.pinch)).y };
@@ -5740,7 +5760,7 @@ export class MatchSystem extends createSystem({
         this.matchOver = true;
         this.markFirstFive(5);
         // The match becomes your echo: the board's challenge code carries it to a friend.
-        if (!this.demo && this.echoRec.rips.length) {
+        if (!this.demo && !this.extras.length && !this.online && this.echoRec.rips.length) {
           try {
             localStorage.setItem(ECHO_KEY, `${encodeBuild(this.myBuild)}.${encodeEcho(this.echoRec)}`);
           } catch {
@@ -5926,7 +5946,7 @@ export class MatchSystem extends createSystem({
   /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */
   private earn(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
     const before = this.progress.level;
-    const award = this.progress.award({ won, finish: loser.finish, pocketPoints: loser.pocketPoints, perfect: this.lastPerfect && won, matchOver, matchWon, rival: this.rival.name });
+    const award = this.progress.award({ won, finish: loser.finish, pocketPoints: loser.pocketPoints, perfect: this.lastPerfect && won, matchOver, matchWon, rival: loser === this.theirs || !won ? this.rival.name : undefined });
     this.xpGained = award.gained;
     this.matchLog.xp += award.gained;
     this.matchLog.rounds.push(`${won ? '' : '-'}${FINISH_WORD[loser.finish ?? 'spin']}`);
@@ -5965,7 +5985,9 @@ export class MatchSystem extends createSystem({
     }
     if (scarChanged) this.myView.scars(this.progress.scarsFor(this.myBuild));
     const ko = loser.finish === 'pocket' || loser.finish === 'over' || loser.finish === 'burst';
-    const fresh = won ? this.progress.mark(this.rival.name, (matchWon ? MARK.beaten : 0) | (ko ? MARK.knockout : 0) | (cause ? MARK.shape : 0)) : 0;
+    // In a brawl a bot's knockout is no mark against the rival (nor its circuit's clearing).
+    const rivalOut = loser === this.theirs || !this.extras.length;
+    const fresh = won && rivalOut ? this.progress.mark(this.rival.name, (matchWon ? MARK.beaten : 0) | (ko ? MARK.knockout : 0) | (cause ? MARK.shape : 0)) : 0;
     // Beating a circuit's champion for the first time clears the circuit: a moment of its own.
     const c = circuitOf(this.rival.name);
     if (fresh & MARK.beaten && c?.champion) {
@@ -6244,7 +6266,8 @@ export class MatchSystem extends createSystem({
    * it, scored on the foe that went out last). At the time cap the most spin wins.
    */
   private brawlVerdict(): -1 | 0 | 1 {
-    if (!this.mine.alive) return -1;
+    // Out while a foe still spins is a lost round; out in the same step as the last foe goes to the ranking (spin left).
+    if (!this.mine.alive && this.tops.some((t, i) => i > 0 && t.alive)) return -1;
     if (!roundOverN(this.tops, this.elapsed)) return 0;
     const rank = rankingN(this.tops, this.elapsed);
     if (rank[0] !== 0) return -1;
