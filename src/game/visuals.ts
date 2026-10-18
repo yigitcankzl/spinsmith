@@ -886,17 +886,20 @@ export class TopView {
    * rival's), a glowing edge on the blade in that color that brightens with spin, a motion-blur
    * disc for fast spin, and a larger drawing (HERO_SCALE; the simulation's radius is unchanged).
    */
-  team(color: number, radius: number) {
-    const ring = new Mesh(
-      new RingGeometry(radius * 1.25, radius * 1.55, 40).rotateX(-Math.PI / 2),
-      new MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: AdditiveBlending, depthWrite: false }),
-    );
-    // The contact shadow is offset away from the back-left key. Counter-offset the team ring so it
-    // remains centered on the top instead of inheriting the shadow's tiny directional bias.
-    ring.position.set(-0.0024, 0.0003, -0.0018);
-    ring.renderOrder = 2;
-    this.teamRing = ring;
-    this.shadow.add(ring);
+  /** `ring`: draw the team ring under the top (a brawl's extra tops skip it to save a draw per eye). */
+  team(color: number, radius: number, ring = true) {
+    if (ring) {
+      const mesh = new Mesh(
+        new RingGeometry(radius * 1.25, radius * 1.55, 40).rotateX(-Math.PI / 2),
+        new MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: AdditiveBlending, depthWrite: false }),
+      );
+      // The contact shadow is offset away from the back-left key. Counter-offset the team ring so it
+      // remains centered on the top instead of inheriting the shadow's tiny directional bias.
+      mesh.position.set(-0.0024, 0.0003, -0.0018);
+      mesh.renderOrder = 2;
+      this.teamRing = mesh;
+      this.shadow.add(mesh);
+    }
     this.drawScale = HERO_SCALE;
     this.body.scale.setScalar(HERO_SCALE);
     this.shadow.geometry.scale(HERO_SCALE, 1, HERO_SCALE);

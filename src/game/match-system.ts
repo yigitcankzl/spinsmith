@@ -6637,7 +6637,9 @@ export class MatchSystem extends createSystem({
       top.hand = build.spin;
       top.state = 'out';
       const view = new TopView(build, color);
-      view.team(color, ringOf(build).radius);
+      // No team ring for a bot: its body is painted in its own colour already, and each ring is a
+      // further additive draw per eye (a 4-top brawl on the hero arena sat right at the 150 budget).
+      view.team(color, ringOf(build).radius, false);
       view.root.name = `brawl-top-${i}`;
       this.stage.add(view.root, view.shadowMesh, view.debris);
       this.extras.push(top);
