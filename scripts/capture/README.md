@@ -19,3 +19,9 @@ real simulated bout and holds the two-handed arena forge at maximum deformation;
 the asserted palm-to-DESK-KO path before capture. Both remain explicitly labelled as IWER footage.
 The setup restarts the managed browser with NVIDIA PRIME offload enabled; renderer identity can be
 checked without guessing via `npx @iwsdk/cli browser run scripts/capture/gpu-info.mjs`.
+
+Run `npm run capture:hands` for a reusable mechanics catalogue rather than a trailer. It records
+twelve separate hand-driven clips (launch, fingertip shaping, arena manipulation, return catch,
+ultimates and workshop gestures) and joins labelled copies into one 1080p60 reference reel under
+`~/Desktop/spinsmith-videos/hand-mechanics/`. Every action goes through IWER's emulated hand
+skeleton; the reel is explicitly labelled as emulator automation, not physical-headset footage.

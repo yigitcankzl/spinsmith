@@ -26,6 +26,7 @@
     "capture:gameplay": "scripts/trailer.sh",
     "capture:ultimates": "scripts/ultimates.sh",
     "capture:competition": "scripts/competition-trailer.sh",
+    "capture:hands": "scripts/hand-mechanics.sh",
     "capture:cinematic": "scripts/capture/cinematic.sh",
     "capture:heroes": "scripts/capture/heroes.sh"
   },
