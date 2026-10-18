@@ -200,7 +200,9 @@ an arena. First to 3 heat wins a match.
   goes over public Nostr relays to a WebRTC link (Trystero, loaded only when a room is opened) with public STUN
   only, so some strict networks will not connect, and it says so. Tested with two browser
   windows (`&net=bc`) and a node loopback with 200 ms round trips and 5% loss
-  (`npm run check:net`); not yet between two headsets.
+  (`npm run check:net`). The real path (Nostr signalling to a WebRTC channel) has also connected
+  two separate browser processes on one machine in about 3 s (`node scripts/net-live-check.mjs`
+  with the dev server running). It has not yet been run between two headsets or two homes.
 - **A reason to come back** (`src/game/orders.ts`, `src/game/board.ts`):
   once the first session is over, the Smith's board over the far rim shows **today's Smith
   Order**, made from the local date and what you have unlocked (the same all day): a rival, an
