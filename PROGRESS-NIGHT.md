@@ -149,6 +149,8 @@ IWER: MENU in ready → "Leave this match?" → hub; the online round regression
 | 9d52960 | The online launch-spot clamp and the guest score sync are pure functions in online.ts, tested in `check:net` (OnlineLink no longer uses TS parameter properties, so node can import it). |
 | 6621d5e, deed7fd | README audit by an agent against the code (16 fixes): the cup comes from the third match, a charge refills in 4 s, lesson grace, tells from the fourth match, signature parts, DESK KO = 3 heat, Nostr signalling, online after the first session, "should be installable" and "offline checked in the browser" instead of claims, the dev keys. |
 
+| 8d5ba2c | **Online trust boundary** (crash-risk sweep agent): the host validates and clamps every guest event (finite numbers, ranges, known kinds, actions and seals) via `sanitizeGuestEvent` (tested in check:net). A malformed launch spot or hello is ignored, pending online starts are voided when a peer leaves (this fixes a null crash), the early-event window is bounded, and the pegs are capped at four. Snapshots from a host are still trusted by the guest (a bad host only breaks its own guest's view). |
+
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes, and the interaction notes are updated.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
