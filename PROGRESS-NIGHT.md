@@ -15,7 +15,7 @@ Goal: turn Spinsmith from a deep systems sandbox into a finished game that can w
   - a README audit against the code;
   - `check:sim` now proves every bout can be countered, and that crowded bouts can be won;
   - `check:sim-n` and `check:net` were added.
-- **Still open:** Quest device test, the video, hosting (last step).
+- **Still open:** Quest device test, the video, draw calls in 4-top brawls on Forge Bowl (151 per eye, at the limit), hosting (last step).
 - **State at 08:00:** see the end of this file. Every check passes, and the tree is clean.
 
 ## Research (4 read-only agents, 03:10–03:25)
@@ -250,7 +250,11 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
 
 ## State at the end of the night (07:40)
 - **Checks:** `tsc --noEmit`, `check:sim`, `check:sim-n`, `check:net`, `build` and `public-release-check` all pass. `report:tops` and `report:arenas` show no warnings.
-- **Render budget (IWER, per eye):** hub about 70–107 depending on what is shown, duel fight about 91, 4-top brawl about 124 (target ≤150).
+- **Render budget (IWER, per eye, measured at 07:39):** it depends on the arena.
+  - Earlier arenas: duel about 91, 4-top brawl about 124.
+  - **Forge Bowl** (Codex's richer hero shell): duel about 128, **4-top brawl about 151, at the 150 target**.
+  - Hub: about 70–107.
+  - **Next perf step:** WOW-PLAN B3 (merge the arena's static parts) and B5 (instance the effect pools), or simplify the extra tops' views in brawls.
 - **History:** about 118 commits on master since Codex's last (6d7bea6), all authored by Yiğitcan Kızıl, none with a Co-Authored-By or Claude line. Nothing is pushed; pushing is left to you.
 - **Workspace:** the tree is clean; worktrees and branches from the night are merged and deleted. The emulator is on the `?demo` save and the dev server is running.
 - **Local only:** `docs/SUBMISSION.md` (updated description and testing card) and the stills in `artifacts/capture/`.
