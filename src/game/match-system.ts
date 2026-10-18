@@ -4969,7 +4969,9 @@ export class MatchSystem extends createSystem({
       const c = this.cups[s];
       if (c && this.arena.shapes.includes(c.shape)) this.arena.free(c.shape);
     }
-    sealStrike(this.arena, this.mine, this.theirs, seal, ox, oz);
+    // Online guest: the host strikes for you (an Anvil Strike from your side); the snapshot shows it.
+    if (this.online?.role === 'guest' && this.online.peer) this.online.sendEvent({ kind: 'strike', x: -ox, z: -oz });
+    else sealStrike(this.arena, this.mine, this.theirs, seal, ox, oz);
     this.shockAt.x = ox;
     this.shockAt.z = oz;
     this.struckOnce = true;
@@ -6180,6 +6182,17 @@ export class MatchSystem extends createSystem({
       this.rivalHandMove(ev.x, ev.z, ev.dx, ev.dz);
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = 'RAMP';
+      playThock();
+    } else if (ev.kind === 'strike') {
+      // The guest's palm comes down: an Anvil Strike centred where they slapped, their top the striker.
+      sealStrike(this.arena, this.theirs, this.mine, 'anvil', ev.x, ev.z);
+      const y = this.arena.height(ev.x, ev.z);
+      this.impacts.shock(ev.x, y, ev.z, 1, TEAM_RIVAL);
+      this.sparks.burst(ev.x, y, ev.z, 1);
+      this.stamp.show('THEIR ANVIL STRIKE', 'live hands', 'rival', 0.9);
+      this.rivalShapeAt = this.elapsed;
+      this.rivalShapeKind = 'STRIKE';
+      this.hitStop = Math.max(this.hitStop, 0.12);
       playThock();
     } else if (ev.kind === 'forge') {
       const action = ev.action as ArenaForgeAction;
