@@ -392,6 +392,11 @@ export class MatchSystem extends createSystem({
   private rematchButton = new Button('rematch', 0.105, 0.026);
   /** Pass and play: the next smith on this headset fights the top and the hands of the match just played. */
   private passButton = new Button('pass', 0.085, 0.026);
+  /** Online/pass play: three choices whose exact parts stay hidden until the rip. */
+  private deckButtons = [0, 1, 2].map((i) => new Button(`deck${i}`, 0.096, 0.024));
+  private deckBuilds: TopBuild[] = [];
+  private deckChoice = -1;
+  private deckPrompted = false;
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
   /** Dev: the hand driver holds the hands, so the gaze is not a pointer. */
@@ -895,7 +900,7 @@ export class MatchSystem extends createSystem({
   private botShapeAt = [0, 0];
   /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
   private online: OnlineLink | null = null;
-  private netRip: { power: number; aim: number; at?: [number, number]; dir?: [number, number] } | null = null;
+  private netRip: { power: number; aim: number; build?: string; at?: [number, number]; dir?: [number, number] } | null = null;
   private netPending: Parameters<MatchSystem['launch']> | null = null;
   private netGo = false;
   private netShapes = new Map<number, FloorShape>();
@@ -1044,7 +1049,7 @@ export class MatchSystem extends createSystem({
     // Low over the arena's middle, in front of the far card and the match bar.
     this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.root.add(this.stamp.mesh);
-    this.root.add(this.handle, this.stage, this.outerRail, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh);
+    this.root.add(this.handle, this.stage, this.outerRail, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, ...this.deckButtons.map((b) => b.mesh));
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
@@ -1061,6 +1066,10 @@ export class MatchSystem extends createSystem({
     this.passButton.set('PASS');
     this.rematchButton.mesh.visible = false;
     this.passButton.mesh.visible = false;
+    for (const b of this.deckButtons) {
+      b.mesh.rotation.set(-SIGN_TILT, 0, 0);
+      b.mesh.visible = false;
+    }
     // The gaze pointer stays dormant on Quest unless the runtime exposes a gaze input source. On
     // Meta VR Glasses it combines that gaze ray with either hand's pinch; the hand path is unchanged.
     this.pointers = [this.gazePointer, this.hands.right, this.hands.left];
@@ -1303,7 +1312,7 @@ export class MatchSystem extends createSystem({
     this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
-      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
+      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, ...this.deckButtons.map((b) => b.mesh), this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
       this.hub.photo();
     }
     this.guardFrameRate(delta);
@@ -1407,6 +1416,7 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.visible = (this.phase === 'result' || (this.phase === 'ready' && this.progress.guide === 'done')) && !this.demo;
     this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo && !(this.online?.role === 'guest' && this.online.peer);
     this.passButton.mesh.visible = this.rematchButton.mesh.visible && this.canPass();
+    if (this.phase !== 'ready') for (const b of this.deckButtons) b.mesh.visible = false;
     if (this.passButton.mesh.visible && !this.passHinted && once('pass')) this.stamp.later('PASS', 'A FRIEND FIGHTS YOUR TOP AND HANDS', 'neutral', 1.6, 1);
     this.passHinted ||= this.passButton.mesh.visible;
     if (this.phase !== 'fight') {
@@ -1508,6 +1518,8 @@ export class MatchSystem extends createSystem({
           this.menuArmed = -10;
           this.menuButton.set('MENU', undefined, false);
         }
+        if (this.updateSecretDeck()) break;
+        if (this.secretDeckPending()) break;
         this.updateReadyPinch();
         break;
       case 'pulling':
@@ -2933,6 +2945,7 @@ export class MatchSystem extends createSystem({
     this.echoRec = { rips: [], forges: [] };
     const friend = !rival && this.progress.guide === 'done' ? this.challenger() : null;
     this.rival = rival ?? friend ?? this.nextRival ?? this.pickRival();
+    this.prepareSecretDeck();
     // A campaign bout: the planned one, or the first match (the first bout's rival in its arena).
     // The first session's guided rematch is still the first bout.
     const planned = last ?? this.nextBoutPick ?? (this.progress.guide !== 'done' || (again && this.progress.matches <= 1) ? BOUTS[0] : null);
@@ -2989,6 +3002,67 @@ export class MatchSystem extends createSystem({
   private pickBuilds() {
     this.setBuilds(this.myBuild, { ...this.rival.build, color: OPPONENT_COLOR });
     console.log(`[MATCH] rival ${this.rival.name}: ${this.theirs.spec.name}, spin ${this.theirs.hand}`);
+  }
+
+  private secretDeckActive() {
+    return !!this.online?.peer || this.rival.name === 'Challenger';
+  }
+
+  /** Builds a stable three-top hand from the equipped top, champions, then legal presets. */
+  private prepareSecretDeck() {
+    this.deckBuilds = [];
+    this.deckChoice = -1;
+    this.deckPrompted = false;
+    if (!this.secretDeckActive()) return;
+    const seen = new Set<string>();
+    const add = (candidate: TopBuild) => {
+      if (this.deckBuilds.length >= 3) return;
+      const build = this.forge.allowed({ ...candidate });
+      const key = `${build.ring}|${build.core}|${build.tip}|${build.spin}|${build.seal ?? 'anvil'}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      this.deckBuilds.push(build);
+    };
+    add(this.myBuild);
+    for (const champion of this.progress.champions) add(champion.build);
+    for (const preset of PRESETS) add(preset.build);
+    while (this.deckBuilds.length < 3) this.deckBuilds.push({ ...this.myBuild });
+    const numeral = ['I', 'II', 'III'];
+    for (let i = 0; i < this.deckButtons.length; i++) {
+      const role = roleOf(specFromBuild(this.deckBuilds[i])).toUpperCase();
+      this.deckButtons[i].set(`${numeral[i]} · ${role}`);
+    }
+  }
+
+  private secretDeckPending() {
+    return this.phase === 'ready' && this.secretDeckActive() && this.deckBuilds.length === 3 && this.deckChoice < 0;
+  }
+
+  /** Picks locally; the network only receives the exact build inside the rip event. */
+  private updateSecretDeck(): boolean {
+    const pending = this.secretDeckPending();
+    for (const button of this.deckButtons) button.mesh.visible = pending && !this.photo;
+    if (!pending) return false;
+    this.count = null;
+    if (!this.deckPrompted) {
+      this.deckPrompted = true;
+      this.label.set('SECRET DECK\nPick I, II or III · parts reveal on RIP');
+      this.labelTimer = 0;
+    }
+    const picked = this.pickButton(this.deckButtons);
+    if (!picked) return false;
+    const index = Number(picked.slice(4));
+    if (!Number.isInteger(index) || !this.deckBuilds[index]) return false;
+    this.deckChoice = index;
+    this.myBuild = { ...this.deckBuilds[index] };
+    this.setBuilds(this.myBuild, this.theirBuild);
+    for (const button of this.deckButtons) button.mesh.visible = false;
+    this.stamp.show('DECK LOCKED', `TOP ${index + 1} · ${roleOf(specFromBuild(this.myBuild)).toUpperCase()}`, 'mine', 0.7);
+    this.label.set(`${buildName(this.myBuild)} locked\nYour opponent sees it when you rip`);
+    this.labelTimer = 1.4;
+    this.count = { t: -0.4, beat: 0 };
+    playPlace();
+    return true;
   }
 
   private describe(t: TopSpec) {
@@ -3155,6 +3229,11 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.scale.setScalar(readScale);
     this.rematchButton.mesh.scale.setScalar(readScale);
     this.passButton.mesh.scale.setScalar(readScale);
+    for (let i = 0; i < this.deckButtons.length; i++) {
+      const button = this.deckButtons[i];
+      button.mesh.scale.setScalar(readScale);
+      button.mesh.position.set((i - 1) * 0.105 * readScale, MENU_Y, 0.225 + this.pushed / (ARENA_SCALE * this.rootK));
+    }
     this.passButton.mesh.position.set(0, MENU_Y, 0.15 + this.pushed / (ARENA_SCALE * this.rootK));
     const resultButtonX = 0.15 * readScale;
     this.menuButton.mesh.position.set(-resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
@@ -3508,6 +3587,10 @@ export class MatchSystem extends createSystem({
     this.arena.reset();
     this.arenaDirty = true;
     // Both tops wait upright at their spawn points.
+    if (!this.typesPicked && this.secretDeckActive()) {
+      this.deckChoice = -1;
+      this.deckPrompted = false;
+    }
     if (!this.typesPicked) this.pickBuilds();
     this.typesPicked = true;
     // The launch zone follows this arena's rim.
@@ -3986,12 +4069,16 @@ export class MatchSystem extends createSystem({
    * ahead, angled into its orbit); `steep` 0..1 trades launch speed for spin.
    */
   private launch(power: number, aim: number, from: { x: number; z: number } | null = null, dir: { x: number; z: number } | null = null, steep = 0) {
+    if (this.secretDeckPending()) {
+      this.locked('Pick one secret-deck top before you rip');
+      return;
+    }
     // Online: the guest only sends its rip and waits for the host's launch; the host waits for the guest's rip.
     const net = this.online?.peer ? this.online : null;
     if (net && !this.netGo) {
       if (net.role === 'guest') {
         // The spot the guest picked (its own arena-local frame) goes in the host's frame: turned half round.
-        net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist, ...(from ? { at: [-from.x, -from.z] as [number, number] } : {}), ...(dir ? { dir: [-dir.x, -dir.z] as [number, number] } : {}) });
+        net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist, build: encodeBuild(this.myBuild), ...(from ? { at: [-from.x, -from.z] as [number, number] } : {}), ...(dir ? { dir: [-dir.x, -dir.z] as [number, number] } : {}) });
         this.netPending = [power, aim, from, dir, steep];
         this.waitForPeer();
         this.label.set(`Ripped\nWaiting for ${net.peerName || 'the host'}`);
@@ -4009,6 +4096,11 @@ export class MatchSystem extends createSystem({
     if (net?.role === 'host' && this.netRip) {
       this.rivalLaunchPower = this.netRip.power;
       this.rivalLaunchAim = this.netRip.aim;
+      const picked = this.netRip.build ? decodeBuild(this.netRip.build) : null;
+      if (picked) {
+        this.setBuilds(this.myBuild, { ...picked, color: OPPONENT_COLOR });
+        this.stamp.show('DECKS REVEALED', `${roleOf(this.mine.spec).toUpperCase()} VS ${roleOf(this.theirs.spec).toUpperCase()}`, 'neutral', 0.65);
+      }
     }
     if (this.phase === 'result') this.toReady();
     const braced = this.bracedLaunch;
@@ -4141,7 +4233,10 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(rx, rz, Math.sin(heading) * aiSpeed, Math.cos(heading) * aiSpeed, launchSpin(aiPower), th);
     this.launchExtras();
     if (net?.role === 'host') {
-      net.launched(this.round, this.arena.layout.name);
+      // Keep the guest's own paint in the reveal packet; the host renders that same build with the
+      // opponent tint, but should not send the tint back as if the guest had chosen it.
+      const guestCode = this.netRip?.build && decodeBuild(this.netRip.build) ? this.netRip.build : encodeBuild(this.theirBuild);
+      net.launched(this.round, this.arena.layout.name, undefined, [encodeBuild(this.myBuild), guestCode]);
       this.netRip = null;
     }
     this.netPending = null;
@@ -6543,7 +6638,9 @@ export class MatchSystem extends createSystem({
   private openOnline(open?: 'host') {
     if (this.progress.guide !== 'done') return;
     if (!open) this.onlineTried = true;
-    const link = linkFromAddress(open ? `?online=host${new URLSearchParams(location.search).get('net') === 'bc' ? '&net=bc' : ''}` : location.search, encodeBuild(this.myBuild), buildName(this.myBuild));
+    // The hello only proves protocol compatibility. Exact parts travel with the committed rip, so
+    // neither table can counter-pick after seeing the other's deck choice.
+    const link = linkFromAddress(open ? `?online=host${new URLSearchParams(location.search).get('net') === 'bc' ? '&net=bc' : ''}` : location.search, encodeBuild(PRESETS[0].build), this.progress.rank);
     if (!link) return;
     this.online = link;
     const say = (text: string, hold = 8) => {
@@ -6571,16 +6668,16 @@ export class MatchSystem extends createSystem({
         } else start();
       } else say(`In room ${link.code}\n${link.peerName} starts the match`);
     };
-    link.onLaunch = (round, arena, layout) => {
+    link.onLaunch = (round, arena, layout, builds) => {
       if (round < 0 && this.phase === 'placing') {
         this.afterPlace = () => {
-          if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout);
+          if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout, builds);
         };
         return;
       }
       if (round < 0 && (this.phase === 'build' || this.phase === 'forge' || this.demo)) {
         this.afterHome = () => {
-          if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout);
+          if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout, builds);
         };
         say(`${link.peerName || 'The host'} is ready\nThe duel starts when you are home`);
         return;
@@ -6624,6 +6721,15 @@ export class MatchSystem extends createSystem({
       this.cordTone.update(null);
       this.chargeRing.visible = false;
       this.netGo = true;
+      if (builds) {
+        const hostBuild = decodeBuild(builds[0]);
+        const guestBuild = decodeBuild(builds[1]);
+        if (hostBuild && guestBuild) {
+          this.myBuild = this.forge.allowed({ ...guestBuild });
+          this.setBuilds(this.myBuild, { ...hostBuild, color: OPPONENT_COLOR });
+          this.stamp.show('DECKS REVEALED', `${roleOf(this.mine.spec).toUpperCase()} VS ${roleOf(this.theirs.spec).toUpperCase()}`, 'neutral', 0.65);
+        }
+      }
       const [power, aim, from, dir, steep] = this.netPending ?? [0.75, 0, null, null, 0];
       this.launch(power, aim, from, dir, steep);
       this.netGo = false;
@@ -6721,7 +6827,7 @@ export class MatchSystem extends createSystem({
     if (ev.kind === 'rip') {
       // A rip that arrives mid-fight belongs to no round: the next one starts from a fresh rip.
       if (this.phase === 'fight') return;
-      this.netRip = { power: ev.power, aim: ev.aim, ...(ev.at ? { at: ev.at } : {}), ...(ev.dir ? { dir: ev.dir } : {}) };
+      this.netRip = { power: ev.power, aim: ev.aim, ...(ev.build ? { build: ev.build } : {}), ...(ev.at ? { at: ev.at } : {}), ...(ev.dir ? { dir: ev.dir } : {}) };
       // Only from ready: a host mid-pull finishes their own new rip, which then finds this one waiting.
       if (this.netPending && this.phase === 'ready') {
         const [power, aim, from, dir, steep] = this.netPending;

@@ -51,6 +51,8 @@ function curve(i: 0 | 1, tMs: number): TopLike {
   assert.equal(parseMsg('{"type":"nope"}'), null);
   assert.equal(parseMsg('not json'), null);
   assert.equal(parseMsg('{"type":"bye"}')?.type, 'bye');
+  const reveal = parseMsg({ type: 'start', arena: 'Forge Bowl', seed: 0, round: 1, builds: ['HOST', 'GUEST'] });
+  assert.deepEqual(reveal?.type === 'start' ? reveal.builds : null, ['HOST', 'GUEST'], 'a round start carries both committed deck reveals');
 }
 
 // Full duel over a bad link ---------------------------------------------------------------------
@@ -205,8 +207,8 @@ console.log('net check: OK');
 {
   const R = 0.17;
   assert.equal(sanitizeGuestEvent({ kind: 'rip', power: NaN, aim: 0, steep: 0, twist: 0 }, R, 0.6), null, 'NaN power is dropped');
-  const rip = sanitizeGuestEvent({ kind: 'rip', power: 9, aim: -4, steep: 0, twist: 0, at: [5, -5] as [number, number] }, R, 0.6)!;
-  assert.ok(rip.kind === 'rip' && rip.power === 1 && rip.aim === -0.6 && rip.at![0] === R * 1.5 && rip.at![1] === -R * 1.5, 'rip values are clamped');
+  const rip = sanitizeGuestEvent({ kind: 'rip', power: 9, aim: -4, steep: 0, twist: 0, build: 'A'.repeat(100), at: [5, -5] as [number, number] }, R, 0.6)!;
+  assert.ok(rip.kind === 'rip' && rip.power === 1 && rip.aim === -0.6 && rip.build?.length === 64 && rip.at![0] === R * 1.5 && rip.at![1] === -R * 1.5, 'rip values and the secret-deck reveal are bounded');
   assert.equal((sanitizeGuestEvent({ kind: 'rip', power: 0.5, aim: 0, steep: 0, twist: 0, at: 5 as unknown as [number, number] }, R, 0.6) as { at?: unknown }).at, undefined, 'a malformed launch spot is dropped');
   assert.equal(sanitizeGuestEvent({ kind: 'rim', sx: 0, sz: 0.1, x: 0, z: 0.08, f: NaN }, R, 0.6), null, 'NaN rim strength is dropped');
   assert.equal(sanitizeGuestEvent({ kind: 'forge', action: 'explode', pull: 0, twist: 0, tilt: 0, sign: 1 }, R, 0.6), null, 'unknown forge action is dropped');
@@ -242,4 +244,3 @@ console.log('direction check: ok');
   assert.equal(sanitizeGuestEvent({ kind: 'sling', px: NaN, pz: 0 }, 0.17, 0.6), null, 'a NaN sling is dropped');
 }
 console.log('cup and sling check: ok');
-

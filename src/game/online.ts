@@ -22,7 +22,7 @@ export class OnlineLink {
   shapesVersion = -1;
   onHello: (() => void) | null = null;
   onEvent: ((ev: GuestEvent) => void) | null = null;
-  onLaunch: ((round: number, arena: string, layout?: unknown) => void) | null = null;
+  onLaunch: ((round: number, arena: string, layout?: unknown, builds?: [string, string]) => void) | null = null;
   onResult: ((winner: number, heat: [number, number]) => void) | null = null;
   onLeft: (() => void) | null = null;
   private encoder = new SnapshotEncoder();
@@ -108,7 +108,8 @@ export class OnlineLink {
     } else if (m.type === 'start' && this.role === 'guest') {
       // A new round: last round's final positions must not show at its start.
       if (m.round >= 0) this.buffer = new SnapshotBuffer();
-      this.onLaunch?.(m.round, m.arena, m.layout);
+      const builds = Array.isArray(m.builds) && m.builds.length === 2 && m.builds.every((b) => typeof b === 'string' && b.length <= 64) ? m.builds : undefined;
+      this.onLaunch?.(m.round, m.arena, m.layout, builds);
     } else if (m.type === 'result' && this.role === 'guest') this.onResult?.(m.winner, m.heat);
     else if (m.type === 'bye') {
       this.peer = false;
@@ -144,8 +145,8 @@ export class OnlineLink {
   }
 
   /** Host: the round's tops have left the launchers (round -1: a match begins in this arena). */
-  launched(round: number, arena: string, layout?: unknown) {
-    this.transport.send({ type: 'start', arena, seed: 0, round, ...(layout ? { layout } : {}) });
+  launched(round: number, arena: string, layout?: unknown, builds?: [string, string]) {
+    this.transport.send({ type: 'start', arena, seed: 0, round, ...(layout ? { layout } : {}), ...(builds ? { builds } : {}) });
   }
 
   /** Host: the round ended; winner 1 is the host, -1 the guest, 2 a draw. */
@@ -222,7 +223,8 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
       // A direction, not a place: normalised, never clamped to the arena.
       const d = Array.isArray(ev.dir) && ev.dir.length >= 2 && num(ev.dir[0]) && num(ev.dir[1]) ? Math.hypot(ev.dir[0], ev.dir[1]) : 0;
       const dir: [number, number] | undefined = d > 1e-6 ? [ev.dir![0] / d, ev.dir![1] / d] : undefined;
-      return { kind: 'rip', power: clamp(ev.power, 0, 1), aim: clamp(ev.aim, -maxAim, maxAim), steep: num(ev.steep) ? clamp(ev.steep, 0, 1) : 0, twist: num(ev.twist) ? clamp(ev.twist, -1, 1) : 0, ...(at ? { at } : {}), ...(dir ? { dir } : {}) };
+      const build = typeof ev.build === 'string' ? ev.build.slice(0, 64) : undefined;
+      return { kind: 'rip', power: clamp(ev.power, 0, 1), aim: clamp(ev.aim, -maxAim, maxAim), steep: num(ev.steep) ? clamp(ev.steep, 0, 1) : 0, twist: num(ev.twist) ? clamp(ev.twist, -1, 1) : 0, ...(build ? { build } : {}), ...(at ? { at } : {}), ...(dir ? { dir } : {}) };
     }
     case 'ramp':
       if (![ev.x, ev.z, ev.dx, ev.dz].every(num)) return null;

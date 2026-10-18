@@ -8,7 +8,7 @@
 import type { MessageAction, Room } from 'trystero';
 import type { Finish, FloorShape, Outcome } from './sim.ts';
 
-export const NET_VERSION = 1;
+export const NET_VERSION = 2;
 export const APP_ID = 'spinsmith-duel-v1';
 export const SNAPSHOT_HZ = 30;
 
@@ -22,7 +22,7 @@ export type PackedTop = [number, number, number, number, number, number, number,
 export type PackedShape = [number, number, number, number, number, number, number, string];
 
 export type GuestEvent =
-  | { kind: 'rip'; power: number; aim: number; steep: number; twist: number; at?: [number, number]; dir?: [number, number] }
+  | { kind: 'rip'; power: number; aim: number; steep: number; twist: number; build?: string; at?: [number, number]; dir?: [number, number] }
   | { kind: 'ramp'; x: number; z: number; dx: number; dz: number }
   | { kind: 'cup'; x: number; z: number }
   | { kind: 'sling'; px: number; pz: number }
@@ -60,7 +60,7 @@ export interface HandsMsg {
 
 export type NetMsg =
   | { type: 'hello'; v: number; build: string; name: string }
-  | { type: 'start'; arena: string; seed: number; round: number; layout?: unknown }
+  | { type: 'start'; arena: string; seed: number; round: number; layout?: unknown; builds?: [string, string] }
   | SnapshotMsg
   | EventMsg
   | HandsMsg
