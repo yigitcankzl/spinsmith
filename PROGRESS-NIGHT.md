@@ -15,7 +15,7 @@ Goal: turn Spinsmith from a deep systems sandbox into a finished game that can w
   - a README audit against the code;
   - `check:sim` now proves every bout can be countered, and that crowded bouts can be won;
   - `check:sim-n` and `check:net` were added.
-- **Still open:** Quest device test, the video, captions and left-hand layout, hosting (last step).
+- **Still open:** Quest device test, the video, a mirrored (left-hand) hub layout, hosting (last step).
 - **State at 08:00:** see the end of this file. Every check passes, and the tree is clean.
 
 ## Research (4 read-only agents, 03:10–03:25)
@@ -194,6 +194,8 @@ The crowd test now uses real spins, and 2-3's crowd changed to Ember Comet. Onli
 
 | c569ea3 | The board's map names the medals the next bout still asks for (unless the next chapter is short of medals, which is shown instead). |
 
+| (latest) | **Sound has a visual twin:** an agent audited every play*() call in match-system and found five sound-only cues (rejected rim spring, a spring without a charge, a busy-card refusal, a dropped rescue rail, the new-smith reset). All five now show a stamp or card. |
+
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
@@ -239,7 +241,7 @@ Measured in IWER: a 4-top brawl fight is 248 calls, about 124 per eye (under 150
 - **Brawl:** bots raise ramps but have no tells or ultimates; the knockout replay is skipped in brawls (its buffer holds two tops).
 - **Campaign:** the map is a re-skinned board (no diorama); no EX remixes; the medal reveal is one stamp.
 - **Content skipped:** the Rack tip (the Tips drawer already holds six parts, and tip meshes are keyed in visuals.ts).
-- **Accessibility not done:** captions for sound cues (most cues already have a stamp: tells, round, ultimate ready, refused moves) and a mirrored hub layout. Every gesture already works with either hand; only the dock and anvil sides are fixed.
+- **Accessibility:** sound cues are covered. An audit of every play*() call found five sound-only cues, and all are now paired with a stamp or card. Not done: a mirrored hub layout. Every gesture already works with either hand; only the dock and anvil sides are fixed.
 - **Capture rig:** after many automated probes the IWER rig drifted to controllers and the default pose. Re-run `scripts/capture/setup.sh restart` before shooting.
 
 ## State at the end of the night (07:20)

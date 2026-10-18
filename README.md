@@ -34,7 +34,7 @@ move says why on the card ("No charge yet", "Strike not ready").
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
 | **Online duel (beta)**, tested in two browser windows | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE` (both after the first session). |
 | **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |
-| **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed), One hand (forge with one hand) and High contrast. |
+| **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed), One hand (forge with one hand) and High contrast. Every gameplay sound has a visual twin (a stamp or the card), so Quiet loses no information. |
 
 All interactions are pinches, palm presses or grabs. Nothing needs a controller, and every one-hand
 gesture (rip, ramp, cup, strike) works with either hand (left-hand rip and ramp checked in IWER).
