@@ -155,6 +155,11 @@ IWER: MENU in ready → "Leave this match?" → hub; the online round regression
 | 05d10f2 | An open online room's code leads the board's front line while you wait (IWER: pegs → room 5J4PT on the board → pegs → closed). |
 | 9b40f60, 2c4b985 | The old circuit counts ("CINDER CIRCUIT 2/3") are gone from the plate and the intro: it is the bout, "brawl" or "free play". |
 
+| ec6e27d | README: one-hand gestures work with either hand (left-hand rip and ramp checked in IWER). |
+| 6125383, (next) | **No walls on the map** (sim-check 35/36): in every bout's arena some forgeable build beats the bout's rival at least half the time without hands (hardest: 2-2 at 70%). In the crowded bouts the best build is last spinning 88% (2-3, fair share 33%) and 75% (3-3, fair share 25%). |
+
+Final smoke (IWER, 06:40): bout (2-1) and rematch (bout kept), PASS → Challenger with echo, brawl, and an online round, all with no console errors.
+
 **Local only (gitignored):**
 - `docs/SUBMISSION.md`: the Devpost description is rewritten (469 words) to cover the campaign, play together and the new comfort modes. The interaction notes are updated, and there is a "How it was tested" card.
 - `artifacts/capture/` holds fresh labelled IWER stills: `brawl-four-tops.png`, `campaign-map.png` and `campaign-crowded-bout-intro.png`.
