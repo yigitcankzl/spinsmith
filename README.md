@@ -49,7 +49,10 @@ an arena. First to 3 heat wins a match.
   Its new pose is saved; when persistent WebXR anchors are available, the room remembers it.
 - **Known limits:** nothing has been measured on a headset yet; table detection relies on the
   room's Space Setup labelling a table or desk. Depth occlusion, persistent-anchor stability and
-  gaze input have only been exercised in IWSDK's browser emulator (IWER).
+  gaze input have only been exercised in IWSDK's browser emulator (IWER). The online duel has
+  been run between two browser windows, not two headsets; an online guest's cups, slings, rim
+  springs and non-Anvil seals are not carried yet. Brawl bots fight with the simulation's own
+  seeking (they do not shape the floor).
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
   slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
