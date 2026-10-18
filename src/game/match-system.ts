@@ -858,7 +858,7 @@ export class MatchSystem extends createSystem({
   private brawlOut = new Set<Top>();
   /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
   private online: OnlineLink | null = null;
-  private netRip: { power: number; aim: number; at?: [number, number] } | null = null;
+  private netRip: { power: number; aim: number; at?: [number, number]; dir?: [number, number] } | null = null;
   private netPending: Parameters<MatchSystem['launch']> | null = null;
   private netGo = false;
   private netShapes = new Map<number, FloorShape>();
@@ -3399,7 +3399,7 @@ export class MatchSystem extends createSystem({
       this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
       // A boss one round from defeat finds its second wind: it says so, then fights harder.
       // A bout's twist is said once, as its second round starts (the intro card names its lesson).
-      if (this.bout && this.round === 1 && !this.rivalRead) {
+      if (this.bout && this.round === 1 && !this.rivalRead && this.progress.guide === 'done') {
         this.label.set(this.bout.twist);
         this.labelTimer = 2.4;
       }
@@ -3798,7 +3798,7 @@ export class MatchSystem extends createSystem({
     if (net && !this.netGo) {
       if (net.role === 'guest') {
         // The spot the guest picked (its own arena-local frame) goes in the host's frame: turned half round.
-        net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist, ...(from ? { at: [-from.x, -from.z] as [number, number] } : {}) });
+        net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist, ...(from ? { at: [-from.x, -from.z] as [number, number] } : {}), ...(dir ? { dir: [-dir.x, -dir.z] as [number, number] } : {}) });
         this.netPending = [power, aim, from, dir, steep];
         this.label.set(`Ripped\nWaiting for ${net.peerName || 'the host'}`);
         this.labelTimer = 0;
@@ -3933,10 +3933,13 @@ export class MatchSystem extends createSystem({
     const aiSpeed = LAUNCH_SPEED * (0.5 + 0.5 * aiPower);
     // From its spot this round, toward the middle, angled into its orbit.
     const aiDir = aiAim + LAUNCH_TILT * th;
-    // Online: the guest's own launch spot, when it picked one.
-    const [rx, rz] = net?.role === 'host' && this.netRip?.at ? this.netRip.at : this.rivalSpot();
+    // Online: the guest's own launch spot and pull direction, when it picked them (checked: inside
+    // the launch ring, never on top of your spot).
+    const [rx, rz] = net?.role === 'host' && this.netRip?.at ? this.guestSpot(this.netRip.at, sx, sz) : this.rivalSpot();
     const inward = Math.atan2(-rx, -rz);
-    this.theirs.launch(rx, rz, Math.sin(inward + aiDir) * aiSpeed, Math.cos(inward + aiDir) * aiSpeed, launchSpin(aiPower), th);
+    const gd = net?.role === 'host' ? this.netRip?.dir : undefined;
+    const heading = gd && Number.isFinite(gd[0]) && Number.isFinite(gd[1]) && Math.hypot(gd[0], gd[1]) > 1e-6 ? Math.atan2(gd[0], gd[1]) + LAUNCH_TILT * th : inward + aiDir;
+    this.theirs.launch(rx, rz, Math.sin(heading) * aiSpeed, Math.cos(heading) * aiSpeed, launchSpin(aiPower), th);
     this.launchExtras();
     if (net?.role === 'host') {
       net.launched(this.round, this.arena.layout.name);
@@ -6109,9 +6112,8 @@ export class MatchSystem extends createSystem({
         playLevelUp();
       }
       const feat = c.circuit.startsWith('Cinder') ? 'cinder' : c.circuit.startsWith('Iron') ? 'iron' : 'crown';
-      if (this.bout) {
-        if (!this.demo) this.progress.feat(feat);
-      } else this.featDone(feat);
+      // In the campaign the chapter's boss bout earns it (trackBout); a rival met earlier in a bout does not.
+      if (!this.bout) this.featDone(feat);
     }
     if (matchWon) this.progress.recordChampion(this.myBuild);
     const event = {
@@ -6210,6 +6212,22 @@ export class MatchSystem extends createSystem({
     });
   }
 
+  /** Host: a guest's launch spot, kept finite, inside the launch ring and LAUNCH_GAP clear of yours. */
+  private guestSpot(at: [number, number], sx: number, sz: number): [number, number] {
+    let [x, z] = at;
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return this.rivalSpot();
+    const max = LAUNCH_MAX_N * this.arena.radius;
+    const r = Math.hypot(x, z);
+    if (r > max) [x, z] = [(x / r) * max, (z / r) * max];
+    const gap = Math.hypot(x - sx, z - sz);
+    if (gap < LAUNCH_GAP) {
+      const ux = gap > 1e-6 ? (x - sx) / gap : 0;
+      const uz = gap > 1e-6 ? (z - sz) / gap : -1;
+      [x, z] = [sx + ux * LAUNCH_GAP, sz + uz * LAUNCH_GAP];
+    }
+    return [x, z];
+  }
+
   /** Closes the online duel and returns to offline play (the pegs light for the seats again). */
   private endOnline() {
     if (!this.online) return;
@@ -6232,7 +6250,7 @@ export class MatchSystem extends createSystem({
   /** Host: what the guest's hands did, from the far side. */
   private applyGuestEvent(ev: GuestEvent) {
     if (ev.kind === 'rip') {
-      this.netRip = { power: ev.power, aim: ev.aim, ...(ev.at ? { at: ev.at } : {}) };
+      this.netRip = { power: ev.power, aim: ev.aim, ...(ev.at ? { at: ev.at } : {}), ...(ev.dir ? { dir: ev.dir } : {}) };
       if (this.netPending && this.phase !== 'fight') {
         const [power, aim, from, dir, steep] = this.netPending;
         this.netGo = true;
@@ -6460,13 +6478,16 @@ export class MatchSystem extends createSystem({
     // One stamp for the bout (the queue keeps three; feats and levels share it), one for a new chapter.
     const got = bout.medals.filter((_, i) => fresh & (2 << i)).map((m) => MEDAL_TEXT[m].toUpperCase());
     const have = [1, 2, 4].filter((m) => (this.progress.bouts[bout.id] ?? 0) & m).length;
-    if (fresh) {
+    const finale = !!(fresh & 1) && bout === BOUTS[BOUTS.length - 1];
+    if (fresh & 1 && bout.boss) this.progress.feat((['cinder', 'iron', 'crown'] as const)[bout.chapter - 1]);
+    // The finale's own stamps replace the bout's (the stamp queue holds three).
+    if (fresh && !finale) {
       const word = fresh & 1 ? (bout.boss ? 'BOSS DOWN!' : 'BOUT WON!') : 'MEDAL!';
       this.stamp.later(word, `${bout.id} · ${have}/3 MEDALS${got.length ? ` · ${got.join(' · ')}` : ''}`, 'mine', 1.6, fresh & 1 && bout.boss ? 1.5 : 1.2);
       playStamp();
     }
     // The campaign's end: the last boss beaten for the first time is the game's finale.
-    if (fresh & 1 && bout === BOUTS[BOUTS.length - 1]) {
+    if (finale) {
       const medals = medalCount(this.progress.bouts);
       this.stamp.later('THE CROWN IS YOURS', 'EVERY CIRCUIT CLEARED', 'mine', 2.4, 1.6);
       this.stamp.later('SPINSMITH', `${medals} OF ${BOUTS.length * 3} MEDALS`, 'mine', 2, 1.4);
