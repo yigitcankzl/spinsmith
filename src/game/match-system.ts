@@ -382,6 +382,8 @@ export class MatchSystem extends createSystem({
   private hub = new Hub();
   private menuButton = new Button('menu', 0.07, 0.026);
   private rematchButton = new Button('rematch', 0.105, 0.026);
+  /** Pass and play: the next smith on this headset fights the top and the hands of the match just played. */
+  private passButton = new Button('pass', 0.085, 0.026);
   /** Everything that can point and pinch at buttons and the arena: both hands, plus the gaze in dev. */
   private pointers: HandState[] = [];
   /** Dev: the hand driver holds the hands, so the gaze is not a pointer. */
@@ -977,7 +979,7 @@ export class MatchSystem extends createSystem({
     // Low over the arena's middle, in front of the far card and the match bar.
     this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.root.add(this.stamp.mesh);
-    this.root.add(this.handle, this.stage, this.outerRail, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh, this.rematchButton.mesh);
+    this.root.add(this.handle, this.stage, this.outerRail, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh);
     this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
@@ -989,7 +991,10 @@ export class MatchSystem extends createSystem({
     this.rematchButton.mesh.position.set(0.2, MENU_Y, 0.14);
     this.rematchButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.rematchButton.set('REMATCH', true, true);
+    this.passButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
+    this.passButton.set('PASS');
     this.rematchButton.mesh.visible = false;
+    this.passButton.mesh.visible = false;
     // The gaze pointer stays dormant on Quest unless the runtime exposes a gaze input source. On
     // Meta VR Glasses it combines that gaze ray with either hand's pinch; the hand path is unchanged.
     this.pointers = [this.gazePointer, this.hands.right, this.hands.left];
@@ -1232,7 +1237,7 @@ export class MatchSystem extends createSystem({
     this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
-      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
+      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
       this.hub.photo();
     }
     this.guardFrameRate(delta);
@@ -1331,6 +1336,7 @@ export class MatchSystem extends createSystem({
     // Large near-rim actions only appear when play has stopped; during a fight the arena is the UI.
     this.menuButton.mesh.visible = this.phase === 'result' && !this.demo;
     this.rematchButton.mesh.visible = this.phase === 'result' && this.matchOver && !this.demo;
+    this.passButton.mesh.visible = this.rematchButton.mesh.visible && this.canPass();
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
       this.overforgeSeal.visible = false;
@@ -1400,9 +1406,13 @@ export class MatchSystem extends createSystem({
           if (this.demo) break;
         }
         // Leaving a match takes two pinches on Menu within 3 s (a stray pinch never ends it).
-        const resultAction = this.pickButton(this.matchOver ? [this.menuButton, this.rematchButton] : [this.menuButton]);
+        const resultAction = this.pickButton(this.matchOver ? [this.menuButton, this.rematchButton, ...(this.canPass() ? [this.passButton] : [])] : [this.menuButton]);
         if (resultAction === 'rematch') {
           this.startMatch(this.rival);
+          break;
+        }
+        if (resultAction === 'pass') {
+          this.passHeadset();
           break;
         }
         if (resultAction === 'menu') {
@@ -1748,6 +1758,7 @@ export class MatchSystem extends createSystem({
     this.cord.set(null);
     this.menuButton.mesh.visible = false;
     this.rematchButton.mesh.visible = false;
+    this.passButton.mesh.visible = false;
     // Your top waits on its stand, not in the arena.
     this.mine.state = 'out';
     // Today's order, from the local date and what the player can meet and play now.
@@ -2844,6 +2855,8 @@ export class MatchSystem extends createSystem({
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.scale.setScalar(readScale);
     this.rematchButton.mesh.scale.setScalar(readScale);
+    this.passButton.mesh.scale.setScalar(readScale);
+    this.passButton.mesh.position.set(0, MENU_Y, 0.15 + this.pushed / (ARENA_SCALE * this.rootK));
     const resultButtonX = 0.15 * readScale;
     this.menuButton.mesh.position.set(-resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
     this.rematchButton.mesh.position.set(resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
@@ -3184,6 +3197,7 @@ export class MatchSystem extends createSystem({
     this.chargeRing.visible = false;
     this.menuButton.mesh.visible = false;
     this.rematchButton.mesh.visible = false;
+    this.passButton.mesh.visible = false;
     this.arena.reset();
     this.arenaDirty = true;
     // Both tops wait upright at their spawn points.
@@ -5893,6 +5907,28 @@ export class MatchSystem extends createSystem({
       playLevelUp();
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
     }
+  }
+
+  /** A duel just ended with your hands on record (the echo saved at match end): someone else can take the headset. */
+  private canPass() {
+    if (this.extras.length || this.progress.guide !== 'done') return false;
+    try {
+      return !!localStorage.getItem(ECHO_KEY);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Pass and play: the next smith fights this match's top and recorded hands, as a challenge code would bring them. */
+  private passHeadset() {
+    try {
+      sessionStorage.setItem('spinsmith.vs', localStorage.getItem(ECHO_KEY) ?? '');
+    } catch {
+      return;
+    }
+    this.stamp.later('PASS THE HEADSET', 'NEXT SMITH: BEAT THAT TOP AND THOSE HANDS', 'neutral', 1.6, 1.2);
+    playStamp();
+    this.startMatch();
   }
 
   /** Seats the brawl's bots: other rivals' tops, each in its own color, spread round the sides. */
