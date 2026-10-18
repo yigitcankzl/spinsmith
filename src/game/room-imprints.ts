@@ -166,9 +166,10 @@ export class RoomImprints {
       }
     } else if (record.seal === 'anvil') {
       for (let i = -2; i <= 2; i++) {
-        const length = 0.07 + 0.025 * ((record.seed * 13 + i * 0.31 + 2) % 1);
+        // Short hairline cracks off the rim: long ones read as a fan of sticks laid on the table.
+        const length = 0.028 + 0.018 * ((record.seed * 13 + i * 0.31 + 2) % 1);
         // Scorched cracks in the wood, not glowing lines: lit, they read as rays fanning off the rim.
-        const crack = new Mesh(new PlaneGeometry(0.0026, length).rotateX(-Math.PI / 2).translate(0, 0, -length / 2), material(0x1a0d06, Math.min(0.85, alpha + 0.2), false));
+        const crack = new Mesh(new PlaneGeometry(0.0026, length).rotateX(-Math.PI / 2).translate(0, 0, -length / 2), material(0x1a0d06, Math.min(0.6, alpha), false));
         crack.position.z = -0.165;
         crack.rotation.y = i * 0.15 + (record.seed - 0.5) * 0.08;
         group.add(crack);
