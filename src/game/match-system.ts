@@ -30,7 +30,7 @@ import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
-import { allBuilds, buildName, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, NAMED_BUILDS, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
 import { ArenaView, ChargePips, Cord, Impacts, Label, mergeByMaterial, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
@@ -848,6 +848,7 @@ export class MatchSystem extends createSystem({
   private extras: Top[] = [];
   private extraViews: TopView[] = [];
   private brawlLoser: Top | null = null;
+  private brawlNames: string[] = [];
   private bout: Bout | null = null;
   private boutEarned = 0;
   /** This match as an echo for a friend's game: each rip and each two-hand forge (echo.ts). */
@@ -3273,7 +3274,7 @@ export class MatchSystem extends createSystem({
       // A bout after the first match names its lesson and twist, and the medals still to earn.
       const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
       const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
-      const line = this.extras.length ? `Brawl: ${this.tops.length} tops. Last top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
+      const line = this.extras.length ? `Brawl with ${this.brawlNames.join(' and ')}\nLast top spinning takes the heat` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}` : `${bout.lesson}\n${bout.twist}`) : this.rivalRead || watch;
       this.label.set(`${this.rival.name}, ${this.rival.title}\n${line}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
     }
     else {
@@ -5972,10 +5973,11 @@ export class MatchSystem extends createSystem({
 
   /** Seats the brawl's bots: other rivals' tops, each in its own color, spread round the sides. */
   private setupBrawl(n: number) {
-    const others = RIVALS.filter((r) => r.name !== this.rival.name);
-    const pool = others.filter((r) => r.level <= this.progress.level);
-    const from = pool.length >= n ? pool : others;
-    const picks = [...from].sort(() => Math.random() - 0.5).slice(0, n);
+    // Other rivals you have met and the named smiths' tops (parts.ts NAMED_BUILDS), shuffled.
+    const met = RIVALS.filter((r) => r.name !== this.rival.name && r.level <= this.progress.level);
+    const pool = [...met, ...NAMED_BUILDS].map((r) => ({ name: r.name, build: r.build }));
+    const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, n);
+    this.brawlNames = picks.map((r) => r.name);
     picks.forEach((r, i) => {
       const color = BRAWL_COLORS[i];
       const build = { ...r.build, color };
