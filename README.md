@@ -26,7 +26,7 @@ Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming,
 | **Circuit Map campaign:** 15 bouts, 3 chapters, 3 medals a bout | Automatic after the first match: PLAY starts the next bout. Pinch the level plate to see the map. |
 | **Brawl:** 3 or 4 tops, last one spinning wins | Pinch the brass pegs beside the level plate (2, 3, 4 tops), then PLAY. |
 | **Pass and play** on one headset | After a duel, pinch PASS: the next person fights that top and its recorded hands. |
-| **Daily Smith Order** | Point at the board over the arena and pinch. |
+| **Daily Smith Order** | Point at the board over the arena and pinch. About every other day it chases a medal you left on the map, and playing it counts for that bout. |
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
 | **Online duel (beta)** between two headsets | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE`. |
 | **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |

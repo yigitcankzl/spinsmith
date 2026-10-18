@@ -6,7 +6,7 @@
  * and two losses in a row on a bout quietly ease it. Medals open chapters, so skill stands in for
  * grinding. No three.js or DOM here.
  */
-import type { OrderEvent } from './orders.ts';
+import type { Goal, OrderEvent } from './orders.ts';
 
 /** What a medal asks for (the win is always the first medal and is not listed). */
 export type Medal = 'rampKO' | 'forgeKO' | 'strikeKO' | 'burst' | 'perfect' | 'sweep' | 'wellSpin' | 'edgeKO';
@@ -171,4 +171,21 @@ export function medalsFrom(bout: Bout, e: OrderEvent, table: boolean): number {
     if (medalMet(m, e, table)) out |= 2 << i;
   });
   return out;
+}
+
+/** Medals a daily order can ask for, as its goal (forge and strike KOs have no order goal). */
+const ORDER_GOAL: Partial<Record<Medal, Goal>> = { rampKO: 'rampKO', burst: 'burst', perfect: 'perfect', sweep: 'sweep', wellSpin: 'wellSpin', edgeKO: 'deskKO' };
+
+/** The first won bout still missing a medal an order can chase, or null (edge medals only with a real table). */
+export function medalOrder(rec: BoutRecord, table: boolean): { bout: string; rival: string; arena: string; goal: Goal } | null {
+  for (const b of BOUTS) {
+    const bits = rec[b.id] ?? 0;
+    if (!(bits & WIN)) continue;
+    for (let i = 0; i < 2; i++) {
+      const goal = ORDER_GOAL[b.medals[i]];
+      if (bits & (2 << i) || !goal || (goal === 'deskKO' && !table)) continue;
+      return { bout: b.id, rival: b.rival, arena: b.arena, goal };
+    }
+  }
+  return null;
 }

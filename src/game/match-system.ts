@@ -48,7 +48,7 @@ import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 import { linkFromAddress } from './online.js';
 import type { OnlineLink } from './online.js';
 import type { GuestEvent, PackedShape, Vec3 } from './net.js';
-import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalsFrom, nextBout, nextGate } from './campaign.js';
+import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from './campaign.js';
 import type { Bout } from './campaign.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
@@ -1844,6 +1844,7 @@ export class MatchSystem extends createSystem({
       built: this.arenas.filter((a) => !ARENAS.includes(a)),
       cup: this.taught('cup'),
       table: !!ROOM.poly,
+      medal: medalOrder(this.progress.bouts, !!ROOM.poly) ?? undefined,
     };
     this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
     // A teaser of tomorrow's order once today's is done (as things stand now).
@@ -1968,6 +1969,12 @@ export class MatchSystem extends createSystem({
       }
       this.startMatch(RIVALS.find((r) => r.name === o.rival));
       this.orderMatch = true;
+      // An order chasing a map medal plays that bout too: its medals and win count on the map.
+      const bout = o.bout ? BOUTS.find((b) => b.id === o.bout) : null;
+      if (bout && !this.extras.length && !this.online && bout.arena === this.arena.layout.name && bout.rival === this.rival.name) {
+        this.bout = bout;
+        this.boutEarned = 0;
+      }
     } else if (action.kind === 'champion') {
       const c = this.progress.champions[action.index];
       if (!c) return;

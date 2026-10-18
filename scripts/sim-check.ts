@@ -22,7 +22,7 @@ import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { sealStrike, rivalMove, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_SPEED, LAUNCH_TILT, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
-import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
+import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
 
 const FORGE = ARENAS[0];
@@ -1349,5 +1349,25 @@ assert.equal(edgeOf('defense', 'attack'), 1);
 assert.equal(edgeOf('stamina', 'attack'), -1);
 assert.equal(edgeOf('balance', 'attack'), 0);
 assert.equal(edgeOf('defense', 'defense'), 0);
+
+// 34. Orders chase map medals: the first won bout missing an order-able medal, about every other day.
+{
+  assert.equal(medalOrder({}, false), null, 'no won bout, no medal order');
+  const m = medalOrder({ '1-1': 1 | 2 }, false);
+  assert.deepEqual(m, { bout: '1-1', rival: 'Drifter', arena: 'Forge Bowl', goal: 'perfect' }, "1-1 won with its ramp medal: the order chases its white-hot medal");
+  assert.equal(medalOrder({ '1-2': 1 }, false)?.goal, 'sweep', 'forge KO has no order goal, so 1-2 asks for no heat lost');
+  assert.equal(medalOrder({ '3-5': 1 }, false)?.goal, 'sweep', 'the edge medal needs a real table');
+  assert.equal(medalOrder({ '3-5': 1 }, true)?.goal, 'deskKO', 'with a table the order asks for the desk edge');
+  const ctx = { rivals: ['Drifter', 'Rim Raider'], arenas: ARENAS.slice(0, 3), built: [], medal: m! };
+  let chased = 0;
+  for (let d = 1; d <= 30; d++) {
+    const o = dailyOrder(`2026-11-${String(d).padStart(2, '0')}`, ctx);
+    if (o.bout) {
+      chased++;
+      assert.ok(o.rival === 'Drifter' && o.arena === 'Forge Bowl' && o.goal === 'perfect' && o.text.includes('1-1'), 'a medal order names its bout');
+    }
+  }
+  assert.ok(chased >= 8 && chased <= 22, `medal orders come about every other day (${chased}/30)`);
+}
 
 console.log('sim-check: all passed');

@@ -18,6 +18,8 @@ export interface Order {
   goal: Goal;
   /** For 'role': the kind of top to win with. */
   role?: Role;
+  /** A Circuit Map bout whose missing medal this order chases (campaign.ts); playing it counts there too. */
+  bout?: string;
   /** What the order says, engraved. */
   text: string;
 }
@@ -33,6 +35,8 @@ export interface OrderContext {
   cup?: boolean;
   /** A horizontal real-world table plane and boundary are available. */
   table?: boolean;
+  /** A won bout with a medal still missing, as an order goal (campaign.ts medalOrder). */
+  medal?: { bout: string; rival: string; arena: string; goal: Goal };
 }
 
 /** What a finished round or match tells the order. */
@@ -88,6 +92,11 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
     return seed / 4294967296;
   };
   const pick = <T>(list: T[]): T => list[Math.floor(next() * list.length)];
+  // Every other day or so the order chases a medal you left on the map: a reason to go back to that bout.
+  if (ctx.medal && next() < 0.5) {
+    const m = ctx.medal;
+    return { date, rival: m.rival, arena: m.arena, goal: m.goal, text: `${orderText(m.rival)[m.goal]} (bout ${m.bout} medal)`, bout: m.bout };
+  }
   const rival = pick(ctx.rivals);
   const goals: Goal[] = ['rampKO', 'burst', 'role', 'perfect', 'sweep'];
   if (ctx.cup) goals.push('wellSpin');
@@ -98,7 +107,14 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
   const pool = goal === 'ownArena' ? ctx.built : goal === 'rampKO' ? ctx.arenas.filter(canKnockOut) : ctx.arenas;
   const arena = pick(pool.length ? pool : ctx.arenas).name;
   const role = goal === 'role' ? pick<Role>(['attack', 'defense', 'stamina']) : undefined;
-  const text: Record<Goal, string> = {
+  const text = orderText(rival, role);
+  // No role key unless the goal has one, so a saved order reloads equal.
+  return { date, rival, arena, goal, ...(role ? { role } : {}), text: text[goal] };
+}
+
+/** What an order says for each goal. */
+function orderText(rival: string, role?: Role): Record<Goal, string> {
+  return {
     rampKO: `Ramp ${rival} out: into a slag pit or over the wall`,
     deskKO: `Knock ${rival} off the real desk edge`,
     burst: `Shatter ${rival}`,
@@ -108,8 +124,6 @@ export function dailyOrder(date: string, ctx: OrderContext): Order {
     sweep: `Beat ${rival} without giving up heat`,
     ownArena: `Beat ${rival} on your own arena`,
   };
-  // No role key unless the goal has one, so a saved order reloads equal.
-  return { date, rival, arena, goal, ...(role ? { role } : {}), text: text[goal] };
 }
 
 /** True when this round or match fulfils the order. */
