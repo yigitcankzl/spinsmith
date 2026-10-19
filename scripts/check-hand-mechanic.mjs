@@ -1,6 +1,8 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
-// Other modes: single-rip, dual-rip, finger-groove, rim-spring, palm-brace, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring, arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
+// Other modes: single-rip, dual-rip, finger-groove, rim-spring, palm-brace, crossguard, forge-wheel,
+// ember-plant, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring,
+// arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
   let target = null;
   for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
@@ -26,7 +28,8 @@ export default async function run({ page, frame }) {
       await sleep(1200);
     }
     const gustCheck = check === 'palm-gust' || check === 'palm-gust-left' || check === 'palm-gust-riposte';
-    if (check === 'palm-brace' || gustCheck || check === 'rim-spring') game.progress.matches = Math.max(2, game.progress.matches);
+    const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant';
+    if (check === 'palm-brace' || gustCheck || check === 'rim-spring' || expansionCheck) game.progress.matches = Math.max(2, game.progress.matches);
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
     if (launchCheck && drive.state().phase !== 'ready') {
@@ -34,7 +37,7 @@ export default async function run({ page, frame }) {
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
     }
     if (launchCheck) window.__game.deckChoice = 0;
-    if (check === 'outer-ring' || check === 'finger-groove' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
+    if (check === 'outer-ring' || check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
@@ -43,7 +46,7 @@ export default async function run({ page, frame }) {
     }
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
     // not spend most of its timeout waiting for the opening clock to reach the normal 2.5 s gate.
-    if ((check === 'finger-groove' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
+    if ((check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
       window.__game.elapsed = Math.max(window.__game.elapsed, 2.7);
       window.__game.charges.charges = 3;
       drive.key('KeyU');
@@ -61,6 +64,18 @@ export default async function run({ page, frame }) {
       const angle = Math.atan2(top.z, top.x) * 180 / Math.PI;
       stateKey = 'palmBrace';
       action = drive.palmBrace({ angle, hold: 1.2, side: 'left' });
+    } else if (check === 'crossguard') {
+      if (before.phase !== 'fight') throw new Error('crossguard check requires a fight');
+      stateKey = 'crossguard';
+      action = drive.crossguard({ hold: 0.25 });
+    } else if (check === 'forge-wheel') {
+      if (before.phase !== 'fight') throw new Error('forge-wheel check requires a fight');
+      stateKey = 'forgeWheel';
+      action = drive.forgeWheel({ direction: 1 });
+    } else if (check === 'ember-plant') {
+      if (before.phase !== 'fight') throw new Error('ember-plant check requires a fight');
+      stateKey = 'ember';
+      action = drive.emberPlant({ x: 0.055, z: 0.035 });
     } else if (check === 'dual-rip') {
       if (before.phase !== 'ready') throw new Error('dual-rip check requires the launch phase');
       stateKey = 'bracedLaunch';
@@ -140,6 +155,9 @@ export default async function run({ page, frame }) {
       else if (launchCheck) sawTransient ||= current.phase === 'fight';
       else if (stateKey === 'groove') sawTransient ||= (current.grooves?.length ?? 0) > 0;
       else if (stateKey === 'palmGust') sawTransient ||= (current.palmGust?.count ?? 0) > (before.palmGust?.count ?? 0);
+      else if (stateKey === 'crossguard') sawTransient ||= current.crossguard?.active || current.crossguard?.hits > before.crossguard?.hits;
+      else if (stateKey === 'forgeWheel') sawTransient ||= Math.abs(current.forgeWheel?.turn ?? 0) > 0.4 || (current.forgeWheel?.current ?? 0) > 0;
+      else if (stateKey === 'ember') sawTransient ||= current.ember?.state === 2 || current.ember?.state === 3;
       else if (stateKey && current[stateKey]) sawTransient = true;
       peakCharges = Math.min(peakCharges, current.charges);
       await sleep(16);
@@ -163,6 +181,9 @@ export default async function run({ page, frame }) {
     if ((check === 'palm-gust' || check === 'palm-gust-left') && after.charges !== before.charges - 1) throw new Error(`normal Forge Gust must spend exactly one charge (${before.charges} -> ${after.charges})`);
     if (check === 'palm-gust-riposte' && (after.charges !== before.charges || !after.palmGust?.riposte)) throw new Error(`Counterflow was not free and marked as a riposte (${before.charges} -> ${after.charges})`);
     if (check === 'rim-spring' && after.charges !== before.charges - 1) throw new Error(`Rim Spring must spend exactly one charge (${before.charges} -> ${after.charges})`);
+    if (check === 'crossguard' && after.charges !== before.charges - 1) throw new Error(`Crossguard must spend exactly one charge on contact (${before.charges} -> ${after.charges})`);
+    if (check === 'forge-wheel' && after.charges !== before.charges - 1) throw new Error(`Forge Wheel must spend exactly one charge on release (${before.charges} -> ${after.charges})`);
+    if (check === 'ember-plant' && (after.charges !== before.charges || after.ember?.state !== 3)) throw new Error(`Ember planting must be earned and free (${before.charges} -> ${after.charges}, state ${after.ember?.state}, gap ${after.ember?.gap})`);
     if (check.startsWith('arena-morph-') && check !== 'arena-morph-tutorial' && check !== 'arena-morph-cancel' && after.charges !== before.charges - 1) throw new Error(`Arena Forge must commit exactly one charge (${before.charges} -> ${after.charges})`);
     if (check.startsWith('arena-morph-') && check !== 'arena-morph-tutorial' && !before.strikeCommitted && after.strikeCommitted) throw new Error('pinched Arena Forge was misread as an ultimate slap');
     return {

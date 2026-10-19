@@ -93,6 +93,10 @@ interface Game {
   /** Hand-first combat state exposed for deterministic emulator captures. */
   overforgeMode?: string;
   palmBraceActive?: boolean;
+  crossguardActive?: boolean;
+  crossguardHits?: number;
+  crossguardA?: Vector3;
+  crossguardB?: Vector3;
   palmGustTime?: number;
   palmGustCooldown?: number;
   palmGustCount?: number;
@@ -107,6 +111,16 @@ interface Game {
   palmLauncherSide?: Side | null;
   palmLauncherDebug?: string;
   palmForgeActive?: boolean;
+  forgeWheel: { visible: boolean; getWorldPosition(v: Vector3): Vector3; localToWorld(v: Vector3): Vector3 };
+  forgeWheelHandle: { getWorldPosition(v: Vector3): Vector3 };
+  forgeWheelCurrentTime?: number;
+  forgeWheelTurn?: number;
+  forgeWheelHeld?: Side | null;
+  forgeWheelGrabGap?: number;
+  emberState?: 0 | 1 | 2 | 3;
+  emberGrabGap?: number;
+  emberPickup: { visible: boolean; getWorldPosition(v: Vector3): Vector3 };
+  spawnEmber(x: number, z: number): void;
   /** Competition-feature state exposed for repeatable emulator proof. */
   outerRingState?: 'idle' | 'rescue' | 'palm' | 'returned' | 'failed';
   outerRingCompleted?: boolean;
@@ -422,6 +436,17 @@ export function installDriver() {
         rimExperiment: !!g.rimExperiment,
         overforge: g.overforgeMode ?? 'idle',
         palmBrace: !!g.palmBraceActive,
+        crossguard: {
+          active: !!g.crossguardActive,
+          hits: g.crossguardHits ?? 0,
+        },
+        forgeWheel: {
+          visible: !!g.forgeWheel?.visible,
+          turn: +(g.forgeWheelTurn ?? 0).toFixed(2),
+          current: +(g.forgeWheelCurrentTime ?? 0).toFixed(2),
+          gap: +(g.forgeWheelGrabGap ?? -1).toFixed(3),
+        },
+        ember: { state: g.emberState ?? 0, gap: +(g.emberGrabGap ?? -1).toFixed(3) },
         palmGust: {
           active: (g.palmGustTime ?? 0) > 0,
           cooldown: +(g.palmGustCooldown ?? 0).toFixed(2),
@@ -865,6 +890,118 @@ export function installDriver() {
       await glide(side, 'pinch', at, 0.22, 0);
       await wait(hold);
       await park(side);
+    },
+
+    /** Hold both palms at different rim sectors and drive one top through the finite Crossguard. */
+    async crossguard(opts: { leftAngle?: number; rightAngle?: number; hold?: number } = {}) {
+      const { leftAngle = 155, rightAngle = 25, hold = 0.8 } = opts;
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('Crossguard only exists during a fight');
+      const before = g.crossguardHits ?? 0;
+      // Keep the live tops away from the forming rail. Without this setup one can naturally cross
+      // during the two-hand reach, consume the one-hit guard, and make a successful take look idle.
+      Object.assign(g.mine, { x: -0.04, z: -0.055, vx: 0, vz: 0, spin: Math.max(0.65, g.mine.spin), state: 'spinning', sinceWall: 1 });
+      Object.assign(g.theirs, { x: 0.04, z: -0.055, vx: 0, vz: 0, spin: Math.max(0.65, g.theirs.spin), state: 'spinning', sinceWall: 1 });
+      const rimPoint = (degrees: number) => {
+        const a = (degrees * Math.PI) / 180;
+        const r = g.arena.radius * 0.98;
+        return local(Math.cos(a) * r, Math.sin(a) * r, 0.052);
+      };
+      await Promise.all([
+        glide('left', 'palm', above(rimPoint(leftAngle), 0.08), 0.25, 0),
+        glide('right', 'palm', above(rimPoint(rightAngle), 0.08), 0.25, 0),
+      ]);
+      await Promise.all([
+        glide('left', 'palm', rimPoint(leftAngle), 0.2, 0),
+        glide('right', 'palm', rimPoint(rightAngle), 0.2, 0),
+      ]);
+      for (let i = 0; i < 30 && !g.crossguardActive; i++) await wait(0.02);
+      if (!g.crossguardActive || !g.crossguardA || !g.crossguardB) throw new Error('two open palms did not form Crossguard');
+      const ax = g.crossguardA.x;
+      const az = g.crossguardA.z;
+      const bx = g.crossguardB.x;
+      const bz = g.crossguardB.z;
+      const dx = bx - ax;
+      const dz = bz - az;
+      const length = Math.hypot(dx, dz) || 1;
+      const nx = -dz / length;
+      const nz = dx / length;
+      Object.assign(g.theirs, {
+        x: (ax + bx) * 0.5 + nx * 0.035,
+        z: (az + bz) * 0.5 + nz * 0.035,
+        vx: -nx * 0.32,
+        vz: -nz * 0.32,
+        spin: Math.max(0.65, g.theirs.spin),
+        state: 'spinning',
+        sinceWall: 1,
+      });
+      for (let i = 0; i < 80 && (g.crossguardHits ?? 0) <= before; i++) await wait(0.02);
+      await wait(hold);
+      await Promise.all([park('left'), park('right')]);
+      if ((g.crossguardHits ?? 0) <= before) throw new Error('top crossed the line but Crossguard did not fire');
+    },
+
+    /** Pinch and turn the physical forge wheel through a quarter arc. */
+    async forgeWheel(opts: { side?: Side; direction?: -1 | 1 } = {}) {
+      const { side = 'right', direction = 1 } = opts;
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('Forge Wheel is not available');
+      for (let i = 0; i < 50 && !g.forgeWheel.visible; i++) await wait(0.02);
+      if (!g.forgeWheel.visible) throw new Error('Forge Wheel did not appear after the fight settled');
+      const handle = g.forgeWheelHandle.getWorldPosition(new Vector3());
+      const center = g.forgeWheel.getWorldPosition(new Vector3());
+      const px = g.forgeWheel.localToWorld(new Vector3(0.04, 0, 0)).sub(center);
+      const py = g.forgeWheel.localToWorld(new Vector3(0, 0.04, 0)).sub(center);
+      await glide(side, 'pinch', above(handle, 0.055), 0.22, 0);
+      await glide(side, 'pinch', handle, 0.14, 0);
+      await setPinch(side, true);
+      // IWER's closed-hand joint can sit centimetres away from the visual pose authority. Preserve
+      // the authored wheel path but offset its later samples so the reported pinch follows it.
+      const closedCorrection = handle.clone().sub(g.hands[side].pinch);
+      let claimed = g.forgeWheelHeld === side;
+      let peakTurn = Math.abs(g.forgeWheelTurn ?? 0);
+      // Hold each arc sample long enough for a low-fps IWER capture to expose it to the real
+      // gesture system. The path is still one continuous, human-speed quarter turn.
+      for (let i = 1; i <= 8; i++) {
+        const a = direction * (i / 8) * (Math.PI / 2);
+        const target = center.clone()
+          .addScaledVector(py, Math.cos(a))
+          .addScaledVector(px, Math.sin(a))
+          .add(closedCorrection);
+        await glide(side, 'pinch', target, 0.16, 1, 'linear');
+        claimed ||= g.forgeWheelHeld === side;
+        peakTurn = Math.max(peakTurn, Math.abs(g.forgeWheelTurn ?? 0));
+      }
+      await setPinch(side, false);
+      await wait(0.15);
+      await park(side);
+      if ((g.forgeWheelCurrentTime ?? 0) <= 0) throw new Error(`quarter turn did not fire the arena current (claimed=${claimed}, peak=${peakTurn.toFixed(2)}, gap=${(g.forgeWheelGrabGap ?? -1).toFixed(3)})`);
+    },
+
+    /** Spawn the deterministic hard-hit rivet, catch it, and plant it low in the bowl. */
+    async emberPlant(opts: { side?: Side; x?: number; z?: number } = {}) {
+      const { side = 'right', x = 0.055, z = 0.035 } = opts;
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('Ember rivet only exists during a fight');
+      if ((g.emberState ?? 0) === 0) g.spawnEmber(0, 0);
+      for (let i = 0; i < 50 && (!g.emberPickup.visible || (g.emberState ?? 0) !== 1); i++) await wait(0.02);
+      await wait(0.7);
+      const ember = g.emberPickup.getWorldPosition(new Vector3());
+      await glide(side, 'pinch', above(ember, 0.055), 0.24, 0);
+      await glide(side, 'pinch', ember, 0.13, 0);
+      await setPinch(side, true);
+      // Closing IWER's hand can move its reported pinch joint far away from the open-hand target.
+      // Approach once more while closed; production intentionally supports pinch-then-contact.
+      await glide(side, 'pinch', () => g.emberPickup.getWorldPosition(new Vector3()), 0.2, 1, 'linear');
+      for (let i = 0; i < 30 && (g.emberState ?? 0) !== 2; i++) await wait(0.02);
+      if ((g.emberState ?? 0) !== 2) throw new Error('pinch did not catch the ember rivet');
+      const target = local(x, z, 0.018);
+      await glide(side, 'pinch', above(target, 0.07), 0.3, 1);
+      await glide(side, 'pinch', target, 0.18, 1, 'linear');
+      await setPinch(side, false);
+      await wait(0.18);
+      await park(side);
+      if ((g.emberState ?? 0) !== 3) throw new Error('rivet did not plant as a bumper');
     },
 
     /** Sweep a relaxed open palm across the inner bowl so the real gesture drives Forge Gust. */
