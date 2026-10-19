@@ -1069,6 +1069,68 @@ export function palmBrace(arena: Arena, top: Top, angle: number, half = 0.42) {
   return true;
 }
 
+/** True when a live top is actually crossing the finite rail between two open palms. */
+export function crossguardCrosses(top: Top, ax: number, az: number, bx: number, bz: number) {
+  if (!top.alive || top.sinceWall < 0.14) return false;
+  const dx = bx - ax;
+  const dz = bz - az;
+  const length2 = dx * dx + dz * dz;
+  if (length2 < 0.0064) return false;
+  const along = ((top.x - ax) * dx + (top.z - az) * dz) / length2;
+  if (along < 0.04 || along > 0.96) return false;
+  const qx = ax + along * dx;
+  const qz = az + along * dz;
+  const length = Math.sqrt(length2);
+  const nx = -dz / length;
+  const nz = dx / length;
+  const distance = (top.x - qx) * nx + (top.z - qz) * nz;
+  const crossing = top.vx * nx + top.vz * nz;
+  return Math.abs(distance) <= 0.016 && Math.abs(crossing) >= 0.045;
+}
+
+/** A two-palm Crossguard is a one-hit rail: it reflects the first top that crosses its chord. */
+export function crossguard(top: Top, ax: number, az: number, bx: number, bz: number, strength = 1) {
+  if (!crossguardCrosses(top, ax, az, bx, bz)) return false;
+  const dx = bx - ax;
+  const dz = bz - az;
+  const length = Math.hypot(dx, dz);
+  const nx = -dz / length;
+  const nz = dx / length;
+  const crossing = top.vx * nx + top.vz * nz;
+  const rebound = crossing * (1.78 + 0.18 * Math.min(1, strength));
+  top.vx -= nx * rebound;
+  top.vz -= nz * rebound;
+  top.kick = Math.min(1, top.kick + Math.abs(crossing) * 1.5);
+  top.kickX = crossing > 0 ? -nx : nx;
+  top.kickZ = crossing > 0 ? -nz : nz;
+  top.wallHit = Math.abs(crossing);
+  top.sinceWall = 0;
+  top.charging = 0;
+  return true;
+}
+
+/** One-use player-forged bumper: a compact physical reflection, not an arena-wide spell. */
+export function emberBumper(top: Top, x: number, z: number, radius = 0.014) {
+  if (!top.alive || top.sinceBump < 0.2) return false;
+  const dx = top.x - x;
+  const dz = top.z - z;
+  const d = Math.hypot(dx, dz) || 1;
+  if (d > top.spec.radius + radius) return false;
+  const nx = dx / d;
+  const nz = dz / d;
+  const inward = top.vx * nx + top.vz * nz;
+  if (inward >= 0) return false;
+  top.vx -= nx * inward * 1.8;
+  top.vz -= nz * inward * 1.8;
+  top.vx += nx * 0.22;
+  top.vz += nz * 0.22;
+  top.kick = Math.max(top.kick, 0.6);
+  top.kickX = nx;
+  top.kickZ = nz;
+  top.sinceBump = 0;
+  return true;
+}
+
 /** Pulling a rim spring sends an inward impulse through the selected sector. */
 export function springRim(arena: Arena, tops: readonly Top[], sx: number, sz: number, x: number, z: number, strength = 1) {
   const r = Math.hypot(sx, sz) || 1;

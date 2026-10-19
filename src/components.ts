@@ -21,6 +21,10 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   arenaForgeCancels: { type: Types.Int16, default: 0 },
   /** DESK KO presentation: 0 idle, 1 rim impact, 2 airborne, 3 scored. */
   deskKoStage: { type: Types.Int8, default: 0 },
+  /** Two open palms currently span a defensive rail across the live arena. */
+  crossguardActive: { type: Types.Boolean, default: false },
+  /** Number of tops redirected by a player-authored Crossguard this session. */
+  crossguardHits: { type: Types.Int16, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);

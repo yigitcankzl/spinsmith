@@ -1,4 +1,4 @@
-import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, NormalBlending, BoxGeometry, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
@@ -13,7 +13,7 @@ import { forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, crossguard, crossguardCrosses, emberBumper, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -510,6 +510,25 @@ export class MatchSystem extends createSystem({
       new RingGeometry(0.105, 0.155, 36, 1, -0.46, 0.92).rotateX(-Math.PI / 2),
       new MeshBasicMaterial({ color: i === 0 ? 0xff9a32 : 0xffb24d, transparent: true, opacity: 0.7, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }),
     ),
+    { visible: false },
+  ));
+  /** Two simultaneous palm braces join into one finite, one-hit rail across the bowl. */
+  private crossguardActive = false;
+  private crossguardConsumed = false;
+  private crossguardHits = 0;
+  private crossguardBreak = 0;
+  private crossguardA = new Vector3();
+  private crossguardB = new Vector3();
+  private crossguardBeam = Object.assign(
+    new Mesh(new BoxGeometry(1, 0.008, 0.006), new MeshBasicMaterial({ color: 0xffa12d, transparent: true, opacity: 0.82, blending: AdditiveBlending, depthWrite: false, toneMapped: false })),
+    { visible: false },
+  );
+  private crossguardGlow = Object.assign(
+    new Mesh(new BoxGeometry(1, 0.016, 0.014), new MeshBasicMaterial({ color: 0xff5a0a, transparent: true, opacity: 0.22, blending: AdditiveBlending, depthWrite: false, toneMapped: false })),
+    { visible: false },
+  );
+  private crossguardPosts = (['left', 'right'] as const).map(() => Object.assign(
+    new Mesh(new CylinderGeometry(0.01, 0.014, 0.032, 12), new MeshBasicMaterial({ color: 0xffc267, transparent: true, opacity: 0.86, blending: AdditiveBlending, depthWrite: false, toneMapped: false })),
     { visible: false },
   ));
   /** One draw call: two true-width rails plus three chevrons show the exact gust corridor. */
@@ -1066,6 +1085,9 @@ export class MatchSystem extends createSystem({
       this.overforgeSeal,
       ...this.palmBraceWalls,
       ...this.palmBraceFeet,
+      this.crossguardGlow,
+      this.crossguardBeam,
+      ...this.crossguardPosts,
       this.palmGustFx,
       this.palmGustRim,
       ...this.rimSpringGuides,
@@ -1100,6 +1122,8 @@ export class MatchSystem extends createSystem({
     this.overforgeRing.renderOrder = 9;
     for (const wall of this.palmBraceWalls) wall.renderOrder = 8;
     for (const foot of this.palmBraceFeet) foot.renderOrder = 8;
+    this.crossguardGlow.renderOrder = this.crossguardBeam.renderOrder = 9;
+    for (const post of this.crossguardPosts) post.renderOrder = 9;
     this.palmGustFx.renderOrder = this.palmGustRim.renderOrder = 8;
     for (const guide of this.rimSpringGuides) guide.renderOrder = 8;
     this.launcherBrace.traverse((o) => { if ((o as Mesh).isMesh) (o as Mesh).renderOrder = 8; });
@@ -1185,6 +1209,8 @@ export class MatchSystem extends createSystem({
       deskKoScored: this.deskKoScored,
       deskKoStage: this.deskKoStage,
       lastRoundHeat: this.lastRoundHeat,
+      crossguardActive: this.crossguardActive,
+      crossguardHits: this.crossguardHits,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -1387,6 +1413,8 @@ export class MatchSystem extends createSystem({
       this.barRings.left.visible = this.barRings.right.visible = this.reticle.visible = this.slapMark.visible = false;
       for (const wall of this.palmBraceWalls) wall.visible = false;
       for (const foot of this.palmBraceFeet) foot.visible = false;
+      this.crossguardBeam.visible = this.crossguardGlow.visible = false;
+      for (const post of this.crossguardPosts) post.visible = false;
       this.palmGustFx.visible = false;
       this.palmGustRim.visible = false;
       this.palmGustSampled.left = this.palmGustSampled.right = false;
@@ -4972,6 +5000,12 @@ export class MatchSystem extends createSystem({
     this.palmBraceGrace.left = this.palmBraceGrace.right = 0;
     for (const wall of this.palmBraceWalls) wall.visible = false;
     for (const foot of this.palmBraceFeet) foot.visible = false;
+    this.crossguardActive = false;
+    this.crossguardConsumed = false;
+    this.crossguardBreak = 0;
+    this.crossguardBeam.visible = this.crossguardGlow.visible = false;
+    for (const post of this.crossguardPosts) post.visible = false;
+    this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
     this.riposteUntil = -9;
     this.riposteSide = null;
     this.riposteTop = null;
@@ -5014,11 +5048,16 @@ export class MatchSystem extends createSystem({
 
   /** Open hands near the rim become forgiving wall sectors; the hand chooses where tops rebound. */
   private updatePalmBrace() {
+    const wasCrossguard = this.crossguardActive;
     this.palmBraceActive = false;
+    this.crossguardActive = false;
     if (!this.taught('defense')) {
       this.palmBraceAngles.left = this.palmBraceAngles.right = null;
       for (const wall of this.palmBraceWalls) wall.visible = false;
       for (const foot of this.palmBraceFeet) foot.visible = false;
+      this.crossguardBeam.visible = this.crossguardGlow.visible = false;
+      for (const post of this.crossguardPosts) post.visible = false;
+      this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
       return;
     }
     const radius = maxRim(this.arena.layout);
@@ -5074,6 +5113,61 @@ export class MatchSystem extends createSystem({
       footMaterial.color.setHex(counterReady ? 0xfff0c2 : side === 'left' ? 0xff9a32 : 0xffb24d);
       footMaterial.opacity = 0.48 + (hitFlash > 0 || counterReady ? 0.35 : 0);
     }
+
+    const left = this.palmBraceAngles.left;
+    const right = this.palmBraceAngles.right;
+    if (left !== null && right !== null) {
+      const ar = rimRadius(this.arena.layout, left) * 0.88;
+      const br = rimRadius(this.arena.layout, right) * 0.88;
+      this.crossguardA.set(Math.cos(left) * ar, this.arena.floorHeight(1) + 0.026, Math.sin(left) * ar);
+      this.crossguardB.set(Math.cos(right) * br, this.arena.floorHeight(1) + 0.026, Math.sin(right) * br);
+      const dx = this.crossguardB.x - this.crossguardA.x;
+      const dz = this.crossguardB.z - this.crossguardA.z;
+      const length = Math.hypot(dx, dz);
+      if (length >= 0.08 && !this.crossguardConsumed) {
+        this.crossguardActive = true;
+        const mx = (this.crossguardA.x + this.crossguardB.x) * 0.5;
+        const mz = (this.crossguardA.z + this.crossguardB.z) * 0.5;
+        const angle = -Math.atan2(dz, dx);
+        const pulse = 1 + 0.06 * Math.sin(this.time * 11);
+        for (const beam of [this.crossguardGlow, this.crossguardBeam]) {
+          beam.visible = !this.photo;
+          beam.position.set(mx, this.crossguardA.y, mz);
+          beam.rotation.set(0, angle, 0);
+          beam.scale.set(length, pulse, pulse);
+        }
+        this.crossguardPosts.forEach((post, i) => {
+          post.visible = !this.photo;
+          post.position.copy(i ? this.crossguardB : this.crossguardA);
+          post.scale.setScalar(pulse);
+        });
+        for (const wall of this.palmBraceWalls) wall.visible = false;
+        for (const foot of this.palmBraceFeet) foot.visible = false;
+        if (!wasCrossguard) {
+          this.label.set('CROSSGUARD\nHOLD BOTH PALMS · ONE RETURN');
+          this.labelTimer = 1.1;
+          playTick();
+        }
+      }
+    } else {
+      this.crossguardConsumed = false;
+    }
+    if (!this.crossguardActive && this.crossguardBreak <= 0) {
+      this.crossguardBeam.visible = this.crossguardGlow.visible = false;
+      for (const post of this.crossguardPosts) post.visible = false;
+    }
+    if (this.crossguardBreak > 0) {
+      this.crossguardBreak = Math.max(0, this.crossguardBreak - this.frameDt);
+      const fade = this.crossguardBreak / 0.28;
+      this.crossguardBeam.visible = this.crossguardGlow.visible = !this.photo && fade > 0;
+      (this.crossguardBeam.material as MeshBasicMaterial).opacity = 0.82 * fade;
+      (this.crossguardGlow.material as MeshBasicMaterial).opacity = 0.3 * fade;
+      for (const post of this.crossguardPosts) post.visible = false;
+    } else {
+      (this.crossguardBeam.material as MeshBasicMaterial).opacity = 0.82;
+      (this.crossguardGlow.material as MeshBasicMaterial).opacity = 0.22;
+    }
+    this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', this.crossguardActive);
   }
 
   /**
@@ -6617,18 +6711,47 @@ export class MatchSystem extends createSystem({
       let braced = false;
       let bracedSide: Side | null = null;
       let bracedTop: Top | null = null;
-      for (const side of ['left', 'right'] as const) {
-        const angle = this.palmBraceAngles[side];
-        if (angle === null) continue;
-        if (palmBrace(this.arena, this.mine, angle)) {
-          braced = true;
-          bracedSide = side;
-          bracedTop = this.mine;
+      if (this.crossguardActive && !this.crossguardConsumed) {
+        for (const top of this.tops) {
+          if (!crossguardCrosses(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z)) continue;
+          const force = this.charges.spend(this.elapsed, TUNING.grace);
+          this.crossguardConsumed = true;
+          this.crossguardActive = false;
+          this.crossguardBreak = 0.28;
+          if (!force) {
+            this.locked('CROSSGUARD BROKE\nWAIT FOR ONE SHAPING CHARGE');
+            break;
+          }
+          crossguard(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z, force);
+          this.crossguardHits++;
+          this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
+          this.rootEntity?.setValue(FirstFiveState, 'crossguardHits', this.crossguardHits);
+          this.lastShape = { t: this.elapsed, kind: 'parry' };
+          this.recordIntervention();
+          const y = this.arena.height(top.x, top.z);
+          this.impacts.shock(top.x, y, top.z, 0.95, 0xffa12d);
+          this.sparks.burst(top.x, y, top.z, 1);
+          this.stamp.show('CROSSGUARD!', 'TWO PALMS · ONE HARD RETURN', 'mine', 0.72, 1.05);
+          this.label.set('RAIL SPENT — OPEN BOTH HANDS TO REARM');
+          this.labelTimer = 1.25;
+          this.roomLight.hit();
+          playThock();
+          break;
         }
-        if (palmBrace(this.arena, this.theirs, angle)) {
-          braced = true;
-          bracedSide = side;
-          bracedTop = this.theirs;
+      } else if (!this.crossguardConsumed) {
+        for (const side of ['left', 'right'] as const) {
+          const angle = this.palmBraceAngles[side];
+          if (angle === null) continue;
+          if (palmBrace(this.arena, this.mine, angle)) {
+            braced = true;
+            bracedSide = side;
+            bracedTop = this.mine;
+          }
+          if (palmBrace(this.arena, this.theirs, angle)) {
+            braced = true;
+            bracedSide = side;
+            bracedTop = this.theirs;
+          }
         }
       }
       if (braced && this.elapsed - this.palmBraceHitAt > 0.22) {
