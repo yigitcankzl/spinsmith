@@ -544,6 +544,8 @@ export class MatchSystem extends createSystem({
   private forgeWheelDirection = 0;
   private forgeWheelHandLocal = new Vector3();
   private forgeWheelHandleWorld = new Vector3();
+  /** Last real pinch-to-handle gap, retained for emulator/device usability evidence. */
+  private forgeWheelGrabGap = -1;
   private forgeWheelCurrent = (() => {
     const group = Object.assign(new Group(), { visible: false });
     for (let i = 0; i < 3; i++) {
@@ -568,6 +570,7 @@ export class MatchSystem extends createSystem({
   private emberHandLocal = new Vector3();
   private emberWorld = new Vector3();
   private emberBumperAt = new Vector3();
+  private emberGrabGap = -1;
   private emberPickup = (() => {
     const group = Object.assign(new Group(), { visible: false });
     const core = new Mesh(new OctahedronGeometry(0.01, 0), new MeshBasicMaterial({ color: 0xffd38a, toneMapped: false }));
@@ -1271,7 +1274,9 @@ export class MatchSystem extends createSystem({
       crossguardActive: this.crossguardActive,
       crossguardHits: this.crossguardHits,
       forgeWheelTurn: Math.round(this.forgeWheelTurn * 100) / 100,
+      forgeWheelGrabGap: Math.round(this.forgeWheelGrabGap * 1000) / 1000,
       emberState: this.emberState,
+      emberGrabGap: Math.round(this.emberGrabGap * 1000) / 1000,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -5177,7 +5182,11 @@ export class MatchSystem extends createSystem({
       this.emberPickup.getWorldPosition(this.emberWorld);
       for (const side of ['left', 'right'] as const) {
         const hand = this.hands[side];
-        if (!hand.tracked || !hand.justPinched || hand.pinch.distanceTo(this.emberWorld) > 0.055) continue;
+        if (hand.tracked && hand.pinching) this.emberGrabGap = hand.pinch.distanceTo(this.emberWorld);
+        // The waiting rivet is outside the bowl, so this Quest/IWER-tolerant catch volume cannot
+        // steal a ramp or cup pinch. Contact while already pinching also works, so one low-fps
+        // justPinched frame can never make the small airborne pickup feel intangible.
+        if (!hand.tracked || !hand.pinching || hand.pinch.distanceTo(this.emberWorld) > 0.1) continue;
         this.emberHeld = side;
         this.emberLost = 0;
         this.setEmberState(2);
@@ -5269,7 +5278,9 @@ export class MatchSystem extends createSystem({
         this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', this.forgeWheelTurn);
         return;
       }
-      const committed = hand.tracked && hand.justReleased && Math.abs(this.forgeWheelTurn) >= 0.45;
+      // IWER reports a visible 90° handle arc as roughly 0.41 rad at the tracked pinch joint.
+      // A 0.35-rad commit remains deliberate (grab + directed turn + release) without dropping it.
+      const committed = hand.tracked && hand.justReleased && Math.abs(this.forgeWheelTurn) >= 0.35;
       const signedTurn = this.forgeWheelTurn;
       this.forgeWheelHeld = null;
       if (!committed) {
@@ -5319,7 +5330,11 @@ export class MatchSystem extends createSystem({
     this.forgeWheelHandle.getWorldPosition(this.forgeWheelHandleWorld);
     for (const side of ['left', 'right'] as const) {
       const hand = this.hands[side];
-      if (!hand.tracked || !hand.justPinched || hand.pinch.distanceTo(this.forgeWheelHandleWorld) > 0.055) continue;
+      if (hand.tracked && hand.justPinched) this.forgeWheelGrabGap = hand.pinch.distanceTo(this.forgeWheelHandleWorld);
+      // The handle is deliberately outside the bowl, so a generous 10 cm pinch volume cannot
+      // steal floor shaping. IWER measures 8.5 cm of closed-finger drift around this small grip;
+      // the turn angle itself remains strict, so proximity alone never fires the current.
+      if (!hand.tracked || !hand.justPinched || hand.pinch.distanceTo(this.forgeWheelHandleWorld) > 0.1) continue;
       this.forgeWheelHeld = side;
       this.forgeWheelHandLocal.copy(hand.pinch);
       this.stage.worldToLocal(this.forgeWheelHandLocal);
