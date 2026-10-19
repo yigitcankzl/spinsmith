@@ -557,6 +557,35 @@ export class MatchSystem extends createSystem({
     }
     return group;
   })();
+  /** A hard clash throws one catchable rivet toward the player; carrying it back authors a bumper. */
+  private emberState: 0 | 1 | 2 | 3 = 0;
+  private emberSpawned = false;
+  private emberHeld: Side | null = null;
+  private emberFlight = 0;
+  private emberLost = 0;
+  private emberFrom = new Vector3();
+  private emberHome = new Vector3();
+  private emberHandLocal = new Vector3();
+  private emberWorld = new Vector3();
+  private emberBumperAt = new Vector3();
+  private emberPickup = (() => {
+    const group = Object.assign(new Group(), { visible: false });
+    const core = new Mesh(new OctahedronGeometry(0.01, 0), new MeshBasicMaterial({ color: 0xffd38a, toneMapped: false }));
+    const halo = new Mesh(new TorusGeometry(0.017, 0.0025, 6, 24), new MeshBasicMaterial({ color: 0xff5a0a, transparent: true, opacity: 0.75, blending: AdditiveBlending, depthWrite: false, toneMapped: false }));
+    halo.name = 'EmberCatchHalo';
+    core.renderOrder = halo.renderOrder = 10;
+    group.add(core, halo);
+    return group;
+  })();
+  private emberBumperFx = (() => {
+    const group = Object.assign(new Group(), { visible: false });
+    const rivet = new Mesh(new CylinderGeometry(0.012, 0.017, 0.024, 12), new MeshBasicMaterial({ color: 0xb96822, toneMapped: false }));
+    const ring = new Mesh(new RingGeometry(0.018, 0.025, 28).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.72, blending: AdditiveBlending, depthWrite: false, toneMapped: false }));
+    ring.position.y = -0.01;
+    rivet.renderOrder = ring.renderOrder = 9;
+    group.add(rivet, ring);
+    return group;
+  })();
   /** One draw call: two true-width rails plus three chevrons show the exact gust corridor. */
   private palmGustFx = (() => {
     const vertices: number[] = [];
@@ -1116,6 +1145,8 @@ export class MatchSystem extends createSystem({
       ...this.crossguardPosts,
       this.forgeWheel,
       this.forgeWheelCurrent,
+      this.emberPickup,
+      this.emberBumperFx,
       this.palmGustFx,
       this.palmGustRim,
       ...this.rimSpringGuides,
@@ -1240,6 +1271,7 @@ export class MatchSystem extends createSystem({
       crossguardActive: this.crossguardActive,
       crossguardHits: this.crossguardHits,
       forgeWheelTurn: Math.round(this.forgeWheelTurn * 100) / 100,
+      emberState: this.emberState,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -1445,6 +1477,7 @@ export class MatchSystem extends createSystem({
       this.crossguardBeam.visible = this.crossguardGlow.visible = false;
       for (const post of this.crossguardPosts) post.visible = false;
       this.forgeWheel.visible = this.forgeWheelCurrent.visible = false;
+      this.emberPickup.visible = this.emberBumperFx.visible = false;
       this.palmGustFx.visible = false;
       this.palmGustRim.visible = false;
       this.palmGustSampled.left = this.palmGustSampled.right = false;
@@ -1686,6 +1719,7 @@ export class MatchSystem extends createSystem({
         break;
       case 'fight':
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
+        this.updateEmber(dt);
         this.updateForgeWheel(dt);
         if (!this.deskVerdict && this.outerRingState !== 'rescue' && this.outerRingState !== 'palm') {
           this.updateStrike(dt);
@@ -3705,6 +3739,7 @@ export class MatchSystem extends createSystem({
 
   private toReady() {
     this.cancelActiveGestures();
+    this.resetEmber();
     for (const t of this.extras) {
       t.state = 'out';
       t.finish = null;
@@ -4320,6 +4355,7 @@ export class MatchSystem extends createSystem({
     this.lastPerfect = perfect;
     this.charges.reset();
     this.forgeBar.reset();
+    this.resetEmber();
     if (this.progress.matches === 0 && !this.demo) this.tutorialRound++;
     // Round three teaches the ultimate; start it nearly full so the lesson arrives before the fight ends.
     if (this.progress.matches === 0 && this.tutorialRound >= 3 && !this.demo) this.forgeBar.value = 0.8;
@@ -4728,7 +4764,7 @@ export class MatchSystem extends createSystem({
       const rimGuide = this.rimSpringGuides[side === 'left' ? 0 : 1];
       rimGuide.visible = false;
       // A pinching hand that owns the forge seal must not also author a ramp underneath it.
-      if (this.overforgeHeld === side || this.overforgeControl?.side === side || this.forgeWheelHeld === side) continue;
+      if (this.overforgeHeld === side || this.overforgeControl?.side === side || this.forgeWheelHeld === side || this.emberHeld === side) continue;
       this.updateCup(side);
       if (!h.tracked) {
         if ((this.shapeLost[side] += this.frameDt) < HAND_LOSS_GRACE) continue;
@@ -5081,7 +5117,120 @@ export class MatchSystem extends createSystem({
     this.forgeWheel.rotation.z = 0;
     this.forgeWheel.visible = this.forgeWheelCurrent.visible = false;
     this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', 0);
+    if (this.emberHeld) {
+      this.emberHeld = null;
+      this.emberState = 1;
+      this.emberPickup.position.copy(this.emberHome);
+      this.rootEntity?.setValue(FirstFiveState, 'emberState', 1);
+    }
     this.clearPalmBrace();
+  }
+
+  private setEmberState(state: 0 | 1 | 2 | 3) {
+    this.emberState = state;
+    this.rootEntity?.setValue(FirstFiveState, 'emberState', state);
+  }
+
+  private resetEmber() {
+    this.emberSpawned = false;
+    this.emberHeld = null;
+    this.emberFlight = 0;
+    this.emberLost = 0;
+    this.setEmberState(0);
+    this.emberPickup.visible = this.emberBumperFx.visible = false;
+  }
+
+  /** The first hard clash throws a single earned rivet into reach instead of spawning random loot. */
+  private spawnEmber(x: number, z: number) {
+    if (this.emberSpawned || this.emberState !== 0 || !this.taught('defense')) return;
+    this.emberSpawned = true;
+    this.emberFlight = 0;
+    this.emberFrom.set(x, this.arena.height(x, z) + 0.025, z);
+    const radius = maxRim(this.arena.layout);
+    this.emberHome.set(Math.max(-0.08, Math.min(0.08, x)), this.arena.floorHeight(1) + 0.035, radius + 0.025);
+    this.emberPickup.position.copy(this.emberFrom);
+    this.emberPickup.visible = !this.photo;
+    this.setEmberState(1);
+    this.label.set('HOT RIVET!\nPINCH IT · PLANT IT IN THE BOWL');
+    this.labelTimer = 1.7;
+  }
+
+  /** Catch the hot rivet, carry it through space, and release against the floor to forge a bumper. */
+  private updateEmber(dt: number) {
+    if (this.emberState === 0) return;
+    if (this.emberState === 1 && this.emberFlight < 0.65) {
+      this.emberFlight = Math.min(0.65, this.emberFlight + dt);
+      const t = this.emberFlight / 0.65;
+      this.emberPickup.position.lerpVectors(this.emberFrom, this.emberHome, t);
+      this.emberPickup.position.y += Math.sin(t * Math.PI) * 0.07;
+      this.emberPickup.rotation.x += dt * 8;
+      this.emberPickup.rotation.y += dt * 11;
+      if (t < 1) return;
+      playLand('table', this.emberHome.x, 0.45);
+    }
+    if (this.emberState === 1) {
+      this.emberPickup.visible = !this.photo;
+      this.emberPickup.rotation.z += dt * 2;
+      const pulse = 1 + Math.sin(this.time * 8) * 0.12;
+      this.emberPickup.scale.setScalar(pulse);
+      this.emberPickup.updateWorldMatrix(true, true);
+      this.emberPickup.getWorldPosition(this.emberWorld);
+      for (const side of ['left', 'right'] as const) {
+        const hand = this.hands[side];
+        if (!hand.tracked || !hand.justPinched || hand.pinch.distanceTo(this.emberWorld) > 0.055) continue;
+        this.emberHeld = side;
+        this.emberLost = 0;
+        this.setEmberState(2);
+        this.label.set('RIVET CAUGHT\nPRESS IT INTO THE ARENA');
+        this.labelTimer = 1.2;
+        playPick();
+        break;
+      }
+      return;
+    }
+    if (this.emberState === 2 && this.emberHeld) {
+      const hand = this.hands[this.emberHeld];
+      if (hand.tracked) {
+        this.emberLost = 0;
+        this.emberHandLocal.copy(hand.pinch);
+        this.stage.worldToLocal(this.emberHandLocal);
+        this.emberPickup.position.copy(this.emberHandLocal);
+        if (hand.pinching) return;
+        if (hand.justReleased) {
+          const floor = this.arena.height(this.emberHandLocal.x, this.emberHandLocal.z);
+          if (this.arena.inside(this.emberHandLocal.x, this.emberHandLocal.z) && Math.abs(this.emberHandLocal.y - floor) <= 0.085) {
+            this.emberBumperAt.set(this.emberHandLocal.x, floor, this.emberHandLocal.z);
+            this.emberBumperFx.position.set(this.emberBumperAt.x, floor + 0.012, this.emberBumperAt.z);
+            this.emberBumperFx.visible = !this.photo;
+            this.emberPickup.visible = false;
+            this.emberHeld = null;
+            this.setEmberState(3);
+            this.recordIntervention();
+            this.lastShape = { t: this.elapsed, kind: 'ramp' };
+            this.stamp.show('RIVET PLANTED!', 'FIRST TOP TO HIT IT GETS KICKED', 'mine', 0.72, 1.05);
+            this.sparks.embers(this.emberBumperAt.x, floor, this.emberBumperAt.z, 8, 0.08, 0.08, 1);
+            playThock();
+            return;
+          }
+          this.emberHeld = null;
+          this.setEmberState(1);
+          this.emberPickup.position.copy(this.emberHome);
+          this.label.set('PLANT IT LOW, INSIDE THE BOWL');
+          this.labelTimer = 1.1;
+          return;
+        }
+      } else if ((this.emberLost += dt) >= HAND_LOSS_GRACE) {
+        this.emberHeld = null;
+        this.setEmberState(1);
+        this.emberPickup.position.copy(this.emberHome);
+      }
+      return;
+    }
+    if (this.emberState === 3) {
+      this.emberBumperFx.visible = !this.photo;
+      const pulse = 1 + 0.08 * Math.sin(this.time * 10);
+      this.emberBumperFx.scale.setScalar(pulse);
+    }
   }
 
   /** Pinch the near wheel's handle and turn it: the bowl receives the same signed rotation. */
@@ -6926,6 +7075,21 @@ export class MatchSystem extends createSystem({
           playStamp();
         });
       } else clash = step(this.arena, this.mine, this.theirs);
+      if (this.emberState === 3) {
+        for (const top of this.tops) {
+          if (!emberBumper(top, this.emberBumperAt.x, this.emberBumperAt.z)) continue;
+          const y = this.arena.height(top.x, top.z);
+          this.setEmberState(0);
+          this.emberBumperFx.visible = false;
+          this.impacts.hit(top.x, y, top.z, 0.9);
+          this.impacts.shock(top.x, y, top.z, 0.78, 0xff7a1a);
+          this.sparks.embers(top.x, y, top.z, 12, 0.16, 0.12, 1);
+          this.stamp.show('RIVET KICK!', 'YOUR PLANTED METAL FIRED', 'mine', 0.62, 0.9);
+          this.roomLight.hit();
+          playThock();
+          break;
+        }
+      }
       this.record(clash);
       if (clash) this.openingClash(clash, mineVx, mineVz, rivalVx, rivalVz, openingDx, openingDz);
       else if (this.firstClashPending && this.elapsed >= 1.4) {
@@ -6986,6 +7150,7 @@ export class MatchSystem extends createSystem({
         this.sparks.burst(clash.x, y, clash.z, clash.strength);
         if (clash.strength > HARD_HIT && this.elapsed - this.lastHardHit > HIT_STOP_GAP) {
           this.lastHardHit = this.elapsed;
+          this.spawnEmber(clash.x, clash.z);
           // A hard hit: more sparks, a ring of light, both tops flash, and a brief hit stop.
           this.sparks.burst(clash.x, y, clash.z, 1);
           this.impacts.hit(clash.x, y, clash.z, clash.strength);

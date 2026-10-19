@@ -27,6 +27,8 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   crossguardHits: { type: Types.Int16, default: 0 },
   /** Signed quarter-turn authored through the near forge wheel; zero while idle. */
   forgeWheelTurn: { type: Types.Float32, default: 0 },
+  /** 0 none, 1 airborne/available, 2 held, 3 planted as a live bumper. */
+  emberState: { type: Types.Int8, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);
