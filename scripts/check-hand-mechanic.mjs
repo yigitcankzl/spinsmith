@@ -1,6 +1,6 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
-// Other modes: single-rip, dual-rip, finger-groove, rim-spring, palm-brace, crossguard, forge-wheel,
+// Other modes: single-rip, dual-rip, intent-preview, ramp-release, finger-groove, rim-spring, palm-brace, crossguard, forge-wheel,
 // ember-plant, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring,
 // arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
@@ -29,7 +29,7 @@ export default async function run({ page, frame }) {
     }
     const gustCheck = check === 'palm-gust' || check === 'palm-gust-left' || check === 'palm-gust-riposte';
     const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant';
-    if (check === 'palm-brace' || gustCheck || check === 'rim-spring' || expansionCheck) game.progress.matches = Math.max(2, game.progress.matches);
+    if (check === 'intent-preview' || check === 'ramp-release' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || expansionCheck) game.progress.matches = Math.max(2, game.progress.matches);
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
     if (launchCheck && drive.state().phase !== 'ready') {
@@ -40,7 +40,7 @@ export default async function run({ page, frame }) {
     // Reproduce the old cross-round bug: the next launch must clear a late parry timestamp before
     // Counterflow tries to earn its new riposte window.
     if (check === 'palm-gust-riposte') game.palmBraceHitAt = 30;
-    if (check === 'outer-ring' || check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
+    if (check === 'intent-preview' || check === 'ramp-release' || check === 'outer-ring' || check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
@@ -50,7 +50,7 @@ export default async function run({ page, frame }) {
     if (check === 'palm-gust-riposte' && game.palmBraceHitAt !== -9) throw new Error(`new round kept stale Palm Brace timestamp ${game.palmBraceHitAt}`);
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
     // not spend most of its timeout waiting for the opening clock to reach the normal 2.5 s gate.
-    if ((check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
+    if ((check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
       window.__game.elapsed = Math.max(window.__game.elapsed, 2.7);
       window.__game.charges.charges = 3;
       drive.key('KeyU');
@@ -61,8 +61,34 @@ export default async function run({ page, frame }) {
     let action;
     let stateKey;
     let tutorialProof;
+    let intentProof;
 
-    if (check === 'palm-brace') {
+    if (check === 'intent-preview') {
+      if (before.phase !== 'fight') throw new Error('intent-preview check requires a fight');
+      Object.assign(game.mine, { x: -0.08, z: -0.06, vx: 0, vz: 0 });
+      Object.assign(game.theirs, { x: -0.08, z: 0.06, vx: 0, vz: 0 });
+      action = (async () => {
+        const ramp = await drive.hoverArena({ n: 0.7, angle: 0, side: 'right' });
+        const forge = await drive.hoverArena({ n: 0.86, angle: Math.PI / 4, side: 'right' });
+        const rim = await drive.hoverArena({ n: 0.94, angle: 0, side: 'right' });
+        intentProof = { ramp, forge, rim };
+        if (ramp.claim !== 'RAMP' || !ramp.label.includes('RAMP CLAIMED')) throw new Error(`floor preview disagreed with Ramp: ${JSON.stringify(ramp)}`);
+        if (forge.claim !== 'FORGE' || !forge.label.includes('PINCH BOTH GLOWS')) throw new Error(`authored grip preview disagreed with Arena Forge: ${JSON.stringify(forge)}`);
+        if (rim.claim !== 'RIM' || !rim.label.includes('PINCH + PULL: SPRING')) throw new Error(`outer-lip preview disagreed with Rim Spring: ${JSON.stringify(rim)}`);
+        await drive.park('right');
+      })();
+    } else if (check === 'ramp-release') {
+      if (before.phase !== 'fight') throw new Error('ramp-release check requires a fight');
+      const groovesBefore = before.grooves?.length ?? 0;
+      const interventionsBefore = before.diagnostics?.interventions ?? 0;
+      action = (async () => {
+        await drive.ramp({ at: { x: 0.04, z: 0.02 }, angle: 20, hold: 0.35, side: 'right' });
+        const afterRamp = drive.state();
+        if ((afterRamp.diagnostics?.interventions ?? 0) !== interventionsBefore + 1) throw new Error(`Ramp release authored more than one intervention (${interventionsBefore} -> ${afterRamp.diagnostics?.interventions ?? 0})`);
+        if (afterRamp.charges < before.charges - 1) throw new Error(`Ramp release spent more than one charge (${before.charges} -> ${afterRamp.charges})`);
+        if ((afterRamp.grooves?.length ?? 0) !== groovesBefore) throw new Error('Ramp release leaked into Finger Groove');
+      })();
+    } else if (check === 'palm-brace') {
       if (before.phase !== 'fight') throw new Error('palm-brace check requires a fight');
       const top = before.mine.alive ? before.mine : before.rival_top;
       const angle = Math.atan2(top.z, top.x) * 180 / Math.PI;
@@ -197,7 +223,7 @@ export default async function run({ page, frame }) {
     return {
       check,
       before: { phase: before.phase, charges: before.charges },
-      observed: tutorialProof ?? (stateKey ? { stateKey, sawTransient } : { chargeSpent: peakCharges < before.charges }),
+      observed: tutorialProof ?? intentProof ?? (stateKey ? { stateKey, sawTransient } : { chargeSpent: peakCharges < before.charges }),
       after: { phase: after.phase, charges: after.charges, build: after.build, morph: after.morph, diagnostics: after.diagnostics },
     };
   }, mode);

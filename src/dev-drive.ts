@@ -67,9 +67,11 @@ interface Game {
   forgeBar: { value: number };
   struckOnce: boolean;
   charges: { charges: number };
+  handHoverClaim: Record<Side, '' | 'RAMP' | 'RIM' | 'FORGE' | 'CATCH' | 'SLING'>;
   rimPulls?: Record<Side, unknown | null>;
   cups: Record<Side, { shape: { x: number; z: number }; caught: unknown } | null>;
   label: { current: string };
+  labelTimer: number;
   rival: { name: string; move: string };
   rivalShapeKind?: string;
   hub: { debugPositions(): string };
@@ -436,6 +438,7 @@ export function installDriver() {
           trophies: g.progress.deskTrophies?.map((t) => ({ rival: t.rival, angle: +t.angle.toFixed(2), date: t.date })) ?? [],
         },
         charges: g.charges.charges,
+        intent: { ...g.handHoverClaim },
         rimExperiment: !!g.rimExperiment,
         overforge: g.overforgeMode ?? 'idle',
         palmBrace: !!g.palmBraceActive,
@@ -1035,6 +1038,7 @@ export function installDriver() {
       await setPinch(side, false);
       await glide(side, 'palm', above(start, 0.07), 0.28, 0);
       await glide(side, 'palm', start, 0.18, 0);
+      await wait(0.16);
       await glide(side, 'palm', end, 0.32, 0, 'linear');
       await wait(0.35);
       await glide(side, 'palm', above(end, 0.08), 0.18, 0);
@@ -1086,6 +1090,22 @@ export function installDriver() {
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */
     async move(side: Side, to: number[], dur = 0.3, point: Point = 'pinch') {
       await glide(side, point, new Vector3(...(to as [number, number, number])), dur);
+    },
+    /** Park an open pinch point over an authored arena sector and report the action preview. */
+    async hoverArena(opts: { n: number; angle: number; side?: Side }) {
+      const { n, angle, side = 'right' } = opts;
+      const g = game();
+      const r = rimRadius(g.arena.layout, angle) * n;
+      const target = local(Math.cos(angle) * r, Math.sin(angle) * r, 0.025);
+      g.labelTimer = 0;
+      await setPinch(side, false);
+      await glide(side, 'pinch', target, 0.28, 0);
+      // Re-arm only the transient preview after the reach. A clash/rivet message may legitimately
+      // use the shared card during the approach; the next real update now proves the hover copy.
+      g.handHoverClaim[side] = '';
+      g.labelTimer = 0;
+      await wait(0.08);
+      return { claim: g.handHoverClaim[side], label: g.label.current };
     },
     pinch: setPinch,
     /** Calibrates the emulated fingers before a recording, so the calibration pose is not filmed. */

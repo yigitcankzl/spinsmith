@@ -114,8 +114,13 @@ const INTRO_TIME = 2.5;
 const HAND_LOSS_GRACE = 0.28;
 /** A one-hand rim pull waits this long for the other hand before it can become a spring. */
 const RIM_SPRING_INTENT = 0.25;
+/** A finished pinch tool owns the whole withdrawal, so opening/parking fingers cannot draw. */
+const SHAPING_RELEASE_LOCK = 0.65;
 /** An open palm must sweep this fast above the bowl before it becomes a deliberate forge gust. */
 const PALM_GUST_SPEED = 0.34;
+/** A palm must settle in the bowl before its next motion can count as a deliberate gust. */
+const PALM_GUST_ARM_TIME = 0.12;
+const PALM_GUST_ARM_SPEED = 0.16;
 /** A gust is a committed move, not a free per-frame force; this keeps it tactical and readable. */
 const PALM_GUST_COOLDOWN = 1.8;
 /** Long enough to survive a slow emulator frame and still leave the hand's direction readable. */
@@ -299,6 +304,8 @@ export class MatchSystem extends createSystem({
   private palmGustBlockedUntil: Record<Side, number> = { left: -9, right: -9 };
   /** A released held tool owns its fingertip follow-through, so it cannot draw a Cup or Groove. */
   private shapingBlockedUntil: Record<Side, number> = { left: -9, right: -9 };
+  /** Release ownership lasts until the fingertip visibly leaves the surface, not just for a timer. */
+  private shapingNeedsClearance: Record<Side, boolean> = { left: false, right: false };
   private palmGustCount = 0;
   private riposteUntil = -9;
   private riposteSide: Side | null = null;
@@ -728,8 +735,10 @@ export class MatchSystem extends createSystem({
   private entrance: { t: number; vs: string; sub: string; champion: boolean; from?: Vector3 } | null = null;
   private portal = Object.assign(new Mesh(new RingGeometry(0.7, 1, 48), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide })), { visible: false });
   private portalCore = Object.assign(new Mesh(new CircleGeometry(0.7, 48), new MeshBasicMaterial({ color: 0x0a1a24, transparent: true, opacity: 0.85, depthWrite: false, side: DoubleSide })), { visible: false });
-  /** Each hand's mark on the arena floor under it: a soft shadow, or a warm glow when the strike is ready. */
+  /** The exact pinch point projected onto the arena, so the preview and the eventual action agree. */
   private handAt = new Vector3();
+  /** The fingertip has its own target: an open-hand press catches beside a top while pinch shapes. */
+  private handTipAt = new Vector3();
   /** The pinch ring between each thumb and index: it closes as the fingers do, and lights when they meet. */
   private pinchRings = (['left', 'right'] as const).map(() => {
     const m = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, depthTest: false }));
@@ -753,7 +762,7 @@ export class MatchSystem extends createSystem({
   })();
   /** Plays one quiet tick when a hand first enters the arena's actionable near-surface band. */
   private handHover: Record<Side, boolean> = { left: false, right: false };
-  private handHoverClaim: Record<Side, '' | 'RAMP' | 'RIM' | 'CATCH' | 'SLING'> = { left: '', right: '' };
+  private handHoverClaim: Record<Side, '' | 'RAMP' | 'RIM' | 'FORGE' | 'CATCH' | 'SLING'> = { left: '', right: '' };
   /** Molten handprints left on the desk by strikes (a small pool). */
   private palmPrints = [0, 1, 2].map(() => Object.assign(new Mesh(new PlaneGeometry(0.075, 0.075), new MeshBasicMaterial({ map: PALM, transparent: true, depthWrite: false, blending: AdditiveBlending })), { visible: false }));
   private nextPrint = 0;
@@ -2680,9 +2689,10 @@ export class MatchSystem extends createSystem({
       this.handHover[side] = false;
       m.visible = false;
       if (!play || !h.tracked) return;
-      // Between the wrist and the fingertip (toLocal reuses one vector, so copy first).
-      const w = this.handAt.copy(this.toLocal(h.wrist));
-      const l = w.lerp(this.toLocal(h.index), 0.5);
+      // Preview the same pinch point that updateShaping consumes. The fingertip is kept separately
+      // because a press beside a top claims Catch without changing the pinch target underneath it.
+      const l = this.handAt.copy(this.toLocal(h.pinch));
+      const tip = this.root.worldToLocal(this.handTipAt.copy(h.index));
       const n = normRadius(this.arena.layout, l.x, l.z);
       if (n > 1.15) return;
       const floor = this.arena.height(l.x, l.z);
@@ -2697,7 +2707,7 @@ export class MatchSystem extends createSystem({
       const k = 1 - up / 0.12;
       m.scale.setScalar(0.05 + 0.04 * (1 - k));
       const mat = m.material as MeshBasicMaterial;
-      let claim: '' | 'RAMP' | 'RIM' | 'CATCH' | 'SLING' = '';
+      let claim: '' | 'RAMP' | 'RIM' | 'FORGE' | 'CATCH' | 'SLING' = '';
       if (hovering) {
         let caught = false;
         let nearTop = false;
@@ -2708,24 +2718,26 @@ export class MatchSystem extends createSystem({
           }
         }
         for (const top of this.tops) {
-          if (top.alive && Math.hypot(top.x - l.x, top.z - l.z) <= MAGNET_CATCH) {
+          if (top.alive && Math.hypot(top.x - tip.x, top.z - tip.z) <= MAGNET_CATCH) {
             nearTop = true;
             break;
           }
         }
-        claim = caught ? 'SLING' : n >= RIM_GRAB_MIN || forgeGripIntent(n, Math.atan2(l.z, l.x)) ? 'RIM' : nearTop && this.taught('cup') ? 'CATCH' : 'RAMP';
+        const forgeReady = this.taught('forge');
+        const forgeGrip = forgeReady && forgeGripIntent(n, Math.atan2(l.z, l.x));
+        claim = caught ? 'SLING' : forgeGrip ? 'FORGE' : forgeReady && n >= RIM_GRAB_MIN ? 'RIM' : nearTop && this.taught('cup') ? 'CATCH' : 'RAMP';
       }
       if (claim !== this.handHoverClaim[side]) {
         this.handHoverClaim[side] = claim;
         if (claim && this.labelTimer <= 0) {
-          const instruction = claim === 'CATCH' ? 'PRESS TO MAGNET-CATCH' : claim === 'SLING' ? 'PINCH + PULL TO SLING' : claim === 'RIM' ? 'SECOND HAND: FORGE · OPEN PALM: BRACE' : 'PINCH + DRAG TO RAISE A RAMP';
+          const instruction = claim === 'CATCH' ? 'PRESS TO MAGNET-CATCH' : claim === 'SLING' ? 'PINCH + PULL TO SLING' : claim === 'FORGE' ? 'PINCH BOTH GLOWS · SQUEEZE / TWIST / TILT' : claim === 'RIM' ? 'PINCH + PULL: SPRING · BOTH HANDS: FORGE' : 'PINCH + DRAG TO RAISE A RAMP';
           this.label.set(`${claim} CLAIMED\n${instruction}`);
           this.labelTimer = 0.65;
         }
       }
       const shaping = this.phase === 'fight' && (hovering || h.pinching || !!this.shaping[side] || !!this.slings[side] || this.pressing[side]);
       if (hot || shaping) {
-        mat.color.setHex(claim === 'CATCH' || claim === 'SLING' ? 0xffd060 : claim === 'RIM' ? 0xff9a32 : 0xff8a2a);
+        mat.color.setHex(claim === 'CATCH' || claim === 'SLING' ? 0xffd060 : claim === 'FORGE' ? 0xffc14a : claim === 'RIM' ? 0xff9a32 : 0xff8a2a);
         mat.blending = AdditiveBlending;
         mat.opacity = (hot ? 0.5 : 0.25) + (hot ? 0.5 : 0.45) * k;
       } else {
@@ -4511,6 +4523,7 @@ export class MatchSystem extends createSystem({
     this.clearPalmBrace();
     this.palmGustBlockedUntil.left = this.palmGustBlockedUntil.right = -9;
     this.shapingBlockedUntil.left = this.shapingBlockedUntil.right = -9;
+    this.shapingNeedsClearance.left = this.shapingNeedsClearance.right = false;
     this.palmGustSampled.left = this.palmGustSampled.right = false;
     this.palmGustAge.left = this.palmGustAge.right = 0;
     this.lastHardHit = -1;
@@ -4790,6 +4803,21 @@ export class MatchSystem extends createSystem({
       const h = this.hands[side];
       const rimGuide = this.rimSpringGuides[side === 'left' ? 0 : 1];
       rimGuide.visible = false;
+      if (this.shapingNeedsClearance[side]) {
+        if (!h.tracked) this.shapingNeedsClearance[side] = false;
+        else {
+          const tip = this.root.worldToLocal(this.handTipAt.copy(h.index));
+          const clear = !this.arena.inside(tip.x, tip.z) || tip.y > this.arena.height(tip.x, tip.z) + 0.035;
+          if (clear) {
+            this.shapingNeedsClearance[side] = false;
+            this.tipFresh[side] = true;
+          } else {
+            this.grooving[side] = null;
+            this.pressing[side] = false;
+            continue;
+          }
+        }
+      }
       if (this.elapsed < this.shapingBlockedUntil[side]) {
         this.shaping[side] = null;
         this.grooving[side] = null;
@@ -4919,7 +4947,7 @@ export class MatchSystem extends createSystem({
       // Let go: the ramp, if set, keeps working on its own; a pulled sling fires.
       const rim = this.rimPulls[side];
       if (rim) {
-        this.rimPulls[side] = null;
+        this.blockShapingRelease(side);
         // A brief hold gives the second hand time to join the arena forge. If it stays one-handed,
         // a deliberate inward pull visibly springs this sector instead of becoming a dead gesture.
         if (this.taught('defense') && this.elapsed - rim.started >= RIM_SPRING_INTENT) {
@@ -4927,8 +4955,13 @@ export class MatchSystem extends createSystem({
         }
         continue;
       }
+      const hadPinchTool = !!this.shaping[side] || !!this.slings[side];
       this.shaping[side] = null;
       this.endSling(side, true);
+      if (hadPinchTool) {
+        this.blockShapingRelease(side);
+        continue;
+      }
       // A fingertip pressed into the floor makes a well, once per press, if it came down with
       // intent (a hand resting or drifting down does not) and not just as a ramp was let go.
       const tip = this.toLocal(h.index);
@@ -5116,6 +5149,20 @@ export class MatchSystem extends createSystem({
     this.riposteTop = null;
   }
 
+  /** One physical release may finish one tool; its opening fingers cannot author a second tool. */
+  private blockShapingRelease(side: Side) {
+    this.shapingBlockedUntil[side] = this.elapsed + SHAPING_RELEASE_LOCK;
+    this.shapingNeedsClearance[side] = true;
+    this.palmGustBlockedUntil[side] = this.elapsed + SHAPING_RELEASE_LOCK;
+    this.shaping[side] = null;
+    this.grooving[side] = null;
+    this.rimPulls[side] = null;
+    this.pressing[side] = false;
+    this.tipFresh[side] = true;
+    this.palmGustSampled[side] = false;
+    this.palmGustAge[side] = 0;
+  }
+
   /** A pause, rescue, round end, or committed slap can never be mistaken for releasing a gesture. */
   private cancelActiveGestures() {
     for (const side of ['left', 'right'] as const) {
@@ -5130,6 +5177,7 @@ export class MatchSystem extends createSystem({
       this.palmGustAge[side] = 0;
       this.palmGustBlockedUntil[side] = -9;
       this.shapingBlockedUntil[side] = -9;
+      this.shapingNeedsClearance[side] = false;
     }
     this.cord.set(null);
     this.arenaMorphing = false;
@@ -5249,15 +5297,7 @@ export class MatchSystem extends createSystem({
           const side = this.emberHeld;
           // Opening the hand after carrying the rivet moves IWER/Quest's reported index joint.
           // Keep that release owned by Ember, so its follow-through cannot also draw a free Groove.
-          this.shapingBlockedUntil[side] = this.elapsed + 0.18;
-          this.palmGustBlockedUntil[side] = this.elapsed + 0.35;
-          this.shaping[side] = null;
-          this.grooving[side] = null;
-          this.rimPulls[side] = null;
-          this.pressing[side] = false;
-          this.tipFresh[side] = true;
-          this.palmGustSampled[side] = false;
-          this.palmGustAge[side] = 0;
+          this.blockShapingRelease(side);
           this.emberHandLocal.copy(this.emberPickup.position);
           const floor = this.arena.height(this.emberHandLocal.x, this.emberHandLocal.z);
           if (this.arena.inside(this.emberHandLocal.x, this.emberHandLocal.z) && Math.abs(this.emberHandLocal.y - floor) <= 0.085) {
@@ -5583,16 +5623,26 @@ export class MatchSystem extends createSystem({
         this.palmGustSampled[side] = true;
         this.palmGustLast[side].copy(palm);
         this.palmGustOrigin[side].copy(palm);
-        this.palmGustAge[side] = 0;
+        this.palmGustAge[side] = -PALM_GUST_ARM_TIME;
         continue;
       }
-      this.palmGustAge[side] += dt;
       const last = this.palmGustLast[side];
       const dx = palm.x - last.x;
       const dz = palm.z - last.z;
       const speed = (Math.hypot(dx, dz) * ARENA_SCALE) / Math.max(1e-3, dt);
       last.copy(palm);
       const origin = this.palmGustOrigin[side];
+      const wasArming = this.palmGustAge[side] < 0;
+      this.palmGustAge[side] += dt;
+      if (wasArming) {
+        // Reaching across the bowl keeps moving the origin and never arms. A brief settled palm,
+        // followed by a new sweep, is both more intentional and easier to read on camera.
+        if (speed > PALM_GUST_ARM_SPEED) this.palmGustAge[side] = -PALM_GUST_ARM_TIME;
+        origin.copy(palm);
+        if (this.palmGustAge[side] < 0) continue;
+        this.palmGustAge[side] = 0;
+        continue;
+      }
       const pathX = palm.x - origin.x;
       const pathZ = palm.z - origin.z;
       const path = Math.hypot(pathX, pathZ);
