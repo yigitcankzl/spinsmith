@@ -153,6 +153,8 @@ interface Game {
 
 interface Goal {
   point: Point;
+  /** Presentation intent used to shape acceleration and settle without changing the gameplay target. */
+  intent?: 'reach' | 'grip' | 'force' | 'release';
   from: Vector3;
   /** A fixed point, or one followed each frame (a moving top). */
   to: Vector3 | (() => Vector3);
@@ -162,6 +164,8 @@ interface Goal {
   curve: 'natural' | 'linear';
   /** Small shoulder/elbow lift for an open-hand reach; contact drags stay exactly on the surface. */
   lift: number;
+  /** Sideways bow in world space, giving relaxed reaches an elbow-led path instead of a rail. */
+  arc: number;
   done: () => void;
 }
 
@@ -215,12 +219,26 @@ export function installDriver() {
     if (g && advance) {
       g.t += dt;
       const raw = g.dur > 0 ? Math.min(1, g.t / g.dur) : 1;
-      // Reaches ease in and out like a hand; fast physical gestures keep their measured speed.
-      const k = g.curve === 'natural' ? raw * raw * (3 - 2 * raw) : raw;
+      // A reach, a precise grip and a forceful stroke do not share one robotic tween. Minimum-jerk
+      // reaches settle softly, grips decelerate into contact, and releases clear the prop quickly.
+      let k = raw;
+      if (g.intent === 'force') {
+        // Smooth acceleration into a readable mid-stroke snap without sacrificing the velocity
+        // thresholds used by the real gesture system.
+        k = 0.5 - Math.cos(raw * Math.PI) * 0.5;
+      } else if (g.curve === 'natural') {
+        if (g.intent === 'grip') k = 1 - ((1 - raw) ** 3);
+        else if (g.intent === 'release') k = 1 - ((1 - raw) ** 2);
+        else if (g.intent === 'reach') {
+          const r3 = raw * raw * raw;
+          k = r3 * (10 + raw * (-15 + raw * 6));
+        } else k = raw * raw * (3 - 2 * raw);
+      }
       const at = new Vector3().lerpVectors(g.from, typeof g.to === 'function' ? g.to() : g.to, k);
       // Human reaches do not travel on a ruler-straight line. A restrained lift keeps the hand
       // clear of the arena on approach, while pinched drags and fast gameplay strokes remain flat.
       if (g.lift > 0) at.y += Math.sin(raw * Math.PI) * g.lift;
+      if (g.arc !== 0) at.x += Math.sin(raw * Math.PI) * g.arc;
       aim[side] = { point: g.point, at };
       if (raw >= 1) {
         goals[side] = null;
@@ -344,6 +362,7 @@ export function installDriver() {
     dur: number,
     pinch = pinchNow[side],
     curve: Goal['curve'] = 'natural',
+    intent?: Goal['intent'],
   ) => {
     await prime(side);
     return new Promise<void>((done) => {
@@ -351,10 +370,13 @@ export function installDriver() {
       const a = aim[side];
       const from = a && a.point === point ? a.at.clone() : measured(side, point, new Vector3());
       const target = typeof to === 'function' ? to() : to;
-      const lift = curve === 'natural' && pinch < 0.15
+      const lift = curve === 'natural' && pinch < 0.15 && intent !== 'grip'
         ? Math.min(0.018, Math.max(0.004, from.distanceTo(target) * 0.08))
         : 0;
-      goals[side] = { point, from, to: typeof to === 'function' ? to : to.clone(), t: 0, dur, pinch, curve, lift, done };
+      const arc = curve === 'natural' && (intent === 'reach' || intent === 'release')
+        ? (side === 'left' ? -1 : 1) * Math.min(0.012, Math.max(0.003, from.distanceTo(target) * 0.045))
+        : 0;
+      goals[side] = { point, intent, from, to: typeof to === 'function' ? to : to.clone(), t: 0, dur, pinch, curve, lift, arc, done };
     });
   };
 
@@ -366,6 +388,20 @@ export function installDriver() {
       const raw = Math.min(1, (performance.now() - started) / (dur * 1000));
       const k = raw * raw * (3 - 2 * raw);
       pinchNow[side] = from + (to - from) * k;
+      if (raw >= 1) return;
+      await wait(1 / 60);
+    }
+  };
+  /** Keeps a two-hand grip on one clock, so sparse XR frames cannot see two separate gestures. */
+  const tweenBothPinches = async (to: number, dur = 0.12) => {
+    const fromLeft = pinchNow.left;
+    const fromRight = pinchNow.right;
+    const started = performance.now();
+    for (;;) {
+      const raw = Math.min(1, (performance.now() - started) / (dur * 1000));
+      const k = raw * raw * (3 - 2 * raw);
+      pinchNow.left = fromLeft + (to - fromLeft) * k;
+      pinchNow.right = fromRight + (to - fromRight) * k;
       if (raw >= 1) return;
       await wait(1 / 60);
     }
@@ -398,7 +434,7 @@ export function installDriver() {
     const x = g.arena.radius * (side === 'left' ? -1.3 : 1.3);
     return g.root.localToWorld(new Vector3(x, -0.11, g.arena.radius * 1.7));
   };
-  const park = async (side: Side) => glide(side, 'pinch', idlePoint(side), 0.3, 0);
+  const park = async (side: Side) => glide(side, 'pinch', idlePoint(side), 0.42, 0, 'natural', 'release');
 
   const api = {
     /** What an agent needs to choose the next move. */
@@ -704,9 +740,12 @@ export function installDriver() {
         const actual = g.root.worldToLocal(g.hands[side].pinch.clone());
         throw new Error(`rim grip was not claimed at n=${(Math.hypot(actual.x, actual.z) / rimRadius(g.arena.layout, Math.atan2(actual.z, actual.x))).toFixed(3)}, y=${actual.y.toFixed(3)}, floor=${g.arena.height(actual.x, actual.z).toFixed(3)}`);
       }
-      await glide(side, 'pinch', end, 0.28);
+      // Readable grip beat, and long enough to satisfy the production anti-brush intent threshold
+      // even when the emulator is rendering only a few XR frames per second.
+      await wait(0.45);
+      await glide(side, 'pinch', end, 0.3, 1, 'natural', 'force');
       await setPinch(side, false);
-      await glide(side, 'pinch', above(end, 0.08), 0.2, 0);
+      await glide(side, 'pinch', above(end, 0.08), 0.26, 0, 'natural', 'release');
       await park(side);
     },
 
@@ -721,14 +760,19 @@ export function installDriver() {
       const startLeft = local(gl.x, gl.z, 0.004);
       const startRight = local(gr.x, gr.z, 0.004);
       await Promise.all([
-        glide('left', 'pinch', above(startLeft, 0.06), 0.3, 0),
-        glide('right', 'pinch', above(startRight, 0.06), 0.3, 0),
+        glide('left', 'pinch', above(startLeft, 0.06), 0.31, 0, 'natural', 'reach'),
+        (async () => {
+          await wait(0.045);
+          await glide('right', 'pinch', above(startRight, 0.06), 0.34, 0, 'natural', 'reach');
+        })(),
       ]);
       await Promise.all([
-        glide('left', 'pinch', startLeft, 0.16, 0),
-        glide('right', 'pinch', startRight, 0.16, 0),
+        glide('left', 'pinch', startLeft, 0.18, 0, 'natural', 'grip'),
+        glide('right', 'pinch', startRight, 0.2, 0, 'natural', 'grip'),
       ]);
-      await Promise.all([setPinch('left', true), setPinch('right', true)]);
+      // The comfort system mirrors a lone forge grip. Close together so the first hand is never
+      // briefly interpreted as a complete one-hand forge before the second grip arrives.
+      await tweenBothPinches(1, 0.15);
       await wait(0.12);
       // Squeeze, twist and tilt about the midpoint between the grips, as two real hands would.
       const mx = (gl.x + gr.x) / 2;
@@ -739,14 +783,16 @@ export function installDriver() {
       const targetLeft = local(mx - Math.cos(a0) * targetHalf, mz - Math.sin(a0) * targetHalf, 0.004 - tilt * 0.5);
       const targetRight = local(mx + Math.cos(a0) * targetHalf, mz + Math.sin(a0) * targetHalf, 0.004 + tilt * 0.5);
       await Promise.all([
-        glide('left', 'pinch', targetLeft, 0.42, 1, 'natural'),
-        glide('right', 'pinch', targetRight, 0.42, 1, 'natural'),
+        glide('left', 'pinch', targetLeft, 0.46, 1, 'natural', 'force'),
+        glide('right', 'pinch', targetRight, 0.48, 1, 'natural', 'force'),
       ]);
       await wait(hold);
-      await Promise.all([setPinch('left', false), setPinch('right', false)]);
+      // Release is the gameplay commit edge, so both fingers open together even though the reach
+      // and grip are intentionally offset. Two separate release frames would spend two charges.
+      await tweenBothPinches(0, 0.13);
       await Promise.all([
-        glide('left', 'pinch', above(targetLeft, 0.09), 0.2, 0),
-        glide('right', 'pinch', above(targetRight, 0.09), 0.2, 0),
+        glide('left', 'pinch', above(targetLeft, 0.09), 0.28, 0, 'natural', 'release'),
+        glide('right', 'pinch', above(targetRight, 0.09), 0.3, 0, 'natural', 'release'),
       ]);
       await Promise.all([park('left'), park('right')]);
     },
@@ -986,13 +1032,13 @@ export function installDriver() {
       let peakTurn = Math.abs(g.forgeWheelTurn ?? 0);
       // Hold each arc sample long enough for a low-fps IWER capture to expose it to the real
       // gesture system. The path is still one continuous, human-speed quarter turn.
-      for (let i = 1; i <= 8; i++) {
-        const a = direction * (i / 8) * (Math.PI / 2);
+      for (let i = 1; i <= 12; i++) {
+        const a = direction * (i / 12) * (Math.PI / 2);
         const target = center.clone()
           .addScaledVector(py, Math.cos(a))
           .addScaledVector(px, Math.sin(a))
           .add(closedCorrection);
-        await glide(side, 'pinch', target, 0.16, 1, 'linear');
+        await glide(side, 'pinch', target, 0.1, 1, 'linear');
         claimed ||= g.forgeWheelHeld === side;
         peakTurn = Math.max(peakTurn, Math.abs(g.forgeWheelTurn ?? 0));
       }
@@ -1032,8 +1078,8 @@ export function installDriver() {
     },
 
     /** Sweep a relaxed open palm across the inner bowl so the real gesture drives Forge Gust. */
-    async palmGust(opts: { angle?: number; side?: Side; riposte?: boolean } = {}) {
-      const { angle = 0, side = 'right', riposte = false } = opts;
+    async palmGust(opts: { angle?: number; side?: Side; riposte?: boolean; settle?: number } = {}) {
+      const { angle = 0, side = 'right', riposte = false, settle = 0.55 } = opts;
       if (game().phase !== 'fight') throw new Error('Forge Gust only exists during a fight');
       if (riposte) {
         game().riposteSide = side;
@@ -1044,14 +1090,20 @@ export function installDriver() {
       const r = game().arena.radius * 0.58;
       const start = local(-Math.cos(a) * r, -Math.sin(a) * r, 0.065);
       const end = local(Math.cos(a) * r, Math.sin(a) * r, 0.065);
+      const follow = end.clone().add(end.clone().sub(start).setLength(0.018));
       const before = game().palmGustCount ?? 0;
       await setPinch(side, false);
-      await glide(side, 'palm', above(start, 0.07), 0.28, 0);
-      await glide(side, 'palm', start, 0.18, 0);
-      await wait(0.16);
+      await glide(side, 'palm', above(start, 0.07), 0.32, 0, 'natural', 'reach');
+      await glide(side, 'palm', start, 0.2, 0, 'natural', 'grip');
+      // Hold one readable beat before the sweep. Besides communicating intent, this gives even a
+      // heavily loaded IWER capture two stationary frames to arm the production recognizer.
+      await wait(settle);
+      // Keep the combat stroke at constant velocity: recorder load can leave only a handful of XR
+      // samples, and the production recognizer must still see a fast path through the whole bowl.
       await glide(side, 'palm', end, 0.32, 0, 'linear');
-      await wait(0.35);
-      await glide(side, 'palm', above(end, 0.08), 0.18, 0);
+      await glide(side, 'palm', follow, 0.1, 0, 'linear');
+      await wait(0.22);
+      await glide(side, 'palm', above(follow, 0.08), 0.26, 0, 'natural', 'release');
       await park(side);
       if ((game().palmGustCount ?? 0) <= before) throw new Error('open-palm sweep did not trigger Forge Gust');
     },
@@ -1071,10 +1123,13 @@ export function installDriver() {
       const brace = local(ux * g.arena.radius * 0.98, uz * g.arena.radius * 0.98, 0.05);
       const start = local(ux * g.arena.radius * 0.58, uz * g.arena.radius * 0.58, 0.065);
       const end = local(-ux * g.arena.radius * 0.58, -uz * g.arena.radius * 0.58, 0.065);
+      const follow = end.clone().add(end.clone().sub(start).setLength(0.018));
       const beforeCount = g.palmGustCount ?? 0;
       const beforeCharges = g.charges.charges;
       await setPinch(side, false);
-      await glide(side, 'palm', above(brace, 0.07), 0.2, 0);
+      // The parry window is timing-critical: arrive at the brace with constant speed so IWER's
+      // sparse low-fps samples still include the outward-moving contact frame.
+      await glide(side, 'palm', above(brace, 0.07), 0.2, 0, 'linear');
       await glide(side, 'palm', brace, 0.12, 0, 'linear');
       // Establish the visible palm wall before releasing the test top. Otherwise the top can reach
       // the physical rail during the hand's approach and the arena—not the player's palm—rebounds it.
@@ -1089,11 +1144,15 @@ export function installDriver() {
       });
       for (let i = 0; i < 30 && g.riposteSide !== side; i++) await wait(0.01);
       if (g.riposteSide !== side) throw new Error('open palm did not earn a riposte window');
-      await glide(side, 'palm', start, 0.09, 0, 'linear');
-      await glide(side, 'palm', end, 0.22, 0, 'linear');
-      await wait(0.18);
+      await glide(side, 'palm', start, 0.18, 0, 'natural', 'grip');
+      // Settle at the sweep origin long enough for the real recognizer to distinguish an intended
+      // Counterflow from the preceding parry/reposition. This also gives the move a readable beat.
+      await wait(0.55);
+      await glide(side, 'palm', end, 0.3, 0, 'linear', 'force');
+      await glide(side, 'palm', follow, 0.1, 0, 'linear');
+      const countered = (g.palmGustCount ?? 0) > beforeCount && !!g.palmGustRiposte;
       await park(side);
-      if ((g.palmGustCount ?? 0) <= beforeCount || !g.palmGustRiposte) throw new Error('parry sweep did not trigger Counterflow');
+      if (!countered) throw new Error('parry sweep did not trigger Counterflow');
       if (g.charges.charges !== beforeCharges) throw new Error('Counterflow spent a shaping charge');
     },
 
