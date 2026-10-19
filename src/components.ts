@@ -29,6 +29,10 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   forgeWheelTurn: { type: Types.Float32, default: 0 },
   /** 0 none, 1 airborne/available, 2 held, 3 planted as a live bumper. */
   emberState: { type: Types.Int8, default: 0 },
+  /** Readable rival wind-up on the live arena: 0 none, 1 charge, 2 quake, 3 pull. */
+  rivalTell: { type: Types.Int8, default: 0 },
+  /** Visible hand-to-finish chain: 0 idle, 1 authored, 2 impact, 3 decisive finish. */
+  causeChain: { type: Types.Int8, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);

@@ -14,7 +14,7 @@ import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
 import { controlSeal, crossguard, crossguardCrosses, emberBumper, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
-import type { Clash, FloorShape, Seal, ShapeKind } from './sim.js';
+import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
 import type { OpeningZone } from './progress.js';
@@ -107,6 +107,7 @@ const REC_TOP = 11;
 const REC = 2 * REC_TOP + 3;
 /** A finish this soon (s) after the player's shape is credited to it. */
 const CAUSE_WINDOW = 1.5;
+const RIVAL_TELL_CODE: Record<RivalMove, number> = { charge: 1, quake: 2, pull: 3 };
 const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', burst: 'SHATTER', spin: 'OUTLAST' };
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
@@ -704,6 +705,45 @@ export class MatchSystem extends createSystem({
   })();
   /** A rival's tell drawn on the floor: the lane of a charge, the line of a pull toward its pit. */
   private lane = new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }));
+  /** Cyan says where the rival's move travels; orange says where the player's hands can answer. */
+  private rivalTellFx = Object.assign(new Group(), { visible: false });
+  private rivalTellTarget = new Mesh(
+    new RingGeometry(0.026, 0.034, 40).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.82, blending: AdditiveBlending, depthWrite: false }),
+  );
+  private rivalTellGuard = new Mesh(
+    new RingGeometry(0.032, 0.04, 40).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0xff9a32, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }),
+  );
+  private rivalTellChevrons = [0, 1, 2].map(() => {
+    const arrow = new Shape().moveTo(0, 0.014).lineTo(-0.009, -0.009).lineTo(0, -0.004).lineTo(0.009, -0.009).closePath();
+    return new Mesh(
+      new ShapeGeometry(arrow).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.88, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }),
+    );
+  });
+  private rivalTellQuake = [0, 1, 2].map(() => new Mesh(
+    new RingGeometry(0.035, 0.041, 48).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, opacity: 0.7, blending: AdditiveBlending, depthWrite: false }),
+  ));
+  private rivalTellCode = 0;
+
+  /** The hand-authored floor, its impact, and the finish stay joined by one warm trace. */
+  private causeFx = Object.assign(new Group(), { visible: false });
+  private causePath = new Mesh(
+    new PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, -0.5),
+    new MeshBasicMaterial({ color: 0xff9a32, transparent: true, opacity: 0.72, blending: AdditiveBlending, depthWrite: false }),
+  );
+  private causeOrigin = new Mesh(
+    new RingGeometry(0.018, 0.025, 36).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0xff9a32, transparent: true, opacity: 0.8, blending: AdditiveBlending, depthWrite: false }),
+  );
+  private causeTarget = new Mesh(
+    new RingGeometry(0.025, 0.034, 40).rotateX(-Math.PI / 2),
+    new MeshBasicMaterial({ color: 0xffc466, transparent: true, opacity: 0.9, blending: AdditiveBlending, depthWrite: false }),
+  );
+  private causeCue = { t: 0, stage: 0 as 0 | 1 | 2 | 3, kind: '', sx: 0, sz: 0, tx: 0, tz: 0 };
+  private firstHeroRamp = false;
   /** Seconds left of a won match's celebration (sparks round the rim). */
   private celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
@@ -1134,6 +1174,8 @@ export class MatchSystem extends createSystem({
     this.openingEcho.add(this.openingEchoShaft, this.openingEchoHead);
     this.rivalIntent.add(...this.rivalIntentDashes, this.rivalIntentHead);
     this.launchGuide.add(this.launchSafeZone, this.launchDangerZone, this.launchMarker, this.launchAim, this.launchGhost, this.openingEcho, this.rivalIntent);
+    this.rivalTellFx.add(this.rivalTellTarget, this.rivalTellGuard, ...this.rivalTellChevrons, ...this.rivalTellQuake);
+    this.causeFx.add(this.causePath, this.causeOrigin, this.causeTarget);
     this.launchGuide.visible = false;
     this.launchMarker.visible = this.launchAim.visible = this.launchGhost.visible = this.openingEcho.visible = this.rivalIntent.visible = false;
     this.stage.add(
@@ -1149,6 +1191,8 @@ export class MatchSystem extends createSystem({
       ...this.handMarks,
       this.secretRelic,
       this.lane,
+      this.rivalTellFx,
+      this.causeFx,
       this.ultimateArenaFx,
       this.ultimatePath,
       this.ultimateTarget,
@@ -1201,6 +1245,8 @@ export class MatchSystem extends createSystem({
     this.crossguardGlow.renderOrder = this.crossguardBeam.renderOrder = 9;
     for (const post of this.crossguardPosts) post.renderOrder = 9;
     this.palmGustFx.renderOrder = this.palmGustRim.renderOrder = 8;
+    this.lane.renderOrder = this.rivalTellTarget.renderOrder = this.rivalTellGuard.renderOrder = this.causePath.renderOrder = this.causeOrigin.renderOrder = this.causeTarget.renderOrder = 8;
+    for (const mesh of [...this.rivalTellChevrons, ...this.rivalTellQuake]) mesh.renderOrder = 8;
     for (const guide of this.rimSpringGuides) guide.renderOrder = 8;
     this.launcherBrace.traverse((o) => { if ((o as Mesh).isMesh) (o as Mesh).renderOrder = 8; });
     this.setOverforgeModel(this.myBuild.seal ?? 'anvil');
@@ -1291,6 +1337,8 @@ export class MatchSystem extends createSystem({
       forgeWheelGrabGap: Math.round(this.forgeWheelGrabGap * 1000) / 1000,
       emberState: this.emberState,
       emberGrabGap: Math.round(this.emberGrabGap * 1000) / 1000,
+      rivalTell: this.rivalTellCode,
+      causeChain: this.causeCue.stage,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -1622,6 +1670,8 @@ export class MatchSystem extends createSystem({
     this.passHinted ||= this.passButton.mesh.visible;
     if (this.phase !== 'fight') {
       this.barRings.left.visible = this.barRings.right.visible = this.shock.visible = this.slapMark.visible = this.lane.visible = false;
+      this.rivalTellFx.visible = false;
+      this.setRivalTellState(null);
       this.overforgeSeal.visible = false;
       this.overforgeHeld = null;
       this.overforgeControl = null;
@@ -1830,6 +1880,7 @@ export class MatchSystem extends createSystem({
     for (const c of this.showcase.children) c.rotation.y += dt * 0.4;
     this.updateRewards(dt);
     this.updateShapes();
+    this.updateCauseCue(dt);
     this.arenaView.idleOrbit = this.phase !== 'build';
     // In the workshop the pillars stand where they are picked up.
     if (this.phase === 'build') this.arena.orbitT = 0;
@@ -3196,6 +3247,7 @@ export class MatchSystem extends createSystem({
     this.myPoints = 0;
     this.theirPoints = 0;
     this.tutorialRound = 0;
+    this.firstHeroRamp = false;
     this.wasDown = false;
     this.introDone = false;
     this.rematchTip = '';
@@ -4384,6 +4436,8 @@ export class MatchSystem extends createSystem({
     this.barWasFull = false;
     this.rivalBar.reset();
     this.tellAt = -1;
+    this.setRivalTellState(null);
+    this.clearCauseCue();
     this.rivalCharges.reset();
     this.rivalShapeAt = -9;
     this.lastShape = null;
@@ -6016,6 +6070,84 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) console.log(`[ECHO] ${f.action} ${f.sign} at t ${this.elapsed.toFixed(2)} round ${round}`);
   }
 
+  /** Mirrors the active wind-up into ECS and keeps every threat overlay on one reset path. */
+  private setRivalTellState(move: RivalMove | null) {
+    const code = move ? RIVAL_TELL_CODE[move] : 0;
+    if (code === this.rivalTellCode) return;
+    this.rivalTellCode = code;
+    this.rootEntity?.setValue(FirstFiveState, 'rivalTell', code);
+    if (code) return;
+    this.lane.visible = false;
+    this.rivalTellFx.visible = false;
+    this.rivalTellTarget.visible = this.rivalTellGuard.visible = false;
+    for (const mesh of [...this.rivalTellChevrons, ...this.rivalTellQuake]) mesh.visible = false;
+  }
+
+  /** Starts or advances the warm trace from a hand-authored surface to the top it changed. */
+  private showCauseCue(stage: 1 | 2 | 3, kind: string, sx: number, sz: number, tx = sx, tz = sz) {
+    const cue = this.causeCue;
+    cue.stage = stage;
+    cue.kind = kind;
+    cue.sx = sx;
+    cue.sz = sz;
+    cue.tx = tx;
+    cue.tz = tz;
+    cue.t = stage === 1 ? 1.1 : stage === 2 ? 1.7 : 2.4;
+    this.causeFx.visible = true;
+    this.rootEntity?.setValue(FirstFiveState, 'causeChain', stage);
+  }
+
+  private clearCauseCue() {
+    if (!this.causeCue.stage && !this.causeFx.visible) return;
+    this.causeCue.stage = 0;
+    this.causeCue.t = 0;
+    this.causeFx.visible = false;
+    this.rootEntity?.setValue(FirstFiveState, 'causeChain', 0);
+  }
+
+  private recentPlayerCause(): string | null {
+    if (!this.lastShape || this.elapsed - this.lastShape.t >= CAUSE_WINDOW) return null;
+    return (this.lastShape.kind === 'strike'
+      ? SEAL_NAMES[this.myBuild.seal ?? 'anvil']
+      : this.lastShape.kind === 'well' ? 'CUP' : this.lastShape.kind).toUpperCase();
+  }
+
+  /** Keeps the cause readable during normal head motion without adding a screen-space panel. */
+  private updateCauseCue(dt: number) {
+    const cue = this.causeCue;
+    if (cue.stage === 0) return;
+    cue.t -= dt;
+    if (cue.t <= 0) {
+      this.clearCauseCue();
+      return;
+    }
+    const decisive = cue.stage === 3;
+    const pulse = 1 + (decisive ? 0.22 : 0.12) * Math.sin(this.time * (decisive ? 11 : 8));
+    const sy = this.arena.height(cue.sx, cue.sz) + 0.0035;
+    const ty = this.arena.height(cue.tx, cue.tz) + 0.004;
+    this.causeOrigin.visible = true;
+    this.causeOrigin.position.set(cue.sx, sy, cue.sz);
+    this.causeOrigin.scale.setScalar(pulse);
+    this.causeTarget.visible = cue.stage >= 2;
+    this.causeTarget.position.set(cue.tx, ty, cue.tz);
+    this.causeTarget.scale.setScalar(pulse * (decisive ? 1.25 : 1));
+    const dx = cue.tx - cue.sx;
+    const dz = cue.tz - cue.sz;
+    const length = Math.hypot(dx, dz);
+    this.causePath.visible = cue.stage >= 2 && length > 0.005;
+    if (this.causePath.visible) {
+      this.causePath.position.set(cue.sx, Math.max(sy, ty), cue.sz);
+      this.causePath.rotation.y = Math.atan2(-dx, -dz);
+      this.causePath.scale.set(decisive ? 0.012 : 0.007, 1, length);
+    }
+    const color = decisive ? 0xfff0c2 : cue.stage === 2 ? 0xffc466 : 0xff9a32;
+    for (const mesh of [this.causePath, this.causeOrigin, this.causeTarget]) {
+      const material = mesh.material as MeshBasicMaterial;
+      material.color.setHex(color);
+      material.opacity = decisive ? 0.95 : 0.68 + 0.18 * Math.sin(this.time * 8);
+    }
+  }
+
   private rivalTell(clash: number) {
     if (this.demo || !this.taught('tells') || this.online?.peer) return;
     this.rivalBar.update(STEP, false);
@@ -6031,6 +6163,8 @@ export class MatchSystem extends createSystem({
         this.rivalTellDuration = 0.5;
         this.tellAt = this.elapsed + this.rivalTellDuration;
         them.tell = this.rivalTellDuration;
+        this.setRivalTellState(this.rival.move);
+        this.barMessage = `${this.rival.move.toUpperCase()}?`;
         this.stamp.show('RIVAL FEINT?', 'READ THE WIND-UP', 'rival', 0.45);
         playTell();
         return;
@@ -6040,6 +6174,8 @@ export class MatchSystem extends createSystem({
       this.rivalTellDuration = Math.max(0.88, TELL_TIME - Math.max(0, this.rivalLaunchPower - 0.55) * 0.7);
       this.tellAt = this.elapsed + this.rivalTellDuration;
       them.tell = this.rivalTellDuration;
+      this.setRivalTellState(this.rival.move);
+      this.barMessage = `${this.rival.move.toUpperCase()} INCOMING`;
       playTell();
       this.stamp.show(`${this.rival.move.toUpperCase()}!`, `${this.rival.name} winds up`, 'rival', 0.7);
       {
@@ -6060,7 +6196,8 @@ export class MatchSystem extends createSystem({
     if (them.tell <= 0) {
       // Cut short by the strike (doStrike says so).
       this.tellAt = -1;
-      this.lane.visible = false;
+      this.setRivalTellState(null);
+      this.barMessage = 'READY';
       this.rivalFeinting = false;
       return;
     }
@@ -6073,7 +6210,8 @@ export class MatchSystem extends createSystem({
     if (them.tell > 0) return;
     them.tell = 0;
     this.tellAt = -1;
-    this.lane.visible = false;
+    this.setRivalTellState(null);
+    this.barMessage = 'READY';
     if (this.rivalFeinting) {
       this.rivalFeinting = false;
       this.label.set('FEINT!\nREAL MOVE STILL READY');
@@ -6108,7 +6246,27 @@ export class MatchSystem extends createSystem({
     const them = this.theirs;
     const me = this.mine;
     const move = this.rival.move;
+    this.rivalTellFx.visible = me.alive && them.alive;
+    this.rivalTellTarget.visible = false;
+    this.rivalTellGuard.visible = me.alive;
+    this.rivalTellGuard.position.set(me.x, this.arena.height(me.x, me.z) + 0.004, me.z);
+    this.rivalTellGuard.scale.setScalar(0.92 + 0.18 * Math.sin(this.time * 9));
+    (this.rivalTellGuard.material as MeshBasicMaterial).opacity = 0.62 + 0.25 * k;
+    for (const mesh of this.rivalTellChevrons) mesh.visible = false;
+    for (const mesh of this.rivalTellQuake) mesh.visible = false;
     this.lane.visible = move !== 'quake' && me.alive;
+    if (move === 'quake') {
+      for (let i = 0; i < this.rivalTellQuake.length; i++) {
+        const mesh = this.rivalTellQuake[i];
+        const phase = (k * 0.75 + i / this.rivalTellQuake.length) % 1;
+        mesh.visible = true;
+        mesh.position.set(them.x, this.arena.height(them.x, them.z) + 0.003, them.z);
+        const scale = (0.35 + phase * 2.8) * (this.arena.radius / 0.17);
+        mesh.scale.setScalar(scale);
+        (mesh.material as MeshBasicMaterial).opacity = (0.25 + 0.55 * k) * (1 - phase);
+      }
+      return;
+    }
     if (!this.lane.visible) return;
     let fx = them.x;
     let fz = them.z;
@@ -6136,6 +6294,58 @@ export class MatchSystem extends createSystem({
     this.lane.rotation.y = Math.atan2(-(tx - fx), -(tz - fz));
     this.lane.scale.set(0.012, 1, Math.max(0.001, len));
     (this.lane.material as MeshBasicMaterial).opacity = 0.35 + 0.35 * k;
+    this.rivalTellTarget.visible = true;
+    this.rivalTellTarget.position.set(tx, this.arena.height(tx, tz) + 0.004, tz);
+    this.rivalTellTarget.scale.setScalar(0.9 + 0.2 * Math.sin(this.time * 10));
+    (this.rivalTellTarget.material as MeshBasicMaterial).opacity = 0.55 + 0.35 * k;
+    const dx = tx - fx;
+    const dz = tz - fz;
+    for (let i = 0; i < this.rivalTellChevrons.length; i++) {
+      const mesh = this.rivalTellChevrons[i];
+      const along = Math.min(0.94, Math.max(0.1, (i + 1) / 4 + k * 0.16));
+      const x = fx + dx * along;
+      const z = fz + dz * along;
+      mesh.visible = true;
+      mesh.position.set(x, this.arena.height(x, z) + 0.005, z);
+      mesh.rotation.y = Math.atan2(-dx, -dz);
+      mesh.scale.setScalar(0.75 + 0.35 * k);
+      (mesh.material as MeshBasicMaterial).opacity = 0.45 + 0.45 * k;
+    }
+  }
+
+  /** First-fight choreography: the cyan travel line crosses the orange place to raise the floor. */
+  private drawTutorialLane(x: number, z: number) {
+    const them = this.theirs;
+    const d = Math.hypot(them.x, them.z) || 1;
+    const tx = (them.x / d) * this.arena.radius;
+    const tz = (them.z / d) * this.arena.radius;
+    const dx = tx - them.x;
+    const dz = tz - them.z;
+    const len = Math.hypot(dx, dz);
+    this.rivalTellFx.visible = this.lane.visible = them.alive;
+    if (!them.alive) return;
+    this.lane.position.set(them.x, this.arena.height(them.x, them.z) + 0.002, them.z);
+    this.lane.rotation.y = Math.atan2(-dx, -dz);
+    this.lane.scale.set(0.01, 1, Math.max(0.001, len));
+    (this.lane.material as MeshBasicMaterial).opacity = 0.48;
+    this.rivalTellGuard.visible = true;
+    this.rivalTellGuard.position.set(x, this.arena.height(x, z) + 0.004, z);
+    this.rivalTellGuard.scale.setScalar(0.9 + 0.2 * Math.sin(this.time * 8));
+    this.rivalTellTarget.visible = true;
+    this.rivalTellTarget.position.set(tx, this.arena.height(tx, tz) + 0.004, tz);
+    this.rivalTellTarget.scale.setScalar(0.82 + 0.14 * Math.sin(this.time * 8));
+    for (const mesh of this.rivalTellQuake) mesh.visible = false;
+    for (let i = 0; i < this.rivalTellChevrons.length; i++) {
+      const mesh = this.rivalTellChevrons[i];
+      const along = (i + 1) / 4;
+      const px = them.x + dx * along;
+      const pz = them.z + dz * along;
+      mesh.visible = true;
+      mesh.position.set(px, this.arena.height(px, pz) + 0.005, pz);
+      mesh.rotation.y = Math.atan2(-dx, -dz);
+      mesh.scale.setScalar(0.82);
+      (mesh.material as MeshBasicMaterial).opacity = 0.72;
+    }
   }
 
   /**
@@ -6348,6 +6558,8 @@ export class MatchSystem extends createSystem({
     this.struckOnce = true;
     if (cut) {
       this.tellAt = -1;
+      this.setRivalTellState(null);
+      this.barMessage = 'READY';
       if (perfectInterrupt) {
         this.forgeBar.value = Math.max(this.forgeBar.value, 0.5);
         this.theirs.vx *= 0.35;
@@ -6553,6 +6765,7 @@ export class MatchSystem extends createSystem({
     const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz, sigma);
     this.recordIntervention();
     this.lastShape = { t: this.elapsed, kind };
+    this.showCauseCue(1, kind === 'well' ? 'CUP' : kind.toUpperCase(), x, z);
     this.progress.advance('match');
     this.impacts.shock(x, this.arena.height(x, z), z, 0.45, 0xff8a2a);
     this.sparks.embers(x, this.arena.height(x, z) + 0.005, z, 5, 0.35, 0.035, 1);
@@ -6579,6 +6792,7 @@ export class MatchSystem extends createSystem({
     shape.amp *= f;
     this.recordIntervention();
     this.lastShape = { t: this.elapsed, kind: 'groove' };
+    this.showCauseCue(1, 'GROOVE', sx, sz, ex, ez);
     this.progress.advance('match');
     this.impacts.shock(ex, this.arena.height(ex, ez), ez, 0.5, 0xffc066);
     this.sparks.embers(ex, this.arena.height(ex, ez) + 0.004, ez, 6, 0.4, 0.04, 1);
@@ -6751,11 +6965,34 @@ export class MatchSystem extends createSystem({
         if (authored && t === this.theirs && !this.rewardedShapes.has(s)) {
           this.rewardedShapes.add(s);
           this.lastShape = { t: this.elapsed, kind: s.kind };
-          this.hitStop = Math.max(this.hitStop, 0.08);
+          this.showCauseCue(2, s.kind === 'well' ? 'CUP' : s.kind.toUpperCase(), s.x, s.z, t.x, t.z);
+          const heroRamp = !this.firstHeroRamp && this.progress.matches === 0 && this.tutorialRound === 1 && s.kind === 'ramp';
+          if (heroRamp) {
+            // The first taught ramp must visibly change the fight. It strengthens the authored
+            // outward direction once, without manufacturing a knockout or changing later balance.
+            this.firstHeroRamp = true;
+            const r = Math.hypot(t.x, t.z) || 1;
+            const ox = t.x / r;
+            const oz = t.z / r;
+            t.vx += ox * 0.16;
+            t.vz += oz * 0.16;
+            t.kick = Math.max(t.kick, 0.75);
+            t.kickX = ox;
+            t.kickZ = oz;
+            this.impacts.shock(t.x, this.arena.height(t.x, t.z), t.z, 0.9, 0xffc466);
+            this.sparks.burst(t.x, this.arena.height(t.x, t.z), t.z, 1);
+          }
+          this.hitStop = Math.max(this.hitStop, heroRamp ? 0.12 : 0.08);
           this.accumulator = 0;
           const charge = this.charges.reward();
           this.forgeBar.value = Math.min(1, this.forgeBar.value + 0.12);
-          this.stamp.show(`${s.kind === 'well' ? 'CUP' : s.kind === 'groove' ? 'GROOVE' : 'RAMP'} → ${s.kind === 'groove' ? 'DASH' : 'IMPACT'}`, `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`, 'mine', 0.5, 1.05);
+          this.stamp.show(
+            heroRamp ? 'YOU CHANGED THE FIGHT' : `${s.kind === 'well' ? 'CUP' : s.kind === 'groove' ? 'GROOVE' : 'RAMP'} → ${s.kind === 'groove' ? 'DASH' : 'IMPACT'}`,
+            heroRamp ? 'RAMP → IMPACT' : `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`,
+            'mine',
+            heroRamp ? 0.7 : 0.5,
+            heroRamp ? 1.15 : 1.05,
+          );
         }
       }
     }
@@ -6994,6 +7231,7 @@ export class MatchSystem extends createSystem({
    */
   private beginDeskVerdict(): boolean {
     if (this.demo || !ROOM.poly || this.theirs.finish !== 'over') return false;
+    const cause = this.recentPlayerCause();
     this.deskVerdict = { v: 1, left: DESK_VERDICT_TIME };
     this.deskKoTrailT = 0;
     this.setDeskKoStage(1);
@@ -7008,8 +7246,9 @@ export class MatchSystem extends createSystem({
     this.theirView.hit(1, this.theirs.vx, this.theirs.vz, 0.09);
     this.koFreeze = Math.max(this.koFreeze, 0.09);
     this.roomLight.hit();
-    this.stamp.show('EDGE RUN!', 'REAL TABLE DECIDES', 'mine', 0.65, 1.25);
-    this.label.set('TOP ACROSS THE DESK\nCROSS THE REAL EDGE = +1');
+    if (cause && this.causeCue.stage) this.showCauseCue(3, cause, this.causeCue.sx, this.causeCue.sz, this.theirs.x, this.theirs.z);
+    this.stamp.show('EDGE RUN!', cause ? `YOUR ${cause} → REAL TABLE` : 'REAL TABLE DECIDES', 'mine', 0.65, 1.25);
+    this.label.set(cause ? `YOUR ${cause} SENT IT ACROSS THE DESK\nCROSS THE REAL EDGE = +1` : 'TOP ACROSS THE DESK\nCROSS THE REAL EDGE = +1');
     this.labelTimer = DESK_VERDICT_TIME;
     if (import.meta.env.DEV) console.log('[DESK_KO] table flight started; score is pending');
     return true;
@@ -7051,7 +7290,8 @@ export class MatchSystem extends createSystem({
       this.impacts.hit(p.x, p.y, p.z, 1);
       this.impacts.shock(p.x, p.y, p.z, 1, 0xff8a2a);
       this.slowMo = Math.max(this.slowMo, 0.6);
-      this.stamp.show('OFF THE DESK!', 'REAL EDGE · +1', 'mine', 0.55, 1.25);
+      const cause = this.recentPlayerCause();
+      this.stamp.show('OFF THE DESK!', cause ? `YOUR ${cause} → REAL EDGE +1` : 'REAL EDGE · +1', 'mine', 0.55, 1.25);
       this.featDone('offDesk');
       if (import.meta.env.DEV) console.log(`[DESK_KO] real edge crossed; +${DESK_KO_BONUS} bonus heat`);
       return true;
@@ -7428,9 +7668,7 @@ export class MatchSystem extends createSystem({
         text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points} heat\n${why ? `${why} · ` : ''}${score}`;
       }
       // A finish within 1.5 s of the player's shape names it as the cause.
-      const recent = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW
-        ? (this.lastShape.kind === 'strike' ? SEAL_NAMES[this.myBuild.seal ?? 'anvil'] : this.lastShape.kind === 'well' ? 'CUP' : this.lastShape.kind).toUpperCase()
-        : null;
+      const recent = this.recentPlayerCause();
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
       if (!this.demo && this.progress.guide === 'done' && v === 1 && loser.finish !== 'spin' && this.progress.best('fastestKo', Math.round(this.elapsed * 10) / 10)) this.stamp.later('NEW BEST!', `Fastest knockout: ${this.elapsed.toFixed(1)} s`, 'mine', 1);
       if (v === 1 && loser.finish !== 'spin' && recent && this.lastShape) {
@@ -7445,8 +7683,11 @@ export class MatchSystem extends createSystem({
       const cause = recent && v === 1 ? `YOUR ${recent}` : theirs && v === -1 && loser.finish !== 'spin' ? `THEIR ${this.rivalShapeKind}`.toUpperCase() : '';
       const finishWord = name(loser);
       this.lastCause = cause ? `${cause} → ${finishWord}` : '';
+      if (recent && v === 1 && loser.finish !== 'spin' && this.causeCue.stage) {
+        this.showCauseCue(3, recent, this.causeCue.sx, this.causeCue.sz, loser.x, loser.z);
+      }
       const finishSub = deskKo
-        ? `EDGE +${DESK_KO_BONUS}${decided ? ' · WIN' : ''}`
+        ? `${cause ? `${cause} → ` : ''}EDGE +${DESK_KO_BONUS}${decided ? ' · WIN' : ''}`
         : decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause;
       this.stamp.show(`${finishWord}!`, finishSub, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
       if (recent && v === 1) {
@@ -7554,6 +7795,7 @@ export class MatchSystem extends createSystem({
       const z = this.theirs.z - (this.theirs.z / r) * 0.035;
       this.bumpMark.position.set(x, this.arena.height(x, z) + 0.002, z);
       this.bumpMark.scale.setScalar(1 + 0.3 * Math.sin(this.time * 6));
+      this.drawTutorialLane(x, z);
       this.label.set('PINCH THE FLOOR\nDRAG TOWARD THE RIVAL');
       this.bumpHintShown = true;
       // The ghost hand: down to the ring, pinch, drag outward past the rival, let go.
@@ -7593,6 +7835,10 @@ export class MatchSystem extends createSystem({
       // The first move is made: the hint goes.
       this.bumpHintShown = false;
       this.label.set('');
+    }
+    if (!bump && this.tellAt < 0) {
+      this.lane.visible = false;
+      this.rivalTellFx.visible = false;
     }
     if (!ghost) this.ghost.hide();
     if (!forgeGhost) this.forgeGhost.hide();
