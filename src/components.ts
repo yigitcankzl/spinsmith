@@ -35,6 +35,8 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   causeChain: { type: Types.Int8, default: 0 },
   /** Active information layer: 0 hub, 1 forge, 2 launch, 3 fight, 4 result. */
   uiLayer: { type: Types.Int8, default: 0 },
+  /** Dominant hand presentation: 0 idle, 1 aim, 2 pinch, 3 pull, 4 impact, 5 recover. */
+  handPresentation: { type: Types.Int8, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);

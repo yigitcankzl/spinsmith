@@ -160,6 +160,8 @@ interface Goal {
   dur: number;
   pinch: number;
   curve: 'natural' | 'linear';
+  /** Small shoulder/elbow lift for an open-hand reach; contact drags stay exactly on the surface. */
+  lift: number;
   done: () => void;
 }
 
@@ -215,7 +217,11 @@ export function installDriver() {
       const raw = g.dur > 0 ? Math.min(1, g.t / g.dur) : 1;
       // Reaches ease in and out like a hand; fast physical gestures keep their measured speed.
       const k = g.curve === 'natural' ? raw * raw * (3 - 2 * raw) : raw;
-      aim[side] = { point: g.point, at: new Vector3().lerpVectors(g.from, typeof g.to === 'function' ? g.to() : g.to, k) };
+      const at = new Vector3().lerpVectors(g.from, typeof g.to === 'function' ? g.to() : g.to, k);
+      // Human reaches do not travel on a ruler-straight line. A restrained lift keeps the hand
+      // clear of the arena on approach, while pinched drags and fast gameplay strokes remain flat.
+      if (g.lift > 0) at.y += Math.sin(raw * Math.PI) * g.lift;
+      aim[side] = { point: g.point, at };
       if (raw >= 1) {
         goals[side] = null;
         g.done();
@@ -344,7 +350,11 @@ export function installDriver() {
       pinchNow[side] = pinch;
       const a = aim[side];
       const from = a && a.point === point ? a.at.clone() : measured(side, point, new Vector3());
-      goals[side] = { point, from, to: typeof to === 'function' ? to : to.clone(), t: 0, dur, pinch, curve, done };
+      const target = typeof to === 'function' ? to() : to;
+      const lift = curve === 'natural' && pinch < 0.15
+        ? Math.min(0.018, Math.max(0.004, from.distanceTo(target) * 0.08))
+        : 0;
+      goals[side] = { point, from, to: typeof to === 'function' ? to : to.clone(), t: 0, dur, pinch, curve, lift, done };
     });
   };
 

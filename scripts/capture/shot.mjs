@@ -37,6 +37,30 @@ export default async function run({ page, frame, cdp }) {
       }
     `,
   });
+  // IWER keeps its compositor canvases at a compact editor-friendly size even when the outer
+  // managed iframe is enlarged. Scale the live compositor to viewport height without distorting
+  // its aspect ratio; the narrow side mattes are preferable to a stretched or postage-stamp XR view.
+  await frame.addStyleTag({
+    content: `
+      html, body {
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        background: #080b0e !important;
+      }
+      canvas[style*="z-index: 1"],
+      canvas[style*="z-index: 2"] {
+        position: fixed !important;
+        top: 0 !important;
+        left: 50vw !important;
+        width: auto !important;
+        height: 100vh !important;
+        max-width: none !important;
+        transform: translateX(-50%) !important;
+      }
+    `,
+  });
 
   if (p.disclosure !== false) {
     await page.evaluate(() => {
@@ -122,11 +146,9 @@ export default async function run({ page, frame, cdp }) {
           return;
         }
         const material = new standardMaterial.constructor({
-          color: p.handColor ?? 0xd09a7d,
-          roughness: 0.66,
+          color: p.handColor ?? 0xc98f73,
+          roughness: 0.72,
           metalness: 0,
-          emissive: 0x1b0905,
-          emissiveIntensity: 0.08,
           transparent: true,
           depthWrite: true,
           alphaTest: 0,
@@ -136,12 +158,12 @@ export default async function run({ page, frame, cdp }) {
         material.onBeforeCompile = (shader) => {
           shader.vertexShader = shader.vertexShader
             .replace('#include <common>', '#include <common>\nattribute float wristDist;\nvarying float vWristFade;')
-            .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWristFade = smoothstep(0.015, 0.12, wristDist);');
+            .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWristFade = smoothstep(0.008, 0.05, wristDist);');
           shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', '#include <common>\nvarying float vWristFade;')
             .replace('#include <dithering_fragment>', 'diffuseColor.a *= vWristFade;\n#include <dithering_fragment>');
         };
-        material.customProgramCacheKey = () => 'spinsmith-capture-wrist-fade-v1';
+        material.customProgramCacheKey = () => 'spinsmith-capture-wrist-fade-v2';
         object.material = material;
         object.renderOrder = 10;
         object.frustumCulled = false;

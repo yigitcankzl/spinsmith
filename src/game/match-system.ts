@@ -286,6 +286,9 @@ export class MatchSystem extends createSystem({
   private firstFiveStep = 0;
   /** Coarse information layer mirrored to ECS; avoids several panels competing in one phase. */
   private uiLayerCode = -1;
+  /** One readable hand verb at a time: idle, aim, pinch, pull, impact or recover. */
+  private handPresentationCode = -1;
+  private handRecoverUntil = -1;
   private interventionCount = 0;
   private failedGestures = 0;
   private arenaForgeCancels = 0;
@@ -1342,6 +1345,7 @@ export class MatchSystem extends createSystem({
       rivalTell: this.rivalTellCode,
       causeChain: this.causeCue.stage,
       uiLayer: this.uiLayerCode,
+      handPresentation: this.handPresentationCode,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -2718,15 +2722,26 @@ export class MatchSystem extends createSystem({
     (['left', 'right'] as const).forEach((side, i) => {
       const m = this.pinchRings[i];
       const h = this.hands[side];
-      m.visible = h.tracked && h.gap < 0.07 && this.phase !== 'placing';
+      const engaged = h.pinching
+        || this.phase === 'pulling'
+        || this.handHover[side]
+        || !!this.shaping[side]
+        || !!this.slings[side]
+        || !!this.rimPulls[side]
+        || this.overforgeHeld === side
+        || this.forgeWheelHeld === side
+        || this.emberHeld === side;
+      // An idle tracked hand is already visible in passthrough. Do not decorate it with a large
+      // floating reticle until the player is actually aiming at or manipulating the arena.
+      m.visible = h.tracked && engaged && h.gap < 0.065 && this.phase !== 'placing';
       if (!m.visible) return;
       m.position.copy(h.pinch);
       m.lookAt(this.head);
-      const r = h.pinching ? 0.007 : 0.007 + 0.25 * Math.max(0, h.gap - TUNE.pinchOn);
+      const r = h.pinching ? 0.006 : 0.006 + 0.16 * Math.max(0, h.gap - TUNE.pinchOn);
       m.scale.setScalar(r);
       const mat = m.material as MeshBasicMaterial;
-      mat.color.setHex(h.pinching ? 0xff8a2a : 0xffffff);
-      mat.opacity = h.pinching ? 0.95 : 0.35 + 0.5 * Math.max(0, 1 - (h.gap - TUNE.pinchOn) / 0.05);
+      mat.color.setHex(this.phase === 'pulling' ? 0xffe0a3 : h.pinching ? 0xff8a2a : 0xffc06a);
+      mat.opacity = h.pinching ? 0.9 : 0.22 + 0.42 * Math.max(0, 1 - (h.gap - TUNE.pinchOn) / 0.045);
     });
   }
 
@@ -6102,6 +6117,24 @@ export class MatchSystem extends createSystem({
       this.uiLayerCode = code;
       this.rootEntity?.setValue(FirstFiveState, 'uiLayer', code);
     }
+    if (this.hands.left.justReleased || this.hands.right.justReleased) this.handRecoverUntil = this.time + 0.22;
+    const manipulating = !!this.shaping.left || !!this.shaping.right
+      || !!this.slings.left || !!this.slings.right
+      || !!this.rimPulls.left || !!this.rimPulls.right
+      || !!this.overforgeHeld || !!this.forgeWheelHeld || !!this.emberHeld;
+    const impacting = this.causeCue.stage >= 2 || this.palmGustTime > 0 || this.shockT < 1 || this.arenaMorphHold > 0;
+    const pinching = this.hands.left.pinching || this.hands.right.pinching;
+    const aiming = this.handHover.left || this.handHover.right || this.palmBraceActive || this.palmLauncherSide !== null;
+    const handCode = impacting ? 4
+      : this.phase === 'pulling' || manipulating ? 3
+        : pinching ? 2
+          : this.time < this.handRecoverUntil ? 5
+            : aiming ? 1
+              : 0;
+    if (handCode !== this.handPresentationCode) {
+      this.handPresentationCode = handCode;
+      this.rootEntity?.setValue(FirstFiveState, 'handPresentation', handCode);
+    }
     if (this.phase !== 'fight') return;
     const teaching = this.progress.guide !== 'done';
     const arenaThreat = this.rivalTellCode !== 0;
@@ -7077,6 +7110,10 @@ export class MatchSystem extends createSystem({
 
   /** Arms the one-per-round rescue only when the real table outline is known. */
   private beginOuterRing(): boolean {
+    // Plane discovery may finish after the arena's initial placement, or a dev/HMR session may
+    // restore a ready match without replaying placement. Refresh once at the moment the boundary
+    // becomes gameplay-critical; production still refuses the rescue when no table is known.
+    if (!ROOM.poly) this.setRoom();
     if (this.outerRingUsed || this.demo || !ROOM.poly || this.mine.finish !== 'over') return false;
     this.cancelActiveGestures();
     this.outerRingUsed = true;
