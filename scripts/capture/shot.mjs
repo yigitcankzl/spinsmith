@@ -145,6 +145,14 @@ export default async function run({ page, frame, cdp }) {
           object.visible = false;
           return;
         }
+        // Repeated presentation captures share one IWER scene. Count and preserve an already
+        // patched skin hand instead of reporting zero hands on every capture after the first.
+        if (object.material?.customProgramCacheKey?.() === 'spinsmith-capture-wrist-fade-v2') {
+          object.visible = true;
+          object.frustumCulled = false;
+          patched += 1;
+          return;
+        }
         const material = new standardMaterial.constructor({
           color: p.handColor ?? 0xc98f73,
           roughness: 0.72,
@@ -257,14 +265,16 @@ export default async function run({ page, frame, cdp }) {
       game.stamp.mesh.visible = false;
       game.menuButton.mesh.visible = false;
       game.rematchButton.mesh.visible = false;
+      game.firstClashPending = false;
+      game.launchGuide.visible = false;
       window.__capturePoseError = '';
-      window.__capturePosePromise = window.drive.arenaForge({ squeeze: 0.034, twist: 20, tilt: 0.052, hold: 6 })
+      window.__capturePosePromise = window.drive.arenaForge({ squeeze: 0.034, twist: 20, tilt: 0.052, hold: 10 })
         .catch((error) => { window.__capturePoseError = String(error?.message ?? error); });
       // Reach, close both pinches and arrive at the maximum deformation. The long hold above
       // keeps this deterministic while Chromium writes a high-resolution frame.
       const startedAt = performance.now();
       while (
-        performance.now() - startedAt < 6000
+        performance.now() - startedAt < 12000
         && Math.abs((game.arenaMorph?.scaleX ?? 1) - 1) < 0.04
         && Math.abs(game.arenaMorphTwist ?? 0) < 0.05
       ) await new Promise((resolve) => setTimeout(resolve, 50));
@@ -278,6 +288,7 @@ export default async function run({ page, frame, cdp }) {
       game.stamp.mesh.visible = false;
       game.menuButton.mesh.visible = false;
       game.rematchButton.mesh.visible = false;
+      game.launchGuide.visible = false;
       result.pose = 'arena-forge';
       result.morph = {
         scaleX: game.arenaMorph?.scaleX ?? 1,
@@ -337,11 +348,48 @@ export default async function run({ page, frame, cdp }) {
     }, p.pose);
   }
 
+  const proof = await frame.evaluate((pose) => {
+    const game = window.__game;
+    const trackedHands = Number(game.hands?.left?.tracked) + Number(game.hands?.right?.tracked);
+    const deformation = Math.max(
+      Math.abs((game.arenaMorph?.scaleX ?? 1) - 1),
+      Math.abs((game.arenaMorph?.scaleZ ?? 1) - 1),
+      Math.abs(game.arenaMorph?.tilt ?? 0),
+      Math.abs(game.arenaMorphTwist ?? 0),
+    );
+    const state = {
+      phase: game.phase,
+      trackedHands,
+      deformation,
+      rootVisible: game.root?.visible === true,
+      // The label is a child of the placement group and may keep its own flag while its parent is
+      // hidden. Only the effective parent visibility can leak the placement prompt into a frame.
+      placementVisible: game.print?.visible === true,
+      contactRings: game.handContactRings?.filter((ring) => ring.visible).length ?? 0,
+      launchGuideVisible: game.launchGuide?.visible === true,
+      handPresentation: game.handPresentationCode,
+      handEmphasis: game.handEmphasisValue,
+    };
+    if (pose === 'arena-forge') {
+      if (state.phase !== 'fight') throw new Error(`Capture guard: expected fight, got ${state.phase}`);
+      if (state.trackedHands < 2) throw new Error(`Capture guard: expected two tracked hands, got ${state.trackedHands}`);
+      if (state.deformation < 0.035) throw new Error(`Capture guard: Arena Forge is not visually deformed (${state.deformation.toFixed(3)})`);
+      if (!state.rootVisible) throw new Error('Capture guard: arena root is hidden');
+      if (state.placementVisible) throw new Error('Capture guard: placement UI leaked into Arena Forge frame');
+      if (state.contactRings < 2) throw new Error(`Capture guard: expected two surface contacts, got ${state.contactRings}`);
+      if (state.launchGuideVisible) throw new Error('Capture guard: opening arrows compete with Arena Forge');
+    }
+    return state;
+  }, p.pose);
+  if (p.pose === 'arena-forge' && info.handsPatched < 2) {
+    throw new Error(`Capture guard: expected two rendered skin hands, got ${info.handsPatched}`);
+  }
+
   const screenshot = await cdp.send('Page.captureScreenshot', {
     format: 'png',
     fromSurface: true,
     captureBeyondViewport: false,
   });
   await writeFile(p.output, Buffer.from(screenshot.data, 'base64'));
-  return { output: p.output, info };
+  return { output: p.output, info, proof };
 }
