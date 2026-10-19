@@ -288,6 +288,7 @@ export class MatchSystem extends createSystem({
   private uiLayerCode = -1;
   /** One readable hand verb at a time: idle, aim, pinch, pull, impact or recover. */
   private handPresentationCode = -1;
+  private handEmphasisValue = -1;
   private handRecoverUntil = -1;
   private interventionCount = 0;
   private failedGestures = 0;
@@ -794,6 +795,23 @@ export class MatchSystem extends createSystem({
   private handMarks = (['left', 'right'] as const).map(() =>
     Object.assign(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, depthWrite: false })), { visible: false }),
   );
+  /** A small surface response under an engaged hand. It confirms contact without decorating idle hands. */
+  private handContactRings = (['left', 'right'] as const).map(() => {
+    const mesh = new Mesh(
+      new RingGeometry(0.68, 1, 40).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial({
+        color: 0xff9a32,
+        transparent: true,
+        opacity: 0,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        side: DoubleSide,
+      }),
+    );
+    mesh.renderOrder = 12;
+    mesh.visible = false;
+    return mesh;
+  });
   /** One hand-sized hidden shard per campaign bout; pinch it to keep it between sessions. */
   private secretRelic = (() => {
     const g = new Group();
@@ -1194,6 +1212,7 @@ export class MatchSystem extends createSystem({
       ...this.palmPrints,
       ...this.scorches,
       ...this.handMarks,
+      ...this.handContactRings,
       this.secretRelic,
       this.lane,
       this.rivalTellFx,
@@ -1346,6 +1365,7 @@ export class MatchSystem extends createSystem({
       causeChain: this.causeCue.stage,
       uiLayer: this.uiLayerCode,
       handPresentation: this.handPresentationCode,
+      handEmphasis: Math.round(this.handEmphasisValue * 100) / 100,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -1558,6 +1578,7 @@ export class MatchSystem extends createSystem({
       this.palmGustAge.left = this.palmGustAge.right = 0;
       this.cord.set(null);
       for (const m of this.pinchRings) m.visible = false;
+      for (const m of this.handContactRings) m.visible = false;
       return;
     }
     // On the result card and at home, the card steps back while a stamp holds the far rim (one
@@ -1567,7 +1588,7 @@ export class MatchSystem extends createSystem({
     this.printLabel.update(Math.min(delta, 0.1));
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
-      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks]) o.visible = false;
+      for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks, ...this.handContactRings]) o.visible = false;
       for (const button of this.deckButtons) button.mesh.visible = false;
       this.hub.photo();
     }
@@ -2754,19 +2775,29 @@ export class MatchSystem extends createSystem({
     const hot = this.phase === 'fight' && this.forgeBar.full && this.taught('strike');
     (['left', 'right'] as const).forEach((side, i) => {
       const m = this.handMarks[i];
+      const contact = this.handContactRings[i];
       const h = this.hands[side];
       const wasHovering = this.handHover[side];
       this.handHover[side] = false;
       m.visible = false;
+      contact.visible = false;
       if (!play || !h.tracked) return;
       // Preview the same pinch point that updateShaping consumes. The fingertip is kept separately
       // because a press beside a top claims Catch without changing the pinch target underneath it.
       const l = this.handAt.copy(this.toLocal(h.pinch));
       const tip = this.root.worldToLocal(this.handTipAt.copy(h.index));
+      const rimGrip = this.rimPulls[side];
+      // Once a rim grip is claimed, its authored surface point remains the contact. The hand may
+      // deliberately rise or move outside the bowl while squeezing/tilting; hiding feedback then
+      // made a real two-hand Forge look like only one hand affected the arena.
+      if (rimGrip && (this.arenaMorphing || (!!this.rimPulls.left && !!this.rimPulls.right))) {
+        l.x = rimGrip.x;
+        l.z = rimGrip.z;
+      }
       const n = normRadius(this.arena.layout, l.x, l.z);
       if (n > 1.15) return;
       const floor = this.arena.height(l.x, l.z);
-      const up = l.y - floor;
+      const up = rimGrip && (this.arenaMorphing || (!!this.rimPulls.left && !!this.rimPulls.right)) ? 0.006 : l.y - floor;
       if (up < 0 || up > 0.12) return;
       const hovering = this.phase === 'fight' && this.elapsed >= TUNING.grace && !h.pinching && up <= 0.05;
       this.handHover[side] = hovering;
@@ -2807,9 +2838,21 @@ export class MatchSystem extends createSystem({
       }
       const shaping = this.phase === 'fight' && (hovering || h.pinching || !!this.shaping[side] || !!this.slings[side] || this.pressing[side]);
       if (hot || shaping) {
-        mat.color.setHex(claim === 'CATCH' || claim === 'SLING' ? 0xffd060 : claim === 'FORGE' ? 0xffc14a : claim === 'RIM' ? 0xff9a32 : 0xff8a2a);
+        const color = claim === 'CATCH' || claim === 'SLING' ? 0xffd060 : claim === 'FORGE' ? 0xffc14a : claim === 'RIM' ? 0xff9a32 : 0xff8a2a;
+        mat.color.setHex(color);
         mat.blending = AdditiveBlending;
         mat.opacity = (hot ? 0.5 : 0.25) + (hot ? 0.5 : 0.45) * k;
+        // The surface—not a floating HUD—answers the hand. Both rings light together while the
+        // whole bowl is being forged, making the two-hand cause immediately legible in a still.
+        const forging = this.arenaMorphing || (!!this.rimPulls.left && !!this.rimPulls.right);
+        const committed = h.pinching || !!this.shaping[side] || !!this.slings[side] || !!this.rimPulls[side] || this.pressing[side];
+        contact.visible = committed || hovering;
+        contact.position.set(l.x, floor + 0.003, l.z);
+        const pulse = 1 + 0.08 * Math.sin(this.time * 9 + i * Math.PI);
+        contact.scale.setScalar((forging ? 0.054 : committed ? 0.04 : 0.032) * pulse);
+        const contactMat = contact.material as MeshBasicMaterial;
+        contactMat.color.setHex(forging ? 0xffe0a3 : color);
+        contactMat.opacity = forging ? 0.92 : committed ? 0.72 : 0.32;
       } else {
         this.handHoverClaim[side] = '';
         mat.color.setHex(0x000000);
@@ -6134,6 +6177,16 @@ export class MatchSystem extends createSystem({
     if (handCode !== this.handPresentationCode) {
       this.handPresentationCode = handCode;
       this.rootEntity?.setValue(FirstFiveState, 'handPresentation', handCode);
+    }
+    const handEmphasis = impacting ? 1
+      : this.phase === 'pulling' || manipulating ? 0.82
+        : pinching ? 0.64
+          : aiming ? 0.34
+            : this.time < this.handRecoverUntil ? 0.2
+              : 0;
+    if (Math.abs(handEmphasis - this.handEmphasisValue) > 0.001) {
+      this.handEmphasisValue = handEmphasis;
+      this.rootEntity?.setValue(FirstFiveState, 'handEmphasis', handEmphasis);
     }
     if (this.phase !== 'fight') return;
     const teaching = this.progress.guide !== 'done';

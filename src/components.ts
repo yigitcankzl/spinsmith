@@ -37,6 +37,8 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   uiLayer: { type: Types.Int8, default: 0 },
   /** Dominant hand presentation: 0 idle, 1 aim, 2 pinch, 3 pull, 4 impact, 5 recover. */
   handPresentation: { type: Types.Int8, default: 0 },
+  /** Visual emphasis for the current hand-authored beat, 0 quiet to 1 decisive. */
+  handEmphasis: { type: Types.Float32, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);
