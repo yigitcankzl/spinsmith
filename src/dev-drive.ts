@@ -93,6 +93,8 @@ interface Game {
   /** Hand-first combat state exposed for deterministic emulator captures. */
   overforgeMode?: string;
   palmBraceActive?: boolean;
+  palmBraceAngles: Record<Side, number | null>;
+  palmGustBlockedUntil: Record<Side, number>;
   crossguardActive?: boolean;
   crossguardHits?: number;
   crossguardA?: Vector3;
@@ -119,6 +121,7 @@ interface Game {
   forgeWheelGrabGap?: number;
   emberState?: 0 | 1 | 2 | 3;
   emberGrabGap?: number;
+  interventionCount: number;
   emberPickup: { visible: boolean; getWorldPosition(v: Vector3): Vector3 };
   spawnEmber(x: number, z: number): void;
   /** Competition-feature state exposed for repeatable emulator proof. */
@@ -915,8 +918,16 @@ export function installDriver() {
         glide('left', 'palm', rimPoint(leftAngle), 0.2, 0),
         glide('right', 'palm', rimPoint(rightAngle), 0.2, 0),
       ]);
-      for (let i = 0; i < 30 && !g.crossguardActive; i++) await wait(0.02);
-      if (!g.crossguardActive || !g.crossguardA || !g.crossguardB) throw new Error('two open palms did not form Crossguard');
+      for (let i = 0; i < 30 && !g.crossguardActive && (g.crossguardHits ?? 0) <= before; i++) await wait(0.02);
+      // A live top may cross on the same frame the second palm completes the rail. That is a
+      // successful one-hit Crossguard, not a failed formation whose active state was missed.
+      if ((g.crossguardHits ?? 0) > before) {
+        await Promise.all([park('left'), park('right')]);
+        return;
+      }
+      if (!g.crossguardActive || !g.crossguardA || !g.crossguardB) {
+        throw new Error(`two open palms did not form Crossguard (elapsed ${g.elapsed.toFixed(2)}, blocked ${g.palmGustBlockedUntil.left.toFixed(2)}/${g.palmGustBlockedUntil.right.toFixed(2)}, angles ${g.palmBraceAngles.left}/${g.palmBraceAngles.right})`);
+      }
       const ax = g.crossguardA.x;
       const az = g.crossguardA.z;
       const bx = g.crossguardB.x;
@@ -983,6 +994,7 @@ export function installDriver() {
       const { side = 'right', x = 0.055, z = 0.035 } = opts;
       const g = game();
       if (g.phase !== 'fight') throw new Error('Ember rivet only exists during a fight');
+      const interventionsBefore = g.interventionCount;
       if ((g.emberState ?? 0) === 0) g.spawnEmber(0, 0);
       for (let i = 0; i < 50 && (!g.emberPickup.visible || (g.emberState ?? 0) !== 1); i++) await wait(0.02);
       await wait(0.7);
@@ -999,9 +1011,11 @@ export function installDriver() {
       await glide(side, 'pinch', above(target, 0.07), 0.3, 1);
       await glide(side, 'pinch', target, 0.18, 1, 'linear');
       await setPinch(side, false);
-      await wait(0.18);
+      // A top can hit the planted bumper on the very next physics frame and consume state 3.
+      // The intervention counter is the durable proof that the release authored the rivet.
+      for (let i = 0; i < 12 && g.interventionCount === interventionsBefore; i++) await wait(0.02);
       await park(side);
-      if ((g.emberState ?? 0) !== 3) throw new Error('rivet did not plant as a bumper');
+      if (g.interventionCount === interventionsBefore) throw new Error('rivet did not plant as a bumper');
     },
 
     /** Sweep a relaxed open palm across the inner bowl so the real gesture drives Forge Gust. */

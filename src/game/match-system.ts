@@ -9,7 +9,7 @@ import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { cloneLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance, validate } from './layout.js';
-import { forgeGrips } from './reach.js';
+import { FORGE_GRIP, forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
@@ -51,7 +51,7 @@ import type { GuestEvent, PackedShape, Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from './campaign.js';
 import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
-import { clampedGrooveX, clampedGrooveZ, grooveLength, GROOVE_MIN_LENGTH, PALM_CATCH_RADIUS } from './hand-tools.js';
+import { clampedGrooveX, clampedGrooveZ, grooveLength, GROOVE_INTENT_LENGTH, GROOVE_MIN_LENGTH, PALM_CATCH_RADIUS } from './hand-tools.js';
 import { brawlModeName, targetWinner } from './brawl.js';
 import type { BrawlMode } from './brawl.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
@@ -95,6 +95,17 @@ const STEEP_SLOW = 0.6;
 const STEEP_SPIN = 0.12;
 /** Pinches this close to the floor (vertically) grab it to start a ramp. */
 const SHAPE_GRAB = 0.05;
+/** Keep near-rim floor pinches available for ramps; only the physical outer lip claims a rim grip. */
+const RIM_GRAB_MIN = 0.9;
+
+/** The two authored two-hand grips sit slightly inside the rim; keep only those inner sectors. */
+function atForgeGrip(layout: ArenaLayout, x: number, z: number) {
+  const n = normRadius(layout, x, z);
+  if (Math.abs(n - FORGE_GRIP.n) > 0.055) return false;
+  const angle = Math.atan2(z, x);
+  const gap = (target: number) => Math.abs(Math.atan2(Math.sin(angle - target), Math.cos(angle - target)));
+  return Math.min(gap(FORGE_GRIP.angle), gap(Math.PI - FORGE_GRIP.angle)) <= 0.2;
+}
 const RESULT_TIME = 4;
 /** A knockout replay: this many sim steps (2 s) recorded, played back at this speed. */
 const REPLAY_STEPS = 240;
@@ -1430,6 +1441,10 @@ export class MatchSystem extends createSystem({
         if (e.code === 'KeyO' && this.phase === 'fight') {
           // Throw a top over the wall now, outward from the center, to see it land on the table.
           // Shift+O throws yours and arms the Outer Ring rescue path.
+          // Rebuild the dev table before the deterministic rescue probe. Entering the forge or
+          // replacing the XR session can invalidate IWER's old room polygon even though the arena
+          // is still visibly seated on the same emulated desk.
+          if (e.shiftKey && import.meta.env.DEV && !ROOM.poly) this.setRoom();
           const t = e.shiftKey ? this.mine : this.theirs;
           const r = Math.hypot(t.x, t.z) || 1;
           // The rescue probe must land on the table; the faster rival shot remains the off-desk
@@ -2708,7 +2723,7 @@ export class MatchSystem extends createSystem({
             break;
           }
         }
-        claim = caught ? 'SLING' : n >= 0.82 ? 'RIM' : nearTop && this.taught('cup') ? 'CATCH' : 'RAMP';
+        claim = caught ? 'SLING' : n >= RIM_GRAB_MIN || atForgeGrip(this.arena.layout, l.x, l.z) ? 'RIM' : nearTop && this.taught('cup') ? 'CATCH' : 'RAMP';
       }
       if (claim !== this.handHoverClaim[side]) {
         this.handHoverClaim[side] = claim;
@@ -4500,6 +4515,13 @@ export class MatchSystem extends createSystem({
     this.strikeWindowShown = false;
     this.knuckleTapAt.left = this.knuckleTapAt.right = -9;
     this.knuckleUsed = false;
+    // `elapsed` restarts every round. A timestamp from the previous round would otherwise make the
+    // first Palm Brace rebound without opening Counterflow's riposte window.
+    this.palmBraceHitAt = -9;
+    this.clearPalmBrace();
+    this.palmGustBlockedUntil.left = this.palmGustBlockedUntil.right = -9;
+    this.palmGustSampled.left = this.palmGustSampled.right = false;
+    this.palmGustAge.left = this.palmGustAge.right = 0;
     this.lastHardHit = -1;
     this.accumulator = 0;
     this.clashes = 0;
@@ -4594,6 +4616,15 @@ export class MatchSystem extends createSystem({
       this.arenaMorphLost = 0;
       this.arenaMorphing = false;
       this.rimPulls.left = this.rimPulls.right = null;
+      // Arena Forge owns both hands through release. `updateShaping()` is intentionally skipped on
+      // this frame, so set the shared open-palm guard here; otherwise the same release can become
+      // Forge Gust or Crossguard and spend a second charge.
+      for (const side of ['left', 'right'] as const) {
+        this.palmGustBlockedUntil[side] = this.elapsed + 0.35;
+        this.palmGustSampled[side] = false;
+        this.palmGustAge[side] = 0;
+      }
+      this.clearPalmBrace();
       this.rimSpringGuides[0].visible = false;
       this.rimSpringGuides[1].visible = false;
 
@@ -4746,7 +4777,7 @@ export class MatchSystem extends createSystem({
       this.recordIntervention();
       this.impacts.shock(l.x, this.arena.floorHeight(1), l.z, 0.85, 0xffb347);
       this.sparks.burst(l.x, this.arena.floorHeight(1), l.z, 0.8);
-      this.stamp.show('KNUCKLE QUAKE!', 'DOUBLE TAP → TABLE SHOCK', 'mine', 0.75, 1.05);
+      this.stamp.show('TABLE KNOCK!', 'PINCH + DOUBLE TAP → SHOCK', 'mine', 0.75, 1.05);
       this.label.set('THE REAL TABLE HIT THE ARENA');
       this.labelTimer = 1.2;
       this.roomLight.hit();
@@ -4840,7 +4871,8 @@ export class MatchSystem extends createSystem({
         // A rim grip is half of the two-hand forge (from its lesson on); alone it is a rim spring (later).
         if (!rim && h.justPinched && open && this.taught('forge')) {
           const n = normRadius(this.arena.layout, l.x, l.z);
-          if (n >= 0.82 && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
+          const grip = n >= RIM_GRAB_MIN || atForgeGrip(this.arena.layout, l.x, l.z);
+          if (grip && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
             rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z, started: this.elapsed };
             playTick();
           }
@@ -4922,7 +4954,9 @@ export class MatchSystem extends createSystem({
       if (touching && groove) {
         groove.x = clampedGrooveX(groove.sx, groove.sz, tip.x, tip.z);
         groove.z = clampedGrooveZ(groove.sx, groove.sz, tip.x, tip.z);
-        if (grooveLength(groove.sx, groove.sz, groove.x, groove.z) >= GROOVE_MIN_LENGTH * 0.45) groove.active = true;
+        // Decide early enough that a deliberate draw cannot become a Cup while the finger is
+        // already moving sideways. The threshold remains above normal tracked-hand jitter.
+        if (grooveLength(groove.sx, groove.sz, groove.x, groove.z) >= GROOVE_INTENT_LENGTH) groove.active = true;
         if (groove.active) {
           this.pressing[side] = false;
           continue;
@@ -5201,11 +5235,18 @@ export class MatchSystem extends createSystem({
       const hand = this.hands[this.emberHeld];
       if (hand.tracked) {
         this.emberLost = 0;
-        this.emberHandLocal.copy(hand.pinch);
-        this.stage.worldToLocal(this.emberHandLocal);
-        this.emberPickup.position.copy(this.emberHandLocal);
-        if (hand.pinching) return;
+        // Opening a tracked hand can move its reported pinch joint several centimetres in a
+        // single frame. Keep the rivet at the last closed-hand sample for the release test;
+        // otherwise a deliberate press into the bowl can jump above or outside it as the fingers
+        // open and feel randomly rejected on both Quest and IWER.
+        if (hand.pinching) {
+          this.emberHandLocal.copy(hand.pinch);
+          this.stage.worldToLocal(this.emberHandLocal);
+          this.emberPickup.position.copy(this.emberHandLocal);
+          return;
+        }
         if (hand.justReleased) {
+          this.emberHandLocal.copy(this.emberPickup.position);
           const floor = this.arena.height(this.emberHandLocal.x, this.emberHandLocal.z);
           if (this.arena.inside(this.emberHandLocal.x, this.emberHandLocal.z) && Math.abs(this.emberHandLocal.y - floor) <= 0.085) {
             this.emberBumperAt.set(this.emberHandLocal.x, floor, this.emberHandLocal.z);
@@ -5372,7 +5413,11 @@ export class MatchSystem extends createSystem({
       foot.visible = false;
       let angle = this.palmBraceAngles[side];
       let accepted = false;
-      if (h.tracked && !h.pinching && this.overforgeControl?.side !== side && this.overforgeHeld !== side) {
+      // A hand that just released a pinch still looks like an open palm for a few frames. Without
+      // this ownership window, releasing two-hand Arena Forge can accidentally build Crossguard
+      // and spend a second charge on the same physical gesture.
+      if (h.tracked && !h.pinching && this.elapsed >= this.palmGustBlockedUntil[side]
+        && this.overforgeControl?.side !== side && this.overforgeHeld !== side) {
         const wrist = this.handAt.copy(this.toLocal(h.wrist));
         const index = this.root.worldToLocal(this.local.copy(h.index));
         const palm = wrist.lerp(index, 0.45);
@@ -5802,7 +5847,9 @@ export class MatchSystem extends createSystem({
       const l = h.tracked ? this.slapAt.copy(this.toLocal(h.wrist)).lerp(this.toLocal(h.index), 0.5) : null;
       const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > SLAP_MIN_N;
       const openPalm = h.tracked && !h.pinching && Math.abs(h.wrist.y - h.index.y) <= 0.08;
-      const ownsAnotherGesture = this.arenaMorphing || !!this.rimPulls[side] || !!this.shaping[side] || !!this.slings[side] || this.overforgeHeld === side || this.overforgeControl?.side === side;
+      const ownsAnotherGesture = this.arenaMorphing || !!this.rimPulls[side] || !!this.shaping[side] || !!this.slings[side]
+        || this.overforgeHeld === side || this.overforgeControl?.side === side
+        || this.palmBraceAngles[side] !== null || this.crossguardActive;
       // The open-palm press is a delayed accessibility fallback for the seal stamp. Keeping its
       // detector live before the fallback appears made the two open hands approaching Arena Forge
       // count as a hidden ultimate slap.
@@ -6704,7 +6751,10 @@ export class MatchSystem extends createSystem({
 
   /** Arms the one-per-round rescue only when the real table outline is known. */
   private beginOuterRing(): boolean {
-    if (this.outerRingUsed || this.demo || !ROOM.poly || this.mine.finish !== 'over') return false;
+    if (this.outerRingUsed || this.demo || !ROOM.poly || this.mine.finish !== 'over') {
+      if (import.meta.env.DEV) console.log(`[OUTER] unavailable used=${this.outerRingUsed} demo=${this.demo} table=${!!ROOM.poly} finish=${this.mine.finish ?? 'none'}`);
+      return false;
+    }
     this.cancelActiveGestures();
     this.outerRingUsed = true;
     this.outerRingState = 'rescue';

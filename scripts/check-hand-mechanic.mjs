@@ -37,6 +37,9 @@ export default async function run({ page, frame }) {
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
     }
     if (launchCheck) window.__game.deckChoice = 0;
+    // Reproduce the old cross-round bug: the next launch must clear a late parry timestamp before
+    // Counterflow tries to earn its new riposte window.
+    if (check === 'palm-gust-riposte') game.palmBraceHitAt = 30;
     if (check === 'outer-ring' || check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
@@ -44,6 +47,7 @@ export default async function run({ page, frame }) {
       for (let i = 0; i < 120 && drive.state().phase !== 'fight'; i++) await sleep(25);
       if (drive.state().phase === 'fight') drive.key('KeyU');
     }
+    if (check === 'palm-gust-riposte' && game.palmBraceHitAt !== -9) throw new Error(`new round kept stale Palm Brace timestamp ${game.palmBraceHitAt}`);
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
     // not spend most of its timeout waiting for the opening clock to reach the normal 2.5 s gate.
     if ((check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
@@ -183,8 +187,12 @@ export default async function run({ page, frame }) {
     if (check === 'rim-spring' && after.charges !== before.charges - 1) throw new Error(`Rim Spring must spend exactly one charge (${before.charges} -> ${after.charges})`);
     if (check === 'crossguard' && after.charges !== before.charges - 1) throw new Error(`Crossguard must spend exactly one charge on contact (${before.charges} -> ${after.charges})`);
     if (check === 'forge-wheel' && after.charges !== before.charges - 1) throw new Error(`Forge Wheel must spend exactly one charge on release (${before.charges} -> ${after.charges})`);
-    if (check === 'ember-plant' && (after.charges !== before.charges || after.ember?.state !== 3)) throw new Error(`Ember planting must be earned and free (${before.charges} -> ${after.charges}, state ${after.ember?.state}, gap ${after.ember?.gap})`);
+    if (check === 'ember-plant' && (after.charges !== before.charges || (after.diagnostics?.interventions ?? 0) <= (before.diagnostics?.interventions ?? 0))) throw new Error(`Ember planting must be earned and free (${before.charges} -> ${after.charges}, state ${after.ember?.state}, gap ${after.ember?.gap})`);
     if (check.startsWith('arena-morph-') && check !== 'arena-morph-tutorial' && check !== 'arena-morph-cancel' && after.charges !== before.charges - 1) throw new Error(`Arena Forge must commit exactly one charge (${before.charges} -> ${after.charges})`);
+    if (check.startsWith('arena-morph-') && !['arena-morph-tutorial', 'arena-morph-cancel'].includes(check)) {
+      const expected = check.slice('arena-morph-'.length);
+      if (after.diagnostics?.arenaForgeAction !== expected) throw new Error(`Arena Forge classified ${after.diagnostics?.arenaForgeAction ?? 'none'} instead of ${expected}`);
+    }
     if (check.startsWith('arena-morph-') && check !== 'arena-morph-tutorial' && !before.strikeCommitted && after.strikeCommitted) throw new Error('pinched Arena Forge was misread as an ultimate slap');
     return {
       check,

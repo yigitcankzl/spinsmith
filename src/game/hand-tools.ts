@@ -2,6 +2,8 @@
 
 export const PALM_CATCH_RADIUS = 0.055;
 export const GROOVE_MIN_LENGTH = 0.045;
+/** Lateral fingertip travel that commits a floor touch to Groove instead of Cup. */
+export const GROOVE_INTENT_LENGTH = 0.012;
 export const GROOVE_MAX_LENGTH = 0.16;
 export const GROOVE_RADIUS = 0.018;
 
