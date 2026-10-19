@@ -17,7 +17,7 @@ import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
 import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
-import { eyeView, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
+import { eyeView, FORGE_GRIP, forgeGripIntent, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { crossguard, emberBumper, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
@@ -25,7 +25,7 @@ import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
 import { targetWinner } from '../src/game/brawl.ts';
-import { clampedGrooveX, clampedGrooveZ, grooveLength, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
+import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
 const FORGE = ARENAS[0];
 const ARENA_RADIUS = FORGE.radius;
@@ -326,6 +326,12 @@ TUNING.grace = 0;
   const x = clampedGrooveX(0, 0, 1, 1);
   const z = clampedGrooveZ(0, 0, 1, 1);
   assert.ok(Math.abs(grooveLength(0, 0, x, z) - GROOVE_MAX_LENGTH) < 1e-9, 'a traced groove is capped to seated reach');
+  assert.equal(hasGrooveIntent(0, 0, GROOVE_INTENT_LENGTH - 0.001, 0), false, 'fingertip jitter stays a Cup candidate');
+  assert.equal(hasGrooveIntent(0, 0, GROOVE_INTENT_LENGTH + 0.001, 0), true, 'a deliberate sideways trace claims Groove');
+  assert.equal(forgeGripIntent(FORGE_GRIP.n, FORGE_GRIP.angle), true, 'the authored right Arena Forge grip owns the inner rim');
+  assert.equal(forgeGripIntent(FORGE_GRIP.n, Math.PI - FORGE_GRIP.angle), true, 'the authored left Arena Forge grip owns the inner rim');
+  assert.equal(forgeGripIntent(FORGE_GRIP.n, 0), false, 'an ordinary near-rim floor pinch remains a Ramp');
+  assert.equal(forgeGripIntent(FORGE_GRIP.n - 0.06, FORGE_GRIP.angle), false, 'a floor pinch inside the forge grip remains a Ramp');
 }
 
 TUNING.grace = GRACE;

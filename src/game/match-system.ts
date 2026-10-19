@@ -9,7 +9,7 @@ import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { cloneLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance, validate } from './layout.js';
-import { FORGE_GRIP, forgeGrips } from './reach.js';
+import { forgeGripIntent, forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
@@ -51,7 +51,7 @@ import type { GuestEvent, PackedShape, Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from './campaign.js';
 import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
-import { clampedGrooveX, clampedGrooveZ, grooveLength, GROOVE_INTENT_LENGTH, GROOVE_MIN_LENGTH, PALM_CATCH_RADIUS } from './hand-tools.js';
+import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_MIN_LENGTH, PALM_CATCH_RADIUS } from './hand-tools.js';
 import { brawlModeName, targetWinner } from './brawl.js';
 import type { BrawlMode } from './brawl.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
@@ -98,14 +98,6 @@ const SHAPE_GRAB = 0.05;
 /** Keep near-rim floor pinches available for ramps; only the physical outer lip claims a rim grip. */
 const RIM_GRAB_MIN = 0.9;
 
-/** The two authored two-hand grips sit slightly inside the rim; keep only those inner sectors. */
-function atForgeGrip(layout: ArenaLayout, x: number, z: number) {
-  const n = normRadius(layout, x, z);
-  if (Math.abs(n - FORGE_GRIP.n) > 0.055) return false;
-  const angle = Math.atan2(z, x);
-  const gap = (target: number) => Math.abs(Math.atan2(Math.sin(angle - target), Math.cos(angle - target)));
-  return Math.min(gap(FORGE_GRIP.angle), gap(Math.PI - FORGE_GRIP.angle)) <= 0.2;
-}
 const RESULT_TIME = 4;
 /** A knockout replay: this many sim steps (2 s) recorded, played back at this speed. */
 const REPLAY_STEPS = 240;
@@ -305,6 +297,8 @@ export class MatchSystem extends createSystem({
   private palmGustSampled: Record<Side, boolean> = { left: false, right: false };
   /** A released pinch owns the hand briefly, so withdrawing it cannot become a second gesture. */
   private palmGustBlockedUntil: Record<Side, number> = { left: -9, right: -9 };
+  /** A released held tool owns its fingertip follow-through, so it cannot draw a Cup or Groove. */
+  private shapingBlockedUntil: Record<Side, number> = { left: -9, right: -9 };
   private palmGustCount = 0;
   private riposteUntil = -9;
   private riposteSide: Side | null = null;
@@ -1441,10 +1435,6 @@ export class MatchSystem extends createSystem({
         if (e.code === 'KeyO' && this.phase === 'fight') {
           // Throw a top over the wall now, outward from the center, to see it land on the table.
           // Shift+O throws yours and arms the Outer Ring rescue path.
-          // Rebuild the dev table before the deterministic rescue probe. Entering the forge or
-          // replacing the XR session can invalidate IWER's old room polygon even though the arena
-          // is still visibly seated on the same emulated desk.
-          if (e.shiftKey && import.meta.env.DEV && !ROOM.poly) this.setRoom();
           const t = e.shiftKey ? this.mine : this.theirs;
           const r = Math.hypot(t.x, t.z) || 1;
           // The rescue probe must land on the table; the faster rival shot remains the off-desk
@@ -2723,7 +2713,7 @@ export class MatchSystem extends createSystem({
             break;
           }
         }
-        claim = caught ? 'SLING' : n >= RIM_GRAB_MIN || atForgeGrip(this.arena.layout, l.x, l.z) ? 'RIM' : nearTop && this.taught('cup') ? 'CATCH' : 'RAMP';
+        claim = caught ? 'SLING' : n >= RIM_GRAB_MIN || forgeGripIntent(n, Math.atan2(l.z, l.x)) ? 'RIM' : nearTop && this.taught('cup') ? 'CATCH' : 'RAMP';
       }
       if (claim !== this.handHoverClaim[side]) {
         this.handHoverClaim[side] = claim;
@@ -4520,6 +4510,7 @@ export class MatchSystem extends createSystem({
     this.palmBraceHitAt = -9;
     this.clearPalmBrace();
     this.palmGustBlockedUntil.left = this.palmGustBlockedUntil.right = -9;
+    this.shapingBlockedUntil.left = this.shapingBlockedUntil.right = -9;
     this.palmGustSampled.left = this.palmGustSampled.right = false;
     this.palmGustAge.left = this.palmGustAge.right = 0;
     this.lastHardHit = -1;
@@ -4799,6 +4790,14 @@ export class MatchSystem extends createSystem({
       const h = this.hands[side];
       const rimGuide = this.rimSpringGuides[side === 'left' ? 0 : 1];
       rimGuide.visible = false;
+      if (this.elapsed < this.shapingBlockedUntil[side]) {
+        this.shaping[side] = null;
+        this.grooving[side] = null;
+        this.rimPulls[side] = null;
+        this.pressing[side] = false;
+        this.tipFresh[side] = true;
+        continue;
+      }
       // A pinching hand that owns the forge seal must not also author a ramp underneath it.
       if (this.overforgeHeld === side || this.overforgeControl?.side === side || this.forgeWheelHeld === side || this.emberHeld === side) continue;
       this.updateCup(side);
@@ -4871,7 +4870,7 @@ export class MatchSystem extends createSystem({
         // A rim grip is half of the two-hand forge (from its lesson on); alone it is a rim spring (later).
         if (!rim && h.justPinched && open && this.taught('forge')) {
           const n = normRadius(this.arena.layout, l.x, l.z);
-          const grip = n >= RIM_GRAB_MIN || atForgeGrip(this.arena.layout, l.x, l.z);
+          const grip = n >= RIM_GRAB_MIN || forgeGripIntent(n, Math.atan2(l.z, l.x));
           if (grip && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
             rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z, started: this.elapsed };
             playTick();
@@ -4956,7 +4955,7 @@ export class MatchSystem extends createSystem({
         groove.z = clampedGrooveZ(groove.sx, groove.sz, tip.x, tip.z);
         // Decide early enough that a deliberate draw cannot become a Cup while the finger is
         // already moving sideways. The threshold remains above normal tracked-hand jitter.
-        if (grooveLength(groove.sx, groove.sz, groove.x, groove.z) >= GROOVE_INTENT_LENGTH) groove.active = true;
+        if (hasGrooveIntent(groove.sx, groove.sz, groove.x, groove.z)) groove.active = true;
         if (groove.active) {
           this.pressing[side] = false;
           continue;
@@ -5130,6 +5129,7 @@ export class MatchSystem extends createSystem({
       this.palmGustSampled[side] = false;
       this.palmGustAge[side] = 0;
       this.palmGustBlockedUntil[side] = -9;
+      this.shapingBlockedUntil[side] = -9;
     }
     this.cord.set(null);
     this.arenaMorphing = false;
@@ -5246,6 +5246,18 @@ export class MatchSystem extends createSystem({
           return;
         }
         if (hand.justReleased) {
+          const side = this.emberHeld;
+          // Opening the hand after carrying the rivet moves IWER/Quest's reported index joint.
+          // Keep that release owned by Ember, so its follow-through cannot also draw a free Groove.
+          this.shapingBlockedUntil[side] = this.elapsed + 0.18;
+          this.palmGustBlockedUntil[side] = this.elapsed + 0.35;
+          this.shaping[side] = null;
+          this.grooving[side] = null;
+          this.rimPulls[side] = null;
+          this.pressing[side] = false;
+          this.tipFresh[side] = true;
+          this.palmGustSampled[side] = false;
+          this.palmGustAge[side] = 0;
           this.emberHandLocal.copy(this.emberPickup.position);
           const floor = this.arena.height(this.emberHandLocal.x, this.emberHandLocal.z);
           if (this.arena.inside(this.emberHandLocal.x, this.emberHandLocal.z) && Math.abs(this.emberHandLocal.y - floor) <= 0.085) {
@@ -6751,10 +6763,7 @@ export class MatchSystem extends createSystem({
 
   /** Arms the one-per-round rescue only when the real table outline is known. */
   private beginOuterRing(): boolean {
-    if (this.outerRingUsed || this.demo || !ROOM.poly || this.mine.finish !== 'over') {
-      if (import.meta.env.DEV) console.log(`[OUTER] unavailable used=${this.outerRingUsed} demo=${this.demo} table=${!!ROOM.poly} finish=${this.mine.finish ?? 'none'}`);
-      return false;
-    }
+    if (this.outerRingUsed || this.demo || !ROOM.poly || this.mine.finish !== 'over') return false;
     this.cancelActiveGestures();
     this.outerRingUsed = true;
     this.outerRingState = 'rescue';

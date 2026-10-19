@@ -72,6 +72,13 @@ export function traySpot(i: number, n: number): Spot {
  */
 export const FORGE_GRIP = { angle: Math.PI / 4, n: 0.86 };
 
+/** True only in the two authored inner-rim sectors that belong to two-hand Arena Forge. */
+export function forgeGripIntent(n: number, angle: number) {
+  if (Math.abs(n - FORGE_GRIP.n) > 0.055) return false;
+  const gap = (target: number) => Math.abs(Math.atan2(Math.sin(angle - target), Math.cos(angle - target)));
+  return Math.min(gap(FORGE_GRIP.angle), gap(Math.PI - FORGE_GRIP.angle)) <= 0.2;
+}
+
 /** The left and right forge grips of an arena (floor level; add the arena height for y). */
 export function forgeGrips(layout: ArenaLayout): [Spot, Spot] {
   return ([Math.PI - FORGE_GRIP.angle, FORGE_GRIP.angle] as const).map((a) => {

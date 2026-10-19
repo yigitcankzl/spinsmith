@@ -18,6 +18,11 @@ export function grooveLength(sx: number, sz: number, x: number, z: number) {
   return Math.min(GROOVE_MAX_LENGTH, Math.hypot(x - sx, z - sz));
 }
 
+/** True once a floor touch has moved far enough sideways to own Groove instead of Cup. */
+export function hasGrooveIntent(sx: number, sz: number, x: number, z: number) {
+  return grooveLength(sx, sz, x, z) >= GROOVE_INTENT_LENGTH;
+}
+
 export function clampedGrooveX(sx: number, sz: number, x: number, z: number) {
   const dx = x - sx;
   const dz = z - sz;
