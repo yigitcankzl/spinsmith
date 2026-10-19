@@ -127,7 +127,9 @@ const PALM_GUST_COOLDOWN = 1.8;
 /** Long enough to survive a slow emulator frame and still leave the hand's direction readable. */
 const PALM_GUST_FX_TIME = 0.65;
 /** A real palm parry can be swept back into the bowl without spending another charge. */
-const RIPOSTE_WINDOW = 0.75;
+// A player must feel the parry, move the open hand back inside the bowl, settle, then sweep.
+// 750 ms made that readable physical sequence fail even in deterministic IWER input.
+const RIPOSTE_WINDOW = 1.15;
 /** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
 const SLAP_MIN_N = 1.18;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
@@ -5591,9 +5593,14 @@ export class MatchSystem extends createSystem({
         const palm = wrist.lerp(index, 0.45);
         const n = normRadius(this.arena.layout, palm.x, palm.z);
         const floor = this.arena.height(palm.x, palm.z);
+        // Hand marks classify the pinch target—the actual authored contact—while Palm Brace uses
+        // the palm midpoint. Reserve the grip when either view says FORGE; their offsets differ.
+        const reservedForgeGrip = this.handHoverClaim[side] === 'FORGE'
+          || (this.taught('forge') && forgeGripIntent(n, Math.atan2(palm.z, palm.x)));
         // A defensive wall requires a low, flat open hand. A relaxed upright hand near the rim no
-        // longer creates an invisible parry sector by accident.
-        accepted = n >= 0.78 && n <= 1.22 && palm.y >= floor - 0.025 && palm.y <= floor + 0.065 && Math.abs(wrist.y - index.y) <= 0.07;
+        // longer creates an invisible parry sector by accident. The two glowing Forge grips are
+        // reserved for that verb, so approaching them cannot spend a charge as Crossguard first.
+        accepted = !reservedForgeGrip && n >= 0.78 && n <= 1.22 && palm.y >= floor - 0.025 && palm.y <= floor + 0.065 && Math.abs(wrist.y - index.y) <= 0.07;
         if (accepted) {
           angle = Math.atan2(palm.z, palm.x);
           this.palmBraceAngles[side] = angle;
