@@ -26,14 +26,25 @@ export default async function run({ page, frame }) {
     game.elapsed = Math.max(game.elapsed, 6);
     game.charges.charges = 3;
     drive.key('KeyU');
+    game.tellTaught = true;
+    game.stamp.cut();
+    game.stamp.queue.length = 0;
+    game.label.set('');
+    game.labelTimer = 0;
+    game.forgeBar.value = 0;
+    game.barWasFull = false;
     Object.assign(game.mine, { x: -0.06, z: 0.01, vx: 0, vz: 0, spin: 1.1, state: 'spinning' });
     Object.assign(game.theirs, { x: 0.08, z: -0.02, vx: 0, vz: 0, spin: 1.1, state: 'spinning' });
     game.rival = { ...game.rival, move: 'charge' };
     game.rivalBar.value = 1;
-    for (let i = 0; i < 160 && drive.state().diagnostics?.rivalTell !== 1; i++) await sleep(25);
-    if (drive.state().diagnostics?.rivalTell !== 1) throw new Error('charge tell did not become visible');
+    game.rivalTell(0);
+    if (game.rivalTellCode !== 1) throw new Error('charge tell did not start');
     // Hold the wind-up long enough for a separate screenshot command to capture it.
+    game.rivalTellDuration = 999;
+    game.tellAt = game.elapsed + 999;
     game.theirs.tell = 999;
+    game.drawLane(0.5);
+    game.syncUiHierarchy();
     game.rivalBar.value = 0;
     Object.assign(game.mine, { vx: 0, vz: 0, spin: 1.1 });
     Object.assign(game.theirs, { vx: 0, vz: 0, spin: 1.1 });

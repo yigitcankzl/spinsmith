@@ -29,6 +29,7 @@
     "capture:ultimates": "scripts/ultimates.sh",
     "capture:competition": "scripts/competition-trailer.sh",
     "capture:hands": "scripts/hand-mechanics.sh",
+    "view:clean": "npx @iwsdk/cli browser run scripts/capture/clean-view.mjs --timeout 30000",
     "capture:cinematic": "scripts/capture/cinematic.sh",
     "capture:heroes": "scripts/capture/heroes.sh"
   },

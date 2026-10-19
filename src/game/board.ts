@@ -105,15 +105,13 @@ export class SmithBoard {
       const y0 = 168 - ((lines.length - 1) * t * 1.15) / 2;
       lines.forEach((l, i) => engrave(g, l, W / 2, y0 + i * t * 1.15, s.done ? TEXT_DIM : TEXT, W - 140));
       setType(g, 'caption', this.k, DIST);
-      // The board hangs out of reach: it is taken by pointing at it and pinching.
+      // The board hangs out of reach: keep its one action short enough to read at a glance.
       const next = s.tomorrow ? `TOMORROW: ${s.tomorrow.rival} ON ${s.tomorrow.arena}` : 'A NEW ORDER COMES TOMORROW';
-      engrave(g, (s.done ? next : `${s.order.arena} · POINT AND PINCH TO TAKE IT`).toUpperCase(), W / 2, 280, s.done ? STEEL : ORANGE, W - 120);
+      engrave(g, (s.done ? next : `${s.order.arena} · PINCH TO PLAY`).toUpperCase(), W / 2, 292, s.done ? STEEL : ORANGE, W - 120);
     }
-    setType(g, 'caption', this.k, DIST);
-    engrave(g, s.history.toUpperCase(), W / 2, 314, TEXT_DIM, W - 140);
     g.fillStyle = 'rgba(0,0,0,0.35)';
-    g.fillRect(80, 344, W - 160, 3);
-    this.drawStamps(g, s, 396);
+    g.fillRect(80, 334, W - 160, 3);
+    this.drawStamps(g, s, 398);
   }
 
   private drawBack(g: CanvasRenderingContext2D, s: BoardState) {

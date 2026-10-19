@@ -48,7 +48,7 @@ import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 import { clampGuestSpot, guestPointsBefore, linkFromAddress, sanitizeGuestEvent } from './online.js';
 import type { OnlineLink } from './online.js';
 import type { GuestEvent, PackedShape, Vec3 } from './net.js';
-import { BOUTS, boutSkill, CHAPTERS, MEDAL_SHORT, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from './campaign.js';
+import { BOUTS, boutSkill, CHAPTERS, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from './campaign.js';
 import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_MIN_LENGTH, PALM_CATCH_RADIUS } from './hand-tools.js';
@@ -284,6 +284,8 @@ export class MatchSystem extends createSystem({
   private rootEntity?: Entity;
   /** Session-only judge/tester evidence: placement → match → rip → intervention → result → forge. */
   private firstFiveStep = 0;
+  /** Coarse information layer mirrored to ECS; avoids several panels competing in one phase. */
+  private uiLayerCode = -1;
   private interventionCount = 0;
   private failedGestures = 0;
   private arenaForgeCancels = 0;
@@ -1339,6 +1341,7 @@ export class MatchSystem extends createSystem({
       emberGrabGap: Math.round(this.emberGrabGap * 1000) / 1000,
       rivalTell: this.rivalTellCode,
       causeChain: this.causeCue.stage,
+      uiLayer: this.uiLayerCode,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -1881,6 +1884,7 @@ export class MatchSystem extends createSystem({
     this.updateRewards(dt);
     this.updateShapes();
     this.updateCauseCue(dt);
+    this.syncUiHierarchy();
     this.arenaView.idleOrbit = this.phase !== 'build';
     // In the workshop the pillars stand where they are picked up.
     if (this.phase === 'build') this.arena.orbitT = 0;
@@ -2780,7 +2784,7 @@ export class MatchSystem extends createSystem({
       }
       if (claim !== this.handHoverClaim[side]) {
         this.handHoverClaim[side] = claim;
-        if (claim && this.labelTimer <= 0) {
+        if (claim && this.labelTimer <= 0 && this.progress.guide !== 'done') {
           const instruction = claim === 'CATCH' ? 'PRESS TO MAGNET-CATCH' : claim === 'SLING' ? 'PINCH + PULL TO SLING' : claim === 'FORGE' ? 'PINCH BOTH GLOWS · SQUEEZE / TWIST / TILT' : claim === 'RIM' ? 'PINCH + PULL: SPRING · BOTH HANDS: FORGE' : 'PINCH + DRAG TO RAISE A RAMP';
           this.label.set(`${claim} CLAIMED\n${instruction}`);
           this.labelTimer = 0.65;
@@ -3929,16 +3933,16 @@ export class MatchSystem extends createSystem({
       this.introDone = true;
       // The first rematch says what the new part changes (the same rival: a clean comparison).
       const watch = this.progress.matches === 1 && this.myBuild.tip === 'spur' ? `Watch your Spur: it turns on ${this.rival.name} sooner` : `"${this.rival.intro}"`;
-      // A bout after the first match names its lesson and twist, and the medals still to earn.
-      const have = bout ? this.progress.bouts[bout.id] ?? 0 : 0;
-      const medals = bout ? bout.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]) : [];
-      const secret = bout && !bout.night && !this.progress.hasSecret(bout.id) ? `\nHidden shard: ${this.progress.secretCount}/${BOUTS.length}` : '';
       const brawlRule = this.activeBrawlMode === 'pocket' ? 'First credited pocket wins' : this.activeBrawlMode === 'crucible' ? 'First credited 3-heat pocket wins' : 'Last top spinning takes the heat';
-      const line = this.extras.length && bout ? `${bout.lesson}\nLast top spinning takes the heat${secret}` : this.extras.length ? `Brawl with ${this.brawlNames.length > 1 ? `${this.brawlNames.slice(0, -1).join(', ')} and ${this.brawlNames[this.brawlNames.length - 1]}` : this.brawlNames[0]}\n${brawlModeName(this.activeBrawlMode)} · ${brawlRule}` : bout && this.progress.guide === 'done' && !this.rivalRead ? (medals.length ? `${bout.lesson}\nMedals: ${medals.join(' · ')}${secret}` : `${bout.lesson}\n${bout.twist}${secret}`) : this.rivalRead || watch;
+      const focus = this.extras.length
+        ? `${brawlModeName(this.activeBrawlMode)} · ${brawlRule}`
+        : bout && this.progress.guide === 'done' && !this.rivalRead
+          ? bout.lesson
+          : this.rivalRead || watch;
       // The type loop, read before the rip: whose top counters whose.
       const edge = this.progress.guide === 'done' ? edgeOf(roleOf(specFromBuild(this.myBuild)), roleOf(specFromBuild(this.rival.build))) : 0;
       const read = edge > 0 ? ' · you counter it' : edge < 0 ? ' · it counters you' : '';
-      this.label.set(`${this.rival.name}, ${this.rival.title}${read}\n${line}${COMFORT.assist ? ' · Assist: 80% speed' : ''}`);
+      this.label.set(`${this.rival.name.toUpperCase()} · ${this.rival.title.toUpperCase()}${read}\n${focus}`);
     }
     else {
       this.label.set('');
@@ -6083,6 +6087,28 @@ export class MatchSystem extends createSystem({
     for (const mesh of [...this.rivalTellChevrons, ...this.rivalTellQuake]) mesh.visible = false;
   }
 
+  /** One phase owns one information layer: the live fight never carries a persistent prose card. */
+  private syncUiHierarchy() {
+    const code = this.phase === 'forge' || this.phase === 'build'
+      ? 1
+      : this.phase === 'ready' || this.phase === 'pulling'
+        ? 2
+        : this.phase === 'fight'
+          ? 3
+          : this.phase === 'result'
+            ? 4
+            : 0;
+    if (code !== this.uiLayerCode) {
+      this.uiLayerCode = code;
+      this.rootEntity?.setValue(FirstFiveState, 'uiLayer', code);
+    }
+    if (this.phase !== 'fight') return;
+    const teaching = this.progress.guide !== 'done';
+    const arenaThreat = this.rivalTellCode !== 0;
+    const sequentialNote = this.labelTimer > 0 && !this.stamp.busy && !arenaThreat;
+    this.label.mesh.visible = !!this.label.current && !arenaThreat && (teaching || sequentialNote);
+  }
+
   /** Starts or advances the warm trace from a hand-authored surface to the top it changed. */
   private showCauseCue(stage: 1 | 2 | 3, kind: string, sx: number, sz: number, tx = sx, tz = sz) {
     const cue = this.causeCue;
@@ -6155,6 +6181,9 @@ export class MatchSystem extends createSystem({
     const them = this.theirs;
     if (this.tellAt < 0) {
       if (!them.alive || !this.mine.alive) return;
+      // A queued round/reward word owns the same read band. Let it finish before the arena itself
+      // becomes the next instruction, rather than stacking two calls for attention.
+      if (this.stamp.occupied) return;
       // Skilled rivals read a ready strike once per round and show a short fake wind-up. Spending
       // into it still lands the seal, but does not earn an interrupt/refund; holding reveals it.
       if (this.tellTaught && this.rivalBar.full && this.forgeBar.full && !this.rivalFeintUsed && this.rivalLaunchPower >= 0.62) {
@@ -6165,7 +6194,6 @@ export class MatchSystem extends createSystem({
         them.tell = this.rivalTellDuration;
         this.setRivalTellState(this.rival.move);
         this.barMessage = `${this.rival.move.toUpperCase()}?`;
-        this.stamp.show('RIVAL FEINT?', 'READ THE WIND-UP', 'rival', 0.45);
         playTell();
         return;
       }
@@ -6175,9 +6203,8 @@ export class MatchSystem extends createSystem({
       this.tellAt = this.elapsed + this.rivalTellDuration;
       them.tell = this.rivalTellDuration;
       this.setRivalTellState(this.rival.move);
-      this.barMessage = `${this.rival.move.toUpperCase()} INCOMING`;
+      this.barMessage = this.rival.move.toUpperCase();
       playTell();
-      this.stamp.show(`${this.rival.move.toUpperCase()}!`, `${this.rival.name} winds up`, 'rival', 0.7);
       {
         const dx = this.mine.x - them.x;
         const dz = this.mine.z - them.z;

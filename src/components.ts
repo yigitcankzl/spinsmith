@@ -33,6 +33,8 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   rivalTell: { type: Types.Int8, default: 0 },
   /** Visible hand-to-finish chain: 0 idle, 1 authored, 2 impact, 3 decisive finish. */
   causeChain: { type: Types.Int8, default: 0 },
+  /** Active information layer: 0 hub, 1 forge, 2 launch, 3 fight, 4 result. */
+  uiLayer: { type: Types.Int8, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);

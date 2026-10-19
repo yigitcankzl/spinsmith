@@ -2834,6 +2834,11 @@ export class Stamp {
     return this.t >= 0;
   }
 
+  /** A visible or queued stamp still owns the player's attention band. */
+  get occupied() {
+    return this.t >= 0 || this.queue.length > 0;
+  }
+
   later(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1, size = 1) {
     // At most three wait: a pile of rewards is not a sequence anyone reads.
     if (this.queue.length < 3) this.queue.push([word, sub, side, hold, size]);
