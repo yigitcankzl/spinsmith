@@ -11,6 +11,9 @@ export default async function run({ page, frame }) {
       game.needPlace = false;
       if (game.phase === 'placing') game.place();
       else if (game.phase !== 'hub') game.toHub();
+      // Re-entering emulated XR can leave the placed world hidden even though the phase has already
+      // advanced. A proof capture must make the same placed root visible before staging the bout.
+      game.root.visible = true;
       if (game.phase !== 'hub') throw new Error(`Forge hero preparation could not reach the hub (got ${game.phase})`);
       const forgeBowl = game.arenas.find((arena) => arena.name === 'Forge Bowl');
       if (!forgeBowl) throw new Error('Forge Bowl arena not found');
