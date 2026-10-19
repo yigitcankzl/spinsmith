@@ -7,7 +7,9 @@
 
 import { defineAssets } from '@iwsdk/core';
 import forgeArenaShell from './scene-assets/forge-arena-shell.scene-asset.js';
+import forgeWheel from './scene-assets/forge-wheel.scene-asset.js';
 
 export default defineAssets({
   'forge-arena-shell': forgeArenaShell,
+  'forge-wheel': forgeWheel,
 });

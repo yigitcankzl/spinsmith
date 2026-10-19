@@ -54,6 +54,7 @@ import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, GROOVE_MIN_LENGTH, PALM_CATCH_RADIUS } from './hand-tools.js';
 import { brawlModeName, targetWinner } from './brawl.js';
 import type { BrawlMode } from './brawl.js';
+import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
@@ -531,6 +532,31 @@ export class MatchSystem extends createSystem({
     new Mesh(new CylinderGeometry(0.01, 0.014, 0.032, 12), new MeshBasicMaterial({ color: 0xffc267, transparent: true, opacity: 0.86, blending: AdditiveBlending, depthWrite: false, toneMapped: false })),
     { visible: false },
   ));
+  /** A literal wheel outside the near rim turns the arena current; it cannot collide with floor pinches. */
+  private forgeWheel = Object.assign(forgeWheelModel.clone(true), { visible: false });
+  private forgeWheelHandle = this.forgeWheel.getObjectByName('ForgeWheelHandle')!;
+  private forgeWheelHeld: Side | null = null;
+  private forgeWheelLastAngle = 0;
+  private forgeWheelTurn = 0;
+  private forgeWheelStartRotation = 0;
+  private forgeWheelCooldown = 0;
+  private forgeWheelCurrentTime = 0;
+  private forgeWheelDirection = 0;
+  private forgeWheelHandLocal = new Vector3();
+  private forgeWheelHandleWorld = new Vector3();
+  private forgeWheelCurrent = (() => {
+    const group = Object.assign(new Group(), { visible: false });
+    for (let i = 0; i < 3; i++) {
+      const arc = new Mesh(
+        new TorusGeometry(0.055 + i * 0.032, 0.0028, 6, 36, Math.PI * 1.35).rotateX(Math.PI / 2),
+        new MeshBasicMaterial({ color: i === 1 ? 0xffd08a : 0xff7a1a, transparent: true, opacity: 0.62 - i * 0.12, blending: AdditiveBlending, depthWrite: false, toneMapped: false }),
+      );
+      arc.rotation.y = i * 0.75;
+      arc.renderOrder = 8;
+      group.add(arc);
+    }
+    return group;
+  })();
   /** One draw call: two true-width rails plus three chevrons show the exact gust corridor. */
   private palmGustFx = (() => {
     const vertices: number[] = [];
@@ -1088,6 +1114,8 @@ export class MatchSystem extends createSystem({
       this.crossguardGlow,
       this.crossguardBeam,
       ...this.crossguardPosts,
+      this.forgeWheel,
+      this.forgeWheelCurrent,
       this.palmGustFx,
       this.palmGustRim,
       ...this.rimSpringGuides,
@@ -1211,6 +1239,7 @@ export class MatchSystem extends createSystem({
       lastRoundHeat: this.lastRoundHeat,
       crossguardActive: this.crossguardActive,
       crossguardHits: this.crossguardHits,
+      forgeWheelTurn: Math.round(this.forgeWheelTurn * 100) / 100,
     });
     // Only the physical fight layer receives real-world depth. Cards and guidance remain readable.
     this.stage.name = 'arena-depth-layer';
@@ -1415,6 +1444,7 @@ export class MatchSystem extends createSystem({
       for (const foot of this.palmBraceFeet) foot.visible = false;
       this.crossguardBeam.visible = this.crossguardGlow.visible = false;
       for (const post of this.crossguardPosts) post.visible = false;
+      this.forgeWheel.visible = this.forgeWheelCurrent.visible = false;
       this.palmGustFx.visible = false;
       this.palmGustRim.visible = false;
       this.palmGustSampled.left = this.palmGustSampled.right = false;
@@ -1656,6 +1686,7 @@ export class MatchSystem extends createSystem({
         break;
       case 'fight':
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
+        this.updateForgeWheel(dt);
         if (!this.deskVerdict && this.outerRingState !== 'rescue' && this.outerRingState !== 'palm') {
           this.updateStrike(dt);
           this.updateKnuckleKnock(dt);
@@ -4697,7 +4728,7 @@ export class MatchSystem extends createSystem({
       const rimGuide = this.rimSpringGuides[side === 'left' ? 0 : 1];
       rimGuide.visible = false;
       // A pinching hand that owns the forge seal must not also author a ramp underneath it.
-      if (this.overforgeHeld === side || this.overforgeControl?.side === side) continue;
+      if (this.overforgeHeld === side || this.overforgeControl?.side === side || this.forgeWheelHeld === side) continue;
       this.updateCup(side);
       if (!h.tracked) {
         if ((this.shapeLost[side] += this.frameDt) < HAND_LOSS_GRACE) continue;
@@ -5043,7 +5074,114 @@ export class MatchSystem extends createSystem({
     this.rimSpringGuides[0].visible = this.rimSpringGuides[1].visible = false;
     this.palmGustTime = 0;
     this.palmGustFx.visible = this.palmGustRim.visible = false;
+    this.forgeWheelHeld = null;
+    this.forgeWheelTurn = 0;
+    this.forgeWheelCurrentTime = 0;
+    this.forgeWheelDirection = 0;
+    this.forgeWheel.rotation.z = 0;
+    this.forgeWheel.visible = this.forgeWheelCurrent.visible = false;
+    this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', 0);
     this.clearPalmBrace();
+  }
+
+  /** Pinch the near wheel's handle and turn it: the bowl receives the same signed rotation. */
+  private updateForgeWheel(dt: number) {
+    this.forgeWheelCooldown = Math.max(0, this.forgeWheelCooldown - dt);
+    const radius = maxRim(this.arena.layout);
+    this.forgeWheel.position.set(-radius * 0.68, this.arena.floorHeight(1) + 0.066, radius + 0.055);
+    this.forgeWheel.scale.setScalar(0.62);
+    this.forgeWheel.visible = !this.photo && this.taught('defense') && !this.deskVerdict && this.outerRingState === 'idle';
+    this.forgeWheelCurrent.position.set(0, this.arena.floorHeight(1) + 0.005, 0);
+    if (this.forgeWheelCurrentTime > 0) {
+      this.forgeWheelCurrentTime = Math.max(0, this.forgeWheelCurrentTime - dt);
+      const life = this.forgeWheelCurrentTime / 1.25;
+      this.forgeWheelCurrent.visible = !this.photo && life > 0;
+      this.forgeWheelCurrent.rotation.y += this.forgeWheelDirection * dt * 3.4;
+      for (const child of this.forgeWheelCurrent.children) {
+        const material = (child as Mesh).material as MeshBasicMaterial | undefined;
+        if (material) material.opacity = 0.18 + life * 0.48;
+      }
+    } else {
+      this.forgeWheelCurrent.visible = false;
+    }
+    if (!this.forgeWheel.visible && !this.forgeWheelHeld) return;
+
+    if (this.forgeWheelHeld) {
+      const side = this.forgeWheelHeld;
+      const hand = this.hands[side];
+      if (hand.tracked && hand.pinching) {
+        this.forgeWheelHandLocal.copy(hand.pinch);
+        this.stage.worldToLocal(this.forgeWheelHandLocal);
+        const angle = Math.atan2(this.forgeWheelHandLocal.y - this.forgeWheel.position.y, this.forgeWheelHandLocal.x - this.forgeWheel.position.x);
+        const step = Math.max(-0.32, Math.min(0.32, Math.atan2(Math.sin(angle - this.forgeWheelLastAngle), Math.cos(angle - this.forgeWheelLastAngle))));
+        this.forgeWheelTurn = Math.max(-1.75, Math.min(1.75, this.forgeWheelTurn + step));
+        this.forgeWheelLastAngle = angle;
+        this.forgeWheel.rotation.z = this.forgeWheelStartRotation + this.forgeWheelTurn;
+        this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', this.forgeWheelTurn);
+        return;
+      }
+      const committed = hand.tracked && hand.justReleased && Math.abs(this.forgeWheelTurn) >= 0.45;
+      const signedTurn = this.forgeWheelTurn;
+      this.forgeWheelHeld = null;
+      if (!committed) {
+        this.forgeWheel.rotation.z = this.forgeWheelStartRotation;
+        this.forgeWheelTurn = 0;
+        this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', 0);
+        if (hand.justReleased) this.failSay('TURN THE WHEEL A QUARTER ARC');
+        return;
+      }
+      const force = this.charges.spend(this.elapsed, TUNING.grace);
+      if (!force) {
+        this.forgeWheel.rotation.z = this.forgeWheelStartRotation;
+        this.forgeWheelTurn = 0;
+        this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', 0);
+        this.locked('NO CHARGE YET\nTHE FORGE WHEEL NEEDS ONE');
+        return;
+      }
+      const direction = Math.sign(signedTurn);
+      const power = (0.17 + Math.min(0.09, Math.abs(signedTurn) * 0.055)) * force;
+      for (const top of this.tops) {
+        if (!top.alive) continue;
+        const r = Math.hypot(top.x, top.z) || 1;
+        const tx = (-top.z / r) * direction;
+        const tz = (top.x / r) * direction;
+        top.vx += tx * power;
+        top.vz += tz * power;
+        top.kick = Math.max(top.kick, 0.35);
+        top.kickX = tx;
+        top.kickZ = tz;
+      }
+      this.forgeWheelDirection = direction;
+      this.forgeWheelCurrentTime = 1.25;
+      this.forgeWheelCooldown = 1.2;
+      this.recordIntervention();
+      this.lastShape = { t: this.elapsed, kind: 'ramp' };
+      this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', signedTurn);
+      this.stamp.show(direction > 0 ? 'CURRENT: RIGHT!' : 'CURRENT: LEFT!', 'YOUR HAND TURNED THE WHOLE BOWL', 'mine', 0.75, 1.05);
+      this.label.set('THE FLOOR CURRENT FOLLOWS YOUR WHEEL');
+      this.labelTimer = 1.3;
+      this.roomLight.hit();
+      playMachine();
+      return;
+    }
+
+    if (this.forgeWheelCooldown > 0) return;
+    this.forgeWheel.updateWorldMatrix(true, true);
+    this.forgeWheelHandle.getWorldPosition(this.forgeWheelHandleWorld);
+    for (const side of ['left', 'right'] as const) {
+      const hand = this.hands[side];
+      if (!hand.tracked || !hand.justPinched || hand.pinch.distanceTo(this.forgeWheelHandleWorld) > 0.055) continue;
+      this.forgeWheelHeld = side;
+      this.forgeWheelHandLocal.copy(hand.pinch);
+      this.stage.worldToLocal(this.forgeWheelHandLocal);
+      this.forgeWheelLastAngle = Math.atan2(this.forgeWheelHandLocal.y - this.forgeWheel.position.y, this.forgeWheelHandLocal.x - this.forgeWheel.position.x);
+      this.forgeWheelStartRotation = this.forgeWheel.rotation.z;
+      this.forgeWheelTurn = 0;
+      this.label.set('FORGE WHEEL\nTURN A QUARTER ARC · RELEASE');
+      this.labelTimer = 1.2;
+      playPick();
+      break;
+    }
   }
 
   /** Open hands near the rim become forgiving wall sectors; the hand chooses where tops rebound. */

@@ -25,6 +25,8 @@ export const FirstFiveState = createComponent('FirstFiveState', {
   crossguardActive: { type: Types.Boolean, default: false },
   /** Number of tops redirected by a player-authored Crossguard this session. */
   crossguardHits: { type: Types.Int16, default: 0 },
+  /** Signed quarter-turn authored through the near forge wheel; zero while idle. */
+  forgeWheelTurn: { type: Types.Float32, default: 0 },
 });
 
 export default defineComponents([FirstFiveState]);
