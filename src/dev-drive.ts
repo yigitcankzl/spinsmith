@@ -108,6 +108,8 @@ interface Game {
   palmGustDirection?: { x: number; y: number };
   palmGustHits?: number;
   palmGustRiposte?: boolean;
+  flickCount?: number;
+  lastFlick?: { gain: number; dx: number; dz: number; rival: boolean };
   riposteUntil?: number;
   riposteSide?: Side | null;
   riposteTop?: Game['mine'] | null;
@@ -509,6 +511,7 @@ export function installDriver() {
           riposte: !!g.palmGustRiposte,
           counterReady: !!g.riposteSide && (g.riposteUntil ?? -9) >= g.elapsed,
         },
+        flick: { count: g.flickCount ?? 0, last: g.lastFlick ?? null },
         bracedLaunch: !!g.bracedLaunch,
         palmLauncher: g.palmLauncherSide ?? null,
         palmLauncherDebug: g.palmLauncherDebug ?? '',
@@ -1127,6 +1130,41 @@ export function installDriver() {
       await glide(side, 'palm', above(follow, 0.08), 0.26, 0, 'natural', 'release');
       await park(side);
       if ((game().palmGustCount ?? 0) <= before) throw new Error('open-palm sweep did not trigger Forge Gust');
+    },
+
+    /**
+     * Lower an open index beside a top, then swing it straight through at `speed` real m/s. The
+     * real fingertip collider decides the hit; the probe only makes the rival tired and still so
+     * the proof is repeatable.
+     */
+    async flick(opts: { target?: 'rival' | 'mine'; angle?: number; speed?: number; side?: Side } = {}) {
+      const { target = 'rival', angle = 0, speed = 1.4, side = 'right' } = opts;
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('a flick only exists during a fight');
+      const top = target === 'rival' ? g.theirs : g.mine;
+      const a = (angle * Math.PI) / 180;
+      const dx = Math.cos(a);
+      const dz = Math.sin(a);
+      const r = g.arena.radius * 0.4;
+      Object.assign(top, { x: -dx * r * 0.2, z: -dz * r * 0.2, vx: 0, vz: 0, spin: 0.3 });
+      const back = 0.05;
+      const start = () => local(top.x - dx * back, top.z - dz * back, 0.008);
+      const before = g.flickCount ?? 0;
+      await setPinch(side, false);
+      await glide(side, 'index', () => above(start(), 0.06), 0.3, 0, 'natural', 'reach');
+      await glide(side, 'index', start, 0.16, 0, 'natural', 'grip');
+      Object.assign(top, { vx: 0, vz: 0 });
+      // Constant velocity through the top: the collider must see a real swing, not a teleport.
+      const travel = back + 0.06;
+      const end = local(top.x + dx * 0.06, top.z + dz * 0.06, 0.008);
+      await glide(side, 'index', end, (travel * ARENA_SCALE) / speed, 0, 'linear');
+      await wait(0.15);
+      // Lift clear of the bowl before going home, as a hand does: parking low would sweep the rim.
+      await glide(side, 'index', above(end, 0.08), 0.24, 0, 'natural', 'release');
+      await glide(side, 'index', above(local(0, g.arena.radius * 1.5), 0.1), 0.3, 0, 'natural', 'release');
+      await park(side);
+      if ((game().flickCount ?? 0) <= before) throw new Error(`fingertip swing did not flick the ${target} top`);
+      return { flicks: (game().flickCount ?? 0) - before };
     },
 
     /** Prepare one outward-moving rival, parry it with an open palm, then sweep that force inward. */

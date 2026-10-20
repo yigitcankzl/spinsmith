@@ -47,7 +47,7 @@ export interface OrderEvent {
   wonRound: boolean;
   finish: 'pocket' | 'over' | 'burst' | 'spin' | null;
   /** The player's shape that caused the finish (within the cause window), if any. */
-  cause: 'ramp' | 'well' | 'groove' | 'sling' | 'strike' | 'parry' | 'squeeze' | 'stretch' | 'twist' | 'tilt' | null;
+  cause: 'ramp' | 'well' | 'groove' | 'sling' | 'strike' | 'parry' | 'squeeze' | 'stretch' | 'twist' | 'tilt' | 'flick' | null;
   /** A cup actually caught a top during this round (a spin finish comes too late for the cause window). */
   cupCaughtInRound: boolean;
   /** The match ended with this round, won by the player, and the rival scored nothing. */

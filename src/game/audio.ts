@@ -514,6 +514,16 @@ export function playDash(x = 0) {
   );
 }
 
+/** A fingertip cutting the air: a short whoosh, brighter and louder the faster the swing (arena m/s). */
+export function playSwish(speed: number, x = 0) {
+  const k = Math.max(0, Math.min(1, (speed - 0.25) / 0.6));
+  at(x, () =>
+    vary(0.08, () => {
+      hiss(0.12 + 0.16 * k, 0.12 + 0.06 * k, 1200 + 2600 * k, 3800 + 4200 * k, 2.5);
+    }),
+  );
+}
+
 /**
  * The rip lets go: the launcher's clack (a sharp steel latch), a whoosh scaled by power; a perfect
  * rip adds a bright bell ping.

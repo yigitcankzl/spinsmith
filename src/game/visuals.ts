@@ -17,6 +17,7 @@ import {
   Float32BufferAttribute,
   Group,
   InstancedMesh,
+  OctahedronGeometry,
   Material,
   Matrix4,
   LatheGeometry,
@@ -2591,6 +2592,73 @@ export class Trails {
       this.mesh.setMatrixAt(i, this.m.compose(this.v, this.q, this.s.set(r, 1, r)));
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
+/**
+ * The hot streak a swinging fingertip leaves in the air: white-hot at the newest point, cooling to
+ * orange and gone in a quarter second. Two hands, one instanced draw, nothing drawn when idle.
+ */
+export class FingerStreak {
+  static readonly PER = 24;
+  static readonly LIFE = 0.26;
+  readonly mesh: InstancedMesh;
+  private age = new Float32Array(FingerStreak.PER * 2).fill(9);
+  private size = new Float32Array(FingerStreak.PER * 2);
+  private at = new Float32Array(FingerStreak.PER * 2 * 3);
+  private next = [0, 0];
+  private newest = 9;
+  private readonly m = new Matrix4();
+  private readonly v = new Vector3();
+  private readonly s = new Vector3();
+  private readonly q = new Quaternion();
+  private readonly hot = new Color(0xfff1d0);
+  private readonly cool = new Color(0xff6a1a);
+  private readonly cold = new Color(0x5d6b7a);
+  private readonly c = new Color();
+  private cooled = new Uint8Array(FingerStreak.PER * 2);
+
+  constructor() {
+    this.mesh = new InstancedMesh(
+      new OctahedronGeometry(1, 1),
+      new MeshBasicMaterial({ transparent: true, blending: AdditiveBlending, depthWrite: false }),
+      FingerStreak.PER * 2,
+    );
+    this.mesh.frustumCulled = false;
+    this.mesh.visible = false;
+    this.mesh.renderOrder = 13;
+    for (let i = 0; i < FingerStreak.PER * 2; i++) {
+      this.mesh.setColorAt(i, this.hot);
+      this.mesh.setMatrixAt(i, this.m.makeScale(0, 0, 0));
+    }
+  }
+
+  /** A point of hand `side` (0 left, 1 right) at arena speed `speed`; `armed` false draws it cold. */
+  drop(side: number, x: number, y: number, z: number, speed: number, armed: boolean) {
+    const i = side * FingerStreak.PER + this.next[side];
+    this.next[side] = (this.next[side] + 1) % FingerStreak.PER;
+    this.age[i] = 0;
+    this.size[i] = 0.002 + Math.min(0.006, speed * 0.008);
+    this.at[i * 3] = x;
+    this.at[i * 3 + 1] = y;
+    this.at[i * 3 + 2] = z;
+    this.cooled[i] = armed ? 0 : 1;
+    this.newest = 0;
+  }
+
+  update(dt: number) {
+    this.newest += dt;
+    this.mesh.visible = this.newest < FingerStreak.LIFE;
+    if (!this.mesh.visible) return;
+    for (let i = 0; i < FingerStreak.PER * 2; i++) {
+      this.age[i] += dt;
+      const k = Math.max(0, 1 - this.age[i] / FingerStreak.LIFE);
+      this.v.fromArray(this.at, i * 3);
+      this.mesh.setMatrixAt(i, this.m.compose(this.v, this.q, this.s.setScalar(this.size[i] * k)));
+      this.mesh.setColorAt(i, this.cooled[i] ? this.cold : this.c.copy(this.cool).lerp(this.hot, k * k));
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 }
 

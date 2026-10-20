@@ -1,6 +1,6 @@
 import { AdditiveBlending, NormalBlending, BoxGeometry, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
-import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch } from './audio.js';
+import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -13,7 +13,7 @@ import { forgeGripIntent, forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, crossguard, crossguardCrosses, emberBumper, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { controlSeal, crossguard, crossguardCrosses, emberBumper, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -33,7 +33,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, edgeOf, NAMED_BUILDS, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, mergeByMaterial, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, mergeByMaterial, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, FingerStreak, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
 import { BRASS } from './materials.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, SHAPING, ShapingCharges, StrikeBar } from './shaping.js';
@@ -58,6 +58,10 @@ import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
+/** Seconds after a flick before the same hand can flick again (its follow-through). */
+const FLICK_FOLLOW_THROUGH = 0.4;
+/** Seconds after a pinch lets go before that hand can flick (the release pull-back). */
+const FLICK_AFTER_RELEASE = 0.45;
 /** Fingertip distance from a live top that claims the magnetic catch gesture (arena-local m). */
 const MAGNET_CATCH = 0.052;
 /** Placing waits at least this long for planes, and places on the tray after SETTLE_MAX without a table (s). */
@@ -304,6 +308,16 @@ export class MatchSystem extends createSystem({
   private palmGustTime = 0;
   private palmGustCooldown = 0;
   private palmGustSide: Side | null = null;
+  /** Fingertip collider: last arena-local tip and its smoothed velocity, per hand. */
+  private flickPrev: Record<Side, Vector3 | null> = { left: null, right: null };
+  private flickVel: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
+  private flickTip = new Vector3();
+  private flickRaw = new Vector3();
+  private flickCount = 0;
+  /** The last flick, for the emulator probes: speed handed over and its direction. */
+  private lastFlick = { gain: 0, dx: 0, dz: 0, rival: false };
+  /** One swing is one flick: the follow-through cannot catch the same top again. */
+  private flickReadyAt: Record<Side, number> = { left: -9, right: -9 };
   private palmGustDirection = new Vector2();
   private palmGustLength = 0;
   private palmGustHits = 0;
@@ -426,6 +440,9 @@ export class MatchSystem extends createSystem({
   private lastHardHit = -1;
   private impacts = new Impacts();
   private trails = new Trails();
+  private fingerStreak = new FingerStreak();
+  /** Per hand: the swing is above flick speed (for one whoosh per swing). */
+  private swinging: Record<Side, boolean> = { left: false, right: false };
   private pillar = new Pillar();
   private trailT = 0;
   private showcase = new Group();
@@ -800,6 +817,14 @@ export class MatchSystem extends createSystem({
   private handMarks = (['left', 'right'] as const).map(() =>
     Object.assign(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0x000000, map: SOFT_SHADOW, transparent: true, depthWrite: false })), { visible: false }),
   );
+  /** The armed fingertip: hot while a charge can pay for a flick, cold grey when only a nudge is left. */
+  private flickGlows = (['left', 'right'] as const).map(() => {
+    const m = new Mesh(new OctahedronGeometry(1, 2), new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }));
+    m.renderOrder = 14;
+    m.visible = false;
+    return m;
+  });
+  private flickHintShown = false;
   /** A small surface response under an engaged hand. It confirms contact without decorating idle hands. */
   private handContactRings = (['left', 'right'] as const).map(() => {
     const mesh = new Mesh(
@@ -998,7 +1023,7 @@ export class MatchSystem extends createSystem({
   private marks = new ShapeMarks(0xff8a2a, 10);
   private pips = new ChargePips(SHAPING.charges);
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
-  private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' | ArenaForgeAction } | null = null;
+  private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' | 'flick' | ArenaForgeAction } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
   private parried = false;
@@ -1218,6 +1243,7 @@ export class MatchSystem extends createSystem({
       ...this.scorches,
       ...this.handMarks,
       ...this.handContactRings,
+      ...this.flickGlows,
       this.secretRelic,
       this.lane,
       this.rivalTellFx,
@@ -1247,6 +1273,7 @@ export class MatchSystem extends createSystem({
       this.sparks.points,
       this.impacts.root,
       this.trails.mesh,
+      this.fingerStreak.mesh,
       this.pillar.mesh,
       this.ripArrows,
       this.bumpMark,
@@ -1831,6 +1858,7 @@ export class MatchSystem extends createSystem({
             this.updatePalmBrace();
           }
           this.updatePalmGust(dt);
+          this.updateFlick(dt);
         }
         this.updateFight(dt);
         break;
@@ -1907,6 +1935,7 @@ export class MatchSystem extends createSystem({
       }
     }
     this.trails.update(vdt);
+    this.fingerStreak.update(vdt);
     this.pillar.update(Math.min(delta, 0.1));
     this.updateGuide();
     this.updateRivalGhost(dt);
@@ -5699,6 +5728,124 @@ export class MatchSystem extends createSystem({
    * Sweep a flat open palm across the inner bowl. A short path and speed threshold reject hovering;
    * the cooldown turns continuous hand motion into one readable, tactical impulse.
    */
+  /**
+   * The open fingertip is a body in the fight. A slow touch only nudges a top off the finger
+   * (free, at most every half second per top, so herding goes nowhere); a real swing through a
+   * top spends one shaping charge and hands it the finger's speed. Every other hand verb owns
+   * its gesture first: pinches, presses, palm walls, gusts and two-hand forging never flick.
+   */
+  private updateFlick(dt: number) {
+    if (!this.flickHintShown && this.flickCount === 0 && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
+      && this.elapsed > TUNING.grace && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) > 0.6 && this.labelTimer <= 0) {
+      this.flickHintShown = true;
+      this.label.set('RIVAL IS TIRED\nSWING A FINGER THROUGH IT: FLICK');
+      this.labelTimer = 2.2;
+    }
+    for (const side of ['left', 'right'] as const) {
+      const h = this.hands[side];
+      const glow = this.flickGlows[side === 'left' ? 0 : 1];
+      glow.visible = false;
+      if (!h.tracked || h.pinching || dt <= 0) {
+        this.flickPrev[side] = null;
+        continue;
+      }
+      // A hand pulling back after a pinch tool (ramp, rim spring, sling, forge) is a release, not a swing.
+      if (h.justReleased) this.flickReadyAt[side] = Math.max(this.flickReadyAt[side], this.time + FLICK_AFTER_RELEASE);
+      const tip = this.root.worldToLocal(this.flickTip.copy(h.index));
+      const prev = this.flickPrev[side];
+      if (!prev) {
+        this.flickPrev[side] = tip.clone();
+        this.flickVel[side].set(0, 0, 0);
+        continue;
+      }
+      // Two-frame smoothing: tracking jitter never reads as a swing, a real flick still does.
+      const vel = this.flickVel[side];
+      vel.lerp(this.flickRaw.set((tip.x - prev.x) / dt, (tip.y - prev.y) / dt, (tip.z - prev.z) / dt), 0.6);
+      prev.copy(tip);
+      const owned = this.palmBraceAngles[side] !== null || this.pressing[side] || this.arenaMorphing
+        || this.elapsed < this.palmGustBlockedUntil[side]
+        || this.overforgeControl?.side === side || this.overforgeHeld === side
+        || (this.palmGustTime > 0 && this.palmGustSide === side);
+      const along = Math.hypot(vel.x, vel.z);
+      // A fingertip coming down onto the table is a press (cup), not a swing.
+      if (owned || -vel.y > along) continue;
+      const floor = this.arena.height(tip.x, tip.z);
+      // Only a fingertip down at the tops' own height (about 5 cm real) touches them; a hand passing over does not.
+      if (tip.y < floor - 0.012 || tip.y > floor + 0.022) continue;
+      if (!this.arena.inside(tip.x, tip.z)) continue;
+      const armed = this.charges.charges >= 1 && this.time >= this.flickReadyAt[side];
+      glow.visible = !this.photo;
+      glow.position.copy(tip);
+      glow.scale.setScalar(armed ? 0.0065 + Math.min(0.004, along * 0.008) : 0.005);
+      (glow.material as MeshBasicMaterial).color.setHex(armed ? 0xff8a2a : 0x7d8a99);
+      // The swing reads before it lands: a hot streak behind the fingertip and one whoosh per swing.
+      if (along > 0.12) this.fingerStreak.drop(side === 'left' ? 0 : 1, tip.x, tip.y, tip.z, along, armed);
+      const fast = along >= FLICK_HARD;
+      if (fast && !this.swinging[side]) playSwish(along, tip.x);
+      this.swinging[side] = fast;
+      // A full hand of charges: the fingertip sheds embers, ready to strike.
+      if (armed && this.charges.charges >= 3 && Math.random() < dt * 5) this.sparks.embers(tip.x, tip.y - 0.006, tip.z, 1, 0.05, 0.03, 1);
+      for (const top of this.tops) {
+        const approach = fingerTouches(top, tip.x, tip.z, vel.x, vel.z);
+        if (!approach) continue;
+        if (this.time < this.flickReadyAt[side]) break;
+        // Only the finger's own swing makes a flick: a top running into a still finger just rebounds.
+        const gap = Math.hypot(top.x - tip.x, top.z - tip.z) || 1;
+        const swing = (vel.x * (top.x - tip.x) + vel.z * (top.z - tip.z)) / gap;
+        let force = 0;
+        if (swing >= FLICK_HARD) {
+          force = this.charges.spend(this.elapsed, TUNING.grace);
+          if (!force) this.locked('FLICK NEEDS A CHARGE\nA soft touch only nudges');
+        }
+        if (!force && top.sinceTouch < 0.5) continue;
+        const d = Math.hypot(top.x - tip.x, top.z - tip.z) || 1;
+        const dx = (top.x - tip.x) / d;
+        const dz = (top.z - tip.z) / d;
+        const y = this.arena.height(top.x, top.z);
+        if (!force) {
+          fingerContact(top, tip.x, tip.z, vel.x, vel.z, 0);
+          this.sparks.burst(top.x, y, top.z, 0.18);
+          playTick();
+          continue;
+        }
+        this.blockShapingRelease(side);
+        this.flickReadyAt[side] = this.time + FLICK_FOLLOW_THROUGH;
+        if (this.online?.role === 'guest' && this.online.peer) {
+          const target = top === this.mine ? 'mine' : 'rival';
+          this.online.sendEvent({ kind: 'flick', target, dx: -dx, dz: -dz, s: approach, f: force });
+          top.sinceTouch = 0;
+        } else {
+          const gain = fingerContact(top, tip.x, tip.z, vel.x, vel.z, force);
+          this.lastFlick = { gain, dx, dz, rival: top === this.theirs };
+        }
+        this.flickCount++;
+        this.recordIntervention();
+        const strength = Math.min(1, 0.45 + approach);
+        const view = top === this.mine ? this.myView : top === this.theirs ? this.theirView : null;
+        view?.flash();
+        view?.hit(strength, dx, dz, 0.05);
+        this.impacts.hit(top.x, y, top.z, strength);
+        this.impacts.shock(top.x, y, top.z, 0.55 + strength * 0.35, top === this.theirs ? 0xffb04a : 0xffe2a8);
+        this.sparks.burst(top.x, y, top.z, 0.5 + strength * 0.4);
+        this.hitStop = Math.max(this.hitStop, 0.05 + strength * 0.03);
+        // The blow itself: a streak of light along the flick, a scorch where it landed and, on a
+        // tired rival, a breath of slow motion so the throw is seen.
+        this.impacts.dash(top.x, y, top.z, dx, dz);
+        this.sparks.embers(top.x, y, top.z, 8, 0.12, 0.1, 1);
+        this.scorch(top.x, y, top.z);
+        if (top === this.theirs && top.spin < 0.5) this.slowMo = Math.max(this.slowMo, 0.35);
+        this.lastShape = { t: this.elapsed, kind: 'flick' };
+        this.roomLight.hit();
+        playClash(strength, top.x);
+        playThock(top.x, top.z);
+        const tired = top.spin < 0.5;
+        this.stamp.show('FLICK!', top === this.theirs ? (tired ? 'TIRED RIVAL THROWN' : 'FRESH SPIN SHRUGS IT OFF') : 'YOUR TOP REDIRECTED', top === this.theirs ? 'mine' : 'neutral', 0.55, 0.9);
+        if (import.meta.env.DEV) console.log(`[FLICK] ${side} ${top === this.mine ? 'mine' : 'rival'} swing ${swing.toFixed(2)} approach ${approach.toFixed(2)} force ${force.toFixed(2)} spin ${top.spin.toFixed(2)}`);
+        break;
+      }
+    }
+  }
+
   private updatePalmGust(dt: number) {
     this.palmGustCooldown = Math.max(0, this.palmGustCooldown - dt);
     if (this.elapsed > this.riposteUntil) {
@@ -8338,6 +8485,21 @@ export class MatchSystem extends createSystem({
       }
       if (hits) this.stamp.show('THEIR FORGE GUST', 'LIVE HANDS', 'rival', 0.6);
       playDash(ev.ex);
+    } else if (ev.kind === 'flick') {
+      // Guest-side 'mine' is the host's rival top.
+      const top = ev.target === 'mine' ? this.theirs : this.mine;
+      const reach = top.spec.radius + FINGER_RADIUS - 0.002;
+      top.sinceTouch = 99;
+      fingerContact(top, top.x - ev.dx * reach, top.z - ev.dz * reach, top.vx + ev.dx * ev.s, top.vz + ev.dz * ev.s, ev.f);
+      const y = this.arena.height(top.x, top.z);
+      (top === this.mine ? this.myView : this.theirView).flash();
+      this.impacts.hit(top.x, y, top.z, 0.8);
+      this.sparks.burst(top.x, y, top.z, 0.7);
+      this.stamp.show('THEIR FLICK', 'LIVE HANDS', 'rival', 0.55);
+      this.rivalShapeAt = this.elapsed;
+      this.rivalShapeKind = 'FLICK';
+      this.hitStop = Math.max(this.hitStop, 0.07);
+      playThock(top.x, top.z);
     } else if (ev.kind === 'strike') {
       // The guest's palm comes down: their seal (Anvil when unknown), centred where they slapped, their top the striker.
       const seal = (SEALS as readonly string[]).includes(ev.seal ?? '') ? (ev.seal as Seal) : 'anvil';

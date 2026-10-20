@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, FORGE_GRIP, forgeGripIntent, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { crossguard, emberBumper, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
@@ -316,6 +316,26 @@ TUNING.grace = 0;
   emberHit.launch(0, 0.02, 0, -0.3, 0.8, 1);
   assert.equal(emberBumper(emberHit, 0, 0), true, 'a planted ember is a one-contact physical bumper');
   assert.ok(emberHit.vz > 0.15, 'the ember bumper gives a readable return kick');
+
+  // The fingertip is a body: a paid swing throws a tired top, a fresh one shrugs, a soft touch only nudges.
+  const flicked = (spin: number, power: number, swing = 0.5) => {
+    const t = new Top(STAMINA);
+    t.launch(0, 0, 0, 0, spin, 1);
+    fingerContact(t, -(t.spec.radius + FINGER_RADIUS - 0.002), 0, swing, 0, power);
+    return t;
+  };
+  const tired = flicked(0.25, 1);
+  const fresh = flicked(1, 1);
+  const soft = flicked(0.25, 0);
+  assert.ok(tired.vx > 0.4 && Math.abs(tired.vz) < 1e-9, 'a paid flick sends a tired top along the swing, hard enough to pocket it');
+  assert.ok(fresh.vx > 0.1 && fresh.vx < tired.vx * 0.6, 'a fresh, fast-spinning top shrugs most of a flick off');
+  assert.ok(soft.vx > 0 && soft.vx < 0.35, 'a soft touch nudges a top off the finger without the hand speed');
+  assert.ok(flicked(0.2, 1, 5).vx <= FLICK_MAX * STAMINA.knockback + 1e-9, 'no swing hands a top more than FLICK_MAX');
+  assert.ok(tired.x > -1e-9, 'a flicked top is pushed out of the finger, never through it');
+  const away = new Top(STAMINA);
+  away.launch(0.2, 0, 0, 0, 0.3, 1);
+  assert.equal(fingerContact(away, 0, 0, 0.5, 0, 1), 0, 'a fingertip only touches the top it overlaps');
+  assert.equal(fingerContact(tired, tired.x - 0.02, 0, 0.5, 0, 1), 0, 'one swing is one touch (no double hit on the next frame)');
 }
 
 // Hand-tool geometry stays deterministic and allocation-free for the live gesture loop.

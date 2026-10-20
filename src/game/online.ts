@@ -10,6 +10,9 @@ import type { GuestEvent, NetMsg, PackedShape, TopLike, Transport, Vec3 } from '
 import type { FloorShape } from './sim.ts';
 import { GROOVE_MAX_LENGTH } from './hand-tools.ts';
 
+/** A remote flick's approach speed is a hand swing (arena m/s), never a cannon. */
+const FLICK_MAX_APPROACH = 1.2;
+
 export type Role = 'host' | 'guest';
 
 export class OnlineLink {
@@ -264,6 +267,13 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
       }
       const target = ev.target === 'mine' || ev.target === 'rival' ? ev.target : undefined;
       return { kind: 'gust', sx, sz, ex, ez, f: clamp(ev.f, 0, 1.5), ...(target ? { target } : {}) };
+    }
+    case 'flick': {
+      // A direction and an approach speed, never a place: the host finds the top itself.
+      if (![ev.dx, ev.dz, ev.s, ev.f].every(num) || (ev.target !== 'mine' && ev.target !== 'rival')) return null;
+      const d = Math.hypot(ev.dx, ev.dz);
+      if (d < 1e-6) return null;
+      return { kind: 'flick', target: ev.target, dx: ev.dx / d, dz: ev.dz / d, s: clamp(ev.s, 0, FLICK_MAX_APPROACH), f: clamp(ev.f, 0, 1) };
     }
     case 'cup':
       if (!num(ev.x) || !num(ev.z)) return null;

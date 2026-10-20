@@ -697,6 +697,8 @@ export class Top {
   sinceDash = 99;
   /** Seconds since the last bumper kick (large = none recently). */
   sinceBump = 99;
+  /** Seconds since a hand last touched it (large = none recently). */
+  sinceTouch = 99;
   /** Seconds since a hard knock on the wall, and how hard it was (outward m/s): for scrape sparks. */
   sinceWall = 99;
   wallHit = 0;
@@ -737,7 +739,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sinceWall: 99, sincePad: 99, tell: 0, rushing: 0, charging: 0, chargeAngle: 0, hammer: 0, hammerX: 0, hammerZ: 0, guard: 0, guardAngle: 0, anchor: 0, damage: 0, pocketPoints: 2, finish: null, outAt: -1, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sinceTouch: 99, sinceWall: 99, sincePad: 99, tell: 0, rushing: 0, charging: 0, chargeAngle: 0, hammer: 0, hammerX: 0, hammerZ: 0, guard: 0, guardAngle: 0, anchor: 0, damage: 0, pocketPoints: 2, finish: null, outAt: -1, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -930,6 +932,7 @@ function advance(arena: Arena, t: Top, other: Top, dt: number) {
   t.wobble = Math.min(1, Math.max(0, (0.35 - t.spin) / (0.35 - TOPPLE_SPIN)));
   t.sinceDash += dt;
   t.sinceBump += dt;
+  t.sinceTouch += dt;
   t.sinceWall += dt;
   t.sincePad += dt;
   t.rushing = Math.max(0, t.rushing - dt);
@@ -1129,6 +1132,64 @@ export function emberBumper(top: Top, x: number, z: number, radius = 0.014) {
   top.kickZ = nz;
   top.sinceBump = 0;
   return true;
+}
+
+/** Fingertip collider radius (arena-local m). */
+export const FINGER_RADIUS = 0.009;
+/** Approach speed (arena m/s) at which a touch becomes a paid, decisive flick. */
+export const FLICK_HARD = 0.32;
+/** Most speed one flick can hand a top (arena m/s): enough to pocket a tired top; walls need a ramp or a clash too. */
+export const FLICK_MAX = 0.7;
+/** Approach-to-speed gain of a paid flick. */
+export const FLICK_GAIN = 1.6;
+/** Share of a flick a top at full spin still takes (gyroscopic stiffness). */
+export const FLICK_STIFF_MIN = 0.35;
+
+/** True when a fingertip at (x, z) moving at (vx, vz) is pressing into this live top. */
+export function fingerTouches(top: Top, x: number, z: number, vx: number, vz: number, radius = FINGER_RADIUS) {
+  if (!top.alive || top.sinceTouch < 0.12) return 0;
+  const dx = top.x - x;
+  const dz = top.z - z;
+  const reach = top.spec.radius + radius;
+  const d2 = dx * dx + dz * dz;
+  if (d2 > reach * reach) return 0;
+  const d = Math.sqrt(d2);
+  if (d < 1e-6) return 0;
+  const approach = ((vx - top.vx) * dx + (vz - top.vz) * dz) / d;
+  return approach > 0 ? approach : 0;
+}
+
+/**
+ * The hand is a body in the fight. A fingertip pressing into a top pushes it out of the finger.
+ * `power` 0 is a soft touch: the top rebounds off the finger but never takes the hand's speed.
+ * `power` > 0 is a paid flick: the top takes the finger's approach speed, so the swing decides.
+ */
+export function fingerContact(top: Top, x: number, z: number, vx: number, vz: number, power: number, radius = FINGER_RADIUS) {
+  const approach = fingerTouches(top, x, z, vx, vz, radius);
+  if (!approach) return 0;
+  const dx = top.x - x;
+  const dz = top.z - z;
+  const d = Math.hypot(dx, dz);
+  const nx = dx / d;
+  const nz = dz / d;
+  const reach = top.spec.radius + radius;
+  top.x = x + nx * reach;
+  top.z = z + nz * reach;
+  // A fast-spinning top is gyroscopically stiff and shrugs a flick off; a tired, wobbling one is
+  // thrown. When to flick matters as much as where.
+  const stiff = FLICK_STIFF_MIN + (1 - FLICK_STIFF_MIN) * (1 - Math.max(0, Math.min(1, top.spin)));
+  const gain = power > 0
+    ? Math.min(FLICK_MAX, approach * FLICK_GAIN) * Math.min(1, power) * Math.max(0.6, top.spec.knockback) * stiff
+    : approach * 0.6;
+  top.vx += nx * gain;
+  top.vz += nz * gain;
+  top.kick = Math.min(1, top.kick + gain * 1.4);
+  top.kickX = nx;
+  top.kickZ = nz;
+  if (power > 0) top.damage = Math.min(0.95, top.damage + 0.02 * power);
+  top.charging = 0;
+  top.sinceTouch = 0;
+  return gain;
 }
 
 /** Pulling a rim spring sends an inward impulse through the selected sector. */

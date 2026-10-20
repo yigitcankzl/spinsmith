@@ -4,7 +4,7 @@
  */
 import { rimRadius } from './layout.ts';
 import { ARENAS } from './arenas.ts';
-import { Arena, ATTACK, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
+import { Arena, ATTACK, FINGER_RADIUS, fingerContact, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
 import type { FloorShape } from './sim.ts';
 import { SHAPE_SIZE, ShapingCharges, StrikeBar, behindOn } from './shaping.ts';
 
@@ -98,6 +98,56 @@ export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.trackin
       z: p.z - (p.z / pr) * 0.012 + HUMAN.posErr * gauss(rnd),
       a: Math.atan2(p.z, p.x) + HUMAN.dirErr * gauss(rnd),
     });
+  };
+}
+
+/**
+ * A human-feasible flicker: sees the tired rival in the outer band, and after `delay` (reaction
+ * and tracking; a flick needs no gesture to build) its fingertip swings through the rival from
+ * behind toward the nearest pocket (or straight out), with the same aim error as a ramp.
+ * `aimed` false is a masher: flicks either top in a random direction whenever a charge is ready.
+ */
+export function humanFlick(delay = HUMAN.reaction + HUMAN.tracking, swing = 0.5, aimed = true): Policy {
+  let pending: { at: number; target: Top; a: number } | null = null;
+  let lastT = Infinity;
+  let last = -9;
+  return (arena, me, rival, t, charges, rnd) => {
+    if (t < lastT) {
+      pending = null;
+      last = -9;
+    }
+    lastT = t;
+    if (pending && pending.at <= t) {
+      const { target, a } = pending;
+      pending = null;
+      const f = charges.spend(t, TUNING.grace);
+      if (f && target.alive) {
+        const nx = Math.cos(a);
+        const nz = Math.sin(a);
+        const reach = target.spec.radius + FINGER_RADIUS - 0.002;
+        fingerContact(target, target.x - nx * reach, target.z - nz * reach, target.vx + nx * swing, target.vz + nz * swing, f);
+      }
+    }
+    if (pending || t < TUNING.grace || t - last < HUMAN.minGap || charges.charges < 1) return;
+    if (!aimed) {
+      if (rnd() > 0.02) return;
+      last = t;
+      pending = { at: t + delay, target: rnd() < 0.5 ? me : rival, a: rnd() * Math.PI * 2 };
+      return;
+    }
+    const r = Math.hypot(rival.x, rival.z);
+    if (!rival.alive || r < arena.radius * 0.55) return;
+    last = t;
+    const angle = Math.atan2(rival.z, rival.x);
+    let a = angle;
+    const pockets = arena.layout.pockets;
+    if (pockets.length) {
+      const gap = (p: { angle: number }) => Math.abs(Math.atan2(Math.sin(p.angle - angle), Math.cos(p.angle - angle)));
+      const pocket = pockets.reduce((p, q) => (gap(q) < gap(p) ? q : p));
+      const rim = rimRadius(arena.layout, pocket.angle);
+      a = Math.atan2(Math.sin(pocket.angle) * rim - rival.z, Math.cos(pocket.angle) * rim - rival.x);
+    }
+    pending = { at: t + delay, target: rival, a: a + HUMAN.dirErr * gauss(rnd) };
   };
 }
 

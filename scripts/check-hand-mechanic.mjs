@@ -1,7 +1,7 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
 // Other modes: single-rip, dual-rip, intent-preview, ramp-release, finger-groove, rim-spring, palm-brace, crossguard, forge-wheel,
-// ember-plant, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring,
+// ember-plant, flick, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring,
 // arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
   let target = null;
@@ -28,7 +28,7 @@ export default async function run({ page, frame }) {
       await sleep(1200);
     }
     const gustCheck = check === 'palm-gust' || check === 'palm-gust-left' || check === 'palm-gust-riposte';
-    const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant';
+    const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant' || check === 'flick';
     if (check === 'intent-preview' || check === 'ramp-release' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || expansionCheck) game.progress.matches = Math.max(2, game.progress.matches);
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
@@ -65,8 +65,14 @@ export default async function run({ page, frame }) {
 
     if (check === 'intent-preview') {
       if (before.phase !== 'fight') throw new Error('intent-preview check requires a fight');
-      Object.assign(game.mine, { x: -0.08, z: -0.06, vx: 0, vz: 0 });
-      Object.assign(game.theirs, { x: -0.08, z: 0.06, vx: 0, vz: 0 });
+      // Live tops keep cruising; pin them away from the hover points so a top drifting under the
+      // hand cannot turn the floor preview into CATCH (the probe is about claims, not the fight).
+      const pin = () => {
+        Object.assign(game.mine, { x: -0.08, z: -0.06, vx: 0, vz: 0 });
+        Object.assign(game.theirs, { x: -0.08, z: 0.06, vx: 0, vz: 0 });
+      };
+      pin();
+      const pinned = setInterval(pin, 16);
       action = (async () => {
         const ramp = await drive.hoverArena({ n: 0.7, angle: 0, side: 'right' });
         const forge = await drive.hoverArena({ n: 0.86, angle: Math.PI / 4, side: 'right' });
@@ -76,7 +82,7 @@ export default async function run({ page, frame }) {
         if (forge.claim !== 'FORGE' || !forge.label.includes('PINCH BOTH GLOWS')) throw new Error(`authored grip preview disagreed with Arena Forge: ${JSON.stringify(forge)}`);
         if (rim.claim !== 'RIM' || !rim.label.includes('PINCH + PULL: SPRING')) throw new Error(`outer-lip preview disagreed with Rim Spring: ${JSON.stringify(rim)}`);
         await drive.park('right');
-      })();
+      })().finally(() => clearInterval(pinned));
     } else if (check === 'ramp-release') {
       if (before.phase !== 'fight') throw new Error('ramp-release check requires a fight');
       const groovesBefore = before.grooves?.length ?? 0;
@@ -102,6 +108,16 @@ export default async function run({ page, frame }) {
       if (before.phase !== 'fight') throw new Error('forge-wheel check requires a fight');
       stateKey = 'forgeWheel';
       action = drive.forgeWheel({ direction: 1 });
+    } else if (check === 'flick') {
+      if (before.phase !== 'fight') throw new Error('flick check requires a fight');
+      action = (async () => {
+        const proof = await drive.flick({ target: 'rival', angle: 0, speed: 1.4, side: 'right' });
+        const after = drive.state();
+        const last = after.flick.last;
+        if (after.charges !== before.charges - 1) throw new Error(`a hard flick must spend exactly one charge (${before.charges} -> ${after.charges})`);
+        if (proof.flicks !== 1) throw new Error(`one swing flicked ${proof.flicks} times`);
+        if (!last?.rival || last.gain < 0.3 || last.dx < 0.9) throw new Error(`the flick did not throw the rival along the swing: ${JSON.stringify(last)}`);
+      })();
     } else if (check === 'ember-plant') {
       if (before.phase !== 'fight') throw new Error('ember-plant check requires a fight');
       stateKey = 'ember';

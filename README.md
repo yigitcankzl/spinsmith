@@ -249,6 +249,15 @@ an arena. First to 3 heat wins a match.
   into a slag pit within 20°). A cup with nothing in it, or a catch not slung, lets go after 2 s. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
   shape affects both tops. In the opening match every finish scores one heat so all three lessons
   get a round. Afterwards knockouts score two as normal. Three charges, shown as sparks on the near rim: a shape spends one, a strong clash or about 4 s refills one, a hand keeps one live shape, and nothing can be shaped in the first 2.5 s (6 s in the first three matches). A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
+- **Flick (direct touch):** your open index fingertip is a body in the fight. Lower it to the
+  tops' height (it glows orange while a charge can pay, grey when not) and swing it through a top:
+  the top takes the finger's speed. A real swing spends one charge; a slow touch or a top running
+  into a still finger only nudges it, free, at most twice a second. A fast-spinning top shrugs most
+  of a flick off, a tired, wobbling one is thrown, so the timing matters as much as the aim. In the
+  headless sim a human-paced flicker (0.32 s lag, 15° aim error) wins 68% against an equal rival
+  (no hands 50%, random flicking 48%) and comes back from a spin deficit in 33% of rounds instead
+  of 5% (`npm run report:flick`, 6 rounds per arena and type pairing). Online, the guest's flick is sent as a
+  direction and swing speed and the host applies it.
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on
   contact, lean into hits, wobble as spin drains, then topple.
 - **Far ramps:** point the hand ray at the floor during a fight and hold the pinch to
