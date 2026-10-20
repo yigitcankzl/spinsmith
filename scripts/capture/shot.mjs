@@ -385,6 +385,8 @@ export default async function run({ page, frame, cdp }) {
     throw new Error(`Capture guard: expected two rendered skin hands, got ${info.handsPatched}`);
   }
 
+  if (p.screenshot === false) return { info, proof };
+
   const screenshot = await cdp.send('Page.captureScreenshot', {
     format: 'png',
     fromSurface: true,

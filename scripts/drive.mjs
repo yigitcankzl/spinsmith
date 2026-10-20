@@ -31,6 +31,14 @@ export default async function run({ page, frame, workspaceRoot }) {
   // Calibrate both emulated hands before recording so the clip opens on a settled natural pose,
   // not on the driver's one-time open/closed measurements.
   await target.evaluate(() => window.drive.prepare());
+  // Presentation setup and shader compilation can leave an old low-water mark in diagnostics.
+  // Reset it immediately before capture so the returned state describes this recording only.
+  await target.evaluate(() => {
+    const game = window.__game;
+    game.lowestFps = 0;
+    game.fpsWindowFrames = 0;
+    game.fpsWindowTime = 0;
+  });
 
   // Records what the player sees: the emulator's room (canvas z 1) with the game drawn over it
   // (canvas z 2), composited each frame; the emulator's gizmos and panels (z 3) are left out.
@@ -74,10 +82,37 @@ export default async function run({ page, frame, workspaceRoot }) {
     const stream = out.captureStream(settings.fps);
     const sound = window.__audioTap?.();
     for (const t of sound?.getAudioTracks() ?? []) stream.addTrack(t);
-    const rec = new MediaRecorder(stream, {
-      mimeType: sound ? 'video/webm;codecs=vp9,opus' : 'video/webm;codecs=vp9',
-      videoBitsPerSecond: settings.bitrate,
-    });
+    // Chromium on this workstation exposes H.264 MediaRecorder. Prefer it over VP9: it is much
+    // cheaper during a live XR capture and prevents the recorder from starving the game loop.
+    // VP8 is the lightweight portable fallback; VP9 is intentionally last.
+    const candidates = sound
+      ? [
+          'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+          'video/mp4;codecs=avc1.42E01E',
+          'video/webm;codecs=vp8,opus',
+          'video/webm;codecs=vp8',
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp9',
+        ]
+      : [
+          'video/mp4;codecs=avc1.42E01E',
+          'video/webm;codecs=vp8',
+          'video/webm;codecs=vp9',
+        ];
+    let rec = null;
+    let mimeType = '';
+    for (const candidate of candidates) {
+      if (!MediaRecorder.isTypeSupported(candidate)) continue;
+      try {
+        rec = new MediaRecorder(stream, {
+          mimeType: candidate,
+          videoBitsPerSecond: settings.bitrate,
+        });
+        mimeType = candidate;
+        break;
+      } catch {}
+    }
+    if (!rec) throw new Error('No supported MediaRecorder codec was available.');
     const parts = [];
     rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
     rec.start(500);
@@ -86,8 +121,8 @@ export default async function run({ page, frame, workspaceRoot }) {
       game: [game.width, game.height],
       output: [out.width, out.height],
     };
-    window.__rec = { rec, parts, source, stop: () => (on = false) };
-    return { ok: true, source };
+    window.__rec = { rec, parts, source, mimeType, stop: () => (on = false) };
+    return { ok: true, source, mimeType };
   }, capture);
   if (!started?.ok) throw new Error(String(started));
   let result;
@@ -116,14 +151,31 @@ export default async function run({ page, frame, workspaceRoot }) {
   let b64 = '';
   for (let at = 0; at < size; at += 700000) b64 += await target.evaluate(([a, n]) => window.__rec.b64.slice(a, a + n), [at, 700000]);
   await target.evaluate(() => delete window.__rec);
-  const webm = `${video}.webm`;
-  writeFileSync(webm, Buffer.from(b64, 'base64'));
-  execFileSync('ffmpeg', [
-    '-y', '-loglevel', 'error', '-i', webm,
-    '-c:v', 'libx264', '-crf', capture.crf, '-preset', capture.preset, '-tune', 'animation',
+  const captureFile = `${video}.capture.${started.mimeType.startsWith('video/mp4') ? 'mp4' : 'webm'}`;
+  writeFileSync(captureFile, Buffer.from(b64, 'base64'));
+  const shared = [
+    '-y', '-loglevel', 'error', '-i', captureFile,
     '-pix_fmt', 'yuv420p', '-r', String(capture.fps),
     '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', video,
-  ]);
-  rmSync(webm);
-  return { video, mb: +(b64.length * 0.75 / 1e6).toFixed(1), source: started.source, state: result };
+  ];
+  const nvenc = [
+    '-c:v', 'h264_nvenc', '-preset', 'p6', '-tune', 'hq', '-rc', 'vbr', '-cq', '14', '-b:v', '0',
+  ];
+  const software = [
+    '-c:v', 'libx264', '-crf', capture.crf, '-preset', capture.preset, '-tune', 'animation',
+  ];
+  const insertCodec = (codec) => [...shared.slice(0, 5), ...codec, ...shared.slice(5)];
+  try {
+    execFileSync('ffmpeg', insertCodec(nvenc));
+  } catch {
+    execFileSync('ffmpeg', insertCodec(software));
+  }
+  rmSync(captureFile);
+  return {
+    video,
+    mb: +(b64.length * 0.75 / 1e6).toFixed(1),
+    source: started.source,
+    recorder: started.mimeType,
+    state: result,
+  };
 }

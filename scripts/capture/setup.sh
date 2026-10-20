@@ -12,7 +12,9 @@ if [[ "${1:-}" == "restart" ]]; then
   echo "Restarting the managed GPU-backed IWER capture runtime..."
   timeout 150 env -u WAYLAND_DISPLAY \
     XDG_SESSION_TYPE=x11 \
+    IWSDK_GPU=vulkan \
     __NV_PRIME_RENDER_OFFLOAD=1 \
+    __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 \
     __GLX_VENDOR_LIBRARY_NAME=nvidia \
     __VK_LAYER_NV_optimus=NVIDIA_only \
     DRI_PRIME=1 \

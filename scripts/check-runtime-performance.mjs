@@ -1,0 +1,47 @@
+// Desktop-IWER smoke check. This proves which renderer the managed browser uses and samples the
+// game's own one-second FPS windows. It is not a substitute for a physical Quest performance test.
+export default async function run({ page, frame }) {
+  let target = null;
+  for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
+    if (await candidate.evaluate(() => typeof window.__game === 'object').catch(() => false)) {
+      target = candidate;
+      break;
+    }
+  }
+  if (!target) throw new Error('window.__game not found: enter the emulated XR session first');
+
+  return target.evaluate(async () => {
+    const game = window.__game;
+    const renderer = game.world?.renderer ?? game.renderer;
+    const gl = renderer?.getContext?.();
+    if (!gl) throw new Error('WebGL renderer unavailable');
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+
+    // Ignore startup/HMR history and measure five fresh one-second windows in the live game loop.
+    game.lowestFps = 0;
+    game.fpsWindowFrames = 0;
+    game.fpsWindowTime = 0;
+    await new Promise((resolve) => setTimeout(resolve, 5200));
+
+    const diagnostics = window.spinsmithDiagnostics?.();
+    return {
+      environment: 'desktop IWER emulator',
+      renderer: info
+        ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL)
+        : gl.getParameter(gl.RENDERER),
+      vendor: info
+        ? gl.getParameter(info.UNMASKED_VENDOR_WEBGL)
+        : gl.getParameter(gl.VENDOR),
+      phase: game.phase,
+      lowestFpsOverFiveSeconds: diagnostics?.lowestFps ?? null,
+      liteMode: diagnostics?.liteMode ?? null,
+      drawCalls: renderer.info.render.calls,
+      triangles: renderer.info.render.triangles,
+      recorderCodecs: {
+        h264: MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E'),
+        vp8: MediaRecorder.isTypeSupported('video/webm;codecs=vp8'),
+        vp9: MediaRecorder.isTypeSupported('video/webm;codecs=vp9'),
+      },
+    };
+  });
+}
