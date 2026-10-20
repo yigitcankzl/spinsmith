@@ -8,6 +8,8 @@ export default async function run({ page, frame }) {
       g.phase = 'fight';
       g.demo = false;
       g.rival = { ...g.rival, level: 6 };
+      // A campaign bout without arena shaping keeps its rival quiet by design; test the policy itself.
+      g.bout = null;
       g.elapsed = Math.max(g.elapsed, 10);
       g.arena.elapsed = Math.max(g.arena.elapsed, 10);
       g.rivalShapeAt = g.elapsed - 9;

@@ -29,7 +29,7 @@ export default async function run({ page, frame }) {
     }
     const gustCheck = check === 'palm-gust' || check === 'palm-gust-left' || check === 'palm-gust-riposte';
     const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant' || check === 'flick';
-    if (check === 'intent-preview' || check === 'ramp-release' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || expansionCheck) game.progress.matches = Math.max(2, game.progress.matches);
+    if (check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || expansionCheck) game.progress.matches = Math.max(2, game.progress.matches);
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
     if (launchCheck && drive.state().phase !== 'ready') {

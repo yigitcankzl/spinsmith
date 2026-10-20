@@ -659,9 +659,16 @@ export function installDriver() {
           continue;
         }
         const end = start.clone().add(pull);
-        await glide(side, 'pinch', end, len / speed, pinchNow[side], 'linear');
-        if (opts.onBeat) g.ripBeatAt = g.time;
-        await tweenPinch(side, 0, 0.12);
+        // A real rip lets go while the hand is still moving: power is the speed at release and
+        // fades within ~0.1 s of stopping, so open the fingers over the last 60 ms of the pull.
+        const dur = len / speed;
+        const letGo = (async () => {
+          await wait(Math.max(0, dur - 0.06));
+          if (opts.onBeat) g.ripBeatAt = g.time;
+          await tweenPinch(side, 0, 0.06);
+        })();
+        await glide(side, 'pinch', end, dur, pinchNow[side], 'linear');
+        await letGo;
         await wait(0.3);
         if ((g.phase as string) === 'fight') break;
         if (attempt === 2) throw new Error('rip did not build enough motion to launch');

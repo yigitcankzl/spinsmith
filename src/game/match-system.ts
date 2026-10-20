@@ -5128,7 +5128,9 @@ export class MatchSystem extends createSystem({
       const down = (this.tipDown[side] += (raw - this.tipDown[side]) * (1 - Math.exp(-this.frameDt / 0.08)));
       // Direct touch has a second, deliberately different verb: slide the open index finger along
       // the floor, then lift. A stationary downward jab remains a Cup, so the gestures do not race.
-      const touching = open && this.arena.inside(tip.x, tip.z) && depth > -0.012 && depth < 0.024;
+      // Grooves arrive with the other defensive tools: in the first matches an open finger skimming
+      // the floor on its way to pinch a ramp must not draw one and spend the lesson's charge.
+      const touching = open && this.taught('defense') && this.arena.inside(tip.x, tip.z) && depth > -0.012 && depth < 0.024;
       let groove = this.grooving[side];
       if (touching && !groove && !this.pressing[side]) {
         groove = this.grooving[side] = { sx: tip.x, sz: tip.z, x: tip.x, z: tip.z, active: false };
@@ -5735,7 +5737,7 @@ export class MatchSystem extends createSystem({
    * its gesture first: pinches, presses, palm walls, gusts and two-hand forging never flick.
    */
   private updateFlick(dt: number) {
-    if (!this.flickHintShown && this.flickCount === 0 && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
+    if (!this.flickHintShown && this.flickCount === 0 && this.progress.matches >= 1 && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
       && this.elapsed > TUNING.grace && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) > 0.6 && this.labelTimer <= 0) {
       this.flickHintShown = true;
       this.label.set('RIVAL IS TIRED\nSWING A FINGER THROUGH IT: FLICK');

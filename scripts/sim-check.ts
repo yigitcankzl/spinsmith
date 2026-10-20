@@ -815,6 +815,11 @@ TUNING.grace = 0;
   assert.ok(again.level === 1 && again.guide === 'launch' && again.stamps === 0 && again.champions.length === 0, 'a reset is a new smith');
   freshSave(st);
   for (const k of SAVE_KEYS) assert.ok(!mem.has(k), `fresh clears ${k}`);
+  // Real storage: keys outside the list (anchored pose, desk scars, comfort) go too; other sites' keys stay.
+  for (const k of ['spinsmith.spatial-pose.v1', 'spinsmith.room-imprints.v1', 'spinsmith.comfort.v1', 'spinsmith.hint.flick', 'other.app']) mem.set(k, '1');
+  const listed = { ...st, get length() { return mem.size; }, key: (i: number) => [...mem.keys()][i] ?? null };
+  freshSave(listed);
+  assert.deepEqual([...mem.keys()], ['other.app'], 'a fresh start on a shared headset forgets every spinsmith key, and only those');
 }
 
 // 16. Reach: every target touched directly sits within a seated arm's comfortable reach and not

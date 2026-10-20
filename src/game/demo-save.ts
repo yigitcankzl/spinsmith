@@ -15,11 +15,24 @@ export const SAVE_KEYS = ['spinsmith.progress.v1', 'spinsmith.top.v1', 'spinsmit
 
 export interface WritableStorage extends Storage {
   removeItem(key: string): void;
+  /** Present on real browser storage: lets a fresh start find keys added after this list. */
+  readonly length?: number;
+  key?(index: number): string | null;
 }
 
-/** Forgets everything: the next start is a new player's first session. */
+/**
+ * Forgets everything: the next start is a new player's first session. On a shared headset that
+ * includes the last player's anchored smithy pose, desk scars, hints and comfort choices.
+ */
 export function freshSave(storage: WritableStorage) {
-  for (const k of SAVE_KEYS) storage.removeItem(k);
+  const keys = new Set(SAVE_KEYS);
+  if (storage.key && storage.length !== undefined) {
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k?.startsWith('spinsmith.')) keys.add(k);
+    }
+  }
+  for (const k of keys) storage.removeItem(k);
 }
 
 /** A smith at level 8, past the first session, with three stamps, some marks, the first chapter cleared and two champions. */
