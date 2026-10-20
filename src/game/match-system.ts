@@ -129,7 +129,10 @@ const PALM_GUST_FX_TIME = 0.65;
 /** A real palm parry can be swept back into the bowl without spending another charge. */
 // A player must feel the parry, move the open hand back inside the bowl, settle, then sweep.
 // 750 ms made that readable physical sequence fail even in deterministic IWER input.
-const RIPOSTE_WINDOW = 1.15;
+// A readable Counterflow is parry → reposition → settle → sweep. The old 1.15 s window expired
+// during that physical follow-through on both low-FPS IWER and normal human-speed motion, turning
+// a correctly earned riposte into a paid Forge Gust at the final frame.
+const RIPOSTE_WINDOW = 1.8;
 /** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
 const SLAP_MIN_N = 1.18;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
@@ -5806,6 +5809,10 @@ export class MatchSystem extends createSystem({
       this.locked('Forge Gust needs one charge\nParry first for a free riposte');
       return;
     }
+    // The open index travels close to the bowl during the same physical sweep. Own that whole
+    // stroke as a Gust; otherwise updateShaping can retain its fingertip trail and commit a paid
+    // Finger Groove when the player lifts the hand after a free Counterflow.
+    this.blockShapingRelease(side);
     const power = Math.min(1.5, strength * force * (riposte ? 1.25 : 1));
     const candidates = riposte && this.riposteTop ? [this.riposteTop] : this.tops;
     const struck = candidates.filter((top) => palmGustCrosses(this.arena, top, sx, sz, gustEx, gustEz));
@@ -7246,6 +7253,10 @@ export class MatchSystem extends createSystem({
     me.lifted = 0;
     me.finish = null;
     me.state = 'spinning';
+    // The same open hand is still crossing the bowl when the rescue completes. Reserve its lift as
+    // the tail of Palm Return; otherwise the index fingertip can immediately start a Cup and flash
+    // a contradictory "NO CATCH" message after a visibly successful return.
+    if (this.outerRailSide) this.blockShapingRelease(this.outerRailSide);
     this.outerRingState = 'returned';
     this.outerRingCompleted = true;
     this.recordIntervention();

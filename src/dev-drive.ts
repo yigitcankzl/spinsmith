@@ -696,7 +696,11 @@ export function installDriver() {
       await glide(side, 'pinch', local(x, z, 0.004), 0.1, 0);
       const drag = local(x + dx * 0.025, z + dz * 0.025, 0.004);
       await setPinch(side, true);
+      // A short grip beat makes the pinch readable in proof footage and mirrors the deliberate
+      // pause a player naturally takes before pulling live arena material.
+      await wait(0.28);
       await glide(side, 'pinch', drag, hold);
+      await wait(0.18);
       await setPinch(side, false);
       await glide(side, 'pinch', above(drag, 0.08), 0.2, 0);
       await park(side);
@@ -721,8 +725,8 @@ export function installDriver() {
     },
 
     /** Pinch a rim sector, pull its spring rail toward the middle, then release. */
-    async rimSpring(opts: { angle?: number; pull?: number; side?: Side } = {}) {
-      const { angle = 35, pull = 0.04, side = 'right' } = opts;
+    async rimSpring(opts: { angle?: number; pull?: number; side?: Side; target?: 'rival' | 'mine' | false } = {}) {
+      const { angle = 35, pull = 0.04, side = 'right', target = 'rival' } = opts;
       const g = game();
       const a = (angle * Math.PI) / 180;
       // Non-circular arenas do not share `arena.radius` at every angle. Aim at the actual local
@@ -743,6 +747,23 @@ export function installDriver() {
       // Readable grip beat, and long enough to satisfy the production anti-brush intent threshold
       // even when the emulator is rendering only a few XR frames per second.
       await wait(0.45);
+      // Proof and regression runs need to demonstrate the tactical result, not merely a valid pull
+      // into an empty sector. Stage one live top late enough that normal simulation cannot drift it
+      // away before release; production gameplay is untouched because this exists only in DEV.
+      if (target) {
+        const top = target === 'mine' ? g.mine : g.theirs;
+        const tr = rimRadius(g.arena.layout, a) * 0.76;
+        Object.assign(top, {
+          x: Math.cos(a) * tr,
+          z: Math.sin(a) * tr,
+          vx: Math.cos(a) * 0.025,
+          vz: Math.sin(a) * 0.025,
+          spin: Math.max(0.55, top.spin),
+          state: 'spinning',
+          finish: null,
+          lifted: 0,
+        });
+      }
       await glide(side, 'pinch', end, 0.3, 1, 'natural', 'force');
       await setPinch(side, false);
       await glide(side, 'pinch', above(end, 0.08), 0.26, 0, 'natural', 'release');
@@ -1153,7 +1174,9 @@ export function installDriver() {
       const countered = (g.palmGustCount ?? 0) > beforeCount && !!g.palmGustRiposte;
       await park(side);
       if (!countered) throw new Error('parry sweep did not trigger Counterflow');
-      if (g.charges.charges !== beforeCharges) throw new Error('Counterflow spent a shaping charge');
+      if (g.charges.charges !== beforeCharges) {
+        throw new Error(`Counterflow changed shaping charges (${beforeCharges} -> ${g.charges.charges}; elapsed ${g.elapsed.toFixed(2)}; riposteUntil ${(g.riposteUntil ?? -9).toFixed(2)}; gustRiposte ${!!g.palmGustRiposte})`);
+      }
     },
 
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */
