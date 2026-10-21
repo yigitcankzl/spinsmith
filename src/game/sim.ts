@@ -1114,8 +1114,16 @@ export function crossguard(top: Top, ax: number, az: number, bx: number, bz: num
   return true;
 }
 
-/** One-use player-forged bumper: a compact physical reflection, not an arena-wide spell. */
-export function emberBumper(top: Top, x: number, z: number, radius = 0.014) {
+/** A planted ember rivet stays a live post this long (s), kicking every top that hits it. */
+export const EMBER_POST_TIME = 3;
+/** Extra outward (away from the bowl centre) push the post gives the rival's top (m/s). */
+export const EMBER_RIVAL_KICK = 0.4;
+
+/**
+ * Player-forged ember post: a compact physical reflection, not an arena-wide spell. `outward` adds a
+ * push away from the bowl centre (the rival's top gets EMBER_RIVAL_KICK; your own gets 0).
+ */
+export function emberBumper(top: Top, x: number, z: number, radius = 0.014, outward = 0) {
   if (!top.alive || top.sinceBump < 0.2) return false;
   const dx = top.x - x;
   const dz = top.z - z;
@@ -1129,6 +1137,11 @@ export function emberBumper(top: Top, x: number, z: number, radius = 0.014) {
   top.vz -= nz * inward * 1.8;
   top.vx += nx * 0.22;
   top.vz += nz * 0.22;
+  if (outward > 0) {
+    const r = Math.hypot(top.x, top.z) || 1;
+    top.vx += (top.x / r) * outward;
+    top.vz += (top.z / r) * outward;
+  }
   top.kick = Math.max(top.kick, 0.6);
   top.kickX = nx;
   top.kickZ = nz;

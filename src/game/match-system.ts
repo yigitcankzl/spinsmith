@@ -13,7 +13,7 @@ import { forgeGripIntent, forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_POST_TIME, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -655,6 +655,7 @@ export class MatchSystem extends createSystem({
   private emberHandLocal = new Vector3();
   private emberWorld = new Vector3();
   private emberBumperAt = new Vector3();
+  private emberPostUntil = 0;
   private emberGrabGap = -1;
   private emberPickup = (() => {
     const group = Object.assign(new Group(), { visible: false });
@@ -5636,9 +5637,10 @@ export class MatchSystem extends createSystem({
             this.emberPickup.visible = false;
             this.emberHeld = null;
             this.setEmberState(3);
+            this.emberPostUntil = this.elapsed + EMBER_POST_TIME;
             this.recordIntervention();
             this.lastShape = { t: this.elapsed, kind: 'ramp' };
-            this.stamp.show('RIVET PLANTED!', 'FIRST TOP TO HIT IT GETS KICKED', 'mine', 0.72, 1.05);
+            this.stamp.show('RIVET PLANTED!', 'A HOT POST FOR 3 S: IT KICKS THEIRS OUT', 'mine', 0.72, 1.05);
             this.sparks.embers(this.emberBumperAt.x, floor, this.emberBumperAt.z, 8, 0.08, 0.08, 1);
             playThock();
             return;
@@ -7982,19 +7984,21 @@ export class MatchSystem extends createSystem({
           playStamp();
         });
       } else clash = step(this.arena, this.mine, this.theirs);
-      if (this.emberState === 3) {
+      if (this.emberState === 3 && this.elapsed > this.emberPostUntil) {
+        // The post cools after EMBER_POST_TIME.
+        this.setEmberState(0);
+        this.emberBumperFx.visible = false;
+      } else if (this.emberState === 3) {
         for (const top of this.tops) {
-          if (!emberBumper(top, this.emberBumperAt.x, this.emberBumperAt.z)) continue;
+          const rivalTop = top === this.theirs;
+          if (!emberBumper(top, this.emberBumperAt.x, this.emberBumperAt.z, 0.014, rivalTop ? EMBER_RIVAL_KICK : 0)) continue;
           const y = this.arena.height(top.x, top.z);
-          this.setEmberState(0);
-          this.emberBumperFx.visible = false;
           this.impacts.hit(top.x, y, top.z, 0.9);
           this.impacts.shock(top.x, y, top.z, 0.78, 0xff7a1a);
           this.sparks.embers(top.x, y, top.z, 12, 0.16, 0.12, 1);
-          this.stamp.show('RIVET KICK!', 'YOUR PLANTED METAL FIRED', 'mine', 0.62, 0.9);
+          if (rivalTop) this.stamp.show('RIVET KICK!', 'YOUR PLANTED METAL FIRED', 'mine', 0.62, 0.9);
           this.roomLight.hit();
           playThock();
-          break;
         }
       }
       this.record(clash);

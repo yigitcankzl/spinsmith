@@ -352,8 +352,12 @@ TUNING.grace = 0;
 
   const emberHit = new Top(ATTACK);
   emberHit.launch(0, 0.02, 0, -0.3, 0.8, 1);
-  assert.equal(emberBumper(emberHit, 0, 0), true, 'a planted ember is a one-contact physical bumper');
+  assert.equal(emberBumper(emberHit, 0, 0), true, 'a planted ember post reflects a top that hits it');
   assert.ok(emberHit.vz > 0.15, 'the ember bumper gives a readable return kick');
+  const emberRival = new Top(ATTACK);
+  emberRival.launch(0.05, 0.02, 0, -0.3, 0.8, 1);
+  emberBumper(emberRival, 0.05, 0, 0.014, 0.4);
+  assert.ok(emberRival.vx > 0.3, 'the ember post kicks the rival top outward, away from the bowl centre');
 
   // The fingertip is a body: a paid swing throws a tired top, a fresh one shrugs, a soft touch only nudges.
   const flicked = (spin: number, power: number, swing = 0.5) => {
