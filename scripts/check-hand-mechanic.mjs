@@ -155,7 +155,14 @@ export default async function run({ page, frame }) {
     } else if (check === 'finger-groove') {
       if (before.phase !== 'fight') throw new Error('finger-groove check requires a fight');
       stateKey = 'groove';
-      action = drive.groove({ side: 'right' });
+      // A top cruising under the stroke turns it into a flick or blocks it near your own top; hold
+      // both tops on the far side of the bowl while the fingertip draws.
+      const g = window.__game;
+      const hold = setInterval(() => {
+        Object.assign(g.mine, { x: -0.05, z: -0.07, vx: 0, vz: 0 });
+        Object.assign(g.theirs, { x: 0.05, z: -0.07, vx: 0, vz: 0 });
+      }, 16);
+      action = drive.groove({ side: 'right' }).finally(() => clearInterval(hold));
     } else if (check === 'arena-morph-tutorial') {
       const g = window.__game;
       g.progress.matches = 0;

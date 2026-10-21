@@ -29,7 +29,7 @@ import type { BrawlField } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
 import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
-import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from './desk-edge.js';
+import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector, rayExit } from './desk-edge.js';
 import type { DeskSector } from './desk-edge.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
@@ -418,6 +418,8 @@ export class MatchSystem extends createSystem({
     return m;
   });
   private deskEdgeSectors: DeskSector[] = [];
+  /** The detected desk's outline in arena-local space (dev throws aim at the most desk). */
+  private deskEdgePoly: XZ[] | null = null;
   private deskEdgeKey = '';
   /**
    * The first match's staged DESK KO: armed for the forge-lesson round, the rival is steered to
@@ -1601,7 +1603,15 @@ export class MatchSystem extends createSystem({
           const speed = e.shiftKey ? 0.3 : 0.8;
           // The rescue probe throws away from any real table edge in reach, so the top lands on wood.
           let a = Math.atan2(t.z, t.x);
-          if (e.shiftKey) for (let k = 0; k < 4 && this.deskEdgeSectors.some((sec) => inSector(sec, a)); k++) a += Math.PI / 2;
+          if (e.shiftKey && this.deskEdgePoly) {
+            // The direction with the most desk beyond the rim (16 candidates).
+            let room = -1;
+            for (let k = 0; k < 16; k++) {
+              const c = (k / 16) * Math.PI * 2;
+              const d = rayExit(this.deskEdgePoly, Math.cos(c), Math.sin(c));
+              if (d > room) [room, a] = [d, c];
+            }
+          }
           t.vx = Math.cos(a) * speed;
           t.vz = Math.sin(a) * speed;
           t.state = 'out';
@@ -3837,6 +3847,7 @@ export class MatchSystem extends createSystem({
           });
         } else poly = ROOM.poly!; // DEV stand-in desk: already arena-local.
         // 25 cm of real desk beyond the rim still counts as "soon off the edge".
+        this.deskEdgePoly = poly;
         this.deskEdgeSectors = deskSectors(poly, maxRim(L), 0.25 / s, arcs.length);
         this.deskEdgeSectors.forEach((sec, i) => {
           // RingGeometry turned flat (rotateX(-PI/2)) maps its theta to atan2 angle -theta.
@@ -5383,6 +5394,9 @@ export class MatchSystem extends createSystem({
         const slapping = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, palm.x, palm.z) > SLAP_MIN_N;
         if (slapping) {
           if (import.meta.env.DEV) console.log('[SHAPE] well ignored: a slap outside the rim');
+        } else if (this.time < this.flickReadyAt[side]) {
+          // A hand that just let go of a pinch (a forge, ramp or spring) settling onto the bowl is not a cup.
+          if (import.meta.env.DEV) console.log('[SHAPE] well ignored: just released a pinch');
         } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) {
           let target: Top | null = null;
           let gap = MAGNET_CATCH;
@@ -5831,7 +5845,8 @@ export class MatchSystem extends createSystem({
       // A hand that just released a pinch still looks like an open palm for a few frames. Without
       // this ownership window, releasing two-hand Arena Forge can accidentally build Crossguard
       // and spend a second charge on the same physical gesture.
-      if (h.tracked && !h.pinching && this.elapsed >= this.palmGustBlockedUntil[side]
+      // A Spin Rub is one open hand low over the bowl too; while its window is open no rail is built.
+      if (h.tracked && !h.pinching && this.elapsed >= this.palmGustBlockedUntil[side] && this.time >= this.rubUntil
         && this.overforgeControl?.side !== side && this.overforgeHeld !== side) {
         const wrist = this.handAt.copy(this.toLocal(h.wrist));
         const index = this.root.worldToLocal(this.local.copy(h.index));
@@ -6148,7 +6163,7 @@ export class MatchSystem extends createSystem({
       const palm = wrist.lerp(index, 0.48);
       const floor = this.arena.height(palm.x, palm.z);
       const n = normRadius(this.arena.layout, palm.x, palm.z);
-      const valid = n < 0.74 && palm.y >= floor + 0.025 && palm.y <= floor + 0.12 && Math.abs(wrist.y - index.y) <= 0.075;
+      const valid = this.time >= this.rubUntil && n < 0.74 && palm.y >= floor + 0.025 && palm.y <= floor + 0.12 && Math.abs(wrist.y - index.y) <= 0.075;
       if (!valid) {
         this.palmGustSampled[side] = false;
         this.palmGustAge[side] = 0;
@@ -6187,6 +6202,9 @@ export class MatchSystem extends createSystem({
         continue;
       }
       if (this.palmGustCooldown > 0 || speed < PALM_GUST_SPEED || path * ARENA_SCALE < 0.105) continue;
+      // A fingertip arriving on your own top is a Spin Rub reaching in, not a sweep (a sweep that
+      // crosses your top still fires once it is past it).
+      if (this.mine.alive && Math.hypot(index.x - this.mine.x, index.z - this.mine.z) < 0.04) continue;
       const strength = Math.max(0.65, Math.min(1.5, speed / 0.75));
       this.doPalmGust(side, origin.x, origin.z, palm.x, palm.z, strength);
       this.palmGustSampled[side] = false;
