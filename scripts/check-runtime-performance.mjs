@@ -21,7 +21,20 @@ export default async function run({ page, frame }) {
     game.lowestFps = 0;
     game.fpsWindowFrames = 0;
     game.fpsWindowTime = 0;
+    // CPU cost of the game's own per-frame update (simulation, hands, FX; not WebGL submission).
+    // Heap growth is not reported: Chromium buckets performance.memory without a precise-memory flag.
+    const original = game.update;
+    const updateMs = [];
+    game.update = function (...args) {
+      const t0 = performance.now();
+      const r = original.apply(this, args);
+      updateMs.push(performance.now() - t0);
+      return r;
+    };
     await new Promise((resolve) => setTimeout(resolve, 5200));
+    game.update = original;
+    const sortedMs = updateMs.slice().sort((a, b) => a - b);
+    const pct = (q) => Math.round((sortedMs[Math.min(sortedMs.length - 1, Math.floor(sortedMs.length * q))] ?? 0) * 100) / 100;
 
     const diagnostics = window.spinsmithDiagnostics?.();
     return {
@@ -35,6 +48,8 @@ export default async function run({ page, frame }) {
       phase: game.phase,
       lowestFpsOverFiveSeconds: diagnostics?.lowestFps ?? null,
       liteMode: diagnostics?.liteMode ?? null,
+      updateFrames: updateMs.length,
+      updateMs: { p50: pct(0.5), p95: pct(0.95), max: pct(1) },
       drawCalls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       recorderCodecs: {
