@@ -524,6 +524,16 @@ export function playSwish(speed: number, x = 0) {
   );
 }
 
+/** A fingertip rubbing spin back into a top: a soft, bright tick that rises with the window's gain (0..1). */
+export function playRub(gain: number, x = 0) {
+  const k = Math.max(0, Math.min(1, gain));
+  at(x, () =>
+    vary(0.05, () => {
+      hiss(0.05 + 0.05 * k, 0.04, 2400 + 3200 * k, 3600 + 4200 * k, 6);
+    }),
+  );
+}
+
 /**
  * The rip lets go: the launcher's clack (a sharp steel latch), a whoosh scaled by power; a perfect
  * rip adds a bright bell ping.

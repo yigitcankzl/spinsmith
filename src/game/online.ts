@@ -9,6 +9,7 @@ import { BroadcastChannelTransport, EventReceiver, HandsReceiver, EventSender, i
 import type { GuestEvent, NetMsg, PackedShape, TopLike, Transport, Vec3 } from './net.ts';
 import type { FloorShape } from './sim.ts';
 import { GROOVE_MAX_LENGTH } from './hand-tools.ts';
+import { RUB_WINDOW_MAX } from './sim.ts';
 
 /** A remote flick's approach speed is a hand swing (arena m/s), never a cannon. */
 const FLICK_MAX_APPROACH = 1.2;
@@ -275,6 +276,10 @@ export function sanitizeGuestEvent(ev: GuestEvent, radius: number, maxAim: numbe
       if (d < 1e-6) return null;
       return { kind: 'flick', target: ev.target, dx: ev.dx / d, dz: ev.dz / d, s: clamp(ev.s, 0, FLICK_MAX_APPROACH), f: clamp(ev.f, 0, 1) };
     }
+    case 'rub':
+      // Spin the guest rubbed into its own top: never more than one paid window's worth.
+      if (!num(ev.gain)) return null;
+      return { kind: 'rub', gain: clamp(ev.gain, -RUB_WINDOW_MAX, RUB_WINDOW_MAX) };
     case 'cup':
       if (!num(ev.x) || !num(ev.z)) return null;
       return { kind: 'cup', x: pos(ev.x), z: pos(ev.z) };

@@ -1194,6 +1194,57 @@ export function fingerContact(top: Top, x: number, z: number, vx: number, vz: nu
   return gain;
 }
 
+/** A rub only counts within this much of the rim's touching distance (arena m), so a finger tracing the rim stays on it. */
+export const RUB_SLACK = 0.004;
+/** Fingertip speed along the rim (arena m/s) a rub needs before it does anything. */
+export const RUB_MIN = 0.04;
+/** Fingertip speed along the rim (arena m/s) that reaches the full rub rate. */
+export const RUB_FULL = 0.22;
+/** Most spin a rub adds per second (spin is 0..1). */
+export const RUB_RATE = 0.3;
+/** Most spin one rub call adds, whatever the frame time. */
+export const RUB_STEP_MAX = 0.012;
+/** Most spin one paid rub window can add (also the cap on a remote rub). */
+export const RUB_WINDOW_MAX = 0.28;
+/** Share of the rub rate a wrong-way rub brakes by. */
+export const RUB_BRAKE = 0.4;
+
+/**
+ * Rubbing a fingertip along a spinning top's rim the way it turns puts spin back into it; rubbing
+ * against the spin brakes it a little. Returns the spin change (negative when braking). Only the
+ * tangential part of the finger's motion (perpendicular to centre -> tip) counts, and only when it
+ * dominates the radial part. The top is only eased out of the finger, never kicked: no velocity
+ * change. Spin never rises above 1.
+ */
+export function spinRub(top: Top, x: number, z: number, vx: number, vz: number, power: number, dt = STEP) {
+  if (!top.alive || power <= 0 || dt <= 0) return 0;
+  const rx = x - top.x;
+  const rz = z - top.z;
+  const d = Math.hypot(rx, rz);
+  const reach = top.spec.radius + FINGER_RADIUS;
+  if (d < 1e-6 || d > reach + RUB_SLACK) return 0;
+  const ux = rx / d;
+  const uz = rz / d;
+  // The rim surface moves along (uz, -ux) * hand: the angle advances by hand (three.js rotation.y).
+  const rvx = vx - top.vx;
+  const rvz = vz - top.vz;
+  const tan = (rvx * uz - rvz * ux) * top.hand;
+  const rad = rvx * ux + rvz * uz;
+  if (Math.abs(tan) <= Math.abs(rad) || Math.abs(tan) < RUB_MIN) return 0;
+  const k = Math.min(1, (Math.abs(tan) - RUB_MIN) / (RUB_FULL - RUB_MIN));
+  let gain = Math.min(RUB_STEP_MAX, k * RUB_RATE * dt) * Math.min(1, power);
+  if (tan > 0) gain = Math.min(gain, Math.max(0, 1 - top.spin));
+  else gain = -Math.min(gain * RUB_BRAKE, Math.max(0, top.spin));
+  top.spin += gain;
+  // A finger inside the rim eases the top off it by at most a millimetre a call.
+  if (d < reach) {
+    const push = Math.min(0.001, reach - d);
+    top.x -= ux * push;
+    top.z -= uz * push;
+  }
+  return gain;
+}
+
 /** Pulling a rim spring sends an inward impulse through the selected sector. */
 export function springRim(arena: Arena, tops: readonly Top[], sx: number, sz: number, x: number, z: number, strength = 1) {
   const r = Math.hypot(sx, sz) || 1;
