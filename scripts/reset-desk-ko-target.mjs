@@ -18,7 +18,12 @@ export default async function run({ page, frame }) {
       // Browser commands can queue behind a very slow IWER frame. Re-launch both simulation tops
       // here so the final setup is fresh at the instant this command executes.
       g.mine.launch(0, g.arena.radius * 0.55, 0, 0, 0.9, g.mine.hand);
-      g.theirs.launch(g.arena.radius * 0.97, 0, 0, 0, 0.9, g.theirs.hand);
+      // Aim at the real table: the rival waits at the rim facing the nearest real edge in reach
+      // (the game's own desk-edge sectors), and the palm strikes from the opposite side.
+      const edge = g.deskEdgeSectors?.[0]?.angle ?? 0;
+      const ex = Math.cos(edge);
+      const ez = Math.sin(edge);
+      g.theirs.launch(g.arena.radius * 0.97 * ex, g.arena.radius * 0.97 * ez, 0, 0, 0.9, g.theirs.hand);
       g.arena.shapes.splice(0);
       // Capture scripts may deliberately hold the two rim grips for several seconds. This proof
       // is independent: clear every transient forge latch so only the palm motion below can spend
@@ -55,7 +60,7 @@ export default async function run({ page, frame }) {
       g.barWasFull = true;
       g.elapsed = Math.max(g.elapsed, 3.2);
       g.arena.elapsed = Math.max(g.arena.elapsed, 3.2);
-      const strike = g.root.localToWorld(g.handAt.set(-g.arena.radius * 1.55, 0, 0));
+      const strike = g.root.localToWorld(g.handAt.set(-g.arena.radius * 1.55 * ex, 0, -g.arena.radius * 1.55 * ez));
       return {
         phase: g.phase,
         bar: g.forgeBar.value,
@@ -63,6 +68,7 @@ export default async function run({ page, frame }) {
         interventions: window.spinsmithDiagnostics?.().interventions ?? 0,
         strike: { x: strike.x, y: g.root.position.y - 0.08 * g.rootK, z: strike.z },
         rival: { x: g.theirs.x, z: g.theirs.z },
+        edge,
       };
     });
   }
