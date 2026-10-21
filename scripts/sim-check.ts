@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, FORGE_GRIP, forgeGripIntent, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
@@ -336,6 +336,40 @@ TUNING.grace = 0;
   away.launch(0.2, 0, 0, 0, 0.3, 1);
   assert.equal(fingerContact(away, 0, 0, 0.5, 0, 1), 0, 'a fingertip only touches the top it overlaps');
   assert.equal(fingerContact(tired, tired.x - 0.02, 0, 0.5, 0, 1), 0, 'one swing is one touch (no double hit on the next frame)');
+}
+
+// Spin Rub: a fingertip run along the rim the way the top turns puts spin back; against it brakes.
+{
+  const rubbed = (spin: number, hand: number) => {
+    const t = new Top(STAMINA);
+    t.launch(0, 0, 0, 0, spin, hand);
+    return t;
+  };
+  // Tip on the rim at +x: the rim there moves along -z for hand +1 (angle advances by hand, rotation.y).
+  const reach = STAMINA.radius + FINGER_RADIUS - 0.001;
+  const t = rubbed(0.4, 1);
+  const gain = spinRub(t, reach, 0, 0, -0.25, 1, 1 / 72);
+  assert.ok(gain > 0 && Math.abs(t.spin - 0.4 - gain) < 1e-12, 'a rub along the spin puts spin back');
+  const left = rubbed(0.4, -1);
+  assert.ok(spinRub(left, reach, 0, 0, 0.25, 1, 1 / 72) > 0, 'a left-hand top spins up from a rub the other way');
+  const wrong = rubbed(0.4, 1);
+  const brake = spinRub(wrong, reach, 0, 0, 0.25, 1, 1 / 72);
+  assert.ok(brake < 0 && -brake < gain, 'a rub against the spin brakes it, more gently than a right rub adds');
+  const far = rubbed(0.4, 1);
+  assert.equal(spinRub(far, reach + 0.02, 0, 0, -0.25, 1, 1 / 72), 0, 'no contact, no rub');
+  assert.equal(spinRub(rubbed(0.4, 1), reach, 0, -0.3, -0.1, 1, 1 / 72), 0, 'a mostly radial motion is not a rub');
+  assert.equal(spinRub(rubbed(0.4, 1), reach, 0, 0, -0.25, 0, 1 / 72), 0, 'an unpaid rub does nothing');
+  assert.ok(spinRub(rubbed(0.4, 1), reach, 0, 0, -5, 1, 1) <= RUB_STEP_MAX + 1e-12, 'one rub call is capped');
+  const second = rubbed(0.2, 1);
+  let total = 0;
+  for (let i = 0; i < 72; i++) total += spinRub(second, reach, 0, 0, -5, 1, 1 / 72);
+  assert.ok(total <= RUB_RATE + 1e-9, 'a second of rubbing adds at most RUB_RATE');
+  const full = rubbed(0.995, 1);
+  for (let i = 0; i < 200; i++) spinRub(full, reach, 0, 0, -0.25, 1, 1 / 72);
+  assert.ok(full.spin <= 1 + 1e-12 && full.spin > 0.999, 'a rub never raises spin above 1');
+  const still = rubbed(0.4, 1);
+  for (let i = 0; i < 86; i++) spinRub(still, reach - 0.002, 0, 0, -0.25, 1, 1 / 72);
+  assert.ok(Math.hypot(still.x, still.z) < 0.004 && still.vx === 0 && still.vz === 0, 'a rub barely moves the top and never kicks it');
 }
 
 // Hand-tool geometry stays deterministic and allocation-free for the live gesture loop.

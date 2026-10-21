@@ -263,6 +263,13 @@ an arena. First to 4 heat wins a match.
   (no hands 50%, random flicking 48%) and comes back from a spin deficit in 33% of rounds instead
   of 5% (`npm run report:flick`, 6 rounds per arena and type pairing). Online, the guest's flick is sent as a
   direction and swing speed and the host applies it.
+- **Spin Rub (direct touch, from the third match):** run the same fingertip slowly along your own
+  top's rim, mostly sideways rather than into it (below flick speed). The first rub spends one
+  charge and opens a 1.2 s window: rubbing the way the top turns adds up to 0.3 spin a second
+  (0.28 per window, never above full spin), rubbing against it brakes at 40% of that rate. The top
+  is eased off the finger but never pushed. Without a charge it does nothing. Online, the guest
+  sends the spin it rubbed and the host caps it per window. Covered by `npm run check:sim` and
+  `check:net`; not yet tried on a headset.
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on
   contact, lean into hits, wobble as spin drains, then topple.
 - **Far ramps:** point the hand ray at the floor during a fight and hold the pinch to

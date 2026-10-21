@@ -12,6 +12,7 @@ import {
 } from '../src/game/net.ts';
 import type { GuestEvent, NetMsg, TopLike } from '../src/game/net.ts';
 import type { FloorShape } from '../src/game/sim.ts';
+import { RUB_WINDOW_MAX } from '../src/game/sim.ts';
 
 const HOST_HZ = 120;
 const SNAP_EVERY = HOST_HZ / 30;
@@ -216,6 +217,10 @@ console.log('net check: OK');
   const flick = sanitizeGuestEvent({ kind: 'flick', target: 'rival', dx: 3, dz: 4, s: 99, f: 7 }, R, 0.6)!;
   assert.ok(flick.kind === 'flick' && Math.abs(Math.hypot(flick.dx, flick.dz) - 1) < 1e-9 && flick.s <= 1.2 && flick.f === 1, 'a remote flick is a unit direction with a bounded swing and force');
   assert.equal(sanitizeGuestEvent({ kind: 'flick', target: 'both' as 'mine', dx: 1, dz: 0, s: 0.4, f: 1 }, R, 0.6), null, 'a remote flick must name one top');
+  const rub = sanitizeGuestEvent({ kind: 'rub', gain: 9 }, R, 0.6)!;
+  assert.ok(rub.kind === 'rub' && rub.gain === RUB_WINDOW_MAX, 'a remote rub is capped to one paid window of spin');
+  assert.ok((sanitizeGuestEvent({ kind: 'rub', gain: -9 }, R, 0.6) as { gain: number }).gain === -RUB_WINDOW_MAX, 'a remote wrong-way rub brakes by at most one window');
+  assert.equal(sanitizeGuestEvent({ kind: 'rub', gain: NaN }, R, 0.6), null, 'a remote rub needs a finite gain');
   const untargeted = sanitizeGuestEvent({ kind: 'gust', sx: 0, sz: 0, ex: 0.1, ez: 0, f: 1, target: 'bogus' as 'mine' }, R, 0.6)!;
   assert.ok(untargeted.kind === 'gust' && untargeted.target === undefined, 'an invalid riposte target is dropped');
   assert.equal(sanitizeGuestEvent({ kind: 'gust', sx: 0, sz: 0, ex: NaN, ez: 0, f: 1 }, R, 0.6), null, 'a malformed palm gust is dropped');

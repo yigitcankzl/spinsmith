@@ -1,6 +1,6 @@
 import { AdditiveBlending, NormalBlending, BoxGeometry, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
-import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish } from './audio.js';
+import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish, playRub } from './audio.js';
 import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -13,7 +13,7 @@ import { forgeGripIntent, forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { controlSeal, crossguard, crossguardCrosses, emberBumper, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -64,6 +64,9 @@ const FLICK_FOLLOW_THROUGH = 0.4;
 const GROOVE_COMMIT_DELAY = 0.25;
 /** Seconds after a pinch lets go before that hand can flick (the release pull-back). */
 const FLICK_AFTER_RELEASE = 0.45;
+/** Seconds one shaping charge keeps a Spin Rub open, and the pause before rubbing can spend another. */
+const RUB_WINDOW = 1.2;
+const RUB_REOPEN = 0.4;
 /** Fingertip distance from a live top that claims the magnetic catch gesture (arena-local m). */
 const MAGNET_CATCH = 0.052;
 /** Placing waits at least this long for planes, and places on the tray after SETTLE_MAX without a table (s). */
@@ -322,6 +325,22 @@ export class MatchSystem extends createSystem({
   private lastFlick = { gain: 0, dx: 0, dz: 0, rival: false };
   /** One swing is one flick: the follow-through cannot catch the same top again. */
   private flickReadyAt: Record<Side, number> = { left: -9, right: -9 };
+  /** Spin Rub: the paid window's end and when the next charge may open one (this.time). */
+  private rubUntil = -9;
+  private rubReadyAt = -9;
+  /** Spin this window has rubbed in (negative when braking) and the charge's force. */
+  private rubGain = 0;
+  private rubPower = 0;
+  private rubStamped = false;
+  private rubFlashAt = -9;
+  private rubSoundAt = -9;
+  /** Guest only: rubbed spin not yet sent to the host, and when it last went. */
+  private rubPending = 0;
+  private rubSentAt = -9;
+  /** Host only: the guest's current rub window and the spin it has rubbed in it. */
+  private guestRubUntil = -9;
+  private guestRubSum = 0;
+  private guestRubSaidAt = -9;
   private palmGustDirection = new Vector2();
   private palmGustLength = 0;
   private palmGustHits = 0;
@@ -5763,6 +5782,13 @@ export class MatchSystem extends createSystem({
       this.label.set('RIVAL IS TIRED\nSWING A FINGER THROUGH IT: FLICK');
       this.labelTimer = 2.2;
     }
+    // A guest's rubbed spin goes to the host in small batches, and the rest when the window closes.
+    if (this.rubPending !== 0 && this.online?.role === 'guest' && this.online.peer
+      && (this.time >= this.rubUntil || this.time - this.rubSentAt >= 0.2)) {
+      this.online.sendEvent({ kind: 'rub', gain: this.rubPending });
+      this.rubPending = 0;
+      this.rubSentAt = this.time;
+    }
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
       const glow = this.flickGlows[side === 'left' ? 0 : 1];
@@ -5807,6 +5833,8 @@ export class MatchSystem extends createSystem({
       this.swinging[side] = fast;
       // A full hand of charges: the fingertip sheds embers, ready to strike.
       if (armed && this.charges.charges >= 3 && Math.random() < dt * 5) this.sparks.embers(tip.x, tip.y - 0.006, tip.z, 1, 0.05, 0.03, 1);
+      // A slow fingertip running along your own top's rim is a Spin Rub, never a flick or a nudge.
+      if (this.updateRub(tip, vel, along, dt)) continue;
       for (const top of this.tops) {
         const approach = fingerTouches(top, tip.x, tip.z, vel.x, vel.z);
         if (!approach) continue;
@@ -5866,6 +5894,76 @@ export class MatchSystem extends createSystem({
         break;
       }
     }
+  }
+
+  /**
+   * Spin Rub: an open fingertip run along your own top's rim, mostly tangential and slower than a
+   * flick, rubs spin back into it the way it turns (against it brakes a little). One shaping charge
+   * opens a RUB_WINDOW; a window adds at most RUB_WINDOW_MAX spin. True when the finger is rubbing
+   * (so the flick stands down this frame).
+   */
+  private updateRub(tip: Vector3, vel: Vector3, along: number, dt: number) {
+    const top = this.mine;
+    if (!this.taught('defense') || !top.alive || along >= FLICK_HARD) return false;
+    const rx = tip.x - top.x;
+    const rz = tip.z - top.z;
+    const d = Math.hypot(rx, rz);
+    if (d < 1e-6 || d > top.spec.radius + FINGER_RADIUS + RUB_SLACK) return false;
+    const rvx = vel.x - top.vx;
+    const rvz = vel.z - top.vz;
+    const tangential = Math.abs(rvx * rz - rvz * rx) / d;
+    const radial = Math.abs(rvx * rx + rvz * rz) / d;
+    if (tangential <= radial || tangential < RUB_MIN) return false;
+    if (this.time >= this.rubUntil) {
+      if (this.time < this.rubReadyAt) return true;
+      const force = this.charges.spend(this.elapsed, TUNING.grace);
+      if (!force) {
+        this.locked('SPIN RUB NEEDS A CHARGE');
+        return true;
+      }
+      this.rubUntil = this.time + RUB_WINDOW;
+      this.rubReadyAt = this.rubUntil + RUB_REOPEN;
+      this.rubGain = 0;
+      this.rubPower = force;
+      this.rubStamped = false;
+      this.recordIntervention();
+    }
+    if (this.rubGain >= RUB_WINDOW_MAX) return true;
+    let gain = spinRub(top, tip.x, tip.z, vel.x, vel.z, this.rubPower, dt);
+    const over = this.rubGain + gain - RUB_WINDOW_MAX;
+    if (over > 0) {
+      top.spin -= over;
+      gain -= over;
+    }
+    this.rubGain += gain;
+    if (this.online?.role === 'guest' && this.online.peer) this.rubPending += gain;
+    if (gain === 0) return true;
+    const nx = -rx / d;
+    const nz = -rz / d;
+    const cx = top.x - nx * top.spec.radius;
+    const cz = top.z - nz * top.spec.radius;
+    const y = this.arena.height(cx, cz);
+    if (gain < 0) {
+      if (this.time - this.rubSoundAt >= 0.3) {
+        this.rubSoundAt = this.time;
+        playTick();
+      }
+      return true;
+    }
+    if (Math.random() < dt * 24) this.sparks.embers(cx, y + 0.004, cz, 1, 0.04, 0.02, 1);
+    if (this.time - this.rubFlashAt >= 0.3) {
+      this.rubFlashAt = this.time;
+      this.myView.flash();
+    }
+    if (this.time - this.rubSoundAt >= 0.09) {
+      this.rubSoundAt = this.time;
+      playRub(this.rubGain / RUB_WINDOW_MAX, cx);
+    }
+    if (!this.rubStamped && this.rubGain >= 0.02) {
+      this.rubStamped = true;
+      this.stamp.show('SPIN RUB!', 'YOUR TOP SPINS UP', 'mine', 0.5, 0.9);
+    }
+    return true;
   }
 
   private updatePalmGust(dt: number) {
@@ -8523,6 +8621,24 @@ export class MatchSystem extends createSystem({
       this.rivalShapeKind = 'FLICK';
       this.hitStop = Math.max(this.hitStop, 0.07);
       playThock(top.x, top.z);
+    } else if (ev.kind === 'rub') {
+      // Guest-side 'mine' is the host's rival top; one window's worth of spin per RUB_WINDOW at most.
+      const top = this.theirs;
+      if (!top.alive) return;
+      if (this.time >= this.guestRubUntil) {
+        this.guestRubUntil = this.time + RUB_WINDOW + RUB_REOPEN;
+        this.guestRubSum = 0;
+      }
+      const gain = Math.min(ev.gain, RUB_WINDOW_MAX - this.guestRubSum);
+      this.guestRubSum += Math.max(0, gain);
+      top.spin = gain > 0 ? Math.max(top.spin, Math.min(1, top.spin + gain)) : Math.max(0, top.spin + gain);
+      if (gain > 0 && this.time - this.guestRubSaidAt >= 1) {
+        this.guestRubSaidAt = this.time;
+        this.theirView.flash();
+        this.stamp.show('THEIR SPIN RUB', 'LIVE HANDS', 'rival', 0.45);
+        this.rivalShapeAt = this.elapsed;
+        this.rivalShapeKind = 'SPIN RUB';
+      }
     } else if (ev.kind === 'strike') {
       // The guest's palm comes down: their seal (Anvil when unknown), centred where they slapped, their top the striker.
       const seal = (SEALS as readonly string[]).includes(ev.seal ?? '') ? (ev.seal as Seal) : 'anvil';

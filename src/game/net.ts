@@ -31,7 +31,8 @@ export type GuestEvent =
   | { kind: 'strike'; x: number; z: number; seal?: string }
   | { kind: 'rim'; sx: number; sz: number; x: number; z: number; f: number }
   | { kind: 'gust'; sx: number; sz: number; ex: number; ez: number; f: number; target?: 'mine' | 'rival' }
-  | { kind: 'flick'; target: 'mine' | 'rival'; dx: number; dz: number; s: number; f: number };
+  | { kind: 'flick'; target: 'mine' | 'rival'; dx: number; dz: number; s: number; f: number }
+  | { kind: 'rub'; gain: number };
 
 export interface SnapshotMsg {
   type: 'snapshot';
