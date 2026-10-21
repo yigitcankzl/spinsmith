@@ -467,6 +467,8 @@ export class MatchSystem extends createSystem({
   private barPoints: [number, number] = [0, 0];
   /** First-match lesson: one new arena verb per round (ramp, two-hand forge, ultimate). */
   private tutorialRound = 0;
+  /** This match is the first one (kept through its verdict, when progress already counts it): see quietFirst. */
+  private quietMatch = false;
   /** The signature two-hand arena move has happened at least once this session. */
   private morphedOnce = false;
   private xpGained = 0;
@@ -2377,6 +2379,7 @@ export class MatchSystem extends createSystem({
     this.phase = 'hub';
     this.markFirstFive(1);
     this.matchOver = false;
+    this.quietMatch = false;
     this.prepareNext();
     this.arena.reset(this.arenas[this.arenaIndex]);
     this.arenaDirty = true;
@@ -2956,7 +2959,7 @@ export class MatchSystem extends createSystem({
       this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 1);
       playLand('table', them.x, 1);
       duck(0.4, 0.3);
-      this.stamp.show(e.vs, e.sub, 'rival', 1.6);
+      this.stamp.show(e.vs, this.quietFirst ? '' : e.sub, 'rival', 1.6);
     }
     if (e.t > 2.1) {
       this.theirView.root.scale.setScalar(1);
@@ -3060,7 +3063,7 @@ export class MatchSystem extends createSystem({
       }
       if (claim !== this.handHoverClaim[side]) {
         this.handHoverClaim[side] = claim;
-        if (claim && this.labelTimer <= 0 && this.progress.guide !== 'done') {
+        if (claim && this.labelTimer <= 0 && this.progress.guide !== 'done' && (claim !== 'RIM' || this.taught('spring'))) {
           this.label.set(CLAIM[claim]);
           this.labelTimer = 0.65;
         }
@@ -3094,7 +3097,7 @@ export class MatchSystem extends createSystem({
   /** Keeps the current bout's one hidden shard inside reach and lets either pinch claim it. */
   private updateSecretRelic(dt: number) {
     const bout = this.bout;
-    const canFind = !!bout && !bout.night && !this.progress.hasSecret(bout.id) && !this.demo && !this.photo && (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight');
+    const canFind = !!bout && !bout.night && !this.progress.hasSecret(bout.id) && !this.demo && !this.quietFirst && !this.photo && (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight');
     this.secretRelic.visible = canFind;
     if (!canFind || !bout) return;
     const index = Math.max(0, BOUTS.findIndex((b) => b.id === bout.id));
@@ -3274,6 +3277,8 @@ export class MatchSystem extends createSystem({
   /** A feat earned for the first time: stamped after what shows now. */
   private featDone(id: string) {
     if (this.demo || !this.progress.feat(id)) return;
+    // Match 1's feats are kept (the board lists them); only its verdict's are stamped.
+    if (this.quietFirst && !this.matchOver) return;
     this.stamp.later('FEAT!', FEATS[id], 'mine', 1.3);
     playStamp();
     if (import.meta.env.DEV) console.log(`[FEAT] ${id}`);
@@ -3605,6 +3610,7 @@ export class MatchSystem extends createSystem({
     this.myPoints = 0;
     this.theirPoints = 0;
     this.tutorialRound = 0;
+    this.quietMatch = this.progress.matches === 0;
     this.firstHeroRamp = false;
     this.wasDown = false;
     this.introDone = false;
@@ -4407,7 +4413,7 @@ export class MatchSystem extends createSystem({
       this.label.set('');
       // Later rounds are framed: the round, or what is at stake.
       const point = MATCH_HEAT - 1;
-      const word = this.myPoints >= point && this.theirPoints >= point ? 'FINAL ROUND' : this.myPoints >= point || this.theirPoints >= point ? 'MATCH POINT' : `ROUND ${this.round + 1}`;
+      const word = this.quietFirst ? `ROUND ${this.round + 1}` : this.myPoints >= point && this.theirPoints >= point ? 'FINAL ROUND' : this.myPoints >= point || this.theirPoints >= point ? 'MATCH POINT' : `ROUND ${this.round + 1}`;
       this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
       // A boss one round from defeat finds its second wind: it says so, then fights harder.
       // A bout's twist is said once, as its second round starts (the intro card names its lesson).
@@ -4655,7 +4661,7 @@ export class MatchSystem extends createSystem({
       const pct = Math.round(power * 20) * 5;
       const curve = Math.abs(this.launchTwist) > 0.2 ? ` · CURVE ${this.launchTwist > 0 ? 'RIGHT' : 'LEFT'}` : '';
       const brace = this.bracedLaunch ? ' · BRACED' : '';
-      this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%${curve}${brace}` : power > 0 ? `${pct}%${curve}${brace}${fading}` : `${LESSON.ripPull}${brace}`);
+      if (!this.quietFirst) this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%${curve}${brace}` : power > 0 ? `${pct}%${curve}${brace}${fading}` : `${LESSON.ripPull}${brace}`);
       this.lostFor = 0;
       if (dist < MAX_PULL) return;
     } else if (h.tracked && (this.openFor += dt) < RIP_RELEASE) {
@@ -4927,7 +4933,8 @@ export class MatchSystem extends createSystem({
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
     this.count = null;
-    this.stamp.show(perfect ? 'WHITE HOT!' : braced ? 'BRACED RIP!' : this.launchTiming > 1.04 ? 'PERFECT RIP!' : this.launchTiming > 1 ? 'ON BEAT!' : 'RIP!', braced ? 'two hands · stable launch' : '', 'mine', 0.35);
+    if (this.quietFirst) this.stamp.show('RIP!', '', 'mine', 0.35);
+    else this.stamp.show(perfect ? 'WHITE HOT!' : braced ? 'BRACED RIP!' : this.launchTiming > 1.04 ? 'PERFECT RIP!' : this.launchTiming > 1 ? 'ON BEAT!' : 'RIP!', braced ? 'two hands · stable launch' : '', 'mine', 0.35);
     if (perfect) this.featDone('whiteHot');
     this.matchLog.rip = Math.max(this.matchLog.rip, power);
     this.lastRip = power;
@@ -5068,8 +5075,8 @@ export class MatchSystem extends createSystem({
     const kind = steep > 0.6 ? 'Spin launch: slow, long spin' : steep < 0.25 && power > 0.5 && (from || dir) ? 'Dash launch' : '';
     const curve = Math.abs(this.launchTwist) > 0.2 ? `Curve ${this.launchTwist > 0 ? 'right' : 'left'}` : '';
     const opening = [this.launchTiming > 1.04 ? 'Perfect timing' : this.launchTiming > 1 ? 'On beat' : '', this.launchReadout(), curve, kind].filter(Boolean).join(' · ');
-    this.label.set(perfect ? `White hot!\n${opening || 'A head start on the strike'}` : opening);
-    this.labelTimer = perfect || opening ? 1.5 : 0;
+    this.label.set(this.quietFirst ? '' : perfect ? `White hot!\n${opening || 'A head start on the strike'}` : opening);
+    this.labelTimer = !this.quietFirst && (perfect || opening) ? 1.5 : 0;
     this.launchFrom = null;
     this.devLaunchTwist = 0;
     this.bracedLaunch = false;
@@ -5142,8 +5149,8 @@ export class MatchSystem extends createSystem({
       this.clearCrossguard();
       this.arenaMorphHold = 0;
       this.arenaView.charge = 1;
-      const firstLesson = !this.demo && this.progress.matches === 0 && this.tutorialRound === 2;
-      this.stamp.show('TWO-HAND FORGE', firstLesson ? 'SQUEEZE THE RIMS' : 'SQUEEZE · STRETCH · TILT · TWIST', 'mine', 0.7);
+      // Match 1's card and ghost hands teach the squeeze; later matches name all four actions.
+      if (!this.quietFirst) this.stamp.show('TWO-HAND FORGE', 'SQUEEZE · STRETCH · TILT · TWIST', 'mine', 0.7);
       playTick();
     }
 
@@ -5229,7 +5236,7 @@ export class MatchSystem extends createSystem({
       // Twist keeps its turn; tilt keeps which side went low (the echo mirrors it to the far side).
       const sign = action === 'twist' ? Math.sign(this.arenaMorphTwist) : action === 'tilt' ? Math.sign(this.arenaMorphShove.x) : 1;
       this.echoRec.forges.push({ round: this.echoRec.rips.length - 1, t: this.elapsed, action, sign: sign < 0 ? -1 : 1 });
-      this.stamp.show(ARENA_FORGE_TITLE[action], ARENA_FORGE_EFFECT[action], 'mine', 1.05, 1.15);
+      if (!this.quietFirst) this.stamp.show(ARENA_FORGE_TITLE[action], ARENA_FORGE_EFFECT[action], 'mine', 1.05, 1.15);
       // The stamp names the action and its effect; the card only points at the result.
       this.label.set(LESSON.forgeDone);
       this.labelTimer = 1.65;
@@ -5442,7 +5449,7 @@ export class MatchSystem extends createSystem({
               this.recordIntervention();
               this.lastShape = { t: this.elapsed, kind: 'ramp' };
               this.arenaView.flashRail(rail.x, rail.z);
-              this.stamp.show('DASH RAIL!', 'FIRST TOP ACROSS GETS THE KICK', 'mine', 0.65);
+              if (!this.quietFirst) this.stamp.show('DASH RAIL!', 'FIRST TOP ACROSS GETS THE KICK', 'mine', 0.65);
               playDash(rail.x);
             }
             continue;
@@ -5677,6 +5684,14 @@ export class MatchSystem extends createSystem({
    * hinted there too and is never gated). Every later verb is released one per completed match
    * (VERB_RELEASE); online, brawl and the demo save have them all.
    */
+  /**
+   * The first match says only its lessons and results: no launch chatter, readouts, cause cards
+   * or mid-match rewards (they wait for the verdict, or for match 2, which says them all again).
+   */
+  private get quietFirst() {
+    return this.quietMatch && !this.demo;
+  }
+
   private taught(verb: 'forge' | 'strike' | 'tells' | ReleasedVerb) {
     const m = this.progress.matches;
     // The two-hand forge is the first match's second lesson.
@@ -6568,8 +6583,10 @@ export class MatchSystem extends createSystem({
       this.overforgeHeld = side;
       this.overforgeMode = 'held';
       playPick();
-      this.label.set(`STAMP ${SEAL_NAMES[seal].toUpperCase()}\nPRESS THE SEAL INTO THE ARENA`);
-      this.labelTimer = 1.6;
+      if (!this.quietFirst) {
+        this.label.set(`STAMP ${SEAL_NAMES[seal].toUpperCase()}\nPRESS THE SEAL INTO THE ARENA`);
+        this.labelTimer = 1.6;
+      }
       break;
     }
   }
@@ -6590,11 +6607,11 @@ export class MatchSystem extends createSystem({
     if (full && !this.barWasFull) {
       playBarFull();
       this.fullSince = this.elapsed;
-      if (!this.photo) this.stamp.show('ULTIMATE READY', SEAL_NAMES[this.myBuild.seal ?? 'anvil'].toUpperCase(), 'mine', 0.8, 1.15);
+      if (!this.photo && !this.quietFirst) this.stamp.show('ULTIMATE READY', SEAL_NAMES[this.myBuild.seal ?? 'anvil'].toUpperCase(), 'mine', 0.8, 1.15);
     }
     this.barWasFull = full;
     const rivalAtRim = this.theirs.alive && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) >= 0.68;
-    if (full && rivalAtRim && !this.strikeWindowShown && this.labelTimer <= 0) {
+    if (full && rivalAtRim && !this.strikeWindowShown && this.labelTimer <= 0 && !this.quietFirst) {
       this.strikeWindowShown = true;
       this.call(LESSON.strikeWindow, CALL.tactic, 1.4);
       this.stamp.show('STRIKE WINDOW', 'RIVAL EXPOSED AT THE RIM', 'mine', 0.6);
@@ -7346,8 +7363,9 @@ export class MatchSystem extends createSystem({
     this.sealPop.add(this.sealPopModels[seal]);
     this.sealPop.userData.t = 0;
     this.sealPop.visible = true;
-    this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', SEAL_CALL[seal], 'mine', 0.95, 1.35);
-    if (!cut) {
+    this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', this.quietFirst ? '' : SEAL_CALL[seal], 'mine', 0.95, 1.35);
+    if (this.quietFirst) this.label.set('');
+    else if (!cut) {
       this.label.set(`ARENA CHANGED\n${SEAL_STATE[seal]}`);
       this.labelTimer = 2.2;
     }
@@ -7720,7 +7738,7 @@ export class MatchSystem extends createSystem({
           this.accumulator = 0;
           const charge = this.charges.reward();
           this.forgeBar.value = Math.min(1, this.forgeBar.value + 0.12);
-          this.stamp.show(
+          if (heroRamp || !this.quietFirst) this.stamp.show(
             heroRamp ? 'YOU CHANGED THE FIGHT' : `${s.kind === 'well' ? 'CUP' : s.kind === 'groove' ? 'GROOVE' : 'RAMP'} → ${s.kind === 'groove' ? 'DASH' : 'IMPACT'}`,
             heroRamp ? 'RAMP → IMPACT' : `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`,
             'mine',
@@ -7767,8 +7785,9 @@ export class MatchSystem extends createSystem({
       sub = 'ANGLE LOST';
     }
     const outcome = `${word} · ${sub}`;
-    this.stamp.show(word, sub, sub === 'COUNTER-HIT' || sub === 'ANGLE LOST' ? 'rival' : 'mine', 0.65);
     this.finishOpening(outcome);
+    if (this.quietFirst) return;
+    this.stamp.show(word, sub, sub === 'COUNTER-HIT' || sub === 'ANGLE LOST' ? 'rival' : 'mine', 0.65);
     playStamp();
     if (import.meta.env.DEV) console.log(`[OPENING] ${word} ${sub} strength ${clash.strength.toFixed(2)}`);
   }
@@ -7989,9 +8008,9 @@ export class MatchSystem extends createSystem({
     this.koFreeze = Math.max(this.koFreeze, 0.09);
     this.roomLight.hit();
     if (cause && this.causeCue.stage) this.showCauseCue(3, cause, this.causeCue.sx, this.causeCue.sz, this.theirs.x, this.theirs.z);
-    this.stamp.show('EDGE RUN!', cause ? `YOUR ${cause} → REAL TABLE` : 'REAL TABLE DECIDES', 'mine', 0.65, 1.25);
+    if (!this.quietFirst) this.stamp.show('EDGE RUN!', cause ? `YOUR ${cause} → REAL TABLE` : 'REAL TABLE DECIDES', 'mine', 0.65, 1.25);
     // The EDGE RUN stamp names the cause; the card says what crossing the edge is worth.
-    this.label.set(LESSON.edgeRun);
+    this.label.set(this.quietFirst ? '' : LESSON.edgeRun);
     this.labelTimer = DESK_VERDICT_TIME;
     if (import.meta.env.DEV) console.log('[DESK_KO] table flight started; score is pending');
     return true;
@@ -8085,9 +8104,11 @@ export class MatchSystem extends createSystem({
       this.elapsed += STEP;
       if (!this.pressureShown && this.elapsed >= SUDDEN_DEATH_AT) {
         this.pressureShown = true;
-        this.call('PRESSURE!\nPOCKETS OPEN · OUTER RIM HEATS', CALL.ambient, 1.8);
-        this.stamp.show('PRESSURE!', 'POCKETS ARE OPENING', 'neutral', 0.75, 1.1);
-        playTell();
+        if (!this.quietFirst) {
+          this.call('PRESSURE!\nPOCKETS OPEN · OUTER RIM HEATS', CALL.ambient, 1.8);
+          this.stamp.show('PRESSURE!', 'POCKETS ARE OPENING', 'neutral', 0.75, 1.1);
+          playTell();
+        }
       }
       this.steerToDeskEdge();
       const mineVx = this.mine.vx;
@@ -8195,8 +8216,10 @@ export class MatchSystem extends createSystem({
       else if (this.firstClashPending && this.elapsed >= 1.4) {
         this.firstClashPending = false;
         this.finishOpening('NO CONTACT · LINES MISSED');
-        this.stamp.show('NO CONTACT', 'LINES MISSED', 'neutral', 0.65);
-        playStamp();
+        if (!this.quietFirst) {
+          this.stamp.show('NO CONTACT', 'LINES MISSED', 'neutral', 0.65);
+          playStamp();
+        }
         if (import.meta.env.DEV) console.log('[OPENING] NO CONTACT');
       }
       // A charge rebounding off your Ward: said once per Ward, and it counts as stopping the move.
@@ -8434,7 +8457,8 @@ export class MatchSystem extends createSystem({
       const finishSub = deskKo
         ? `${cause ? `${cause} → ` : ''}EDGE +${DESK_KO_BONUS}${decided ? ' · WIN' : ''}`
         : decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause;
-      this.stamp.show(`${finishWord}!`, finishSub, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
+      // Match 1's DESK KO! stamp (updateDeskVerdict) already says this round; it is not said twice.
+      if (!(deskKo && this.quietFirst && !decided)) this.stamp.show(`${finishWord}!`, finishSub, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
       if (recent && v === 1) {
         // The stamp names the cause (SLAG! / YOUR RAMP); the card keeps to the score.
         // The decisive move plays out slowly for a moment, in a shower of sparks, then again as a replay.
@@ -8465,7 +8489,8 @@ export class MatchSystem extends createSystem({
         text = `You lose the match\nTry: ${this.rematchTip}`;
       }
     }
-    this.label.set(text);
+    // Match 1's rounds leave the finish to the stamp and the score to the bar; its verdict is carded.
+    this.label.set(this.quietFirst && v !== 2 && !this.matchOver ? '' : text);
     // The card and stamp already name the finish. The bar uses its scarce centre slot for score.
     this.barMessage = v === 2 ? 'DRAW' : `${this.barPoints[0]} — ${this.barPoints[1]}`;
     console.log(`[MATCH] ${this.lastCause ? `${this.lastCause} - ` : ''}${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
@@ -8636,9 +8661,10 @@ export class MatchSystem extends createSystem({
       for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
       if (COMFORT.flashes) this.pillar.play(this.arena.layout, maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), 0xffd34a);
       this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
-      this.stamp.later(`LEVEL ${this.progress.level}!`, this.progress.rank.toUpperCase(), 'mine', 1.2, 1.5);
+      if (!this.quietFirst || matchOver) this.stamp.later(`LEVEL ${this.progress.level}!`, this.progress.rank.toUpperCase(), 'mine', 1.2, 1.5);
     }
-    this.reveals.push(...award.unlocked);
+    // Match 1 reveals only its NEW MOVE: the Spur tip is the home note's next step, the rest wait on the board.
+    this.reveals.push(...(this.quietFirst ? [] : award.unlocked));
     // The first session's own part goes first: the forge calls for it next.
     this.reveals.sort((a, b) => Number(b === 'tip:spur') - Number(a === 'tip:spur'));
     // One new hand verb per completed match: its card leads the reveals (after the first part).
@@ -9293,7 +9319,7 @@ export class MatchSystem extends createSystem({
     this.boutEarned |= earned;
     if (!matchOver) {
       bout.medals.forEach((m, i) => {
-        if (now & (2 << i)) this.stamp.later('MEDAL!', MEDAL_TEXT[m].toUpperCase(), 'mine', 1.1, 1.1);
+        if (now & (2 << i) && !this.quietFirst) this.stamp.later('MEDAL!', MEDAL_TEXT[m].toUpperCase(), 'mine', 1.1, 1.1);
       });
       return;
     }
@@ -9326,13 +9352,13 @@ export class MatchSystem extends createSystem({
       this.stamp.later(`${CHAPTERS[after.chapter - 1].name.toUpperCase()} OPEN!`, `NEXT: ${after.rival.toUpperCase()} IN ${after.arena.toUpperCase()}`, 'mine', 1.8, 1.5);
       playLevelUp();
     }
-    this.reveals.push(...unlocked);
+    if (!this.quietFirst) this.reveals.push(...unlocked);
     if (import.meta.env.DEV) console.log(`[BOUT] ${bout.id} ${matchWon ? 'won' : 'lost'} bits ${this.progress.bouts[bout.id] ?? 0} (+${fresh}) next ${after?.id ?? '-'}${nextGate(this.progress.bouts) ? ` · ${nextGate(this.progress.bouts)}` : ''}`);
   }
 
   /** Shows a level-up, then each new unlock spinning over the arena before it flies off. */
   private updateRewards(dt: number) {
-    if (this.levelUpText && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
+    if (this.levelUpText && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4 && (this.matchOver || !this.quietFirst)) {
       this.label.set(this.levelUpText);
       this.levelUpText = '';
       // The level-up reads before the first unlock replaces it.
