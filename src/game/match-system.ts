@@ -9,7 +9,7 @@ import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { cloneLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance, validate } from './layout.js';
-import { forgeGripIntent, forgeGrips } from './reach.js';
+import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
@@ -143,12 +143,12 @@ const PALM_GUST_FX_TIME = 0.65;
 /** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
 const SLAP_MIN_N = 1.18;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
-const LABEL_AT = new Vector3(0, 0.14, -0.21);
+const LABEL_AT = new Vector3(HUD.card.x, HUD.card.y, HUD.card.z);
 /** At home after the first session the Smith's board fills the card's slot: notes hang just above it. */
-const HOME_NOTE_Y = 0.2;
+const HOME_NOTE_Y = HUD.homeNoteY;
 /** The match bar sits right under the card, its top edge on the card's lower edge (the two read as one display). */
-const BAR_Y = 0.063;
-const BAR_BACK = 0.021;
+const BAR_Y = HUD.barY;
+const BAR_BACK = HUD.barBack;
 /** The MENU plate's height over the arena floor (arena-local), at the rim's height like the tabs. */
 const MENU_Y = 0.012;
 /** The workshop shows the arena a little smaller, so its near rim stays behind the piece rail. */
@@ -208,6 +208,8 @@ const KO_FREEZE = 0.12;
 const COUNT_BEAT = 0.6;
 /** A pointing ray this close to a button's center (m) presses it. */
 const BUTTON_REACH = 0.035;
+/** Head-ray assist (Quest has no gaze source): a button held under the head ray this long lights up, and a pinch anywhere presses it. */
+const HEAD_DWELL = 0.4;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
 /** Launch power at or above this is a perfect rip: extra starting spin. */
 const PERFECT = TUNE.perfect;
@@ -1023,6 +1025,8 @@ export class MatchSystem extends createSystem({
   private passHinted = false;
   private arenaMorphShove = { x: 0, z: 0, t: 0 };
   private gazeAssist = { active: false, target: '' };
+  /** The button under the head ray, since when, and when it was last seen there (pickButton runs per button set). */
+  private headDwell = { id: '', since: 0, seen: -1 };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
   private pressing: Record<Side, boolean> = { left: false, right: false };
   /** An open fingertip touching and sliding across the floor; it becomes a one-use groove on lift. */
@@ -1389,8 +1393,9 @@ export class MatchSystem extends createSystem({
       b.mesh.rotation.set(-SIGN_TILT, 0, 0);
       b.mesh.visible = false;
     }
-    // The gaze pointer stays dormant on Quest unless the runtime exposes a gaze input source. On
-    // Meta VR Glasses it combines that gaze ray with either hand's pinch; the hand path is unchanged.
+    // The gaze pointer stays dormant on Quest unless the runtime exposes a gaze input source (there
+    // its head ray only feeds the button dwell assist). On Meta VR Glasses it combines that gaze ray
+    // with either hand's pinch; the hand path is unchanged.
     this.pointers = [this.gazePointer, this.hands.right, this.hands.left];
     if (import.meta.env.DEV) {
       // A crosshair in the middle of the view shows where the gaze pointer aims.
@@ -2246,6 +2251,25 @@ export class MatchSystem extends createSystem({
         if (h.justPinched && !pressed) pressed = b.id;
       }
     }
+    // Head-ray assist where no gaze pointer runs (Quest): look at a far button for a moment and it
+    // lights up; then a pinch of either hand, wherever it is, presses it. Hands still win.
+    const g = this.gazePointer;
+    if (!hovered && !g.tracked && g.hasRay && !this.gazeOff) {
+      for (const b of buttons) {
+        if (!b.mesh.visible) continue;
+        b.mesh.getWorldPosition(this.p);
+        const t = this.local.copy(this.p).sub(g.rayOrigin).dot(g.rayDir);
+        if (t <= 0 || this.local.copy(g.rayDir).multiplyScalar(t).add(g.rayOrigin).distanceTo(this.p) >= Math.max(BUTTON_REACH, b.height * 0.8)) continue;
+        const d = this.headDwell;
+        if (d.id !== b.id || this.time - d.seen > 0.15) Object.assign(d, { id: b.id, since: this.time });
+        d.seen = this.time;
+        if (this.time - d.since < HEAD_DWELL) break;
+        hovered = b;
+        this.gazeAssist.target = b.id;
+        if (g.justPinched && !pressed) pressed = b.id;
+        break;
+      }
+    }
     for (const b of buttons) b.highlight(b === hovered);
     return pressed;
   }
@@ -2498,8 +2522,18 @@ export class MatchSystem extends createSystem({
       this.labelTimer = 3;
       playTick();
     } else if (action.kind === 'comfort') {
+      const lefty = COMFORT.lefty;
       const name = nextComfort();
       applySound();
+      if (COMFORT.lefty !== lefty) {
+        // The stations swap sides: home is built again on the other hand's side.
+        const old = this.hub;
+        this.root.remove(old.root);
+        this.hub = new Hub();
+        this.hub.roomCode = old.roomCode;
+        this.root.add(this.hub.root);
+        this.toHub();
+      }
       this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
       this.label.set(`Comfort: ${name}\nPinch the dial again for the next`);
       this.labelTimer = 3;
@@ -2546,8 +2580,8 @@ export class MatchSystem extends createSystem({
     // The first session's forge visit is about one part: the one just earned.
     const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:spur' : null;
     this.progress.advance('fit');
-    // The card rides higher in the forge (the stats plate sits on the far rim).
-    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + 0.12, LABEL_AT.z);
+    // The card rides a little higher in the forge, over the raised drawers.
+    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + HUD.forgeLift, LABEL_AT.z);
     const r = this.nextRival;
     let friend = false;
     try {
@@ -3207,7 +3241,8 @@ export class MatchSystem extends createSystem({
 
   /**
    * Meta VR Glasses expose gaze as a target ray and either hand supplies the pinch. In desktop
-   * IWER the head ray is the equivalent; on a Quest without gaze tracking this pointer sleeps.
+   * IWER the head ray is the equivalent; on a Quest without gaze tracking this pointer sleeps and
+   * its head ray only drives the dwell-then-pinch button assist in pickButton.
    */
   private updateGazePointer(frame: XRFrame, ref: XRReferenceSpace, session: XRSession) {
     const g = this.gazePointer;
@@ -3622,11 +3657,10 @@ export class MatchSystem extends createSystem({
     this.stage.scale.setScalar(this.viewK);
     this.builder.viewScale = this.viewK;
     const far = rimRadius(L, -Math.PI / 2) * this.viewK;
-    // In the forge the card stands back behind the stats plate.
-    this.label.mesh.position.z = Math.min(LABEL_AT.z - (p === 'forge' ? 0.03 : 0), -(far + 0.04));
+    // In the forge the card stands a little farther back.
+    this.label.mesh.position.z = hudCardZ(far, p === 'forge');
     // Further away, the card and the bar grow so they read the same.
-    const reach = TUNE.reach / ARENA_SCALE;
-    const grow = Math.max(1, (reach + this.pushed / ARENA_SCALE + far) / (reach + 0.17));
+    const grow = hudGrow(far, this.pushed, TUNE.reach);
     // fitMatch may shrink the whole root to 70% to stay on a real table. Read surfaces cancel that
     // parent scale so type never becomes 30% smaller on the very tables that need it most.
     const readScale = 1 / Math.max(0.7, this.rootK);
@@ -3642,8 +3676,7 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
     // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') {
-      const stampLift = this.phase === 'result' ? 0.12 : 0.08;
-      this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + stampLift * grow, this.label.mesh.position.z + 0.01);
+      this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + HUD.stampLift, this.label.mesh.position.z + 0.01);
     }
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
@@ -4878,9 +4911,9 @@ export class MatchSystem extends createSystem({
       if (!a || !b || !left.tracked || !right.tracked || !left.pinching || !right.pinching) return false;
       const ar = Math.hypot(a.sx, a.sz) || 1;
       const br = Math.hypot(b.sx, b.sz) || 1;
-      // The grips sit 90 degrees apart on the near half (reach.ts FORGE_GRIP); anything wider than
-      // about 70 degrees counts, so a sloppy grip still forges but two pinches side by side do not.
-      if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > 0.3) return false;
+      // The grips sit 50 degrees apart on the near half (reach.ts FORGE_GRIP); anything wider than
+      // about 25 degrees counts, so a sloppy grip still forges but two pinches side by side do not.
+      if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > FORGE_GRIP_MAX_COS) return false;
       // Starting the grab is free. The charge is committed only after a deliberate release.
       if (this.charges.charges < 1) {
         this.locked('No charge yet\nCharges refill in a moment');

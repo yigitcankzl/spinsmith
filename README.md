@@ -34,7 +34,7 @@ move says why on the card ("No charge yet", "Strike not ready").
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
 | **Online duel (beta)**, tested in two browser windows | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE` (both after the first session). |
 | **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |
-| **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed), One hand (forge with one hand) and High contrast. Every gameplay sound has a visual twin (a stamp or the card), so Quiet loses no information. Left-handed layout: open `?lefty` once (`?lefty=0` to undo) and the near-rim stations swap sides. |
+| **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed), One hand (forge with one hand), High contrast and Left-handed. Every gameplay sound has a visual twin (a stamp or the card), so Quiet loses no information. Left-handed: a dial mode (kept like the others; `?lefty` once still holds it in every mode, `?lefty=0` undoes) swaps the near-rim stations to the other side. |
 
 All interactions are pinches, palm presses or grabs. Nothing needs a controller, and every one-hand
 gesture (rip, ramp, cup, strike) works with either hand (left-hand rip and ramp checked in IWER).
@@ -56,14 +56,14 @@ an arena. First to 4 heat wins a match.
   the spot in front of you is used when none is labelled (`npm run check:room-matrix` probes
   this in IWER with synthesised planes; not yet tried in a real room). Persistent anchors have only been exercised in
   IWSDK's browser emulator (IWER). Depth occlusion is switched off under IWER (it has no camera
-  depth), so it has not run anywhere yet. Gaze is only a head-ray stand-in in the emulator. The
+  depth), so it has not run anywhere yet. Gaze: a real gaze input source (Meta VR Glasses) is a full pointer; on Quest, which has none, the head ray only assists buttons (look at one for 0.4 s, it lights up, a pinch of either hand presses it); neither has run on a headset. The
   online duel has been run between two browser windows, not two headsets.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
   slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
   80% speed, calm); and One hand: hold the rim with one hand for a moment and a mirrored partner
   appears on the far rim, so turning, pushing in or out and lifting that one hand twist, squeeze,
-  stretch and tilt the arena (calm); and High contrast: each top's team ring wide and solid (calm).
+  stretch and tilt the arena (calm); High contrast: each top's team ring wide and solid (calm); and Left-handed: the home stations swap sides.
 
 ## What is in the game
 

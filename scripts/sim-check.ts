@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { ARENAS } from '../src/game/arenas.ts';
-import { cloneLayout, validate } from '../src/game/layout.ts';
+import { cloneLayout, rimRadius, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { SHAPING, ShapingCharges, STRIKE_BAR, StrikeBar } from '../src/game/shaping.ts';
 import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, VERB_CARD, VERB_RELEASE, verbReleasedAt, xpToNext } from '../src/game/progress.ts';
@@ -17,7 +17,7 @@ import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
 import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, pickTable, pickTablePlane, placeArena, polyArea, polyMinWidth, REACH, reachSpot, tableRank, TRAY_DROP } from '../src/game/placement.ts';
-import { eyeView, FORGE_GRIP, forgeGripIntent, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
+import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, hudAnchors, hudAnchorsOffMatch, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { crossguard, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
@@ -977,11 +977,14 @@ TUNING.grace = 0;
 // 16. Reach: every target touched directly sits within a seated arm's comfortable reach and not
 // too steeply below the eyes, for trays 0.30-0.45 m below the eyes (Meta suggests 0.42-0.46 m for
 // direct touch and warns against 0.5-0.8 m; the arena is drawn 2.4x, so the far tray parts of a
-// full forge drawer reach a little farther).
+// full forge drawer reach a little farther). The two-hand forge grips of every arena are held to the same bound.
 {
-  const targets: [string, { x: number; y: number; z: number }][] = [...touchTargets(), ['tray, outer of a full drawer', traySpot(0, 8)]];
+  const targets: [string, { x: number; y: number; z: number }][] = [...touchTargets(ARENAS), ['tray, outer of a full drawer', traySpot(0, 8)]];
+  const floor = new Map(ARENAS.map((l) => [l.name, new Arena(l)]));
   for (const drop of [0.3, 0.35, 0.4, 0.45]) {
-    for (const [name, at] of targets) {
+    for (const [name, spot] of targets) {
+      const grip = floor.get(name.replace(/ forge grip (left|right)$/, ''));
+      const at = grip && name.includes('forge grip') ? { ...spot, y: grip.height(spot.x, spot.z) } : spot;
       const v = eyeView(at, drop);
       assert.ok(v.distance >= 0.32 && v.distance <= 0.67, `${name} at drop ${drop}: ${v.distance.toFixed(2)} m from the eyes`);
       assert.ok(v.below <= 63, `${name} at drop ${drop}: ${v.below.toFixed(0)} degrees below the eyes`);
@@ -989,21 +992,42 @@ TUNING.grace = 0;
   }
 }
 
-// 16b. Reach: the two-hand forge grips of every arena. Both arms reach out together for a short,
-// gross gesture, so they get a little more room than a precise touch: at most 0.70 m. The old
-// side grips (x = +-r) sat 0.83-0.90 m away.
+// 16b. Reach: the two-hand forge grips of every arena sit within 2 ft (0.61 m) of a seated player's
+// eyes for trays 0.30-0.40 m below them (the default is 0.35). The deepest tray (0.45 m) puts the
+// eyes 0.45 m above the floor on its own, so there only the 16 bound holds. The old side grips
+// (x = +-r) sat 0.83-0.90 m away.
 {
   for (const layout of ARENAS) {
     const arena = new Arena(layout);
     for (const g of forgeGrips(layout)) {
       const at = { ...g, y: arena.height(g.x, g.z) };
-      for (const drop of [0.3, 0.35, 0.4, 0.45]) {
+      for (const drop of [0.3, 0.35, 0.4]) {
         const v = eyeView(at, drop);
-        assert.ok(v.distance <= 0.7, `${layout.name} forge grip at drop ${drop}: ${v.distance.toFixed(2)} m from the eyes`);
+        assert.ok(v.distance <= 0.61, `${layout.name} forge grip at drop ${drop}: ${v.distance.toFixed(2)} m from the eyes`);
       }
     }
     const [l, r] = forgeGrips(layout);
-    assert.ok((l.x * r.x + l.z * r.z) / (Math.hypot(l.x, l.z) * Math.hypot(r.x, r.z)) < 0.3 - 0.25, `${layout.name} grips leave slack under the forge's opposite-rim test`);
+    assert.ok((l.x * r.x + l.z * r.z) / (Math.hypot(l.x, l.z) * Math.hypot(r.x, r.z)) < FORGE_GRIP_MAX_COS - 0.25, `${layout.name} grips leave slack under the forge's opposite-rim test`);
+  }
+}
+
+// 16b2. Field of view: every essential read surface (the round card and its prompts, the match bar,
+// the count/KO/verdict stamp, the forge card, the home note) sits within +-35 degrees vertically and
+// +-40 degrees horizontally of a seated head looking at the arena centre, for trays 0.30-0.45 m below
+// the eyes, on every arena (slid back as a match slides it), with a standard or a high wall.
+{
+  const near = (l: ArenaLayout) => Math.max(0, rimRadius(l, Math.PI / 2) - 0.17) * 2.4;
+  for (const layout of ARENAS) {
+    const surfaces: [string, { x: number; y: number; z: number }, number][] = [
+      ...[0, 0.016].flatMap((lift) => hudAnchors(layout, lift, near(layout)).map(([n, at]): [string, typeof at, number] => [n, at, REACH + near(layout)])),
+      ...hudAnchorsOffMatch(layout).map(([n, at]): [string, typeof at, number] => [n, at, REACH]),
+    ];
+    for (const drop of [0.3, 0.35, 0.4, 0.45]) {
+      for (const [name, at, reach] of surfaces) {
+        const g = gazeAngles(at, drop, reach);
+        assert.ok(Math.abs(g.up) <= 35 && Math.abs(g.side) <= 40, `${layout.name} ${name} at drop ${drop}: ${g.up.toFixed(1)} up, ${g.side.toFixed(1)} across`);
+      }
+    }
   }
 }
 
@@ -1420,6 +1444,13 @@ TUNING.grace = 0;
   const seen = new Set<string>();
   for (let i = 0; i < COMFORT_MODES.length; i++) seen.add(nextComfort());
   assert.equal(seen.size, COMFORT_MODES.length, 'the dial reaches every mode');
+  assert.ok(COMFORT_MODES.some((m) => m.lefty), 'the dial has a left-handed mode');
+  let lefty = false;
+  for (let i = 0; i < COMFORT_MODES.length; i++) {
+    nextComfort();
+    lefty ||= !!COMFORT.lefty;
+  }
+  assert.ok(lefty, 'stepping the dial reaches the left-handed layout');
   assert.ok(COMFORT.sound && COMFORT.flashes && !COMFORT.gentle, 'a full turn is back to standard');
 }
 
