@@ -16,7 +16,7 @@ import { edgeDistance, fitToTable, insidePoly, MAX_FIT_MOVE, RIM_MARGIN } from '
 import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
 import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
-import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
+import { PEDESTAL, pickTable, pickTablePlane, placeArena, polyArea, polyMinWidth, REACH, reachSpot, tableRank, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, FORGE_GRIP, forgeGripIntent, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
@@ -880,6 +880,54 @@ TUNING.grace = 0;
   assert.ok(!placeArena(head, 0, -1, [{ x: 0.3, y: 0.4, z: -0.9 }]).onTable, 'a table far below the eyes is not used');
   assert.ok(!placeArena({ ...head, y: 1.7 }, 0, -1, [{ x: 0.3, y: 0.9, z: -0.9 }]).onTable, 'standing over a low table uses the tray');
   assert.ok(Number.isFinite(placeArena(head, 0, 0, []).x), 'looking straight down still places ahead');
+}
+
+// 14b. Unlabelled tables: a flat, upward-facing plane at desk height with a usable top counts as
+// a table (ranked below a labelled one); floors, ceilings, walls, couches, tiny or odd-height
+// planes never do; and the one used is under the spot in front of the seated player.
+{
+  const rect = (cx: number, cz: number, w: number, d: number) => [
+    { x: cx - w / 2, z: cz - d / 2 }, { x: cx + w / 2, z: cz - d / 2 }, { x: cx + w / 2, z: cz + d / 2 }, { x: cx - w / 2, z: cz + d / 2 },
+  ];
+  const desk = rect(0, -0.75, 1.2, 0.6);
+  assert.ok(Math.abs(polyArea(desk) - 0.72) < 1e-9 && Math.abs(polyMinWidth(desk) - 0.6) < 1e-9, 'polygon area and width');
+  const flat = (semanticLabel: string | undefined, y: number, poly = desk, upY = 1, orientation = 'horizontal') => ({ orientation, semanticLabel, upY, y, poly });
+  const headY = 1.2;
+  assert.equal(tableRank(flat('table', 0.74), 0, headY), 0, 'a labelled table is rank 0');
+  assert.equal(tableRank(flat('desk', 0.74), null, headY), 0, 'a labelled desk is rank 0');
+  for (const label of [undefined, '', 'other', 'OTHER', 'something new']) assert.equal(tableRank(flat(label, 0.74), 0, headY), 1, `an unlabelled (${label}) desk-height plane is rank 1`);
+  for (const label of ['floor', 'ceiling', 'wall', 'couch', 'bed', 'shelf', 'storage', 'global mesh']) assert.equal(tableRank(flat(label, 0.74), 0, headY), null, `a ${label} is never a table`);
+  assert.equal(tableRank(flat('other', 0.74, desk, -1), 0, headY), null, 'a downward-facing plane (ceiling side) is not a table');
+  assert.equal(tableRank(flat('other', 0.74, desk, 1, 'vertical'), 0, headY), null, 'a vertical plane is not a table');
+  assert.equal(tableRank(flat('other', 0.4), 0, headY), null, 'a surface below 0.45 m (a seat) is not a table');
+  assert.equal(tableRank(flat('other', 1.2), 0, 1.7), null, 'a surface above 1.15 m is not a table');
+  assert.equal(tableRank(flat('other', 0.74, rect(0, -0.75, 0.6, 0.2)), 0, headY), null, 'a narrow ledge is not a table');
+  assert.equal(tableRank(flat('other', 0.74, rect(0, -0.75, 0.32, 0.32)), 0, headY), null, 'a stool-sized top is not a table');
+  assert.equal(tableRank(flat('other', 0.74, []), 0, headY), null, 'a plane without an outline is not a table');
+  // Heights are measured from the floor plane when there is one, else from the eyes.
+  assert.equal(tableRank(flat('other', 0.25), -0.5, headY), 1, 'a desk 0.75 m above a lower floor plane counts');
+  assert.equal(tableRank(flat('other', 0.74), null, headY), 1, 'without a floor, 0.46 m below the eyes counts');
+  assert.equal(tableRank(flat('other', 1.1), null, headY), null, 'without a floor, a surface at eye level does not');
+
+  const head = { x: 0, y: headY, z: 0 };
+  const spot = reachSpot(head, 0, -1);
+  assert.ok(Math.abs(spot.z + REACH) < 1e-9 && spot.x === 0, 'the spot is a reach ahead');
+  const surface = { x: 0, y: 0.74, z: -0.75, rank: 1 as const, poly: desk };
+  const at = placeArena(head, 0, -1, [surface]);
+  assert.ok(at.onTable && Math.abs(at.y - (0.74 + PEDESTAL)) < 1e-9, 'an unlabelled desk in front holds the arena');
+  assert.ok(!placeArena(head, 0, 1, [surface]).onTable, 'an unlabelled surface behind the player is not used');
+  assert.equal(pickTable(head, [surface]), null, 'an unlabelled surface needs the spot it must be under');
+  const chair = { x: 0, y: 0.74, z: 0, rank: 1 as const, poly: rect(0, 0, 1.6, 2) };
+  assert.equal(pickTable(head, [chair], spot), null, 'a surface the head is above is not used');
+  const labelled = { x: 0.8, y: 0.7, z: -0.6, rank: 0 as const, poly: rect(0.8, -0.6, 0.6, 0.6) };
+  assert.equal(pickTablePlane(head, [surface, labelled], spot), labelled, 'a labelled table outranks a nearer unlabelled one');
+  const nearSurface = { ...surface, x: 0.2, poly: rect(0.2, -0.75, 1.2, 0.6) };
+  const sideSurface = { x: 0.9, y: 0.8, z: -0.5, rank: 1 as const, poly: rect(0.9, -0.5, 0.6, 0.6) };
+  assert.equal(pickTablePlane(head, [sideSurface, nearSurface], spot), nearSurface, 'of two surfaces, the one under the spot');
+  const edge = { x: 0, y: 0.74, z: -1.06, rank: 1 as const, poly: rect(0, -1.06, 1, 0.6) };
+  assert.equal(pickTable(head, [edge], spot), 0.74, 'a surface within the fit move of the spot is used');
+  const far = { x: 0, y: 0.74, z: -1.2, rank: 1 as const, poly: rect(0, -1.2, 1, 0.6) };
+  assert.equal(pickTable(head, [far], spot), null, 'a surface out of reach of the spot is not used');
 }
 
 // 15. Shared headsets: the demo save is a level-8 smith past the first session with stamps, marks

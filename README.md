@@ -51,8 +51,10 @@ an arena. First to 4 heat wins a match.
   start over.
 - **Move the arena:** at home, pinch the brass handle on the pedestal's near face and carry it.
   Its new pose is saved; when persistent WebXR anchors are available, the room remembers it.
-- **Known limits:** nothing has been measured on a headset yet; table detection relies on the
-  room's Space Setup labelling a table or desk. Persistent anchors have only been exercised in
+- **Known limits:** nothing has been measured on a headset yet; a table or desk labelled in Space
+  Setup is preferred; an unlabelled ('other') flat surface at desk height, at least 30 cm wide, under
+  the spot in front of you is used when none is labelled (`npm run check:room-matrix` probes
+  this in IWER with synthesised planes; not yet tried in a real room). Persistent anchors have only been exercised in
   IWSDK's browser emulator (IWER). Depth occlusion is switched off under IWER (it has no camera
   depth), so it has not run anywhere yet. Gaze is only a head-ray stand-in in the emulator. The
   online duel has been run between two browser windows, not two headsets.
