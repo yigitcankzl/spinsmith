@@ -5,6 +5,7 @@
  * round's word between the names, and after a round your smith level along the bottom.
  */
 import { CanvasTexture, Color, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
+import { brawlSlots, spinStep } from './brawl.js';
 import { ARENA_SCALE } from './reach.js';
 import { addSlab, CYAN, GLASS_DEPTH, glass, ORANGE, pxPerM, setType, signTexture, STEEL, TEXT, TEXT_DIM } from './ui.js';
 
@@ -23,6 +24,17 @@ const BAR_Y = 118;
 const BAR_H = 56;
 /** In a fight the plate ends under the heat pips; the XP row (and the full height) is for results. */
 const FIGHT_H = 272;
+/** In a brawl: the gap between the tops' slots (px). */
+const BRAWL_GAP = 28;
+
+/** A brawl's tops for the bar: the bots' names (seats 2+, upper case), every top's spin and team colour. */
+export interface BrawlField {
+  names: readonly string[];
+  tops: readonly { spin: number; alive: boolean }[];
+  colors: readonly number[];
+  /** Launched: a top that is not spinning now is out (before the rip nobody is). */
+  live: boolean;
+}
 
 export class MatchBar {
   readonly mesh: Mesh;
@@ -41,6 +53,10 @@ export class MatchBar {
   private readonly white = new Color('#ffffff');
   private readonly k = pxPerM(CW, PW * SCALE * ARENA_SCALE);
   private slab: Mesh;
+  /** The brawl row as last drawn, per seat: spin step (-1 out), name and colour; redrawn only on change. */
+  private lastStep: number[] = [];
+  private lastName: string[] = [];
+  private lastColor: number[] = [];
 
   constructor() {
     this.canvas.width = CW;
@@ -97,12 +113,24 @@ export class MatchBar {
    * right, points toward the match as pips, the round's word between the names (TITLE, never
    * dropped: a word too long for the gap is narrowed). Redraws only when something visible changed.
    */
-  bar(_mine: number, _theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string, xp: { level: number; rank: string; fraction: number; gained: number; show: boolean }) {
+  bar(_mine: number, _theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string, xp: { level: number; rank: string; fraction: number; gained: number; show: boolean }, field?: BrawlField | null) {
     // The spin fills are meshes (animate()); the plate redraws only for names, pips and words.
     // Compared field by field (no string built every frame).
     const k = this.last;
     const fraction = Math.round(xp.fraction * 1000);
-    if (k.ready && k.my === myPoints && k.their === theirPoints && k.toWin === toWin && k.n0 === names[0] && k.n1 === names[1] && k.msg === message && k.show === xp.show && k.level === xp.level && k.fraction === fraction && k.gained === xp.gained) return;
+    // A brawl draws every top's spin on the plate itself (in twentieths, so a fight redraws it a few
+    // dozen times, not every frame); the duel's two mesh bars are hidden.
+    const n = field ? field.tops.length : 0;
+    let fieldSame = n === this.lastStep.length;
+    for (let i = 0; i < n && fieldSame; i++) fieldSame = this.lastStep[i] === this.seatStep(field!, i) && this.lastName[i] === this.seatName(field!, names, i) && this.lastColor[i] === field!.colors[i];
+    for (let i = 0; i < 2; i++) this.fill[i].visible = this.chip[i].visible = n === 0;
+    if (fieldSame && k.ready && k.my === myPoints && k.their === theirPoints && k.toWin === toWin && k.n0 === names[0] && k.n1 === names[1] && k.msg === message && k.show === xp.show && k.level === xp.level && k.fraction === fraction && k.gained === xp.gained) return;
+    this.lastStep.length = this.lastName.length = this.lastColor.length = n;
+    for (let i = 0; i < n; i++) {
+      this.lastStep[i] = this.seatStep(field!, i);
+      this.lastName[i] = this.seatName(field!, names, i);
+      this.lastColor[i] = field!.colors[i];
+    }
     Object.assign(k, { ready: true, my: myPoints, their: theirPoints, toWin, n0: names[0], n1: names[1], msg: message, show: xp.show, level: xp.level, fraction, gained: xp.gained });
     const g = this.canvas.getContext('2d')!;
     // A compact plate while the tops fight: no empty glass below the pips.
@@ -132,6 +160,9 @@ export class MatchBar {
         g.fill();
       }
     }
+    if (field && n > 0) {
+      this.brawlRow(g, field, names, myPoints, theirPoints, toWin, message);
+    } else {
     g.save();
     g.translate(CW / 2, 211);
     g.rotate(Math.PI / 4);
@@ -177,6 +208,7 @@ export class MatchBar {
       const gap = CW - 2 * (BAR_X + Math.min(CW * 0.36, Math.max(widths[0], widths[1])) + 40);
       g.fillText(message, CW / 2, nameY, Math.max(160, gap));
     }
+    }
     // After a round only, along the bottom: your smith level, the XP bar and the XP just earned (not
     // during a fight, when the eyes are on the tops).
     if (xp.show) {
@@ -197,5 +229,77 @@ export class MatchBar {
       g.fillText(xp.gained > 0 ? `+${xp.gained} XP` : 'XP', CW - BAR_X, y, 240);
     }
     this.tex.needsUpdate = true;
+  }
+
+  private seatName(field: BrawlField, names: [string, string], i: number): string {
+    return i < 2 ? names[i] : (field.names[i - 2] ?? '');
+  }
+
+  /** A seat's spin in twentieths, or -1 once it is out. */
+  private seatStep(field: BrawlField, i: number): number {
+    const t = field.tops[i];
+    return field.live && !t.alive ? -1 : spinStep(t.spin);
+  }
+
+  /**
+   * A brawl's plate: one slot per top across the width, each its name over a spin bar in its team
+   * colour (red when low); a top that is out is dimmed, its name struck through and its bar reads
+   * OUT. Below, your points (left), the round's word (middle) and the field's points (right).
+   */
+  private brawlRow(g: CanvasRenderingContext2D, field: BrawlField, names: [string, string], myPoints: number, theirPoints: number, toWin: number, message: string) {
+    const slots = brawlSlots(field.tops.length, CW, BAR_X, BRAWL_GAP);
+    const nameY = 62;
+    slots.forEach((s, i) => {
+      const step = this.seatStep(field, i);
+      const out = step < 0;
+      const v = out ? 0 : step / 20;
+      const color = `#${(field.colors[i] ?? 0xffffff).toString(16).padStart(6, '0')}`;
+      const name = this.seatName(field, names, i);
+      g.globalAlpha = out ? 0.42 : 1;
+      // The name, in the top's colour so it matches the top on the floor (narrowed if too long).
+      setType(g, 'body', this.k, DIST);
+      g.textAlign = 'left';
+      g.fillStyle = color;
+      g.fillText(name, s.x, nameY, s.w);
+      if (out) {
+        const w = Math.min(s.w, g.measureText(name).width);
+        g.fillStyle = TEXT;
+        g.fillRect(s.x - 6, nameY - 3, w + 12, 7);
+      }
+      // The spin bar: dark slot, fill from the left in the team colour.
+      g.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      g.fillRect(s.x, BAR_Y, s.w, BAR_H);
+      if (v > 0) {
+        g.fillStyle = v > 0.25 ? color : '#e0574a';
+        g.fillRect(s.x, BAR_Y, s.w * v, BAR_H);
+      }
+      g.strokeStyle = 'rgba(200, 220, 245, 0.35)';
+      g.lineWidth = 2;
+      g.strokeRect(s.x, BAR_Y, s.w, BAR_H);
+      if (out) {
+        setType(g, 'caption', this.k, DIST);
+        g.fillStyle = TEXT;
+        g.textAlign = 'center';
+        g.fillText('OUT', s.x + s.w / 2, BAR_Y + BAR_H / 2 + 2, s.w);
+      }
+      g.globalAlpha = 1;
+    });
+    // Points toward the match: yours from the left, the field's from the right.
+    const pipY = 226;
+    for (let i = 0; i < toWin; i++) {
+      for (const [dir, pts, color] of [[1, myPoints, ORANGE], [-1, theirPoints, CYAN]] as const) {
+        g.beginPath();
+        g.arc(dir === 1 ? BAR_X + 22 + i * 62 : CW - BAR_X - 22 - i * 62, pipY, 20, 0, Math.PI * 2);
+        g.fillStyle = i < pts ? color : 'rgba(255,255,255,0.14)';
+        g.fill();
+      }
+    }
+    if (message) {
+      setType(g, 'body', this.k, DIST);
+      g.fillStyle = TEXT;
+      g.textAlign = 'center';
+      const gap = CW - 2 * (BAR_X + toWin * 62 + 40);
+      g.fillText(message, CW / 2, pipY, Math.max(160, gap));
+    }
   }
 }

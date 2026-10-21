@@ -25,6 +25,7 @@ import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
 import { anvilModel, Hub, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
+import type { BrawlField } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
 import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
@@ -1200,6 +1201,8 @@ export class MatchSystem extends createSystem({
   private brawlNames: string[] = [];
   /** Bots already called out this round. */
   private brawlOut = new Set<Top>();
+  /** The match bar's view of a brawl (one object, updated in place: nothing allocated per frame). */
+  private barField: BrawlField & { names: string[]; live: boolean } = { names: [], tops: this.tops, colors: [TEAM_MINE, TEAM_RIVAL, ...BRAWL_COLORS], live: false };
   /** For pocket-target brawls: victim index -> most recent top that hit it. */
   private brawlLastHit = new Int8Array(4).fill(-1);
   /** When each brawl bot next raises a ramp (fight time). */
@@ -1951,7 +1954,7 @@ export class MatchSystem extends createSystem({
         fraction: p.fraction,
         gained: this.phase === 'result' ? this.xpGained : 0,
         show: this.phase === 'result',
-      });
+      }, this.extras.length ? this.brawlBarField() : null);
       this.bar.animate(this.mine.spin, this.theirs.spin, dt);
     }
     // Visuals only: after a finish your shape caused they slow down for a moment.
@@ -8902,6 +8905,7 @@ export class MatchSystem extends createSystem({
     const named = names?.map((x) => all.find((r) => r.name === x)).filter((r): r is (typeof all)[0] => !!r);
     const picks = named?.length ? named.slice(0, n) : [...pool].sort(() => Math.random() - 0.5).slice(0, n);
     this.brawlNames = picks.map((r) => r.name);
+    this.barField.names = this.brawlNames.map((x) => x.toUpperCase());
     picks.forEach((r, i) => {
       const color = BRAWL_COLORS[i];
       const build = { ...r.build, color };
@@ -8920,6 +8924,12 @@ export class MatchSystem extends createSystem({
     });
     this.refreshDepthOcclusion();
     if (import.meta.env.DEV) console.log(`[BRAWL] ${this.seats} tops: you, ${this.rival.name}, ${picks.map((r) => r.name).join(', ')}`);
+  }
+
+  /** The bar's brawl field this frame: tops not spinning count as out once the rip has gone. */
+  private brawlBarField(): BrawlField {
+    this.barField.live = this.phase === 'fight' || this.phase === 'result';
+    return this.barField;
   }
 
   private clearBrawl() {
