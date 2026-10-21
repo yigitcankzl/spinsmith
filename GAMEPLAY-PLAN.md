@@ -114,3 +114,30 @@ risks and must not be described as tested.
 - `177fda6` — target-based brawl modes
 - `75ffe81` — secret deck and reveal protocol
 - `3fc33b1` — launch aim stabilisation
+
+## Hands and room pass — 2026-10-21 evening
+
+Headless sweep with the HUMAN reaction/aim model, 20 arenas x 9 type pairings x 6 rounds, win
+points over doing nothing (none = 51.1%); about +-1.5 points is noise. Emulator checks are IWER.
+
+| Verb | Before | After | Change |
+|---|---:|---:|---|
+| Flick (new, fingertip collider) | — | +16.7 | swing through a top; one charge; tired tops fly |
+| Spin Rub (new) | — | +5.9 | rub your own top's rim with its spin; one charge per 1.2 s window |
+| Forge Gust | +0.1 | +8.9 | never pushes your own top; aimed at a pocket: x2 push and a lift |
+| Rim Spring | -1.6 | +10.0 | your top pulled in and rim-held 1 s; the rival slung toward its pocket |
+| Arena Forge squeeze | -1.0 | +7.4 | exposed rival x3, mid-bowl x0.2; squeeze throws the rival out |
+| Arena Forge stretch | +3.3 | +6.9 | same aim rule |
+| Arena Forge tilt | +0.1 | +5.6 | same aim rule |
+| Arena Forge twist | +0.3 | +3.4 | same aim rule |
+| Rush strike | -5.1 | +0.8 | the rim holds your rushing top: no more self-knockouts (13.4% -> 2.6%) |
+
+Random mashing of each reworked verb gains about +2 or less (forge +2.8).
+
+Still dead weight under human lag: palm brace, crossguard, ember rivet (about 0). The no-lag
+brace reaches +12, so their problem is reaction time, not strength.
+
+Room: the emulator now loads IWER's `office_small` capture, whose desk is a real labelled
+plane, so DESK KO, the rival's desk guard and the new red real-edge arcs on the rim run through
+the production table path (desk KO proof: 3 heat). Fresh starts clear every saved key; the
+first match's lessons can now win rounds (IWER: YOUR RAMP -> SLAG at 3.7 s).
