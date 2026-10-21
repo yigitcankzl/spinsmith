@@ -131,11 +131,13 @@ points over doing nothing (none = 51.1%); about +-1.5 points is noise. Emulator 
 | Arena Forge tilt | +0.1 | +5.6 | same aim rule |
 | Arena Forge twist | +0.3 | +3.4 | same aim rule |
 | Rush strike | -5.1 | +0.8 | the rim holds your rushing top: no more self-knockouts (13.4% -> 2.6%) |
+| Crossguard | -0.6 | +5.1 | rail stays live 0.8 s; saves refund the charge; an escaping rival is sent to its pocket |
+| Ember rivet | -0.8 | +7.4 | the planted rivet is a 3 s post that kicks the rival outward |
 
 Random mashing of each reworked verb gains about +2 or less (forge +2.8).
 
-Still dead weight under human lag: palm brace, crossguard, ember rivet (about 0). The no-lag
-brace reaches +12, so their problem is reaction time, not strength.
+Still dead weight under human lag: palm brace (about 0; a wall that stays after the hand lifts
+adds under a point, a wider one helps random use as much). The no-lag brace reaches +12.
 
 Room: the emulator now loads IWER's `office_small` capture, whose desk is a real labelled
 plane, so DESK KO, the rival's desk guard and the new red real-edge arcs on the rim run through
