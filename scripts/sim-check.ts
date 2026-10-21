@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { ARENAS } from '../src/game/arenas.ts';
-import { cloneLayout, validate } from '../src/game/layout.ts';
+import { cloneLayout, rimRadius, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { SHAPING, ShapingCharges, STRIKE_BAR, StrikeBar } from '../src/game/shaping.ts';
 import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, xpToNext } from '../src/game/progress.ts';
@@ -17,7 +17,7 @@ import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
 import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts';
-import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
+import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, hudAnchors, hudAnchorsOffMatch, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { crossguard, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
@@ -940,6 +940,26 @@ TUNING.grace = 0;
     }
     const [l, r] = forgeGrips(layout);
     assert.ok((l.x * r.x + l.z * r.z) / (Math.hypot(l.x, l.z) * Math.hypot(r.x, r.z)) < FORGE_GRIP_MAX_COS - 0.25, `${layout.name} grips leave slack under the forge's opposite-rim test`);
+  }
+}
+
+// 16b2. Field of view: every essential read surface (the round card and its prompts, the match bar,
+// the count/KO/verdict stamp, the forge card, the home note) sits within +-35 degrees vertically and
+// +-40 degrees horizontally of a seated head looking at the arena centre, for trays 0.30-0.45 m below
+// the eyes, on every arena (slid back as a match slides it), with a standard or a high wall.
+{
+  const near = (l: ArenaLayout) => Math.max(0, rimRadius(l, Math.PI / 2) - 0.17) * 2.4;
+  for (const layout of ARENAS) {
+    const surfaces: [string, { x: number; y: number; z: number }, number][] = [
+      ...[0, 0.016].flatMap((lift) => hudAnchors(layout, lift, near(layout)).map(([n, at]): [string, typeof at, number] => [n, at, REACH + near(layout)])),
+      ...hudAnchorsOffMatch(layout).map(([n, at]): [string, typeof at, number] => [n, at, REACH]),
+    ];
+    for (const drop of [0.3, 0.35, 0.4, 0.45]) {
+      for (const [name, at, reach] of surfaces) {
+        const g = gazeAngles(at, drop, reach);
+        assert.ok(Math.abs(g.up) <= 35 && Math.abs(g.side) <= 40, `${layout.name} ${name} at drop ${drop}: ${g.up.toFixed(1)} up, ${g.side.toFixed(1)} across`);
+      }
+    }
   }
 }
 

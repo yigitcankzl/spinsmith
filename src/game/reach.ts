@@ -5,7 +5,7 @@
  * Meta's hands guidance puts direct touch at about 0.42-0.46 m and warns against 0.5-0.8 m.
  * No three.js here.
  */
-import { rimRadius } from './layout.ts';
+import { DISPLAY_RIM, rimRadius } from './layout.ts';
 import type { ArenaLayout } from './layout.ts';
 import { PEDESTAL, REACH } from './placement.ts';
 
@@ -119,4 +119,66 @@ export function touchTargets(layouts: ArenaLayout[] = []): [string, Spot][] {
     ['brawl pegs', { ...BRAWL_AT, y: TABLE_Y + 0.012 }],
     ...layouts.flatMap((l) => forgeGrips(l).map((g, i): [string, Spot] => [`${l.name} forge grip ${i ? 'right' : 'left'}`, g])),
   ];
+}
+
+/**
+ * Where the text hangs (arena-local, before the far-arena growth below): the round card over the far
+ * rim, the match bar under it, the stamps (count, KO, verdict) above it, the forge's card higher.
+ * The headless check keeps each within +-35 degrees up/down and +-40 degrees across of a seated head
+ * looking at the arena centre, for trays 0.30-0.45 m below the eyes.
+ */
+export const HUD = {
+  card: { x: 0, y: 0.14, z: -0.21 } as Spot,
+  /** At home after the first session the card is a note just above the Smith's board. */
+  homeNoteY: 0.18,
+  /** In the forge the card rides this much higher and stands this much farther back. */
+  forgeLift: 0.05,
+  forgeBack: 0.03,
+  /** The match bar's height and how far it leans back from the card. */
+  barY: 0.063,
+  barBack: 0.021,
+  /** A bout's stamp (count, KO, the verdict) just above the card, not grown with it, so it stays in view. */
+  stampLift: 0.04,
+};
+
+/** How much the card and the bar grow for an arena whose far rim is `far` out (arena-local) and slid `pushed` m back. */
+export function hudGrow(far: number, pushed = 0, reach = REACH): number {
+  const r = reach / ARENA_SCALE;
+  return Math.max(1, (r + pushed / ARENA_SCALE + far) / (r + 0.17));
+}
+
+/** The card's distance back for an arena whose far rim is `far` out: never inside the far wall. */
+export function hudCardZ(far: number, forge = false): number {
+  return Math.min(HUD.card.z - (forge ? HUD.forgeBack : 0), -(far + 0.04));
+}
+
+/** Every essential read surface of an arena (arena-local), for a wall `lift` above the standard one and a slide `pushed` m back. */
+export function hudAnchors(layout: ArenaLayout, lift = 0, pushed = 0): [string, Spot][] {
+  const far = rimRadius(layout, -Math.PI / 2);
+  const grow = hudGrow(far, pushed);
+  const z = hudCardZ(far);
+  const cardY = (HUD.card.y + lift) * grow;
+  return [
+    ['round card', { x: HUD.card.x, y: cardY, z }],
+    ['match bar', { x: 0, y: (HUD.barY + lift) * grow, z: z + HUD.barBack * grow }],
+    ['stamp (count, KO, verdict)', { x: HUD.card.x, y: cardY + HUD.stampLift, z: z + 0.01 }],
+  ];
+}
+
+/** The read surfaces off the match (the forge's card, the home note): the arena is shown at display size there and not slid back. */
+export function hudAnchorsOffMatch(layout: ArenaLayout): [string, Spot][] {
+  const far = Math.min(rimRadius(layout, -Math.PI / 2), DISPLAY_RIM);
+  return [
+    ['forge card', { x: HUD.card.x, y: HUD.card.y + HUD.forgeLift, z: hudCardZ(far, true) }],
+    ['home note', { x: HUD.card.x, y: HUD.homeNoteY, z: hudCardZ(far) }],
+  ];
+}
+
+/** Degrees above (+) and beside a seated head looking at the arena centre, of an arena-local spot, for a tray `drop` below the eyes. */
+export function gazeAngles(p: Spot, drop: number, reach = REACH): { up: number; side: number } {
+  const deg = 180 / Math.PI;
+  const x = p.x * ARENA_SCALE;
+  const ahead = reach - p.z * ARENA_SCALE;
+  const y = -drop + p.y * ARENA_SCALE;
+  return { up: (Math.atan2(y, Math.hypot(x, ahead)) + Math.atan2(drop, reach)) * deg, side: Math.atan2(x, ahead) * deg };
 }

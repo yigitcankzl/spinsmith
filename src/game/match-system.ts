@@ -9,7 +9,7 @@ import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { cloneLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance, validate } from './layout.js';
-import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips } from './reach.js';
+import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
@@ -149,12 +149,12 @@ const RIPOSTE_WINDOW = 1.8;
 /** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
 const SLAP_MIN_N = 1.18;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
-const LABEL_AT = new Vector3(0, 0.14, -0.21);
+const LABEL_AT = new Vector3(HUD.card.x, HUD.card.y, HUD.card.z);
 /** At home after the first session the Smith's board fills the card's slot: notes hang just above it. */
-const HOME_NOTE_Y = 0.2;
+const HOME_NOTE_Y = HUD.homeNoteY;
 /** The match bar sits right under the card, its top edge on the card's lower edge (the two read as one display). */
-const BAR_Y = 0.063;
-const BAR_BACK = 0.021;
+const BAR_Y = HUD.barY;
+const BAR_BACK = HUD.barBack;
 /** The MENU plate's height over the arena floor (arena-local), at the rim's height like the tabs. */
 const MENU_Y = 0.012;
 /** The workshop shows the arena a little smaller, so its near rim stays behind the piece rail. */
@@ -2577,8 +2577,8 @@ export class MatchSystem extends createSystem({
     // The first session's forge visit is about one part: the one just earned.
     const focus = this.progress.guide === 'forge' || this.progress.guide === 'fit' ? 'tip:spur' : null;
     this.progress.advance('fit');
-    // The card rides higher in the forge (the stats plate sits on the far rim).
-    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + 0.12, LABEL_AT.z);
+    // The card rides a little higher in the forge, over the raised drawers.
+    this.label.mesh.position.set(LABEL_AT.x, LABEL_AT.y + HUD.forgeLift, LABEL_AT.z);
     const r = this.nextRival;
     let friend = false;
     try {
@@ -3652,11 +3652,10 @@ export class MatchSystem extends createSystem({
     this.stage.scale.setScalar(this.viewK);
     this.builder.viewScale = this.viewK;
     const far = rimRadius(L, -Math.PI / 2) * this.viewK;
-    // In the forge the card stands back behind the stats plate.
-    this.label.mesh.position.z = Math.min(LABEL_AT.z - (p === 'forge' ? 0.03 : 0), -(far + 0.04));
+    // In the forge the card stands a little farther back.
+    this.label.mesh.position.z = hudCardZ(far, p === 'forge');
     // Further away, the card and the bar grow so they read the same.
-    const reach = TUNE.reach / ARENA_SCALE;
-    const grow = Math.max(1, (reach + this.pushed / ARENA_SCALE + far) / (reach + 0.17));
+    const grow = hudGrow(far, this.pushed, TUNE.reach);
     // fitMatch may shrink the whole root to 70% to stay on a real table. Read surfaces cancel that
     // parent scale so type never becomes 30% smaller on the very tables that need it most.
     const readScale = 1 / Math.max(0.7, this.rootK);
@@ -3672,8 +3671,7 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
     // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') {
-      const stampLift = this.phase === 'result' ? 0.12 : 0.08;
-      this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + stampLift * grow, this.label.mesh.position.z + 0.01);
+      this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + HUD.stampLift, this.label.mesh.position.z + 0.01);
     }
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     // The menu stays where the hand finds it, however far the arena slid.
