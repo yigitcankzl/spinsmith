@@ -22,6 +22,7 @@ import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
+import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
 import { targetWinner } from '../src/game/brawl.ts';
@@ -1663,6 +1664,24 @@ assert.equal(edgeOf('defense', 'defense'), 0);
   // Centre off the table, or no table: none.
   assert.equal(deskSectors(square(2, 0, 0.5), 0.15, 0.1).length, 0, 'off table: no sectors');
   assert.equal(deskSectors(null, 0.15, 0.1).length, 0, 'no table: no sectors');
+}
+
+// Fight calls: one card, priorities, no quick repeats.
+{
+  const empty = { key: '', priority: 0, until: 0, onScreen: false };
+  assert.ok(callAllowed(empty, 10, 'a', CALL.ambient, undefined), 'empty card takes any call');
+  const tip = { key: 'tip', priority: CALL.tactic, until: 12, onScreen: true };
+  assert.ok(!callAllowed(tip, 11, 'amb', CALL.ambient, undefined), 'lower call waits for a fresh higher one');
+  assert.ok(!callAllowed(tip, 11, 'tip2', CALL.tactic, undefined), 'equal call waits while fresh');
+  assert.ok(callAllowed(tip, 11, 'tell', CALL.danger, undefined), 'danger interrupts a tip');
+  assert.ok(callAllowed(tip, 12.5, 'amb', CALL.ambient, undefined), 'a stale card can be replaced');
+  assert.ok(!callAllowed(tip, 11, 'tip', CALL.danger, undefined), 'the call already up is not re-shown');
+  assert.ok(!callAllowed(empty, 10, 'a', CALL.danger, 10 - CALL_REPEAT + 0.5), 'same key waits out the repeat gap');
+  assert.ok(callAllowed(empty, 10, 'a', CALL.ambient, 10 - CALL_REPEAT - 0.1), 'same key returns after the gap');
+  const lesson = { key: '', priority: CALL.lesson, until: 13, onScreen: true };
+  assert.ok(!callAllowed(lesson, 11, 'ult', CALL.ultimate, undefined), 'lesson text is not drowned out');
+  const held = { key: 'strike-ready', priority: CALL.ultimate, until: 5, onScreen: true };
+  assert.ok(callAllowed(held, 11, 'amb', CALL.ambient, undefined), 'a persistent card is never fresh');
 }
 
 console.log('sim-check: all passed');
