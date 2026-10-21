@@ -321,6 +321,8 @@ export class MatchSystem extends createSystem({
   private flickTip = new Vector3();
   private flickRaw = new Vector3();
   private flickCount = 0;
+  /** The strongest power reached during the current pull (for the LET GO WHILE MOVING cue). */
+  private pullPeakPower = 0;
   /** A drawn groove waits a beat after the lift: a pinch in that beat means the finger was reaching for a ramp. */
   private pendingGroove: Record<Side, { sx: number; sz: number; ex: number; ez: number; at: number } | null> = { left: null, right: null };
   /** The last flick, for the emulator probes: speed handed over and its direction. */
@@ -4345,6 +4347,7 @@ export class MatchSystem extends createSystem({
     this.pullStartQuat.copy(h.rayQuat);
     this.launchTwist = 0;
     this.maxPull = 0;
+    this.pullPeakPower = 0;
     this.peakSpeed = 0;
     this.lastPull = 0;
     this.rip.reset();
@@ -4390,11 +4393,14 @@ export class MatchSystem extends createSystem({
       this.pullEnd.copy(h.pinch);
       const power = this.pullPower();
       this.showCharge(power, dt);
+      // Power is the speed at release and fades once the hand stops: say so the moment it drops.
+      this.pullPeakPower = Math.max(this.pullPeakPower, power);
+      const fading = this.pullPeakPower >= 0.5 && power < this.pullPeakPower - 0.12 ? '\nLET GO WHILE MOVING' : '';
       // In 5% steps, so the card is not redrawn every frame of the pull.
       const pct = Math.round(power * 20) * 5;
       const curve = Math.abs(this.launchTwist) > 0.2 ? ` · CURVE ${this.launchTwist > 0 ? 'RIGHT' : 'LEFT'}` : '';
       const brace = this.bracedLaunch ? ' · BRACED' : '';
-      this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%${curve}${brace}` : power > 0 ? `${pct}%${curve}${brace}` : `Pull back and let go${brace}`);
+      this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%${curve}${brace}` : power > 0 ? `${pct}%${curve}${brace}${fading}` : `Pull back and let go${brace}`);
       this.lostFor = 0;
       if (dist < MAX_PULL) return;
     } else if (h.tracked && (this.openFor += dt) < RIP_RELEASE) {
