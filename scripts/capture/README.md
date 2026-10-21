@@ -32,7 +32,7 @@ checked without guessing via `npx @iwsdk/cli browser run scripts/capture/gpu-inf
 
 Run `npm run capture:hands` for a reusable mechanics catalogue rather than a trailer. It records
 fourteen separate hand-driven clips (launch, fingertip shaping, arena manipulation, return catch,
-ultimates, workshop gestures, Forge Gust and Counterflow) and joins labelled copies into one
+ultimates, workshop gestures, Forge Gust, Crossguard and Flick) and joins labelled copies into one
 1080p60 reference reel under
 `~/Desktop/spinsmith-videos/hand-mechanics/`. Every action goes through IWER's emulated hand
 skeleton; the reel is explicitly labelled as emulator automation, not physical-headset footage.

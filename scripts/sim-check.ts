@@ -8,7 +8,7 @@ import { ARENAS } from '../src/game/arenas.ts';
 import { cloneLayout, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { SHAPING, ShapingCharges, STRIKE_BAR, StrikeBar } from '../src/game/shaping.ts';
-import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, xpToNext } from '../src/game/progress.ts';
+import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, VERB_CARD, VERB_RELEASE, verbReleasedAt, xpToNext } from '../src/game/progress.ts';
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
@@ -882,6 +882,21 @@ TUNING.grace = 0;
   assert.ok(Number.isFinite(placeArena(head, 0, 0, []).x), 'looking straight down still places ahead');
 }
 
+// 14b. The verb cliff is gone: after the first match's lessons, exactly one hand verb (with its own
+// card) is released per completed match, the most useful (measured) first.
+{
+  const order = Object.entries(VERB_RELEASE).sort((a, b) => a[1] - b[1]);
+  assert.deepEqual(order.map(([, m]) => m), order.map((_, i) => i + 1), 'one verb per completed match, from the second match on');
+  assert.deepEqual(order.slice(0, 5).map(([v]) => v), ['spring', 'gust', 'ember', 'rub', 'crossguard'], 'measured verbs arrive by win points');
+  assert.equal(verbReleasedAt(0), undefined, 'the first match releases no extra verb');
+  for (const [v, m] of order) {
+    assert.equal(verbReleasedAt(m), v);
+    const [name, blurb] = VERB_CARD[v as keyof typeof VERB_CARD];
+    assert.ok(name.length > 0 && name.length <= 16 && blurb.length > 0 && blurb.length <= 60, `${v} has one short unlock card`);
+  }
+  assert.equal(verbReleasedAt(order.length + 1), undefined);
+}
+
 // 15. Shared headsets: the demo save is a level-8 smith past the first session with stamps, marks
 // and champions; a fresh save and Progress.reset() bring back the first session.
 {
@@ -892,6 +907,7 @@ TUNING.grace = 0;
   assert.equal(p.level, 8);
   assert.equal(p.guide, 'done');
   assert.equal(p.stamps, 3);
+  assert.ok(p.matches >= Math.max(...Object.values(VERB_RELEASE)), 'the demo save plays with every released verb');
   assert.ok(p.champions.length >= 2 && p.marksOf('Rim Raider') === 7, 'the demo shows champions and a full medallion');
   assert.ok(mem.has('spinsmith.top.v1'));
   p.reset();

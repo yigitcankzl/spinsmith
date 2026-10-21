@@ -147,12 +147,12 @@ record 04-rim-spring \
   '["wait",0.6]' '["rimSpring",{"angle":38,"pull":0.052}]' '["wait",2.4]'
 fi
 
-# 05 — An open hand becomes a temporary wall at the edge of the bowl.
+# 05 — Two flat palms on the rim become a Crossguard rail that saves your own top.
 if should_capture 5; then
 reset_demo
 start_fight
-record 05-palm-brace \
-  '["wait",0.5]' '["palmBrace",{"angle":48,"hold":2.0}]' '["wait",1.8]'
+record 05-crossguard \
+  '["wait",0.5]' '["crossguard",{"hold":0.8}]' '["wait",1.8]'
 fi
 
 # 06 — Both hands grab the live rim and squeeze, twist and tilt its physics.
@@ -221,13 +221,12 @@ record 13-forge-gust \
   '["wait",0.5]' '["palmGust",{"angle":-12,"side":"left"}]' '["wait",2.4]'
 fi
 
-# 14 — Block an outward top with the palm, then return that exact force with the same hand.
+# 14 — One fingertip swung through the rival flicks it along the swing.
 if should_capture 14; then
 reset_demo
 start_fight
-"$DRIVE" '["key","KeyU"]' '["wait",0.5]' >/dev/null
-record 14-counterflow \
-  '["wait",0.5]' '["counterflow",{"angle":0,"side":"right"}]' '["wait",2.8]'
+record 14-flick \
+  '["wait",0.5]' '["flick",{"target":"rival","angle":0,"speed":1.4,"side":"right"}]' '["wait",2.4]'
 fi
 fi
 
@@ -236,7 +235,7 @@ titles=(
   "PARMAKLA YON OLUGU"
   "SIKISTIRIP RAMPA CEKME"
   "KENAR YAYINI GERME"
-  "AVUC BARIYERI"
+  "CROSSGUARD  IKI AVUC RAY OLUR"
   "IKI ELLE ARENAYI DOVME"
   "CUP VE SAPAN"
   "MASADAN AVUCLA GERI GETIRME"
@@ -245,14 +244,14 @@ titles=(
   "AVUC USTUNDE PARCA TAKMA"
   "SIKISTIRIP YERLESTIRME VE BOYUTLAMA"
   "AVUCLA FORGE GUST"
-  "COUNTERFLOW  KARSILA VE GERI YOLLA"
+  "PARMAKLA FLICK"
 )
 subs=(
   "Acik avuc rampayi tutar  diger el ipi ceker"
   "Isaret parmagi arenaya tek kullanimlik hiz cizgisi kazir"
   "Zemin fiziksel olarak yukselir ve topaci firlatir"
   "Kenari cekip birakinca yay kuvveti olusur"
-  "Acik el kisa sureli fiziksel duvara donusur"
+  "Kenardaki iki duz avuc bir ray kurar  kendi topacini kurtarir"
   "Iki el canli arenayi sikistirir  eger ve cevirir"
   "Parmak zemine cep acar  pinch topaci geri firlatir"
   "Disari cikan topac avucta yakalanip arenaya supurulur"
@@ -261,7 +260,7 @@ subs=(
   "Bir el topaci tasir  diger el gercek parcayi yerine oturtur"
   "Ayni pinch diliyle makine yerlestirilir ve arena genisletilir"
   "Acik avucun yonlu supurmesi yolundaki topaclari fiziksel olarak iter"
-  "Ayni avuc once duvar olur  sonra gelen kuvveti ucretsiz riposte olarak geri yollar"
+  "Parmak ucu rakibin icinden gecer  topac savrulur  tek sarj"
 )
 
 files=()

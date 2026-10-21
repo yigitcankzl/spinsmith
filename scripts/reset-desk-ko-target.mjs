@@ -9,6 +9,7 @@ export default async function run({ page, frame }) {
       const { TableTouch } = await import('/src/game/table-touch.ts');
       COMFORT.gentle = true;
       g.progress.matches = Math.max(3, g.progress.matches);
+      g.everyVerb = true;
       g.progress.guide = 'done';
       if (g.arena.layout.name !== 'Forge Bowl') g.setArena(g.arenas.find((arena) => arena.name === 'Forge Bowl'));
       if (g.phase !== 'fight') {

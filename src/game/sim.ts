@@ -1048,32 +1048,6 @@ function wardCovers(t: Top, angle: number) {
   return t.guard > 0 && angleGap(angle, t.guardAngle) <= WARD_HALF;
 }
 
-/**
- * An open palm held at the rim becomes a temporary wall. This is intentionally a generous sector,
- * not a fingertip collider: the player chooses the rebound angle while the simulation keeps the
- * fast-moving top readable and deterministic.
- */
-export function palmBrace(arena: Arena, top: Top, angle: number, half = 0.42) {
-  if (!top.alive || top.sinceWall < 0.14) return false;
-  const n = normRadius(arena.layout, top.x, top.z);
-  if (n < 0.72 || n > 1.12) return false;
-  const topAngle = Math.atan2(top.z, top.x);
-  if (angleGap(topAngle, angle) > half) return false;
-  const nx = Math.cos(topAngle);
-  const nz = Math.sin(topAngle);
-  const outward = top.vx * nx + top.vz * nz;
-  if (outward < 0.035) return false;
-  top.vx -= nx * outward * 1.85;
-  top.vz -= nz * outward * 1.85;
-  top.kick = Math.min(1, top.kick + outward * 1.5);
-  top.kickX = -nx;
-  top.kickZ = -nz;
-  top.wallHit = outward;
-  top.sinceWall = 0;
-  top.charging = 0;
-  return true;
-}
-
 /** True when a live top is actually crossing the finite rail between two open palms. */
 export function crossguardCrosses(top: Top, ax: number, az: number, bx: number, bz: number) {
   if (!top.alive || top.sinceWall < 0.14) return false;

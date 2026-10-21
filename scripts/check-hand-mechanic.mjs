@@ -1,7 +1,7 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
-// Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
-// Other modes: single-rip, dual-rip, intent-preview, ramp-release, finger-groove, rim-spring, palm-brace, crossguard, forge-wheel,
-// ember-plant, flick, rub, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring,
+// Usage: HAND_CHECK=crossguard npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
+// Other modes: single-rip, dual-rip, intent-preview, ramp-release, finger-groove, rim-spring, crossguard, forge-wheel,
+// ember-plant, flick, rub, palm-gust, palm-gust-left, palm-forge, outer-ring,
 // arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
   let target = null;
@@ -13,7 +13,7 @@ export default async function run({ page, frame }) {
   }
   if (!target) throw new Error('window.drive not found: enter the emulated XR session first');
 
-  const mode = process.env.HAND_CHECK ?? 'palm-brace';
+  const mode = process.env.HAND_CHECK ?? 'crossguard';
   return target.evaluate(async (check) => {
     const drive = window.drive;
     const game = window.__game;
@@ -27,9 +27,13 @@ export default async function run({ page, frame }) {
       window.__game.openForge();
       await sleep(1200);
     }
-    const gustCheck = check === 'palm-gust' || check === 'palm-gust-left' || check === 'palm-gust-riposte';
+    const gustCheck = check === 'palm-gust' || check === 'palm-gust-left';
     const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant' || check === 'flick' || check === 'rub';
-    if (check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || expansionCheck) game.progress.matches = Math.max(2, game.progress.matches);
+    if (check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || gustCheck || check === 'rim-spring' || expansionCheck) {
+      // Verbs now arrive one per match; keep the old two-match lesson shields and unlock them all.
+      game.progress.matches = Math.max(2, game.progress.matches);
+      game.everyVerb = true;
+    }
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
     if (launchCheck && drive.state().phase !== 'ready') {
@@ -37,20 +41,16 @@ export default async function run({ page, frame }) {
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
     }
     if (launchCheck) window.__game.deckChoice = 0;
-    // Reproduce the old cross-round bug: the next launch must clear a late parry timestamp before
-    // Counterflow tries to earn its new riposte window.
-    if (check === 'palm-gust-riposte') game.palmBraceHitAt = 30;
-    if (check === 'intent-preview' || check === 'ramp-release' || check === 'outer-ring' || check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
+    if (check === 'intent-preview' || check === 'ramp-release' || check === 'outer-ring' || check === 'finger-groove' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
       window.__game.startMatch();
       for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
       for (let i = 0; i < 120 && drive.state().phase !== 'fight'; i++) await sleep(25);
       if (drive.state().phase === 'fight') drive.key('KeyU');
     }
-    if (check === 'palm-gust-riposte' && game.palmBraceHitAt !== -9) throw new Error(`new round kept stale Palm Brace timestamp ${game.palmBraceHitAt}`);
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
     // not spend most of its timeout waiting for the opening clock to reach the normal 2.5 s gate.
-    if ((check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || check === 'palm-brace' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
+    if ((check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) && drive.state().phase === 'fight') {
       window.__game.elapsed = Math.max(window.__game.elapsed, 2.7);
       window.__game.charges.charges = 3;
       drive.key('KeyU');
@@ -94,12 +94,6 @@ export default async function run({ page, frame }) {
         if (afterRamp.charges < before.charges - 1) throw new Error(`Ramp release spent more than one charge (${before.charges} -> ${afterRamp.charges})`);
         if ((afterRamp.grooves?.length ?? 0) !== groovesBefore) throw new Error('Ramp release leaked into Finger Groove');
       })();
-    } else if (check === 'palm-brace') {
-      if (before.phase !== 'fight') throw new Error('palm-brace check requires a fight');
-      const top = before.mine.alive ? before.mine : before.rival_top;
-      const angle = Math.atan2(top.z, top.x) * 180 / Math.PI;
-      stateKey = 'palmBrace';
-      action = drive.palmBrace({ angle, hold: 1.2, side: 'left' });
     } else if (check === 'crossguard') {
       if (before.phase !== 'fight') throw new Error('crossguard check requires a fight');
       stateKey = 'crossguard';
@@ -147,9 +141,7 @@ export default async function run({ page, frame }) {
     } else if (gustCheck) {
       if (before.phase !== 'fight') throw new Error('palm-gust check requires a fight');
       stateKey = 'palmGust';
-      action = check === 'palm-gust-riposte'
-        ? drive.counterflow({ angle: 0, side: 'right' })
-        : drive.palmGust({ angle: 0, side: check === 'palm-gust-left' ? 'left' : 'right' });
+      action = drive.palmGust({ angle: 0, side: check === 'palm-gust-left' ? 'left' : 'right' });
     } else if (check === 'palm-forge') {
       if (before.phase !== 'forge') throw new Error('palm-forge check requires the forge');
       stateKey = 'palmForge';
@@ -234,7 +226,6 @@ export default async function run({ page, frame }) {
       if ((after.morph?.cancels ?? 0) <= (before.morph?.cancels ?? 0)) throw new Error('cancel was not recorded');
     }
     if ((check === 'palm-gust' || check === 'palm-gust-left') && after.charges !== before.charges - 1) throw new Error(`normal Forge Gust must spend exactly one charge (${before.charges} -> ${after.charges})`);
-    if (check === 'palm-gust-riposte' && (after.charges !== before.charges || !after.palmGust?.riposte)) throw new Error(`Counterflow was not free and marked as a riposte (${before.charges} -> ${after.charges})`);
     if (check === 'rim-spring' && after.charges !== before.charges - 1) throw new Error(`Rim Spring must spend exactly one charge (${before.charges} -> ${after.charges})`);
     // A Crossguard that saves your own top pays its charge on contact and earns it straight back.
     if (check === 'crossguard' && (after.charges !== before.charges || (after.crossguard?.hits ?? 0) <= (before.crossguard?.hits ?? 0))) throw new Error(`Crossguard save must hit and refund its charge (${before.charges} -> ${after.charges}, hits ${before.crossguard?.hits} -> ${after.crossguard?.hits})`);

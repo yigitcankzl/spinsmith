@@ -18,6 +18,7 @@ export default async function run({ page, frame }) {
 
     drive.rest();
     game.progress.matches = Math.max(3, game.progress.matches);
+    game.everyVerb = true;
     game.progress.guide = 'done';
     game.startMatch();
     for (let i = 0; i < 160 && drive.state().phase !== 'ready'; i++) await sleep(25);

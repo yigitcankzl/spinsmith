@@ -20,6 +20,7 @@ export default async function run({ page, frame }) {
       game.setArena(forgeBowl);
       game.progress.guide = 'done';
       game.progress.matches = Math.max(2, game.progress.matches);
+      game.everyVerb = true;
       // The still is about the live two-hand verb, not the portal/launch sequence. Enter a fresh
       // production fight directly so a title animation or a low-IWER-fps UI tap cannot leave the
       // repeatable capture in the hub.
