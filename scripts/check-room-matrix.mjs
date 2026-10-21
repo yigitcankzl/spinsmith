@@ -19,7 +19,10 @@ export default async function run({ page, frame }) {
   for (const candidate of [frame, ...page.frames()].filter(Boolean)) {
     const found = await candidate.evaluate(() => !!window.__game && !!window.IWER_DEVICE?.sem).catch(() => false);
     if (!found) continue;
-    const report = await candidate.evaluate(async () => {
+    // A browser lease is capped at 110 s, so the captured rooms and the edited variants run as
+    // separate leases (ROOM_CASES=rooms | variants; the npm script runs both).
+    const part = process.env.ROOM_CASES ?? 'all';
+    const report = await candidate.evaluate(async (part) => {
       const g = window.__game;
       const dev = window.IWER_DEVICE;
       const sem = dev.sem;
@@ -34,7 +37,8 @@ export default async function run({ page, frame }) {
       const world = (p) => {
         const m = p.transform.matrix;
         const at = (q) => ({ x: m[0] * q.x + m[4] * q.y + m[8] * q.z + m[12], z: m[2] * q.x + m[6] * q.y + m[10] * q.z + m[14] });
-        return { x: m[12], y: m[13], z: m[14], up: m[5], poly: [...p.polygon].map(at) };
+        // IWER stores horizontal planes flipped (table and floor have m[5] = -1), so only the axis counts.
+        return { x: m[12], y: m[13], z: m[14], up: Math.abs(m[5]), poly: [...p.polygon].map(at) };
       };
       const rect = (w, d) => [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]].map(([x, z]) => new DOMPointReadOnly(x, 0, z, 1));
       const fake = (from, semanticLabel, polygon = from.polygon) => ({ transform: from.transform, polygon, semanticLabel });
@@ -54,7 +58,13 @@ export default async function run({ page, frame }) {
         return best;
       }
       // Seat the head facing the table so the arena's spot is over it and the head is off its top.
+      // The room load can reset the emulated head after it resolves, so measure() re-applies it.
+      let lastSeat = () => {};
       function seat(t) {
+        lastSeat = () => seatNow(t);
+        seatNow(t);
+      }
+      function seatNow(t) {
         let dx = 0;
         let dz = -1;
         let ty = 0.74;
@@ -81,6 +91,8 @@ export default async function run({ page, frame }) {
       }
       async function measure(name, expectTable) {
         await wait(800);
+        lastSeat();
+        await wait(300);
         const seen = g.queries.planes.entities.size ?? [...g.queries.planes.entities].length;
         const raycastHit = !!g.placementProbe.visible;
         const keepProbe = g.placementProbe.visible;
@@ -127,7 +139,7 @@ export default async function run({ page, frame }) {
       }
 
       const results = [];
-      for (const env of ['office_small', 'living_room']) {
+      for (const env of part === 'variants' ? [] : ['office_small', 'living_room']) {
         try {
           await load(env);
           const t = nearestTable();
@@ -149,9 +161,11 @@ export default async function run({ page, frame }) {
         return measure(name, expectTable);
       }
       const horizontalNotFloor = (p) => world(p).up > 0.5 && !/floor|ceiling/.test(label(p));
-      results.push(await variant('no_table', false, horizontalNotFloor, null));
-      results.push(await variant('small_table', true, isTable, (p) => fake(p, 'table', rect(0.5, 0.4))));
-      results.push(await variant('unlabelled_table', true, isTable, (p) => fake(p, 'other')));
+      if (part !== 'rooms') {
+        results.push(await variant('no_table', false, horizontalNotFloor, null));
+        results.push(await variant('small_table', true, isTable, (p) => fake(p, 'table', rect(0.5, 0.4))));
+        results.push(await variant('unlabelled_table', true, isTable, (p) => fake(p, 'other')));
+      }
       // Leave the default room and the seated capture pose behind (scripts/emu.sh front).
       await load('office_small');
       dev.position.set(0, 1.45, 0.12);
@@ -159,7 +173,7 @@ export default async function run({ page, frame }) {
       await wait(500);
       g.placeRoot();
       return { pass: results.every((r) => r.pass), results };
-    });
+    }, part);
     if (!report.pass) throw new Error(`room matrix failed:\n${JSON.stringify(report, null, 2)}`);
     return report;
   }

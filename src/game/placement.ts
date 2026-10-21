@@ -85,14 +85,16 @@ export function polyMinWidth(poly: XZ[]): number {
 
 /**
  * Whether a plane can hold the arena: 0 for a labelled table/desk, 1 for an unlabelled surface
- * (horizontal, facing up, 0.45-1.15 m above the floor, or 0.2-0.75 m below the eyes when there
+ * (horizontal, 0.45-1.15 m above the floor, or 0.2-0.75 m below the eyes when there
  * is no floor plane, and at least 30 cm wide and 0.12 m^2), null otherwise.
  */
 export function tableRank(plane: PlaneInfo, floorY: number | null, headY: number): 0 | 1 | null {
-  if (plane.orientation !== 'horizontal') return null;
+  if (plane.orientation && plane.orientation !== 'horizontal') return null;
   const label = (plane.semanticLabel ?? '').toLowerCase();
-  if (/table|desk/.test(label)) return 0;
-  if (NOT_A_TABLE.test(label) || plane.upY < 0.9 || plane.poly.length < 3) return null;
+  if (/table|desk/.test(label)) return plane.orientation === 'horizontal' || Math.abs(plane.upY) >= 0.9 ? 0 : null;
+  // Only the axis is checked: IWER's captured rooms flip horizontal planes (a table reads -1),
+  // and the height band below already keeps ceilings out.
+  if (NOT_A_TABLE.test(label) || Math.abs(plane.upY) < 0.9 || plane.poly.length < 3) return null;
   if (floorY !== null) {
     const h = plane.y - floorY;
     if (h < TABLE_MIN_H || h > TABLE_MAX_H) return null;

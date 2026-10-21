@@ -3961,7 +3961,9 @@ export class MatchSystem extends createSystem({
         this.warnedPlane = true;
         console.warn('[MATCH] XRPlane has no _plane: table detection is off (IWSDK changed?)');
       }
-      if (plane?.orientation !== 'horizontal') continue;
+      // WebXR may leave orientation unset (IWER derives it from the label only, so an unlabelled
+      // plane has none); tableRank then judges it by its normal.
+      if (!plane || plane.orientation === 'vertical') continue;
       const o = e.object3D!;
       o.updateWorldMatrix(true, false);
       const c = o.getWorldPosition(new Vector3());
