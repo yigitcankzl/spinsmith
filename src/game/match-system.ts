@@ -3848,8 +3848,9 @@ export class MatchSystem extends createSystem({
       arc.rotation.y = -stageYaw;
       const now = rivalNear && inSector(sec, rivalAngle);
       const m = arc.material;
-      m.opacity = now ? 0.55 + 0.2 * Math.sin(this.time * 9) : 0.14 + 0.06 * Math.sin(this.time * 1.8 + i);
-      m.color.setHex(now ? 0xff8a3a : 0xff5a1e);
+      m.opacity = now ? 0.55 + 0.2 * Math.sin(this.time * 9) : 0.3 + 0.08 * Math.sin(this.time * 1.8 + i);
+      // Red, not the bowl's orange: the warning must not melt into the rim it sits on.
+      m.color.setHex(now ? 0xfff0c8 : 0xff2a3a);
     }
     if (sectors.length && this.progress.matches > 0 && this.deskEdgeHintMatch !== this.progress.matches && this.labelTimer <= 0) {
       this.deskEdgeHintMatch = this.progress.matches;
