@@ -5,7 +5,7 @@
 import { rimRadius } from './layout.ts';
 import { ARENAS } from './arenas.ts';
 import { Arena, ATTACK, FINGER_RADIUS, fingerContact, CUP_DEPTH, CUP_HOLD, CUP_SIGMA, DEFENSE, finishPoints, rivalMove, sealStrike, strike, TELL_TIME, LAUNCH_TILT, launchSpeed, launchSpin, STAMINA, step, STEP, Top, TUNING, verdict } from './sim.ts';
-import type { FloorShape } from './sim.ts';
+import type { DropSide, FloorShape } from './sim.ts';
 import { SHAPE_SIZE, ShapingCharges, StrikeBar, behindOn } from './shaping.ts';
 
 
@@ -58,6 +58,10 @@ export interface ShapingResult {
   untouched: number;
   /** Of the rounds where the player fell well behind on spin, the share they still won. */
   comeback: number;
+  /** How decided rounds ended (the loser's finish), as shares of all rounds: pocket, over the wall, burst, out of spin. */
+  finishes: { pocket: number; over: number; burst: number; spin: number };
+  /** Rounds whose loser went over the rim on a drop side (a DESK KO candidate). */
+  overDrop: number;
 }
 
 /**
@@ -66,7 +70,7 @@ export interface ShapingResult {
  * will be with some error. `delay` 0.62 s is a ramp set on release, 0.35 s one set at the pinch.
  */
 export const HUMAN = { reaction: 0.25, gesture: 0.3, tracking: 0.07, posErr: 0.005, dirErr: 0.26, minGap: 1.0 };
-export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking, sigma?: number): Policy {
+export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.tracking, sigma?: number, edge?: number): Policy {
   let pending: { at: number; x: number; z: number; a: number }[] = [];
   let lastT = Infinity;
   let busy = 0;
@@ -91,6 +95,14 @@ export function humanRamp(delay = HUMAN.reaction + HUMAN.gesture + HUMAN.trackin
     busy = t + delay;
     last = t;
     const p = predictOrbit(rival, delay, 1 + 0.25 * gauss(rnd));
+    // Edge-aware (`edge` 0): with a drop side on the rim, spend the ramp only when the rival will
+    // be on it (read off the red arc with the same aim error) and save the charge otherwise.
+    // `edge` PI is the control: the same habit aimed at the opposite, plain stretch of rim.
+    if (edge !== undefined && arena.drops.length && !arena.dropAt(Math.atan2(p.z, p.x) + edge + HUMAN.dirErr * 0.5 * gauss(rnd))) {
+      busy = 0;
+      last = t - HUMAN.minGap + 0.1;
+      return;
+    }
     const pr = Math.hypot(p.x, p.z) || 1;
     pending.push({
       at: t + delay,
@@ -350,8 +362,9 @@ interface Setup {
 }
 
 /** One round from a setup: the verdict, its length, and what the shaper's shapes did. */
-function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => number) {
+function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => number, drops: DropSide[]) {
   const arena = new Arena(s.layout);
+  arena.drops = drops;
   const charges = new ShapingCharges();
   const rivalCharges = new ShapingCharges();
   const bar = new StrikeBar();
@@ -395,7 +408,9 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
     }
     t += STEP;
   }
-  return { v: verdict(a, b, t), t, a, b, shapes, lastShape: Math.max(lastShape, arena.lastStrike), untouched: mine.filter((m) => !m.touched).length, behind };
+  const loser = verdict(a, b, t) === 1 ? b : a;
+  const overDrop = loser.finish === 'over' && arena.dropAt(Math.atan2(loser.z, loser.x));
+  return { v: verdict(a, b, t), t, a, b, overDrop, shapes, lastShape: Math.max(lastShape, arena.lastStrike), untouched: mine.filter((m) => !m.touched).length, behind };
 }
 
 /**
@@ -403,12 +418,14 @@ function playRound(s: Setup, policy: Policy, rivalPolicy: Policy, rnd: () => num
  * same launch (its twin), so the report can say what the shaping changed.
  * `rivalPolicy` lets the rival shape too, under its own charges.
  */
-export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: Policy = POLICIES.none): ShapingResult {
+export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: Policy = POLICIES.none, drops: DropSide[] = []): ShapingResult {
   let seed = 3;
   const launchRnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   let pseed = 7;
   const rnd = () => ((pseed = (pseed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   const types = [ATTACK, DEFENSE, STAMINA];
+  const finishes = { pocket: 0, over: 0, burst: 0, spin: 0 };
+  let overDrop = 0;
   let wins = 0, n = 0, points = 0, ko = 0, shapes = 0, ownKo = 0, flipsWon = 0, flipsLost = 0, untouched = 0, behindN = 0, comebacks = 0;
   const lengths: number[] = [];
   for (const layout of ARENAS) {
@@ -428,15 +445,19 @@ export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: P
             launchA: [0, side * spawn, side * Math.sin(da) * sa, -side * Math.cos(da) * sa, launchSpin(pa), side],
             launchB: [0, -side * spawn, -side * Math.sin(db) * sb, side * Math.cos(db) * sb, launchSpin(pb), -side],
           };
-          const r = playRound(setup, policy, rivalPolicy, rnd);
-          const twin = policy === POLICIES.none ? r : playRound(setup, POLICIES.none, rivalPolicy, rnd);
+          const r = playRound(setup, policy, rivalPolicy, rnd, drops);
+          const twin = policy === POLICIES.none ? r : playRound(setup, POLICIES.none, rivalPolicy, rnd, drops);
           n++;
+          const lost = r.v === 1 ? r.b : r.a;
+          finishes[lost.finish ?? 'spin']++;
+          if (r.overDrop) overDrop++;
           lengths.push(r.t);
           shapes += r.shapes;
           untouched += r.untouched;
           if (r.v === 1) {
             wins++;
-            points += finishPoints(r.b);
+            // A throw over a drop side leaves the real desk too: the live game's DESK KO heat.
+            points += finishPoints(r.b, false, r.overDrop);
             if (r.b.finish !== 'spin') ko++;
           } else if (r.v === -1 && r.a.finish !== 'spin' && r.t - r.lastShape < 1.5) ownKo++;
           if (r.behind) {
@@ -459,5 +480,7 @@ export function reportShaping(policy: Policy, roundsPerPair = 16, rivalPolicy: P
     flipsLost: flipsLost / n,
     untouched: shapes ? untouched / shapes : 0,
     comeback: behindN ? comebacks / behindN : 0,
+    finishes: { pocket: finishes.pocket / n, over: finishes.over / n, burst: finishes.burst / n, spin: finishes.spin / n },
+    overDrop: overDrop / n,
   };
 }

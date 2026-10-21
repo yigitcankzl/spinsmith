@@ -25,6 +25,23 @@ const POCKET_DEPTH = 0.003;
 /** Outward speed (m/s) that carries a top over each kind of wall; high walls are never cleared. */
 const WALL_ESCAPE = { low: 0.7, standard: 1.1, high: Infinity, none: 0 };
 const WALL_BOUNCE = { low: 0.5, standard: 0.55, high: 0.8, none: 0 };
+/**
+ * Drop side: where the detected real desk edge is close (desk-edge.ts deskSectors, the red arcs),
+ * the rim is lower for BOTH tops. Over the wall there takes this share of the usual outward speed,
+ * a high wall there acts as a standard one, and a wall-less berm only holds a top that is slow.
+ * Off (no sectors) on the floating tray, online and in brawls. DESK_DROP_ON false disables it.
+ */
+export const DESK_DROP_ON = true;
+export const DESK_DROP_ESCAPE = 0.55;
+/** Wall-less arenas: on a drop side a top this fast outward (m/s) in the berm's last 10% rolls over it. */
+export const DESK_DROP_BERM = 0.15;
+/** The widest drop side a sector makes (radians either side of its middle): the red arc's own cap. */
+export const DESK_DROP_HALF_MAX = Math.PI * 0.45;
+/** One drop side in the arena's own (sim) frame. */
+export interface DropSide {
+  angle: number;
+  half: number;
+}
 /** A high wall throws a top that climbed it back toward the middle (m/s). */
 const HIGH_WALL_DROP = 0.18;
 /** Rail dash: speed and the cooldown before the same top can dash again. */
@@ -206,6 +223,15 @@ export class Arena {
   lastStrike = -99;
   /** Live player-made shapes (ramps and wells); each fades as it relaxes. */
   shapes: FloorShape[] = [];
+  /** Drop sides facing a close real desk edge (see DESK_DROP_ESCAPE); empty = the plain rim. */
+  drops: DropSide[] = [];
+
+  /** True when `angle` (sim frame) is on a drop side. */
+  dropAt(angle: number): boolean {
+    if (!DESK_DROP_ON) return false;
+    for (const d of this.drops) if (Math.abs(Math.atan2(Math.sin(angle - d.angle), Math.cos(angle - d.angle))) <= d.half) return true;
+    return false;
+  }
 
   constructor(layout: ArenaLayout = ARENAS[0]) {
     this.layout = layout;
@@ -1626,7 +1652,9 @@ function wall(arena: Arena, t: Top) {
   if (L.wall === 'none') {
     // Out once its center has crossed the edge (riding the berm is still in); during the opening
     // grace the edge bounces it back instead.
-    if (r > rim) {
+    // A drop side's berm holds only a slow top: one already rolling out at a walk crosses it.
+    const dropOut = open && r > rim * 0.9 && arena.dropAt(angle) && (t.vx * t.x + t.vz * t.z) / (r || 1) > DESK_DROP_BERM;
+    if (r > rim || dropOut) {
       if (open) {
         t.state = 'out';
         t.finish = 'over';
@@ -1659,7 +1687,9 @@ function wall(arena: Arena, t: Top) {
     t.pocketPoints = pocket.points;
     return;
   }
-  if (open && outward > WALL_ESCAPE[L.wall] * ease * pressureEscape) {
+  const drop = arena.dropAt(angle);
+  const escape = drop ? (L.wall === 'high' ? WALL_ESCAPE.standard : WALL_ESCAPE[L.wall]) * DESK_DROP_ESCAPE : WALL_ESCAPE[L.wall];
+  if (open && outward > escape * ease * pressureEscape) {
     t.state = 'out';
     t.finish = 'over';
     return;

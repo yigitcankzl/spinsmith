@@ -13,8 +13,8 @@ import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_POST_TIME, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
-import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
+import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_POST_TIME, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, DESK_DROP_HALF_MAX, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import type { Clash, DropSide, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress, VERB_CARD, VERB_RELEASE, verbReleasedAt } from './progress.js';
 import { CLAIM, LESSON, lessonText } from './lessons.js';
@@ -422,6 +422,8 @@ export class MatchSystem extends createSystem({
     return m;
   });
   private deskEdgeSectors: DeskSector[] = [];
+  /** The sim's drop sides (Arena.drops), one per red arc, reused every frame. */
+  private deskDrops: DropSide[] = [{ angle: 0, half: 0 }, { angle: 0, half: 0 }];
   /** The detected desk's outline in arena-local space (dev throws aim at the most desk). */
   private deskEdgePoly: XZ[] | null = null;
   private deskEdgeKey = '';
@@ -3919,6 +3921,9 @@ export class MatchSystem extends createSystem({
   private updateDeskEdge(stageYaw: number) {
     const arcs = this.deskArcs;
     const show = this.phase === 'fight' && this.onTable && !!ROOM.poly && !this.photo && !this.extras.length && !this.demo;
+    // The drop side (sim.ts DESK_DROP_ESCAPE) plays only where both tops share one real desk: off
+    // on the tray, online (each peer has its own desk; the host's sim is the only one) and in brawls.
+    this.arena.drops.length = 0;
     if (!show) {
       arcs[0].visible = arcs[1].visible = false;
       return;
@@ -3948,7 +3953,7 @@ export class MatchSystem extends createSystem({
           // rimRadius/height read the stage's own frame: root angle + stage yaw.
           const sa = sec.angle + stageYaw;
           const r = rimRadius(L, sa);
-          const half = Math.min(sec.halfWidth, Math.PI * 0.45);
+          const half = Math.min(sec.halfWidth, DESK_DROP_HALF_MAX);
           arcs[i].geometry.dispose();
           arcs[i].geometry = new RingGeometry(r * 1.02, r * 1.1, 24, 1, -sec.angle - half, half * 2).rotateX(-Math.PI / 2);
           arcs[i].position.y = this.arena.height(Math.cos(sa) * r * 0.97, Math.sin(sa) * r * 0.97) + WALL_HEIGHT[L.wall] + 0.002;
@@ -3967,6 +3972,13 @@ export class MatchSystem extends createSystem({
       arc.visible = !!sec;
       if (!sec) continue;
       arc.rotation.y = -stageYaw;
+      // The red arc IS the drop side: same middle, same capped width, in the sim (stage) frame.
+      if (!this.online?.peer) {
+        const d = this.deskDrops[i];
+        d.angle = sec.angle + stageYaw;
+        d.half = Math.min(sec.halfWidth, DESK_DROP_HALF_MAX);
+        this.arena.drops.push(d);
+      }
       const now = (rivalNear && inSector(sec, rivalAngle)) || (i === 0 && this.deskWrenchAt() !== null);
       const m = arc.material;
       m.opacity = now ? 0.55 + 0.2 * Math.sin(this.time * 9) : 0.3 + 0.08 * Math.sin(this.time * 1.8 + i);
@@ -3975,7 +3987,7 @@ export class MatchSystem extends createSystem({
     }
     if (sectors.length && this.progress.matches > 0 && this.deskEdgeHintMatch !== this.progress.matches && this.labelTimer <= 0) {
       this.deskEdgeHintMatch = this.progress.matches;
-      this.call('REAL EDGE\nTHROW THEM OFF YOUR DESK', CALL.tactic, 2);
+      this.call(this.arena.drops.length ? 'REAL EDGE: LOW RIM\nTHROW THEM OFF YOUR DESK' : 'REAL EDGE\nTHROW THEM OFF YOUR DESK', CALL.tactic, 2);
     }
   }
 
@@ -7480,7 +7492,10 @@ export class MatchSystem extends createSystem({
     if ((top.vx * safeX + top.vz * safeZ) / (speed * safeD) > -0.12) return false;
     const px = top.x + top.vx * 0.5;
     const pz = top.z + top.vz * 0.5;
-    if (insidePoly(poly, px, pz) && edgeDistance(poly, px, pz) > 0.055) return false;
+    // Heading for a drop side (the low rim facing the real edge) is reason enough on its own.
+    const r = Math.hypot(top.x, top.z) || 1;
+    const towardDrop = this.arena.dropAt(Math.atan2(pz, px)) && (top.vx * top.x + top.vz * top.z) / r > 0.05;
+    if (!towardDrop && insidePoly(poly, px, pz) && edgeDistance(poly, px, pz) > 0.055) return false;
     this.deskAvoidX = safeX / safeD;
     this.deskAvoidZ = safeZ / safeD;
     return true;
