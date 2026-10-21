@@ -5257,7 +5257,11 @@ export class MatchSystem extends createSystem({
       // the floor, then lift. A stationary downward jab remains a Cup, so the gestures do not race.
       // Grooves arrive with the other defensive tools: in the first matches an open finger skimming
       // the floor on its way to pinch a ramp must not draw one and spend the lesson's charge.
-      const touching = open && this.taught('defense') && this.arena.inside(tip.x, tip.z) && depth > -0.012 && depth < 0.024;
+      // A finger circling your own top's rim is a Spin Rub, never a groove drawn on the floor.
+      const rubbing = this.time < this.rubUntil || (this.mine.alive
+        && Math.hypot(tip.x - this.mine.x, tip.z - this.mine.z) <= this.mine.spec.radius + FINGER_RADIUS + RUB_SLACK + 0.012);
+      if (rubbing) this.grooving[side] = null;
+      const touching = open && !rubbing && this.taught('defense') && this.arena.inside(tip.x, tip.z) && depth > -0.012 && depth < 0.024;
       let groove = this.grooving[side];
       if (touching && !groove && !this.pressing[side]) {
         groove = this.grooving[side] = { sx: tip.x, sz: tip.z, x: tip.x, z: tip.z, active: false };

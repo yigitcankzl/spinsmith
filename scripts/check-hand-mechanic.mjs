@@ -1,7 +1,7 @@
 // Browser-side regression probe for hand-first mechanics whose public state is transient.
 // Usage: HAND_CHECK=palm-brace npx @iwsdk/cli browser run scripts/check-hand-mechanic.mjs --timeout 100000
 // Other modes: single-rip, dual-rip, intent-preview, ramp-release, finger-groove, rim-spring, palm-brace, crossguard, forge-wheel,
-// ember-plant, flick, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring,
+// ember-plant, flick, rub, palm-gust, palm-gust-left, palm-gust-riposte, palm-forge, outer-ring,
 // arena-morph-{tutorial,squeeze,stretch,twist,tilt,cancel}.
 export default async function run({ page, frame }) {
   let target = null;
@@ -28,7 +28,7 @@ export default async function run({ page, frame }) {
       await sleep(1200);
     }
     const gustCheck = check === 'palm-gust' || check === 'palm-gust-left' || check === 'palm-gust-riposte';
-    const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant' || check === 'flick';
+    const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant' || check === 'flick' || check === 'rub';
     if (check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || check === 'palm-brace' || gustCheck || check === 'rim-spring' || expansionCheck) game.progress.matches = Math.max(2, game.progress.matches);
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
@@ -108,6 +108,15 @@ export default async function run({ page, frame }) {
       if (before.phase !== 'fight') throw new Error('forge-wheel check requires a fight');
       stateKey = 'forgeWheel';
       action = drive.forgeWheel({ direction: 1 });
+    } else if (check === 'rub') {
+      if (before.phase !== 'fight') throw new Error('rub check requires a fight');
+      action = (async () => {
+        // Shorter than one 1.2 s window even on a slow emulator frame clock: a longer rub rightly pays again.
+        const proof = await drive.rub({ seconds: 0.7, side: 'right' });
+        const after = drive.state();
+        if (after.charges !== before.charges - 1) throw new Error(`a Spin Rub window must spend exactly one charge (${before.charges} -> ${after.charges})`);
+        if (!(proof.after > proof.before + 0.05)) throw new Error(`rubbing with the spin did not spin the top up: ${JSON.stringify(proof)}`);
+      })();
     } else if (check === 'flick') {
       if (before.phase !== 'fight') throw new Error('flick check requires a fight');
       action = (async () => {

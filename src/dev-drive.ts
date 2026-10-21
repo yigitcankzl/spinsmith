@@ -55,8 +55,8 @@ interface Game {
   root: { position: Vector3; localToWorld(v: Vector3): Vector3; worldToLocal(v: Vector3): Vector3 };
   rootK: number;
   arena: { radius: number; layout: ArenaLayout & { name?: string }; height(x: number, z: number): number; floorHeight(n: number): number; shapes: { kind: string; boost?: number; length?: number }[] };
-  mine: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string; sinceWall: number };
-  theirs: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string; sinceWall: number };
+  mine: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string; sinceWall: number; hand: number; spec: { radius: number } };
+  theirs: { x: number; z: number; vx: number; vz: number; spin: number; alive: boolean; state: string; sinceWall: number; hand: number; spec: { radius: number } };
   myPoints: number;
   theirPoints: number;
   barPoints: [number, number];
@@ -109,6 +109,7 @@ interface Game {
   palmGustHits?: number;
   palmGustRiposte?: boolean;
   flickCount?: number;
+  rubGain?: number;
   lastFlick?: { gain: number; dx: number; dz: number; rival: boolean };
   riposteUntil?: number;
   riposteSide?: Side | null;
@@ -1177,6 +1178,45 @@ export function installDriver() {
       await park(side);
       if ((game().flickCount ?? 0) <= before) throw new Error(`fingertip swing did not flick the ${target} top`);
       return { flicks: (game().flickCount ?? 0) - before };
+    },
+
+    /**
+     * Rub an open index fingertip round your own top's rim, with its spin, for `seconds`. The
+     * production Spin Rub detector decides; the probe only holds the top still and slows it.
+     */
+    async rub(opts: { seconds?: number; side?: Side; against?: boolean } = {}) {
+      const { seconds = 1.1, side = 'right', against = false } = opts;
+      const g = game();
+      if (g.phase !== 'fight') throw new Error('Spin Rub only exists during a fight');
+      const top = g.mine;
+      const hold = { x: -g.arena.radius * 0.25, z: 0 };
+      Object.assign(top, { ...hold, vx: 0, vz: 0, spin: 0.4 });
+      Object.assign(g.theirs, { x: g.arena.radius * 0.6, z: 0, vx: 0, vz: 0 });
+      const pin = setInterval(() => Object.assign(top, { ...hold, vx: 0, vz: 0 }), 16);
+      const before = top.spin;
+      const r = top.spec.radius + 0.006;
+      // The rim surface runs along (sin a, -cos a) * hand, so the finger's angle must fall for hand +1.
+      const turn = (against ? 1 : -1) * top.hand;
+      let a = Math.PI / 2;
+      const at = () => local(top.x + Math.cos(a) * r, top.z + Math.sin(a) * r, 0.008);
+      try {
+        await setPinch(side, false);
+        // Come in from above like a hand does: the parked hand rests below the table edge, and a
+        // straight reach from there skims the floor and draws a Finger Groove on the way.
+        await glide(side, 'index', above(local(0, g.arena.radius * 1.2), 0.14), 0.3, 0, 'natural', 'reach');
+        await glide(side, 'index', above(at(), 0.06), 0.25, 0, 'natural', 'reach');
+        await glide(side, 'index', at, 0.18, 0, 'natural', 'grip');
+        const steps = Math.round(seconds / 0.04);
+        for (let i = 0; i < steps; i++) {
+          a += turn * 0.2;
+          await glide(side, 'index', at(), 0.04, 0, 'linear');
+        }
+        await glide(side, 'index', above(at(), 0.1), 0.25, 0, 'natural', 'release');
+      } finally {
+        clearInterval(pin);
+      }
+      await park(side);
+      return { before: +before.toFixed(3), after: +game().mine.spin.toFixed(3), gain: +(game().rubGain ?? 0).toFixed(3) };
     },
 
     /** Prepare one outward-moving rival, parry it with an open palm, then sweep that force inward. */

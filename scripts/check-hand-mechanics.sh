@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 CLI=(npx @iwsdk/cli)
 MODES=(
   single-rip dual-rip intent-preview ramp-release finger-groove rim-spring palm-brace crossguard forge-wheel
-  ember-plant flick palm-gust palm-gust-left palm-gust-riposte palm-forge outer-ring
+  ember-plant flick rub palm-gust palm-gust-left palm-gust-riposte palm-forge outer-ring
   arena-morph-tutorial arena-morph-squeeze arena-morph-stretch arena-morph-twist
   arena-morph-tilt arena-morph-cancel
 )
