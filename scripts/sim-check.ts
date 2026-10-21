@@ -24,7 +24,7 @@ import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, ranki
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
-import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
+import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge } from '../src/game/arena-forge.ts';
 import { brawlSlots, spinStep, targetWinner } from '../src/game/brawl.ts';
 import { deskSectors, inSector } from '../src/game/desk-edge.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
@@ -1439,6 +1439,13 @@ TUNING.grace = 0;
     const kick = arenaForgeImpulse('tilt', tilt, top.x, top.z, radius, 0.6, -0.8);
     assert.ok(kick.x * 0.6 + kick.z * -0.8 > 0, 'Tilt sends every top down the same slope');
   }
+
+  // Aimed forge: squeeze draws your own top in but throws the rival out, and a rival caught in
+  // the outer band or heading out takes a far harder kick than one forged at mid-bowl.
+  assert.equal(arenaForgeRivalAction('squeeze'), 'stretch', 'Squeeze throws the rival out');
+  assert.equal(arenaForgeRivalAction('twist'), 'twist');
+  assert.ok(arenaForgeAim(0.15, 0, 0.05, 0, radius) > 2 * arenaForgeAim(0.03, 0, 0, 0, radius), 'a forge aimed at an exposed rival hits it much harder than a mashed one');
+  assert.ok(ARENA_FORGE_SHIELD > 0, 'the forging top gets a brief rim shield');
 
   const charges = new ShapingCharges();
   const cancelled = classifyArenaForge({ pull: 0, twist: 0, tilt: 0 });
