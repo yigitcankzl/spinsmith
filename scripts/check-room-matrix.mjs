@@ -11,6 +11,9 @@
 //   no_table         every horizontal plane except floor and ceiling removed
 //   small_table      the table's outline replaced by a 50 x 40 cm top, still labelled 'table'
 //   unlabelled_table the same table plane with its label changed to 'other' (Space Setup skipped)
+// ROOM_CASES=harder (rebuilt transforms): an unmoved control, a 30-degree tilted unlabelled plane
+// (tray), a second desk 1.6 m away (the near one wins), a 0.38 m coffee table (tray), the table
+// pushed 1.7 m further (tray).
 // For each case the head is seated in front of the room's table (if any) and the game's own
 // placement (placeRoot, which also runs setRoom for ROOM.poly) is called; the probe then checks
 // table vs tray, reach, and desk-edge sectors computed by the game's deskSectors on the outline.
@@ -139,7 +142,7 @@ export default async function run({ page, frame }) {
       }
 
       const results = [];
-      for (const env of part === 'variants' ? [] : ['office_small', 'living_room']) {
+      for (const env of part === 'variants' || part === 'harder' ? [] : ['office_small', 'living_room']) {
         try {
           await load(env);
           const t = nearestTable();
@@ -161,7 +164,36 @@ export default async function run({ page, frame }) {
         return measure(name, expectTable);
       }
       const horizontalNotFloor = (p) => world(p).up > 0.5 && !/floor|ceiling/.test(label(p));
-      if (part !== 'rooms') {
+      // Harder rooms, all from office_small's table: a plane moved/turned with a new rigid transform.
+      const moved = (from, semanticLabel, { dx = 0, dy = 0, dz = 0, tiltDeg = 0 } = {}) => {
+        const p0 = from.transform.position;
+        const q0 = from.transform.orientation;
+        const Q = g.root.quaternion.constructor;
+        const V3 = g.p.constructor;
+        const q = new Q(q0.x, q0.y, q0.z, q0.w).premultiply(new Q().setFromAxisAngle(new V3(0, 0, 1), (tiltDeg * Math.PI) / 180));
+        const transform = new globalThis.XRRigidTransform({ x: p0.x + dx, y: p0.y + dy, z: p0.z + dz, w: 1 }, { x: q.x, y: q.y, z: q.z, w: q.w });
+        return { transform, polygon: from.polygon, semanticLabel };
+      };
+      async function harder(name, expectTable, build) {
+        await load('office_small');
+        const base = nearestTable();
+        if (!base) return { name, pass: false, fails: ['office_small has no table plane to start from'] };
+        const planes = build(base.p);
+        sem.trackedPlanes.delete(base.p);
+        for (const q of planes) sem.trackedPlanes.add(q);
+        seat(base);
+        return measure(name, expectTable);
+      }
+      if (part === 'harder') {
+        // Control: the same rebuilt transform, unmoved, must still hold the arena (so the rejections
+        // below are the rules at work, not a malformed plane).
+        results.push(await harder('rebuilt_control', true, (p) => [moved(p, 'other')]));
+        results.push(await harder('tilted_unlabelled', false, (p) => [moved(p, 'other', { tiltDeg: 30 })]));
+        results.push(await harder('two_desks', true, (p) => [p, moved(p, 'desk', { dx: 1.6 })]));
+        results.push(await harder('coffee_table', false, (p) => [moved(p, 'table', { dy: -0.37 })]));
+        results.push(await harder('far_table', false, (p) => [moved(p, 'table', { dz: -1.7 })]));
+      }
+      if (part !== 'rooms' && part !== 'harder') {
         results.push(await variant('no_table', false, horizontalNotFloor, null));
         results.push(await variant('small_table', true, isTable, (p) => fake(p, 'table', rect(0.5, 0.4))));
         results.push(await variant('unlabelled_table', true, isTable, (p) => fake(p, 'other')));

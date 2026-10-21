@@ -19,7 +19,7 @@
     "check:sim-n": "node scripts/sim-n-check.ts",
     "check:net": "node scripts/net-check.ts",
     "check:desk-ko": "bash scripts/check-desk-ko-hand.sh",
-    "check:room-matrix": "ROOM_CASES=rooms npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=variants npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000",
+    "check:room-matrix": "ROOM_CASES=rooms npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=variants npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=harder npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000",
     "check:desk-ko-first": "bash scripts/check-desk-ko-first-match.sh",
     "check:first-five": "bash scripts/check-first-five.sh",
     "check:desk-guard": "npx @iwsdk/cli browser run scripts/check-desk-guard-probe.mjs --timeout 60000",
