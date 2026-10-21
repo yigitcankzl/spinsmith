@@ -16,6 +16,8 @@ import { edgeDistance, fitToTable, insidePoly, MAX_FIT_MOVE, RIM_MARGIN } from '
 import { nextArena, RIVAL_HOME } from '../src/game/rotation.ts';
 import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
+import { clearSnapshot, decodeSnapshot, encodeSnapshot, loadSnapshot, RESUME_KEY, RESUME_MAX_AGE, RESUME_VERSION, saveSnapshot } from '../src/game/match-resume.ts';
+import type { MatchSnapshot } from '../src/game/match-resume.ts';
 import { PEDESTAL, pickTable, pickTablePlane, placeArena, polyArea, polyMinWidth, REACH, reachSpot, tableRank, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, hudAnchors, hudAnchorsOffMatch, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
@@ -975,6 +977,36 @@ TUNING.grace = 0;
   freshSave(listed);
   assert.deepEqual([...mem.keys()], ['other.app'], 'a fresh start on a shared headset forgets every spinsmith key, and only those');
 }
+{
+  // An interrupted match: the round-start snapshot round-trips, and stale, future, other-version
+  // or malformed ones are ignored (and dropped from storage). A fresh start clears it.
+  const now = 1_800_000_000_000;
+  const snap: MatchSnapshot = {
+    v: RESUME_VERSION, at: now - 60_000, mine: 2, theirs: 1, round: 3, tutorialRound: 3, bout: '1-2', rival: RIVALS[1].name, arena: ARENAS[0].name,
+    myBuild: 'abc', theirBuild: 'def', perfect: true, wasDown: false, heroRamp: true, rounds: ['RING OUT', 'POCKET', 'DESK KO'],
+  };
+  assert.deepEqual(decodeSnapshot(encodeSnapshot(snap), now), snap, 'resume snapshot round trip');
+  assert.equal(decodeSnapshot(encodeSnapshot({ ...snap, at: now - RESUME_MAX_AGE - 1 }), now), null, 'a snapshot older than 12 h is ignored');
+  assert.ok(RESUME_MAX_AGE === 12 * 3600 * 1000);
+  assert.equal(decodeSnapshot(encodeSnapshot({ ...snap, at: now + 3_600_000 }), now), null, 'a snapshot from the future is ignored');
+  assert.equal(decodeSnapshot(JSON.stringify({ ...snap, v: RESUME_VERSION + 1 }), now), null, 'a version mismatch is ignored');
+  assert.equal(decodeSnapshot('{not json', now), null, 'garbage is ignored');
+  assert.equal(decodeSnapshot(JSON.stringify({ ...snap, mine: -1 }), now), null, 'a negative score is ignored');
+  assert.equal(decodeSnapshot(null, now), null);
+  const mem = new Map<string, string>();
+  const st = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) };
+  saveSnapshot(snap, st);
+  assert.ok(RESUME_KEY.startsWith('spinsmith.') && mem.has(RESUME_KEY), 'the snapshot lives under a spinsmith key');
+  assert.deepEqual(loadSnapshot(st, now), snap, 'stored snapshot loads');
+  assert.equal(loadSnapshot(st, now + RESUME_MAX_AGE), null, 'stale stored snapshot is ignored');
+  assert.ok(!mem.has(RESUME_KEY), 'and removed');
+  saveSnapshot(snap, st);
+  clearSnapshot(st);
+  assert.ok(!mem.has(RESUME_KEY), 'match end or home clears it');
+  saveSnapshot(snap, st);
+  freshSave(st);
+  assert.ok(!mem.has(RESUME_KEY), 'freshSave clears the resume snapshot');
+}
 
 // 16. Reach: every target touched directly sits within a seated arm's comfortable reach and not
 // too steeply below the eyes, for trays 0.30-0.45 m below the eyes (Meta suggests 0.42-0.46 m for
@@ -1454,6 +1486,19 @@ TUNING.grace = 0;
   }
   assert.ok(lefty, 'stepping the dial reaches the left-handed layout');
   assert.ok(COMFORT.sound && COMFORT.flashes && !COMFORT.gentle, 'a full turn is back to standard');
+  const { SAFE_COLORS, warnColor } = await import('../src/game/comfort.ts');
+  assert.ok(COMFORT_MODES.some((m) => m.colorSafe), 'the dial has a colour-safe mode');
+  assert.equal(warnColor(0xff2a3a, SAFE_COLORS.edge), 0xff2a3a, 'standard keeps the usual warning colour');
+  let safe = false;
+  for (let i = 0; i < COMFORT_MODES.length; i++) {
+    nextComfort();
+    if (COMFORT.colorSafe) {
+      safe = true;
+      assert.equal(warnColor(0xff2a3a, SAFE_COLORS.edge), SAFE_COLORS.edge, 'colour-safe swaps the desk-edge red');
+      assert.ok(COMFORT.sound && COMFORT.flashes, 'colour-safe keeps sound and flashes');
+    }
+  }
+  assert.ok(safe && !COMFORT.colorSafe, 'stepping the dial reaches colour-safe and a full turn leaves it');
 }
 
 // 26. The rip's speed is measured over a window: 3 mm of tracking jitter neither makes an honest

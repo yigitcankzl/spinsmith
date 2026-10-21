@@ -1,7 +1,7 @@
 import { AdditiveBlending, NormalBlending, BoxGeometry, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish, playRub } from './audio.js';
-import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
+import { COMFORT, COMFORT_MODES, comfortMode, nextComfort, SAFE_COLORS, warnColor } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -58,6 +58,8 @@ import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_MIN_LENGTH, PALM_CATCH_RADIUS } from './hand-tools.js';
 import { brawlModeName, targetWinner } from './brawl.js';
+import { clearSnapshot, loadSnapshot, RESUME_VERSION, saveSnapshot } from './match-resume.js';
+import type { MatchSnapshot } from './match-resume.js';
 import type { BrawlMode } from './brawl.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 
@@ -929,6 +931,8 @@ export class MatchSystem extends createSystem({
   private turn = 0;
   /** This match so far, for the report at home: each round's finish (- = the rival's), best rip, XP. */
   private matchLog = { rounds: [] as string[], rip: 0, xp: 0, won: false, score: '' };
+  /** Where this match's current round started (match-resume.ts): written on pause, session end and page hide. */
+  private resumeSnap: MatchSnapshot | null = null;
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
   private titleShown = false;
   private titleT = 0;
@@ -1056,7 +1060,7 @@ export class MatchSystem extends createSystem({
   /** The quiet forge loop: up at home and in the workshops, ducked under a fight. */
   private loop = new ForgeLoop();
   private rivalShapeAt = -9;
-  private rivalMarks = new ShapeMarks(0x4fd1ff, 6);
+  private rivalMarks = new ShapeMarks(0x4fd1ff, 6, 6);
   /** After a finish your shape caused, the visuals play slowly for a moment (real seconds left). */
   private slowMo = 0;
   private marks = new ShapeMarks(0xff8a2a, 10);
@@ -1647,7 +1651,10 @@ export class MatchSystem extends createSystem({
     // and every sound stop until the player is back, and the paused time is not simulated.
     const paused = this.world.visibilityState.peek() !== VisibilityState.Visible;
     if (paused !== this.paused) {
-      if (paused) this.cancelActiveGestures();
+      if (paused) {
+        this.cancelActiveGestures();
+        this.writeResume();
+      }
       this.paused = paused;
       setAudioPaused(paused);
     }
@@ -1724,6 +1731,9 @@ export class MatchSystem extends createSystem({
         this.settle = 0;
         this.root.visible = false;
       } else if (this.xrSession) this.needPlace = true;
+      // A reload or a closed session keeps the match: the next entry resumes its round.
+      if (!this.xrSession) window.addEventListener('pagehide', () => this.writeResume());
+      session.addEventListener('end', () => this.writeResume());
       this.xrSession = session;
       ref.addEventListener('reset', () => (this.needPlace = true));
     }
@@ -2319,6 +2329,9 @@ export class MatchSystem extends createSystem({
     // A rivet thrown by the last clash of a fight must not linger over the hub.
     this.resetEmber();
     this.bout = null;
+    // Home ends the match: nothing to resume.
+    this.resumeSnap = null;
+    clearSnapshot(localStorage);
     // ?online=… on a new headset waits for the first session; once it is over the room opens.
     if (!this.online && !this.onlineTried && this.progress.guide === 'done' && new URLSearchParams(location.search).has('online')) queueMicrotask(() => this.openOnline());
     // Whatever waited for placement or for home (an online duel) starts now, on any path home.
@@ -2679,7 +2692,7 @@ export class MatchSystem extends createSystem({
       old?.dispose();
       const view = new TopView(build, color);
       if (i === 0) view.scars(scars);
-      view.team(i === 0 ? TEAM_MINE : TEAM_RIVAL, ringOf(build).radius);
+      view.team(i === 0 ? TEAM_MINE : TEAM_RIVAL, ringOf(build).radius, true, i === 0 ? 40 : 6);
       // A top that lands on the desk scorches it.
       view.onLand = (x, y, z) => this.scorch(x, y, z);
       // A spun-out top clatters onto its side in a spray of sparks.
@@ -3346,9 +3359,11 @@ export class MatchSystem extends createSystem({
         this.placedAt = this.time;
         this.root.updateWorldMatrix(true, true);
         this.setRoom();
+        const snap = loadSnapshot(localStorage);
         this.toHub();
         this.stamp.show('SMITHY RESTORED', 'BACK ON YOUR TABLE', 'mine', 1.1, 1.2);
         console.log('[SPATIAL] restored persistent smithy pose');
+        if (snap) this.tryResume(snap);
       }
     }
     if (this.spatialDirty && this.phase === 'hub' && this.sizeSettled && !this.dragging && this.pushed < 1e-4) {
@@ -3413,12 +3428,53 @@ export class MatchSystem extends createSystem({
     this.startMatch();
   }
 
+  /** The round now starting, as a snapshot (duels against the AI only). */
+  private snapRound() {
+    const resumable = !this.demo && !this.photo && !this.online && !this.extras.length && !this.rivalEcho && this.rival.name !== 'Challenger';
+    if (!resumable) {
+      if (this.resumeSnap) clearSnapshot(localStorage);
+      this.resumeSnap = null;
+      return;
+    }
+    const bout = this.bout ? (this.bout.night ? `night:${this.bout.id}` : this.bout.id) : null;
+    this.resumeSnap = {
+      v: RESUME_VERSION, at: Date.now(), mine: this.myPoints, theirs: this.theirPoints, round: this.round, tutorialRound: this.tutorialRound,
+      bout, rival: this.rival.name, arena: this.arena.layout.name, myBuild: encodeBuild(this.myBuild), theirBuild: encodeBuild({ ...this.rival.build }),
+      perfect: this.perfectInMatch, wasDown: this.wasDown, heroRamp: this.firstHeroRamp, rounds: this.matchLog.rounds.slice(0, 16),
+    };
+    this.writeResume();
+  }
+
+  private writeResume() {
+    if (this.resumeSnap) saveSnapshot({ ...this.resumeSnap, at: Date.now() }, localStorage);
+  }
+
+  /** On entry: an interrupted match goes straight back to ready for the round it stopped in. */
+  private tryResume(snap: MatchSnapshot) {
+    if (this.phase !== 'hub' || this.online) return;
+    const rival = RIVALS.find((r) => r.name === snap.rival);
+    const layout = this.arenas.find((a) => a.name === snap.arena);
+    if (!rival || !layout) return clearSnapshot(localStorage);
+    const night = snap.bout?.startsWith('night:');
+    const base = snap.bout ? BOUTS.find((b) => b.id === (night ? snap.bout!.slice(6) : snap.bout)) : undefined;
+    this.arenaIndex = this.arenas.indexOf(layout);
+    this.setArena(layout);
+    const mine = decodeBuild(snap.myBuild);
+    if (mine) this.myBuild = mine;
+    this.rivalEcho = null;
+    this.bout = base ? (night ? nightBout(base, layout.name) : base) : null;
+    this.startMatch(rival, true, snap);
+    this.label.set(`Match resumed\nRound ${snap.round + 1} · ${snap.mine} - ${snap.theirs}`);
+    this.labelTimer = 4;
+    console.log(`[MATCH] resumed vs ${rival.name} in ${layout.name}, round ${snap.round + 1}, heat ${snap.mine}-${snap.theirs}`);
+  }
+
   /**
    * A new match from anywhere (home, the workshop's Save & play, the dev key): every other
    * place closes, a rival is picked, the score and this round's builds are fresh.
    */
   /** `again`: a rematch, which keeps the bout (or the brawl) it repeats. */
-  private startMatch(rival?: Rival, again = false) {
+  private startMatch(rival?: Rival, again = false, resume?: MatchSnapshot) {
     // With a peer connected every match is against the other smith (never a bout, order or AI).
     if (this.online?.peer) {
       rival = this.remoteRival();
@@ -3479,6 +3535,17 @@ export class MatchSystem extends createSystem({
     this.matchLog = { rounds: [], rip: 0, xp: 0, won: false, score: '' };
     // Rounds count within a match ('ROUND 2', the bout's twist), not across the session.
     this.round = 0;
+    if (resume) {
+      this.myPoints = resume.mine;
+      this.theirPoints = resume.theirs;
+      this.round = resume.round;
+      this.tutorialRound = resume.tutorialRound;
+      this.perfectInMatch = resume.perfect;
+      this.wasDown = resume.wasDown;
+      this.firstHeroRamp = resume.heroRamp;
+      this.matchLog.rounds = [...resume.rounds];
+      this.barPoints = [this.myPoints, this.theirPoints];
+    }
     for (const m of [...this.palmPrints, ...this.scorches]) m.visible = false;
     // A workshop demo leaves its random builds in place; the match picks yours and the rival's.
     this.typesPicked = false;
@@ -3625,7 +3692,9 @@ export class MatchSystem extends createSystem({
   /** The first placement: the arena in front, then home. */
   private place() {
     this.placeRoot();
+    const snap = loadSnapshot(localStorage);
     this.toHub();
+    if (snap) this.tryResume(snap);
 
     if (!this.onTable) {
       // No table found (or none labelled one): say so once the title is gone, then the first
@@ -3882,7 +3951,7 @@ export class MatchSystem extends createSystem({
       const m = arc.material;
       m.opacity = now ? 0.55 + 0.2 * Math.sin(this.time * 9) : 0.3 + 0.08 * Math.sin(this.time * 1.8 + i);
       // Red, not the bowl's orange: the warning must not melt into the rim it sits on.
-      m.color.setHex(now ? 0xfff0c8 : 0xff2a3a);
+      m.color.setHex(now ? 0xfff0c8 : warnColor(0xff2a3a, SAFE_COLORS.edge));
     }
     if (sectors.length && this.progress.matches > 0 && this.deskEdgeHintMatch !== this.progress.matches && this.labelTimer <= 0) {
       this.deskEdgeHintMatch = this.progress.matches;
@@ -4129,6 +4198,7 @@ export class MatchSystem extends createSystem({
     this.readySince = this.time;
     this.matchOver = false;
     this.phase = 'ready';
+    this.snapRound();
     this.markFirstFive(2);
     this.outerRingState = 'idle';
     this.outerRingCompleted = false;
@@ -4211,6 +4281,8 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(rx, rz, 0, 0, 1, this.theirs.hand);
     this.planRivalLaunch();
     this.launchSafeZone.position.set(0, this.arena.height(0, 0) + 0.002, 0);
+    this.launchSafeZone.material.color.setHex(warnColor(0x49d8ff, SAFE_COLORS.safe));
+    this.launchDangerZone.material.color.setHex(warnColor(0xff3b24, SAFE_COLORS.danger));
     this.launchDangerZone.position.set(rx, this.arena.height(rx, rz) + 0.002, rz);
     this.puller = null;
     this.cord.set(null);
@@ -4323,7 +4395,9 @@ export class MatchSystem extends createSystem({
     const previousZone = this.launchZoneKind;
     const previousArena = this.launchArenaKind;
     this.classifyLaunch(from.x, from.z);
-    this.launchMarkerMaterial.color.setHex(this.launchZoneKind === 'ambush' ? 0xff3b24 : this.launchZoneKind === 'edge' ? 0xffd34d : this.launchZoneKind === 'center' ? 0x49d8ff : 0xff8a2a);
+    const zone = this.launchZoneKind;
+    // The zone is also named on the card (launchReadout), so colour is never the only signal.
+    this.launchMarkerMaterial.color.setHex(COMFORT.colorSafe ? (zone === 'ambush' ? SAFE_COLORS.danger : zone === 'edge' ? SAFE_COLORS.edge : zone === 'center' ? SAFE_COLORS.safe : SAFE_COLORS.neutral) : zone === 'ambush' ? 0xff3b24 : zone === 'edge' ? 0xffd34d : zone === 'center' ? 0x49d8ff : 0xff8a2a);
     if ((previousZone !== this.launchZoneKind || previousArena !== this.launchArenaKind) && this.progress.guide === 'done' && !this.entrance && !this.stamp.mesh.visible) this.label.set(this.launchReadout());
     return true;
   }
@@ -6113,6 +6187,8 @@ export class MatchSystem extends createSystem({
       if (this.time - this.rubSoundAt >= 0.3) {
         this.rubSoundAt = this.time;
         playTick();
+        // The wrong-way tick has a twin: the rub is slowing your own top.
+        if (!this.stamp.busy) this.stamp.show('WRONG WAY', 'RUB WITH YOUR SPIN', 'neutral', 0.4);
       }
       return true;
     }
@@ -8209,6 +8285,8 @@ export class MatchSystem extends createSystem({
         this.myPoints = 0;
         this.theirPoints = 0;
         this.matchOver = true;
+        this.resumeSnap = null;
+        clearSnapshot(localStorage);
         this.markFirstFive(5);
         // The match becomes your echo: the board's challenge code carries it to a friend.
         if (!this.demo && !this.extras.length && !this.online && this.echoRec.rips.length) {
@@ -8286,6 +8364,8 @@ export class MatchSystem extends createSystem({
     if (v !== 2) {
       this.round++;
       this.typesPicked = false;
+      // The score is in: an interruption now resumes at the next round.
+      if (!this.matchOver) this.snapRound();
     }
   }
 

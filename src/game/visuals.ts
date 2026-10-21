@@ -894,11 +894,14 @@ export class TopView {
    * rival's), a glowing edge on the blade in that color that brightens with spin, a motion-blur
    * disc for fast spin, and a larger drawing (HERO_SCALE; the simulation's radius is unchanged).
    */
-  /** `ring`: draw the team ring under the top (a brawl's extra tops skip it to save a draw per eye). */
-  team(color: number, radius: number, ring = true) {
+  /**
+   * `ring`: draw the team ring under the top (a brawl's extra tops skip it to save a draw per eye).
+   * `sides`: the ring's outline, so ownership is a shape too (yours round, the rival's a hexagon).
+   */
+  team(color: number, radius: number, ring = true, sides = 40) {
     if (ring) {
       const mesh = new Mesh(
-        new RingGeometry(radius * 1.25, radius * 1.55, 40).rotateX(-Math.PI / 2),
+        new RingGeometry(radius * 1.25, radius * 1.55, sides).rotateX(-Math.PI / 2),
         new MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: AdditiveBlending, depthWrite: false }),
       );
       // The contact shadow is offset away from the back-left key. Counter-offset the team ring so it
@@ -2755,8 +2758,9 @@ export class ShapeMarks {
   readonly root = new Group();
   private marks: { group: Group; rings: Mesh[]; chevron: Mesh; lane: Mesh; mats: MeshBasicMaterial[] }[] = [];
 
-  constructor(color: number, count = 4) {
-    const ring = new RingGeometry(0.94, 1, 48).rotateX(-Math.PI / 2);
+  /** `sides`: the rings' outline (the rival's marks are hexagons, yours round: not colour alone). */
+  constructor(color: number, count = 4, sides = 48) {
+    const ring = new RingGeometry(0.94, 1, sides).rotateX(-Math.PI / 2);
     const chevron = new ConeGeometry(0.008, 0.016, 3).rotateX(Math.PI / 2);
     for (let i = 0; i < count; i++) {
       const group = new Group();

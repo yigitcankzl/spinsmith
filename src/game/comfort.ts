@@ -1,7 +1,7 @@
 /**
  * Comfort settings, one dial on the home rim that steps through its modes: sound, flashes, the
  * strike's gesture (a slap, or a gentle press and hold for trays and shared spaces), assist, one
- * hand, contrast and the left-handed layout. Kept in localStorage. No three.js here.
+ * hand, contrast, a colour-blind-safe palette and the left-handed layout. Kept in localStorage. No three.js here.
  */
 export interface Comfort {
   sound: boolean;
@@ -16,6 +16,19 @@ export interface Comfort {
   contrast?: boolean;
   /** Left-handed: the near-rim stations swap sides (also on in every mode after ?lefty, until ?lefty=0). */
   lefty?: boolean;
+  /** Colour-safe: warnings and safe marks use a blue / orange / yellow palette (no red against green or orange). */
+  colorSafe?: boolean;
+}
+
+/**
+ * The colour-safe palette (Okabe-Ito): readable with protanopia, deuteranopia and tritanopia. Who owns
+ * a mark is also told by shape (your rings are round, the rival's are hexagons), never colour alone.
+ */
+export const SAFE_COLORS = { danger: 0xe69f00, safe: 0x56b4e9, edge: 0xf0e442, neutral: 0xf2f2f2 } as const;
+
+/** `normal` in the usual palette, `safe` in the colour-safe mode. */
+export function warnColor(normal: number, safe: number): number {
+  return COMFORT.colorSafe ? safe : normal;
 }
 
 const KEY = 'spinsmith.comfort.v1';
@@ -31,6 +44,7 @@ export const COMFORT_MODES: (Comfort & { name: string })[] = [
   { name: 'One hand: hold the rim to forge, calm', sound: true, flashes: false, gentle: true, oneHand: true },
   { name: 'High contrast: bold team rings, calm', sound: true, flashes: false, gentle: true, contrast: true },
   { name: 'Left-handed: home stations swap sides', sound: true, flashes: true, gentle: false, lefty: true },
+  { name: 'Colour-safe: blue and orange warnings', sound: true, flashes: true, gentle: false, colorSafe: true },
 ];
 
 /** The live settings (read every frame where they matter). */
@@ -58,8 +72,8 @@ const leftyFlag = (() => {
 
 function apply(i: number) {
   mode = (i + COMFORT_MODES.length) % COMFORT_MODES.length;
-  const { sound, flashes, gentle, assist = false, oneHand = false, contrast = false, lefty = false } = COMFORT_MODES[mode];
-  Object.assign(COMFORT, { sound, flashes, gentle, assist, oneHand, contrast, lefty: lefty || leftyFlag });
+  const { sound, flashes, gentle, assist = false, oneHand = false, contrast = false, lefty = false, colorSafe = false } = COMFORT_MODES[mode];
+  Object.assign(COMFORT, { sound, flashes, gentle, assist, oneHand, contrast, lefty: lefty || leftyFlag, colorSafe });
 }
 
 apply(Number(storage()?.getItem(KEY) ?? 0) || 0);
