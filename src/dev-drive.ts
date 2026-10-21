@@ -1154,6 +1154,10 @@ export function installDriver() {
       const dz = Math.sin(a);
       const r = g.arena.radius * 0.4;
       Object.assign(top, { x: -dx * r * 0.2, z: -dz * r * 0.2, vx: 0, vz: 0, spin: 0.3 });
+      // The other top waits across the bowl, off the swing's line, so only the target is struck.
+      const other = target === 'rival' ? g.mine : g.theirs;
+      const parkOther = () => Object.assign(other, { x: dz * r * 1.6, z: -dx * r * 1.6, vx: 0, vz: 0 });
+      parkOther();
       const back = 0.05;
       const start = () => local(top.x - dx * back, top.z - dz * back, 0.008);
       const before = g.flickCount ?? 0;
@@ -1161,6 +1165,7 @@ export function installDriver() {
       await glide(side, 'index', () => above(start(), 0.06), 0.3, 0, 'natural', 'reach');
       await glide(side, 'index', start, 0.16, 0, 'natural', 'grip');
       Object.assign(top, { vx: 0, vz: 0 });
+      parkOther();
       // Constant velocity through the top: the collider must see a real swing, not a teleport.
       const travel = back + 0.06;
       const end = local(top.x + dx * 0.06, top.z + dz * 0.06, 0.008);

@@ -60,6 +60,8 @@ import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 const ARENA_SCALE = TUNE.scale;
 /** Seconds after a flick before the same hand can flick again (its follow-through). */
 const FLICK_FOLLOW_THROUGH = 0.4;
+/** Seconds a lifted finger groove waits for a pinch that would make it a reach for a ramp instead. */
+const GROOVE_COMMIT_DELAY = 0.25;
 /** Seconds after a pinch lets go before that hand can flick (the release pull-back). */
 const FLICK_AFTER_RELEASE = 0.45;
 /** Fingertip distance from a live top that claims the magnetic catch gesture (arena-local m). */
@@ -314,6 +316,8 @@ export class MatchSystem extends createSystem({
   private flickTip = new Vector3();
   private flickRaw = new Vector3();
   private flickCount = 0;
+  /** A drawn groove waits a beat after the lift: a pinch in that beat means the finger was reaching for a ramp. */
+  private pendingGroove: Record<Side, { sx: number; sz: number; ex: number; ez: number; at: number } | null> = { left: null, right: null };
   /** The last flick, for the emulator probes: speed handed over and its direction. */
   private lastFlick = { gain: 0, dx: 0, dz: 0, rival: false };
   /** One swing is one flick: the follow-through cannot catch the same top again. */
@@ -4656,6 +4660,7 @@ export class MatchSystem extends createSystem({
     const heading = stableHeading(gd && Number.isFinite(gd[0]) && Number.isFinite(gd[1]) && Math.hypot(gd[0], gd[1]) > 1e-6 ? Math.atan2(gd[0], gd[1]) + LAUNCH_TILT * th : inward + aiDir);
     this.theirs.launch(rx, rz, Math.sin(heading) * aiSpeed, Math.cos(heading) * aiSpeed, launchSpin(aiPower), th);
     this.theirs.shieldUntil = this.mine.shieldUntil;
+    this.pendingGroove.left = this.pendingGroove.right = null;
     this.launchExtras();
     if (net?.role === 'host') {
       // Keep the guest's own paint in the reveal packet; the host renders that same build with the
@@ -4957,6 +4962,14 @@ export class MatchSystem extends createSystem({
     const open = this.elapsed >= TUNING.grace;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
+      const pending = this.pendingGroove[side];
+      if (pending) {
+        if (h.pinching || !h.tracked) this.pendingGroove[side] = null;
+        else if (this.elapsed - pending.at >= GROOVE_COMMIT_DELAY) {
+          this.pendingGroove[side] = null;
+          this.makeGroove(side, pending.sx, pending.sz, pending.ex, pending.ez);
+        }
+      }
       const rimGuide = this.rimSpringGuides[side === 'left' ? 0 : 1];
       rimGuide.visible = false;
       if (this.shapingNeedsClearance[side]) {
@@ -5154,7 +5167,7 @@ export class MatchSystem extends createSystem({
       } else if (groove) {
         this.grooving[side] = null;
         if (groove.active && grooveLength(groove.sx, groove.sz, groove.x, groove.z) >= GROOVE_MIN_LENGTH) {
-          this.makeGroove(side, groove.sx, groove.sz, groove.x, groove.z);
+          this.pendingGroove[side] = { sx: groove.sx, sz: groove.sz, ex: groove.x, ez: groove.z, at: this.elapsed };
         }
       }
       if (depth > 0.004 && !this.pressing[side] && open) {
@@ -5312,6 +5325,7 @@ export class MatchSystem extends createSystem({
     this.shapingBlockedUntil[side] = this.elapsed + SHAPING_RELEASE_LOCK;
     this.shapingNeedsClearance[side] = true;
     this.palmGustBlockedUntil[side] = this.elapsed + SHAPING_RELEASE_LOCK;
+    this.pendingGroove[side] = null;
     this.shaping[side] = null;
     this.grooving[side] = null;
     this.rimPulls[side] = null;
