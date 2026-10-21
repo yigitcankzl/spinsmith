@@ -46,8 +46,8 @@ const b = (id: string, rival: string, arena: string, skill: number, lesson: stri
 
 export const BOUTS: Bout[] = [
   b('1-1', 'Drifter', 'Forge Bowl', 0, 'Rip, then pinch the floor for a ramp', 'It waits you out: ramp it out before it outlasts you', ['rampKO', 'perfect']),
-  b('1-2', 'Rim Raider', 'Ember Ring', 0.08, 'Grab the rim and forge the arena', 'It charges along the low rim', ['forgeKO', 'sweep']),
-  b('1-3', 'Drifter', 'Zero-G Dish', 0.15, 'Slap your palm down: the Anvil Strike', 'No walls to hide behind', ['strikeKO', 'perfect']),
+  b('1-2', 'Rim Raider', 'Ember Ring', 0.08, 'Pinch the rim, pull, let go: Rim Spring', 'It charges along the low rim', ['forgeKO', 'sweep']),
+  b('1-3', 'Drifter', 'Zero-G Dish', 0.15, 'Sweep a palm toward a pocket: Forge Gust', 'No walls to hide behind', ['strikeKO', 'perfect']),
   b('1-4', 'Rim Raider', 'Twin Basins', 0.22, 'Jab the floor for a cup, then sling', 'Two basins split the floor', ['wellSpin', 'sweep']),
   b('1-5', 'Iron Keep', 'Sumo Square', 0.3, 'Everything you learned, against a wall', 'Ramps barely move it: tilt it or strike it', ['burst', 'sweep']),
   b('2-1', 'Leech', 'Crucible Gate', 0.25, 'Match its spin or lose yours', 'One wide mouth: forge it in', ['forgeKO', 'perfect']),

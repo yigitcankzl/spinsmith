@@ -11,7 +11,7 @@ Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming,
 1. Sit at a table with a Meta Quest 3 or 3S, no controllers, and open the hosted URL in the Quest Browser.
 2. Press **ENTER** and allow spatial data. The arena rises on your real table (a labelled table or desk, or any flat unlabelled surface at desk height); with none it stands on a floating tray and says so.
 3. Pinch your top, pinch near it, pull back and let go: the rip launches it.
-4. The first match teaches one move a round: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — the rival is steered to your real desk edge and flies off it (**DESK KO**); **round 3** slap your palm down for the Anvil Strike. Flick a tired top with your fingertip any time after the forge lesson.
+4. The first match teaches one move a round: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — on a detected table the rival is steered to your real desk edge and flies off it (**DESK KO**; on the tray it is a normal ring-out); **round 3** slap your palm down for the Anvil Strike. Your fingertip can flick a top from the start; its hint comes after the forge lesson.
 5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, cup and sling, Ember Rivet, Spin Rub, Crossguard, ...).
 6. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
 
@@ -243,7 +243,7 @@ an arena. First to 4 heat wins a match.
 - **Real-edge cue:** in a duel fight on a detected table, up to two faint red-orange arcs glow on
   the rim in the directions where the real table edge is within about 25 cm of it; an arc brightens
   while the rival is near the rim inside it; in the first match's forge round the nearest arc pulses for the staged DESK KO. From the second match on, a one-time label (REAL
-  EDGE) explains it. Unverified on a headset.
+  EDGE) explains it. From the second match the rim under each arc is a lower drop side for both tops (a top goes over it at 55% of the usual outward speed; `DESK_DROP_ESCAPE` in `src/game/sim.ts`), so where your real desk edge is changes where throws land; online duels and brawls leave it off. Unverified on a headset.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
   burst, topple and result jingles.

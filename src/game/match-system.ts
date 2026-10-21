@@ -3973,7 +3973,9 @@ export class MatchSystem extends createSystem({
       if (!sec) continue;
       arc.rotation.y = -stageYaw;
       // The red arc IS the drop side: same middle, same capped width, in the sim (stage) frame.
-      if (!this.online?.peer) {
+      // Not in the first match: its lessons (and the staged wrench, which throws on its own) teach
+      // the moves before the room starts changing the rim.
+      if (!this.online?.peer && this.progress.matches > 0) {
         const d = this.deskDrops[i];
         d.angle = sec.angle + stageYaw;
         d.half = Math.min(sec.halfWidth, DESK_DROP_HALF_MAX);

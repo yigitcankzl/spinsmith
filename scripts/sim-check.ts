@@ -944,6 +944,8 @@ TUNING.grace = 0;
   const order = Object.entries(VERB_RELEASE).sort((a, b) => a[1] - b[1]);
   assert.deepEqual(order.map(([, m]) => m), order.map((_, i) => i + 1), 'one verb per completed match, from the second match on');
   assert.deepEqual(order.filter(([v]) => v !== 'cup').slice(0, 5).map(([v]) => v), ['spring', 'gust', 'ember', 'rub', 'crossguard'], 'measured verbs arrive by win points');
+  // Bouts 1-2 to 1-4 teach the move the previous match's card just released (bout n is match n).
+  for (let i = 1; i <= 3; i++) assert.ok(BOUTS[i].lesson.toLowerCase().includes(VERB_CARD[verbReleasedAt(i)!][0].split(' ')[0].toLowerCase()), `bout ${BOUTS[i].id} teaches ${verbReleasedAt(i)}`);
   // Campaign lessons and medals only ask for a verb its bout has released (bout n is match n).
   for (const b of BOUTS) if (b.medals.includes('wellSpin') || /cup/i.test(b.lesson)) assert.ok(BOUTS.indexOf(b) >= VERB_RELEASE.cup, `bout ${b.id} asks for a cup only after cups are released`);
   assert.equal(verbReleasedAt(0), undefined, 'the first match releases no extra verb');
