@@ -401,6 +401,23 @@ npx @iwsdk/cli xr set-select-value --input-json '{"device":"hand-right","value":
 
 The console logs `[MATCH]` lines for placement, launches and results.
 
+**The emulator's table.** `iwsdk.config.json` loads IWER's `office_small` room (`dev.emulator.environment`),
+one of the Meta Quest scene captures IWER ships (`living_room`, `meeting_room`, `music_room`,
+`office_large`, `office_small`, fetched from `@iwer/sem` on unpkg). It holds a real `table`-labelled
+horizontal XRPlane, 1.60 m x 0.75 m with its top at 0.748 m, centred at (0.06, 0.75, -0.65): a
+desk directly in front of the origin, with a wall behind it. IWER feeds it through
+`XRFrame.detectedPlanes` like Quest's Space Setup does, so the game's production detection
+(`tables()` / `tableShape()` in `src/game/match-system.ts`) reads it unchanged: there is no fake
+plane and no dev bypass, and nothing of it is in the Quest build. The head has to be seated
+(eyes at most 0.75 m above the desk, i.e. y <= 1.49), as on a headset: `scripts/emu.sh enter` /
+`front` use y = 1.45, and the pose above (1.15) works too. IWER's default standing head
+(y = 1.6) is correctly refused as "standing over the table" and the arena floats on the tray; seat
+the head and press `P` to re-place. On the table the log reads `[MATCH] arena on table at ...`
+(or `[MATCH] snapped to table at 0.83` if the head was seated after the first placement), and
+each fight logs `[MATCH] fit <arena>: scale ..., slide ... m` without `(no table)`. The `living_room`
+capture also has tables, but none in reach of a seated player at the origin, so every match there
+said "(no table)".
+
 ## Layout
 
 ```

@@ -29,7 +29,10 @@ case "$cmd" in
   front)
     # A seated, slightly pulled-back capture pose: the whole machine and its near-rim stations fit
     # inside 16:9 instead of being cropped at both sides by a headset-close hero framing.
-    $C xr set-transform --input-json '{"device":"headset","position":{"x":0,"y":1.63,"z":0.12},"orientation":{"pitch":-26,"yaw":0,"roll":0}}' >/dev/null 2>&1 ;;
+    # Eyes at 1.45 m: the office_small room's TABLE plane (top 0.748 m) must be no more than
+    # TABLE_MAX_BELOW_EYES (0.75 m, src/game/placement.ts) below the head, or the game treats the
+    # player as standing over it and floats the arena on the tray instead.
+    $C xr set-transform --input-json '{"device":"headset","position":{"x":0,"y":1.45,"z":0.12},"orientation":{"pitch":-32,"yaw":0,"roll":0}}' >/dev/null 2>&1 ;;
   look)
     $C xr look-at --input-json "{\"device\":\"headset\",\"target\":{\"x\":$1,\"y\":$2,\"z\":$3}}" >/dev/null 2>&1 ;;
   shot)
