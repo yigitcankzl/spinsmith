@@ -3067,37 +3067,89 @@ export function forgeEnvironment(renderer: WebGLRenderer): Texture {
   return env;
 }
 
+/** How a ghost hand shows its move: a thumb-and-index pinch, a flat palm press, or one fingertip swing. */
+export type GhostStyle = 'pinch' | 'palm' | 'tip';
+
 /**
- * A ghost hand that shows a move instead of a card telling it: a glowing fingertip that travels a
- * path and a ring that closes when it pinches. play() loops keyframes (arena-local points with a
- * pinch 0..1); hidden when not playing.
+ * A flat low-poly right hand, palm down, fingers away from the player (-z), thumb on -x: the palm
+ * press and slap lessons. Left-handed comfort mirrors it per ghost (scale.x).
+ */
+function palmSilhouette() {
+  const k = 0.0011;
+  const s = new Shape();
+  s.moveTo(-11 * k, 0);
+  s.lineTo(11 * k, 0);
+  s.lineTo(11.5 * k, 21 * k);
+  // Pinky to index: [centre x, length].
+  for (const [cx, len] of [[8.6, 12], [3.2, 17], [-2.2, 19], [-7.6, 16]]) {
+    s.lineTo((cx + 2.3) * k, 23 * k);
+    s.lineTo((cx + 2.3) * k, (23 + len) * k);
+    s.lineTo((cx - 2.3) * k, (23 + len) * k);
+    s.lineTo((cx - 2.3) * k, 23 * k);
+  }
+  s.lineTo(-11 * k, 19 * k);
+  // The thumb, out to the side.
+  s.lineTo(-19 * k, 27 * k);
+  s.lineTo(-22 * k, 24 * k);
+  s.lineTo(-13 * k, 8 * k);
+  s.closePath();
+  // Flat on the floor, the wrist toward the player and the palm's centre at the origin.
+  return new ShapeGeometry(s).translate(0, -20 * k, 0).rotateX(-Math.PI / 2);
+}
+
+/**
+ * Every ghost hand shares one set of geometries and one material per hand colour (the lesson
+ * ghosts are all white): a ghost costs its visible meshes' draw calls and no new programs. Fades
+ * are done by scale, so a shared material never flickers between two ghosts.
+ */
+const GHOST_GEO: { index?: CapsuleGeometry; thumb?: CapsuleGeometry; palm?: ShapeGeometry; ring?: RingGeometry; trail?: SphereGeometry } = {};
+const GHOST_MATS = new Map<number, MeshBasicMaterial>();
+function ghostMaterial(hand: number) {
+  let m = GHOST_MATS.get(hand);
+  if (!m) GHOST_MATS.set(hand, (m = new MeshBasicMaterial({ color: hand, transparent: true, opacity: 0.85, depthWrite: false, side: DoubleSide })));
+  return m;
+}
+
+/**
+ * A ghost hand that shows a move instead of a card telling it: thumb and index fingertips that
+ * travel a path and close as they pinch (or a flat palm that presses, or one fingertip that
+ * swings), with a ring where it touches. play() loops keyframes (arena-local points with a pinch
+ * or press 0..1); hidden when not playing. Respects the comfort dial: no white pop with flashes
+ * off, solid with high contrast, a mirrored palm when left-handed.
  */
 export class GhostHand {
   readonly root = new Group();
   /** Thumb and index fingertips: they close together as the pinch plays, so it reads as a pinch, not a dot. */
   private index: Mesh;
   private thumb: Mesh;
+  private palm: Mesh;
   private ring: Mesh;
   private trail: Mesh;
   private t = 0;
   private readonly accent: number;
+  private readonly hand: MeshBasicMaterial;
 
   constructor(hand = 0xffffff, accent = GUIDE) {
     this.accent = accent;
-    this.index = new Mesh(new CapsuleGeometry(0.0042, 0.014, 4, 10), new MeshBasicMaterial({ color: hand, transparent: true, opacity: 0.85, depthWrite: false }));
-    this.thumb = new Mesh(new CapsuleGeometry(0.0046, 0.011, 4, 10), new MeshBasicMaterial({ color: hand, transparent: true, opacity: 0.85, depthWrite: false }));
-    this.ring = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.8, depthWrite: false, side: DoubleSide }));
-    this.trail = new Mesh(new SphereGeometry(0.0025, 8, 6), new MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.4, depthWrite: false }));
-    this.root.add(this.index, this.thumb, this.ring, this.trail);
+    const g = GHOST_GEO;
+    g.index ??= new CapsuleGeometry(0.0042, 0.014, 3, 8);
+    g.thumb ??= new CapsuleGeometry(0.0046, 0.011, 3, 8);
+    g.palm ??= palmSilhouette();
+    g.ring ??= new RingGeometry(0.8, 1, 24);
+    g.trail ??= new SphereGeometry(0.0025, 8, 6);
+    this.hand = ghostMaterial(hand);
+    this.index = new Mesh(g.index, this.hand);
+    this.thumb = new Mesh(g.thumb, this.hand);
+    this.palm = new Mesh(g.palm, this.hand);
+    this.ring = new Mesh(g.ring, new MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.8, depthWrite: false, side: DoubleSide }));
+    this.trail = new Mesh(g.trail, new MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.4, depthWrite: false }));
+    this.root.add(this.index, this.thumb, this.palm, this.ring, this.trail);
     this.root.visible = false;
     this.ring.rotation.x = -Math.PI / 2;
-    // The index comes down from above and behind, the thumb from below and in front.
-    this.index.rotation.x = 0.5;
-    this.thumb.rotation.x = -1.1;
   }
 
   /** Plays keyframes [time s, x, y, z, pinch] in a loop (the last time is the loop length). */
-  play(keys: number[][], dt: number) {
+  play(keys: number[][], dt: number, style: GhostStyle = 'pinch') {
     this.root.visible = true;
     const len = keys[keys.length - 1][0];
     this.t = (this.t + dt) % len;
@@ -3111,21 +3163,45 @@ export class GhostHand {
     const y = a[2] + (b[2] - a[2]) * e;
     const z = a[3] + (b[3] - a[3]) * e;
     const pinch = a[4] + (b[4] - a[4]) * e;
-    // The fingertips' gap closes with the pinch.
-    const gap = 0.005 + 0.016 * (1 - pinch);
-    this.index.position.set(x, y + 0.006 + gap * 0.6, z - gap * 0.5);
-    this.thumb.position.set(x, y + 0.002 - gap * 0.2, z + 0.004 + gap * 0.7);
+    // Fades at the loop's ends (by scale: the material is shared).
+    const fade = Math.max(0.001, Math.min(1, this.t / 0.3, (len - this.t) / 0.3));
+    this.hand.opacity = COMFORT.contrast ? 1 : 0.85;
+    this.index.visible = style !== 'palm';
+    this.thumb.visible = style === 'pinch';
+    this.palm.visible = style === 'palm';
+    this.ring.visible = style !== 'tip' || pinch > 0.5;
+    if (style === 'pinch') {
+      // The fingertips' gap closes with the pinch: the index comes down from above and behind, the
+      // thumb from below and in front.
+      const gap = 0.005 + 0.016 * (1 - pinch);
+      this.index.rotation.set(0.5, 0, 0);
+      this.index.position.set(x, y + 0.006 + gap * 0.6, z - gap * 0.5);
+      this.thumb.position.set(x, y + 0.002 - gap * 0.2, z + 0.004 + gap * 0.7);
+      this.thumb.rotation.set(-1.1, 0, 0);
+      this.ring.scale.setScalar(0.009 + 0.014 * (1 - pinch));
+    } else if (style === 'palm') {
+      // Pressed (1), the palm is flat on the surface; lifted, it hovers and tips up a little.
+      this.palm.position.set(x, y + 0.002, z);
+      this.palm.rotation.set(-0.25 * (1 - pinch), 0, 0);
+      this.palm.scale.set(COMFORT.lefty ? -fade : fade, fade, fade);
+      this.ring.scale.setScalar(0.014 + 0.03 * pinch);
+    } else {
+      // One fingertip, lying forward like a pointing finger, swung through the path.
+      this.index.rotation.set(1.25, 0, 0);
+      this.index.position.set(x, y + 0.004, z);
+      this.ring.scale.setScalar(0.012);
+    }
+    if (style !== 'palm') {
+      this.index.scale.setScalar(fade);
+      this.thumb.scale.setScalar(fade);
+    }
     this.ring.position.set(x, y, z);
-    this.ring.scale.setScalar(0.009 + 0.014 * (1 - pinch));
-    (this.ring.material as MeshBasicMaterial).color.setHex(pinch > 0.8 ? 0xffffff : this.accent);
+    // A white pop marks the pinch or press; with flashes off it only grows, in the guide colour.
+    (this.ring.material as MeshBasicMaterial).color.setHex(pinch > 0.8 && COMFORT.flashes ? 0xffffff : this.accent);
+    (this.ring.material as MeshBasicMaterial).opacity = (COMFORT.contrast ? 1 : 0.8) * fade;
     // A faint echo a moment behind shows the direction.
     const back = Math.max(0, u - 0.25);
     this.trail.position.set(a[1] + (b[1] - a[1]) * back, a[2] + (b[2] - a[2]) * back, a[3] + (b[3] - a[3]) * back);
-    // Fades at the loop's ends.
-    const fade = Math.min(1, this.t / 0.3, (len - this.t) / 0.3);
-    (this.index.material as MeshBasicMaterial).opacity = 0.85 * fade;
-    (this.thumb.material as MeshBasicMaterial).opacity = 0.85 * fade;
-    (this.ring.material as MeshBasicMaterial).opacity = 0.8 * fade;
   }
 
   hide() {

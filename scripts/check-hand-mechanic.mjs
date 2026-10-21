@@ -78,7 +78,7 @@ export default async function run({ page, frame }) {
         const forge = await drive.hoverArena({ n: 0.86, angle: (65 * Math.PI) / 180, side: 'right' });
         const rim = await drive.hoverArena({ n: 0.94, angle: 0, side: 'right' });
         intentProof = { ramp, forge, rim };
-        if (ramp.claim !== 'RAMP' || !ramp.label.includes('RAMP CLAIMED')) throw new Error(`floor preview disagreed with Ramp: ${JSON.stringify(ramp)}`);
+        if (ramp.claim !== 'RAMP' || !ramp.label.includes('PINCH + DRAG: RAMP')) throw new Error(`floor preview disagreed with Ramp: ${JSON.stringify(ramp)}`);
         if (forge.claim !== 'FORGE' || !forge.label.includes('PINCH BOTH GLOWS')) throw new Error(`authored grip preview disagreed with Arena Forge: ${JSON.stringify(forge)}`);
         if (rim.claim !== 'RIM' || !rim.label.includes('PINCH + PULL: SPRING')) throw new Error(`outer-lip preview disagreed with Rim Spring: ${JSON.stringify(rim)}`);
         await drive.park('right');
@@ -178,7 +178,7 @@ export default async function run({ page, frame }) {
         rightGhost: g.forgeGhost.root.visible,
         tutorialRound: g.tutorialRound,
       };
-      if (!tutorialProof.leftGhost || !tutorialProof.rightGhost || !tutorialProof.label.includes('SQUEEZE INWARD')) throw new Error(`two-hand Squeeze lesson missing: ${JSON.stringify(tutorialProof)}`);
+      if (!tutorialProof.leftGhost || !tutorialProof.rightGhost || !/SQUEEZE INWARD|WRENCH IT OFF YOUR DESK/.test(tutorialProof.label)) throw new Error(`two-hand Squeeze lesson missing: ${JSON.stringify(tutorialProof)}`);
       action = Promise.resolve();
     } else if (check.startsWith('arena-morph')) {
       if (before.phase !== 'fight') throw new Error('arena-morph check requires a fight');

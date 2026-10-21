@@ -130,16 +130,16 @@ export const STAMP_UNLOCKS: Record<number, string> = {
 // Cup and sling come third: campaign bout 1-4 (the fourth match) teaches them and asks for a cup medal.
 export const VERB_RELEASE = { spring: 1, gust: 2, cup: 3, ember: 4, rub: 5, crossguard: 6, groove: 7, wheel: 8 } as const;
 export type ReleasedVerb = keyof typeof VERB_RELEASE;
-/** The unlock card for each released verb: name, and what the hand does. */
+/** The unlock card for each released verb: name, and what the hand does (at most CARD_HOW_WORDS words). */
 export const VERB_CARD: Record<ReleasedVerb, [string, string]> = {
-  spring: ['Rim Spring', 'Pinch the rim, pull inward, let go: it holds your top'],
-  gust: ['Forge Gust', 'Sweep an open palm over the bowl toward a pocket'],
-  ember: ['Ember Rivet', 'Pinch the hot rivet a clash throws out and plant it'],
-  rub: ['Spin Rub', 'Run a fingertip along your top\'s rim, the way it turns'],
-  crossguard: ['Crossguard', 'Two flat palms on the rim make a rail that saves you'],
-  cup: ['Cup and sling', 'Jab the floor to catch a top, then pull and let go'],
-  groove: ['Finger Groove', 'Slide an open fingertip along the floor, then lift'],
-  wheel: ['Forge Wheel', 'Turn the wheel by the near rim to steer the current'],
+  spring: ['Rim Spring', 'Pinch rim, pull, release'],
+  gust: ['Forge Gust', 'Sweep palm toward pocket'],
+  ember: ['Ember Rivet', 'Pinch hot rivet, plant'],
+  rub: ['Spin Rub', 'Fingertip along your rim'],
+  crossguard: ['Crossguard', 'Two palms on rim'],
+  cup: ['Cup and sling', 'Jab floor, catch, sling'],
+  groove: ['Finger Groove', 'Slide fingertip, then lift'],
+  wheel: ['Forge Wheel', 'Turn the near wheel'],
 };
 /** The verb whose card shows when the completed-match count reaches `matches`, if any. */
 export function verbReleasedAt(matches: number): ReleasedVerb | undefined {

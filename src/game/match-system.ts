@@ -17,6 +17,7 @@ import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WI
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress, VERB_CARD, VERB_RELEASE, verbReleasedAt } from './progress.js';
+import { CLAIM, LESSON, lessonText } from './lessons.js';
 import type { OpeningZone, ReleasedVerb } from './progress.js';
 import { rematchAdvice } from './mastery.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
@@ -864,6 +865,8 @@ export class MatchSystem extends createSystem({
     return m;
   });
   private flickHintShown = false;
+  /** Until when the ghost fingertip swings through the rival after the flick hint (stage time). */
+  private flickGhostUntil = -9;
   /** A small surface response under an engaged hand. It confirms contact without decorating idle hands. */
   private handContactRings = (['left', 'right'] as const).map(() => {
     const mesh = new Mesh(
@@ -1490,7 +1493,7 @@ export class MatchSystem extends createSystem({
       this.print.add(new Mesh(new RingGeometry(0.075, 0.08, 48).rotateX(-Math.PI / 2), glow(0.4)), new Mesh(new PlaneGeometry(0.13, 0.13).rotateX(-Math.PI / 2), palm), this.printWait);
       this.printLabel.mesh.position.set(0, 0.12, 0);
       this.printLabel.mesh.scale.setScalar(1.25);
-      this.printLabel.set('Rest your palm here\npress it on the table: the arena rises');
+      this.printLabel.set(LESSON.palmPrint);
       this.print.add(this.printLabel.mesh);
       this.print.visible = false;
       this.world.createTransformEntity(this.print);
@@ -2450,11 +2453,11 @@ export class MatchSystem extends createSystem({
   /** The first session's note at home: where to reach next ('' once the guide is done). */
   private guideNote() {
     const guide = this.progress.guide;
-    if (guide === 'launch') return 'Your top waits in its dock\nPut it in the arena to play';
+    if (guide === 'launch') return LESSON.hubLaunch;
     if (guide === 'bump') return this.progress.matches > 0
       ? 'One lesson remains: raise a ramp\nPut your top in the arena and shape the floor'
-      : 'Finish your first match\nPut your top in the arena';
-    if (guide === 'match') return 'Finish your first match\nPut your top in the arena';
+      : LESSON.hubMatch;
+    if (guide === 'match') return LESSON.hubMatch;
     if (guide === 'forge' || guide === 'fit') return 'New part: Spur tip!\nPinch the small anvil to forge';
     if (guide === 'rematch') return 'Your top is ready\nPut it in the arena for a rematch';
     return '';
@@ -2603,6 +2606,7 @@ export class MatchSystem extends createSystem({
       this.morphedOnce = false;
       this.slungOnce = false;
       this.flickHintShown = false;
+      this.flickGhostUntil = -9;
       this.endOnline();
       for (const k of SAVE_KEYS) if (k !== 'spinsmith.progress.v1') localStorage.removeItem(k);
       this.myBuild = this.forge.allowed({ ...PRESETS[0].build });
@@ -3006,8 +3010,7 @@ export class MatchSystem extends createSystem({
       if (claim !== this.handHoverClaim[side]) {
         this.handHoverClaim[side] = claim;
         if (claim && this.labelTimer <= 0 && this.progress.guide !== 'done') {
-          const instruction = claim === 'CATCH' ? 'PRESS TO MAGNET-CATCH' : claim === 'SLING' ? 'PINCH + PULL TO SLING' : claim === 'FORGE' ? 'PINCH BOTH GLOWS · SQUEEZE / TWIST / TILT' : claim === 'RIM' ? 'PINCH + PULL: SPRING · BOTH HANDS: FORGE' : 'PINCH + DRAG TO RAISE A RAMP';
-          this.label.set(`${claim} CLAIMED\n${instruction}`);
+          this.label.set(CLAIM[claim]);
           this.labelTimer = 0.65;
         }
       }
@@ -3700,7 +3703,7 @@ export class MatchSystem extends createSystem({
       // No table found (or none labelled one): say so once the title is gone, then the first
       // session's note returns.
       const notice = () => {
-        this.label.set('No table found: the arena floats here\nMove it by its brass handle');
+        this.label.set(LESSON.noTable);
         this.labelTimer = 5;
       };
       if (this.title.visible) this.afterTitle = notice;
@@ -4311,7 +4314,8 @@ export class MatchSystem extends createSystem({
       // The type loop, read before the rip: whose top counters whose.
       const edge = this.progress.guide === 'done' ? edgeOf(roleOf(specFromBuild(this.myBuild)), roleOf(specFromBuild(this.rival.build))) : 0;
       const read = edge > 0 ? ' · you counter it' : edge < 0 ? ' · it counters you' : '';
-      this.label.set(`${this.rival.name.toUpperCase()} · ${this.rival.title.toUpperCase()}${read}\n${focus}`);
+      // The first match's card is just who it is: the ghost hand teaches, the quote can wait.
+      this.label.set(this.progress.matches === 0 && !this.demo && !this.extras.length ? lessonText.rival(this.rival.name, this.rival.title) : `${this.rival.name.toUpperCase()} · ${this.rival.title.toUpperCase()}${read}\n${focus}`);
     }
     else {
       this.label.set('');
@@ -4565,7 +4569,7 @@ export class MatchSystem extends createSystem({
       const pct = Math.round(power * 20) * 5;
       const curve = Math.abs(this.launchTwist) > 0.2 ? ` · CURVE ${this.launchTwist > 0 ? 'RIGHT' : 'LEFT'}` : '';
       const brace = this.bracedLaunch ? ' · BRACED' : '';
-      this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%${curve}${brace}` : power > 0 ? `${pct}%${curve}${brace}${fading}` : `Pull back and let go${brace}`);
+      this.label.set(power >= PERFECT ? `WHITE HOT ${pct}%${curve}${brace}` : power > 0 ? `${pct}%${curve}${brace}${fading}` : `${LESSON.ripPull}${brace}`);
       this.lostFor = 0;
       if (dist < MAX_PULL) return;
     } else if (h.tracked && (this.openFor += dt) < RIP_RELEASE) {
@@ -5032,7 +5036,7 @@ export class MatchSystem extends createSystem({
       if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > FORGE_GRIP_MAX_COS) return false;
       // Starting the grab is free. The charge is committed only after a deliberate release.
       if (this.charges.charges < 1) {
-        this.locked('No charge yet\nCharges refill in a moment');
+        this.locked(LESSON.noCharge);
         return false;
       }
 
@@ -5074,7 +5078,7 @@ export class MatchSystem extends createSystem({
       const gesture: ArenaForgeGesture = { pull: this.arenaMorphPull, twist: this.arenaMorphTwist, tilt: this.arenaMorph.tilt };
       const action = trackingLost ? null : classifyArenaForge(gesture);
       if (!action) {
-        this.cancelArenaForge(trackingLost ? 'FORGE CANCELLED\nKEEP BOTH HANDS IN VIEW' : 'FORGE CANCELLED\nMOVE BOTH HANDS BEFORE RELEASE');
+        this.cancelArenaForge(trackingLost ? LESSON.forgeLost : LESSON.forgeStill);
         return true;
       }
       const force = this.charges.spend(this.elapsed, TUNING.grace);
@@ -5135,7 +5139,8 @@ export class MatchSystem extends createSystem({
       const sign = action === 'twist' ? Math.sign(this.arenaMorphTwist) : action === 'tilt' ? Math.sign(this.arenaMorphShove.x) : 1;
       this.echoRec.forges.push({ round: this.echoRec.rips.length - 1, t: this.elapsed, action, sign: sign < 0 ? -1 : 1 });
       this.stamp.show(ARENA_FORGE_TITLE[action], ARENA_FORGE_EFFECT[action], 'mine', 1.05, 1.15);
-      this.label.set(`${ARENA_FORGE_TITLE[action]} ${ARENA_FORGE_EFFECT[action]}\nWATCH THE TOPS REACT`);
+      // The stamp names the action and its effect; the card only points at the result.
+      this.label.set(LESSON.forgeDone);
       this.labelTimer = 1.65;
       this.sparks.burst(0, this.arena.height(0, 0), 0, 0.9);
       this.impacts.shock(0, this.arena.height(0, 0), 0, 0.75);
@@ -5166,7 +5171,7 @@ export class MatchSystem extends createSystem({
     if ((liveAction ?? 'none') !== this.arenaForgeAction) {
       this.arenaForgeAction = liveAction ?? 'none';
       if (liveAction) {
-        this.label.set(`FORGE: ${ARENA_FORGE_TITLE[liveAction]}\nRELEASE TO COMMIT`);
+        this.label.set(lessonText.forgeLive(ARENA_FORGE_TITLE[liveAction]));
         this.labelTimer = 0.45;
       }
     }
@@ -5520,7 +5525,7 @@ export class MatchSystem extends createSystem({
     }
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (!f) {
-      this.locked('No charge yet\nCharges refill in a moment');
+      this.locked(LESSON.noCharge);
       return;
     }
     this.recordIntervention();
@@ -6020,7 +6025,8 @@ export class MatchSystem extends createSystem({
     if (!this.flickHintShown && this.flickCount === 0 && (this.progress.matches >= 1 || this.morphedOnce || this.tutorialRound >= 3) && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
       && this.elapsed > TUNING.grace && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) > 0.6 && this.labelTimer <= 0) {
       this.flickHintShown = true;
-      this.call('RIVAL IS TIRED\nSWING A FINGER THROUGH IT: FLICK', CALL.tactic, 2.2);
+      this.call(LESSON.flick, CALL.tactic, 2.2);
+      this.flickGhostUntil = this.time + 2.6;
     }
     // A guest's rubbed spin goes to the host in small batches, and the rest when the window closes.
     if (this.rubPending !== 0 && this.online?.role === 'guest' && this.online.peer
@@ -6440,7 +6446,7 @@ export class MatchSystem extends createSystem({
         if (seal === 'tilt' || seal === 'magnet' || seal === 'ward') {
           this.overforgeControl = { side, seal, t: 2.8 };
           this.overforgeMode = seal;
-          this.label.set(`${SEAL_NAMES[seal].toUpperCase()} OVERFORGE\nKEEP PINCHING · MOVE YOUR HAND`);
+          this.label.set(lessonText.overforge(SEAL_NAMES[seal]));
           this.labelTimer = 1.6;
         } else this.overforgeMode = 'idle';
         playStamp();
@@ -6496,7 +6502,7 @@ export class MatchSystem extends createSystem({
     const rivalAtRim = this.theirs.alive && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) >= 0.68;
     if (full && rivalAtRim && !this.strikeWindowShown && this.labelTimer <= 0) {
       this.strikeWindowShown = true;
-      this.call('RIM OPEN · STRIKE NOW\nSTAMP ACROSS FROM THE RIVAL', CALL.tactic, 1.4);
+      this.call(LESSON.strikeWindow, CALL.tactic, 1.4);
       this.stamp.show('STRIKE WINDOW', 'RIVAL EXPOSED AT THE RIM', 'mine', 0.6);
       playTick();
     }
@@ -6504,7 +6510,7 @@ export class MatchSystem extends createSystem({
     if (full && !this.struckOnce && !this.demo && this.progress.guide !== 'bump' && this.labelTimer <= 0) {
       this.strikeTaught = true;
       const seal = this.myBuild.seal ?? 'anvil';
-      this.call(`${SEAL_NAMES[seal].toUpperCase()} READY\nPINCH THE SEAL · STAMP THE ARENA`, CALL.ultimate, 0, 'strike-ready');
+      this.call(lessonText.strike(SEAL_NAMES[seal]), CALL.ultimate, 0, 'strike-ready');
     }
     const armed = full && this.elapsed - this.fullSince > 0.5;
     this.updateOverforge(armed, dt);
@@ -6551,7 +6557,7 @@ export class MatchSystem extends createSystem({
       if (!armed) {
         if (import.meta.env.DEV) console.log(`[STRIKE] pressed with the bar at ${Math.round(this.forgeBar.value * 100)}%`);
         // Not full yet: a dull clunk says so (once the strike is taught).
-        if (this.taught('strike')) this.locked(`Strike not ready\nThe bar on your hand is ${Math.round(this.forgeBar.value * 100)}% full`);
+        if (this.taught('strike')) this.locked(lessonText.strikeNotReady(Math.round(this.forgeBar.value * 100)));
         continue;
       }
       // The shockwave starts on the rim beside the palm; the palm leaves a molten print on the desk.
@@ -7383,14 +7389,14 @@ export class MatchSystem extends createSystem({
     if (guest && kind !== 'ramp' && !cup) return null;
     const f = this.charges.spend(this.elapsed, TUNING.grace);
     if (guest) {
-      if (!f) this.locked('No charge yet\nCharges refill in a moment');
+      if (!f) this.locked(LESSON.noCharge);
       else if (cup) guest.sendEvent({ kind: 'cup', x: -x, z: -z });
       else guest.sendEvent({ kind: 'ramp', x: -x, z: -z, dx: -dx, dz: -dz });
       return null;
     }
     if (import.meta.env.DEV) console.log(`[SHAPE] ${kind} at ${x.toFixed(3)},${z.toFixed(3)} amp ${amp.toFixed(3)} factor ${f} charges ${this.charges.charges} t ${this.elapsed.toFixed(1)}`);
     if (!f) {
-      this.locked('No charge yet\nCharges refill in a moment');
+      this.locked(LESSON.noCharge);
       return null;
     }
     const shape = this.arena.addShape(kind, x, z, amp * f, owner, dx, dz, sigma);
@@ -7699,7 +7705,7 @@ export class MatchSystem extends createSystem({
     this.outerRailHead.visible = false;
     (this.outerRailMesh.material as MeshBasicMaterial).opacity = 0.86;
     this.stamp.show('PALM CATCH!', 'YOUR TABLE IS THE ARENA', 'mine', 0.9, 1.2);
-    this.label.set('TOP ON THE TABLE\nOPEN YOUR PALM UNDER IT · SWEEP IN');
+    this.label.set(LESSON.palmCatch);
     this.labelTimer = OUTER_RING_TIME;
     this.accumulator = 0;
     if (import.meta.env.DEV) console.log('[OUTER] rescue armed');
@@ -7799,7 +7805,7 @@ export class MatchSystem extends createSystem({
     if (this.outerRingLeft <= 0 || (waitingForPalm && (this.myView.offDesk || (!at && this.myView.restingAt !== null)))) {
       this.outerRingState = 'failed';
       this.outerRail.visible = false;
-      this.label.set('TABLE EDGE KO\nTHE REAL EDGE ENDS THE ROUND');
+      this.label.set(LESSON.edgeKo);
       if (import.meta.env.DEV) console.log('[OUTER] rescue failed');
       this.finish(-1);
       return true;
@@ -7828,7 +7834,7 @@ export class MatchSystem extends createSystem({
         this.outerRailGeometry.setDrawRange(0, 0);
         this.appendOuterRail(this.outerRingAt.x, this.outerRingAt.z);
         playTick();
-        this.label.set('CAUGHT!\nSWEEP YOUR OPEN PALM TO THE RIM');
+        this.label.set(LESSON.palmCaught);
         if (import.meta.env.DEV) console.log(`[OUTER] ${side} open palm caught the top`);
         break;
       }
@@ -7848,7 +7854,7 @@ export class MatchSystem extends createSystem({
       this.outerRailHead.visible = false;
       this.outerRailGeometry.setDrawRange(0, 0);
       playLocked();
-      this.label.set('Dropped it\nOpen your palm under the top');
+      this.label.set(LESSON.palmDropped);
       this.labelTimer = Math.max(1.6, this.outerRingLeft);
       return true;
     }
@@ -7887,7 +7893,8 @@ export class MatchSystem extends createSystem({
     this.roomLight.hit();
     if (cause && this.causeCue.stage) this.showCauseCue(3, cause, this.causeCue.sx, this.causeCue.sz, this.theirs.x, this.theirs.z);
     this.stamp.show('EDGE RUN!', cause ? `YOUR ${cause} → REAL TABLE` : 'REAL TABLE DECIDES', 'mine', 0.65, 1.25);
-    this.label.set(cause ? `YOUR ${cause} SENT IT ACROSS THE DESK\nCROSS THE REAL EDGE = +1` : 'TOP ACROSS THE DESK\nCROSS THE REAL EDGE = +1');
+    // The EDGE RUN stamp names the cause; the card says what crossing the edge is worth.
+    this.label.set(LESSON.edgeRun);
     this.labelTimer = DESK_VERDICT_TIME;
     if (import.meta.env.DEV) console.log('[DESK_KO] table flight started; score is pending');
     return true;
@@ -8391,8 +8398,9 @@ export class MatchSystem extends createSystem({
       ghost = true;
     }
     if (ready && !this.launchPreviewSide) {
-      // First launch only: the existing ghost hand now demonstrates choosing a point before ripping.
-      const x = -0.045;
+      // First launch only: the existing ghost hand now demonstrates choosing a point before ripping
+      // (on the left-handed side when the dial says so).
+      const x = COMFORT.lefty ? 0.045 : -0.045;
       const z = this.SPAWN - 0.025;
       const h = this.arena.height(x, z);
       this.launchGhost.visible = this.launchMarker.visible = true;
@@ -8417,7 +8425,7 @@ export class MatchSystem extends createSystem({
         ((c as Mesh).material as MeshBasicMaterial).opacity = Math.sin(k * Math.PI);
       });
       // The rival and arena intro shows first; the rip hint follows.
-      if (this.time - this.readySince > INTRO_TIME) this.label.set('PINCH A START POINT\nPULL BACK + RELEASE');
+      if (this.time - this.readySince > INTRO_TIME) this.label.set(LESSON.rip);
     }
     // Outside the first launch: after the intro, the card says what this bout is about (the arena's
     // rule and how the rival plays), and later rounds say to rip again; it is never blank while waiting.
@@ -8435,7 +8443,7 @@ export class MatchSystem extends createSystem({
       this.bumpMark.position.set(x, this.arena.height(x, z) + 0.002, z);
       this.bumpMark.scale.setScalar(1 + 0.3 * Math.sin(this.time * 6));
       this.drawTutorialLane(x, z);
-      this.label.set('PINCH THE FLOOR\nDRAG TOWARD THE RIVAL');
+      this.label.set(LESSON.ramp);
       this.bumpHintShown = true;
       // The ghost hand: down to the ring, pinch, drag outward past the rival, let go.
       const ox = x / (Math.hypot(x, z) || 1);
@@ -8445,9 +8453,7 @@ export class MatchSystem extends createSystem({
       ghost = true;
     } else if (this.phase === 'fight' && !this.demo && this.progress.matches === 0 && this.tutorialRound === 2 && !this.morphedOnce && this.elapsed > TUNING.grace && this.labelTimer <= 0) {
       const desk = this.deskWrenchAt() !== null;
-      this.label.set(desk
-        ? COMFORT.oneHand ? 'WRENCH IT OFF YOUR DESK\nHOLD ONE RIM · PUSH INWARD' : 'WRENCH IT OFF YOUR DESK\nSQUEEZE INWARD · RELEASE'
-        : COMFORT.oneHand ? 'HOLD ONE GLOWING RIM\nPUSH INWARD · RELEASE' : 'PINCH BOTH GLOWING RIMS\nSQUEEZE INWARD · RELEASE');
+      this.label.set(desk ? LESSON.forgeDesk : COMFORT.oneHand ? LESSON.forgeOneHand : LESSON.forge);
       const grips = forgeGrips(this.arena.layout);
       const pulse = 1.15 + 0.15 * Math.sin(this.time * 6);
       for (let i = 0; i < this.rimSpringGuides.length; i++) {
@@ -8472,8 +8478,8 @@ export class MatchSystem extends createSystem({
     } else if (this.phase === 'fight' && !this.demo && !this.online && !this.cuppedOnce && (this.progress.matches === VERB_RELEASE.spring || this.progress.matches === VERB_RELEASE.cup) && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       // The match right after a pinch verb's card repeats it once, in the fight.
       this.label.set(this.progress.matches === VERB_RELEASE.spring && this.rimExperiment
-        ? 'New: pinch the glowing rim, pull it inward, release\nit saves your top there and slings a rival toward a pocket'
-        : 'New: jab the floor → cup\nCatch a top, then sling');
+        ? 'New: pinch rim, pull inward'
+        : 'New: jab floor → cup');
     } else if (this.bumpHintShown && g !== 'bump') {
       // The first move is made: the hint goes.
       this.bumpHintShown = false;
@@ -8482,6 +8488,34 @@ export class MatchSystem extends createSystem({
     if (!bump && this.tellAt < 0) {
       this.lane.visible = false;
       this.rivalTellFx.visible = false;
+    }
+    // The first match's ultimate: the ghost pinches the docked seal and stamps it into the floor;
+    // once the palm-slap fallback mark is up, the second ghost slaps a flat palm onto it. Both go
+    // with the first strike.
+    if (!ghost && this.phase === 'fight' && !this.demo && this.progress.matches === 0 && !this.struckOnce && this.taught('strike')
+      && this.overforgeSeal.visible && !this.overforgeHeld && !this.overforgeControl) {
+      const { x: sx, y: sy, z: sz } = this.overforgeSeal.position;
+      const h = this.arena.height(0, 0);
+      this.ghost.play([[0, sx, sy + 0.04, sz, 0], [0.45, sx, sy, sz, 0], [0.65, sx, sy, sz, 1], [1.4, 0, h + 0.03, 0, 1], [1.7, 0, h + 0.002, 0, 1], [1.9, 0, h + 0.002, 0, 0], [2.6, 0, h + 0.05, 0, 0]], this.frameDt);
+      ghost = true;
+    }
+    if (!forgeGhost && this.slapMark.visible && this.progress.matches === 0 && !this.struckOnce && !this.demo) {
+      const { x, y, z } = this.stage.worldToLocal(this.slapMark.getWorldPosition(this.p));
+      this.forgeGhost.play([[0, x, y + 0.06, z, 0], [0.5, x, y + 0.03, z, 0], [0.62, x, y, z, 1], [0.95, x, y, z, 1], [1.2, x, y + 0.05, z, 0], [1.9, x, y + 0.06, z, 0]], this.frameDt, 'palm');
+      forgeGhost = true;
+    }
+    // The flick hint: one fingertip swings out through the tired rival, until the first flick.
+    if (!forgeGhost && this.phase === 'fight' && this.time < this.flickGhostUntil && this.flickCount === 0 && this.theirs.alive) {
+      const r = Math.hypot(this.theirs.x, this.theirs.z) || 1;
+      const dx = this.theirs.x / r;
+      const dz = this.theirs.z / r;
+      const y = this.arena.height(this.theirs.x, this.theirs.z) + 0.012;
+      const sx = this.theirs.x - dx * 0.05;
+      const sz = this.theirs.z - dz * 0.05;
+      const ex = this.theirs.x + dx * 0.04;
+      const ez = this.theirs.z + dz * 0.04;
+      this.forgeGhost.play([[0, sx, y + 0.02, sz, 0], [0.35, sx, y, sz, 0], [0.6, ex, y, ez, 1], [0.8, ex, y + 0.02, ez, 0], [1.3, ex, y + 0.03, ez, 0]], this.frameDt, 'tip');
+      forgeGhost = true;
     }
     if (!ghost) this.ghost.hide();
     if (!forgeGhost) this.forgeGhost.hide();
