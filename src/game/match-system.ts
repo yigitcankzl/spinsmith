@@ -41,7 +41,8 @@ import { BRASS } from './materials.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, SHAPING, ShapingCharges, StrikeBar } from './shaping.js';
 import { CALL, callAllowed } from './calls.js';
-import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
+import { PEDESTAL, pickTable, pickTablePlane, placeArena, reachSpot, TABLE_MAX_H, TABLE_MIN_H, tableRank } from './placement.js';
+import type { TablePlane } from './placement.js';
 import { TUNE } from './tuning.js';
 import type { Placement, Point } from './placement.js';
 import { applySpatialPose, loadSpatialPose, saveSpatialPose } from './spatial-state.js';
@@ -1825,7 +1826,8 @@ export class MatchSystem extends createSystem({
           return;
         }
         this.print.visible = false;
-        if ((this.settle >= SETTLE_MIN && pickTable(this.head, this.tables()) !== null) || this.settle >= SETTLE_MAX) this.place();
+        this.player.head.getWorldDirection(this.fwd).negate();
+        if ((this.settle >= SETTLE_MIN && pickTable(this.head, this.tables(), reachSpot(this.head, this.fwd.x, this.fwd.z, TUNE.reach)) !== null) || this.settle >= SETTLE_MAX) this.place();
         return;
       case 'hub':
         this.updateHub(dt);
@@ -3527,8 +3529,9 @@ export class MatchSystem extends createSystem({
    */
   private updatePress(dt: number): boolean {
     this.player.head.getWorldDirection(this.fwd).negate();
-    const table = pickTable(this.head, this.tables());
-    const at = placeArena(this.head, this.fwd.x, this.fwd.z, this.tables(), TUNE.reach);
+    const tables = this.tables();
+    const at = placeArena(this.head, this.fwd.x, this.fwd.z, tables, TUNE.reach);
+    const table = pickTable(this.head, tables, at);
     const raycastTable = this.useRaycastPlacement(at);
     const y = at.y - PEDESTAL;
     this.print.visible = true;
@@ -3724,7 +3727,7 @@ export class MatchSystem extends createSystem({
     if (!forced) this.useRaycastPlacement(at);
     // On a table, its rim stays on the wood: moved in from the edge if it would hang over.
     if (at.onTable) {
-      const table = this.tableShape();
+      const table = this.tableShape(at);
       if (table) {
         const fit = fitToTable(at, table.poly, this.arena.radius * ARENA_SCALE + 0.03);
         at.x = fit.x;
@@ -3768,31 +3771,14 @@ export class MatchSystem extends createSystem({
     this.handle.visible = false;
   }
 
-  /** The usable table's outline nearest the head (world x/z) and its height, or null. */
-  private tableShape(): { y: number; poly: XZ[] } | null {
+  /**
+   * The usable table's outline (world x/z) and height, or null: the plane pickTablePlane chooses
+   * for an arena standing at `spot` (default: where the arena stands now).
+   */
+  private tableShape(spot: XZ = { x: this.root.position.x, z: this.root.position.z }): { y: number; poly: XZ[] } | null {
     this.player.head.getWorldPosition(this.head);
-    const y = pickTable(this.head, this.tables());
-    if (y === null) return null;
-    let best: { y: number; poly: XZ[] } | null = null;
-    let bestD = Infinity;
-    for (const e of this.queries.planes.entities) {
-      const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
-      if (plane?.orientation !== 'horizontal' || !/table|desk/.test(plane.semanticLabel ?? '') || !plane.polygon?.length) continue;
-      const o = e.object3D!;
-      o.updateWorldMatrix(true, false);
-      const c = o.getWorldPosition(this.local);
-      if (Math.abs(c.y - y) > 1e-3) continue;
-      const d = Math.hypot(c.x - this.head.x, c.z - this.head.z);
-      if (d >= bestD) continue;
-      bestD = d;
-      // The polygon is in the plane's own space; its world outline is what the arena sits inside.
-      const poly = plane.polygon.map((p) => {
-        const w = this.p.set(p.x, p.y, p.z).applyMatrix4(o.matrixWorld);
-        return { x: w.x, z: w.z };
-      });
-      best = { y, poly };
-    }
-    return best;
+    const t = pickTablePlane(this.head, this.tables(), spot);
+    return t?.poly && t.poly.length >= 3 ? { y: t.y, poly: t.poly } : null;
   }
 
   /**
@@ -3866,6 +3852,11 @@ export class MatchSystem extends createSystem({
 
   /** The lowest horizontal plane labelled floor, else the floor of the local-floor space (0). */
   private floorY(): number {
+    return this.floorPlaneY() ?? 0;
+  }
+
+  /** The lowest horizontal plane labelled floor, or null when the room has none. */
+  private floorPlaneY(): number | null {
     let y = 0;
     let found = false;
     for (const e of this.queries.planes.entities) {
@@ -3875,7 +3866,7 @@ export class MatchSystem extends createSystem({
       if (!found || py < y) y = py;
       found = true;
     }
-    return y;
+    return found ? y : null;
   }
 
   /**
@@ -3937,7 +3928,6 @@ export class MatchSystem extends createSystem({
     console.log(`[MATCH] table polygon n=${n} at ${table.y.toFixed(2)}, floor ${this.floorY().toFixed(2)}`);
   }
 
-  /** Centers of the detected horizontal table and desk planes (world). */
   /** The title fades in over the far rim, holds, then rises away (about 3.5 s). */
   private updateTitle(dt: number) {
     if (!this.title.visible) return;
@@ -3954,8 +3944,16 @@ export class MatchSystem extends createSystem({
   }
 
   private warnedPlane = false;
-  private tables(): Point[] {
-    const out: Point[] = [];
+  private planeW = new Vector3();
+  private planeQ = new Quaternion();
+  /**
+   * The detected planes that could hold the arena (world centers and outlines): labelled tables
+   * and desks (rank 0), and unlabelled flat surfaces at desk height (rank 1, see tableRank).
+   */
+  private tables(): TablePlane[] {
+    const out: TablePlane[] = [];
+    const floor = this.floorPlaneY();
+    const headY = this.player.head.getWorldPosition(this.planeW).y;
     for (const e of this.queries.planes.entities) {
       const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
       // ponytail: '_plane' is IWSDK-internal (pinned 1.0.1); an update that renames it shows up here.
@@ -3963,9 +3961,19 @@ export class MatchSystem extends createSystem({
         this.warnedPlane = true;
         console.warn('[MATCH] XRPlane has no _plane: table detection is off (IWSDK changed?)');
       }
-      if (plane?.orientation !== 'horizontal' || !/table|desk/.test(plane.semanticLabel ?? '')) continue;
-      const p = e.object3D!.getWorldPosition(new Vector3());
-      out.push({ x: p.x, y: p.y, z: p.z });
+      if (plane?.orientation !== 'horizontal') continue;
+      const o = e.object3D!;
+      o.updateWorldMatrix(true, false);
+      const c = o.getWorldPosition(new Vector3());
+      // The polygon is in the plane's own space; its world outline is what the arena sits inside.
+      const poly = (plane.polygon ?? []).map((p) => {
+        const w = this.planeW.set(p.x, p.y, p.z).applyMatrix4(o.matrixWorld);
+        return { x: w.x, z: w.z };
+      });
+      const upY = this.planeW.set(0, 1, 0).applyQuaternion(o.getWorldQuaternion(this.planeQ)).y;
+      const rank = tableRank({ orientation: plane.orientation, semanticLabel: plane.semanticLabel, upY, y: c.y, poly }, floor, headY);
+      if (rank === null) continue;
+      out.push({ x: c.x, y: c.y, z: c.z, rank, poly: poly.length >= 3 ? poly : undefined });
     }
     return out;
   }
@@ -4007,7 +4015,7 @@ export class MatchSystem extends createSystem({
     if (this.phase !== 'placing' && !this.onTable && !this.dragging && this.time - this.placedAt < LATE_TABLE && (this.tableCheck -= dt) <= 0) {
       this.tableCheck = 0.5;
       this.player.head.getWorldPosition(this.head);
-      const table = pickTable(this.head, this.tables());
+      const table = pickTable(this.head, this.tables(), { x: this.root.position.x, z: this.root.position.z });
       if (table !== null) {
         this.onTable = true;
         this.tableY = table + PEDESTAL;
