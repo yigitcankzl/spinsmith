@@ -127,7 +127,8 @@ export const STAMP_UNLOCKS: Record<number, string> = {
  * completed-match count that releases the verb; its card shows as that match ends. Online, brawl
  * and the demo save (level 8) play with every verb.
  */
-export const VERB_RELEASE = { spring: 1, gust: 2, ember: 3, rub: 4, crossguard: 5, cup: 6, groove: 7, wheel: 8 } as const;
+// Cup and sling come third: campaign bout 1-4 (the fourth match) teaches them and asks for a cup medal.
+export const VERB_RELEASE = { spring: 1, gust: 2, cup: 3, ember: 4, rub: 5, crossguard: 6, groove: 7, wheel: 8 } as const;
 export type ReleasedVerb = keyof typeof VERB_RELEASE;
 /** The unlock card for each released verb: name, and what the hand does. */
 export const VERB_CARD: Record<ReleasedVerb, [string, string]> = {

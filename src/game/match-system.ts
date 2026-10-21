@@ -2300,7 +2300,12 @@ export class MatchSystem extends createSystem({
         if (this.time - d.since < HEAD_DWELL) break;
         hovered = b;
         this.gazeAssist.target = b.id;
-        if (g.justPinched && !pressed) pressed = b.id;
+        // Only a pinch made away from the bowl presses it: a pinch over the arena (a ramp, a grip,
+        // skipping a replay) belongs to the fight, not to the button you happen to be looking at.
+        const by = (['left', 'right'] as const).find((side) => this.hands[side].justPinched);
+        const local = by && this.root.worldToLocal(this.handAt.copy(this.hands[by].pinch));
+        const clear = !!local && normRadius(this.arena.layout, local.x, local.z) > 1.35;
+        if (g.justPinched && clear && !pressed) pressed = b.id;
         break;
       }
     }
@@ -6204,7 +6209,7 @@ export class MatchSystem extends createSystem({
       if (this.palmGustCooldown > 0 || speed < PALM_GUST_SPEED || path * ARENA_SCALE < 0.105) continue;
       // A fingertip arriving on your own top is a Spin Rub reaching in, not a sweep (a sweep that
       // crosses your top still fires once it is past it).
-      if (this.mine.alive && Math.hypot(index.x - this.mine.x, index.z - this.mine.z) < 0.04) continue;
+      if (this.mine.alive && Math.hypot(index.x - this.mine.x, index.z - this.mine.z) < 0.025) continue;
       const strength = Math.max(0.65, Math.min(1.5, speed / 0.75));
       this.doPalmGust(side, origin.x, origin.z, palm.x, palm.z, strength);
       this.palmGustSampled[side] = false;

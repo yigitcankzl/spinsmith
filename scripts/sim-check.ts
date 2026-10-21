@@ -939,7 +939,9 @@ TUNING.grace = 0;
 {
   const order = Object.entries(VERB_RELEASE).sort((a, b) => a[1] - b[1]);
   assert.deepEqual(order.map(([, m]) => m), order.map((_, i) => i + 1), 'one verb per completed match, from the second match on');
-  assert.deepEqual(order.slice(0, 5).map(([v]) => v), ['spring', 'gust', 'ember', 'rub', 'crossguard'], 'measured verbs arrive by win points');
+  assert.deepEqual(order.filter(([v]) => v !== 'cup').slice(0, 5).map(([v]) => v), ['spring', 'gust', 'ember', 'rub', 'crossguard'], 'measured verbs arrive by win points');
+  // Campaign lessons and medals only ask for a verb its bout has released (bout n is match n).
+  for (const b of BOUTS) if (b.medals.includes('wellSpin') || /cup/i.test(b.lesson)) assert.ok(BOUTS.indexOf(b) >= VERB_RELEASE.cup, `bout ${b.id} asks for a cup only after cups are released`);
   assert.equal(verbReleasedAt(0), undefined, 'the first match releases no extra verb');
   for (const [v, m] of order) {
     assert.equal(verbReleasedAt(m), v);
@@ -1587,8 +1589,6 @@ TUNING.grace = 0;
     assert.ok(ch[ch.length - 1].boss && ch.filter((b) => b.boss).length === 1, `chapter ${c} ends in its one boss`);
     if (c > 1) assert.ok(ch[0].skill < BOUTS.filter((b) => b.chapter === c - 1).at(-1)!.skill, `chapter ${c} starts below the last boss (sawtooth)`);
   }
-  // The cup medal only where cups have been taught (after two finished matches, bout 1-3 at the earliest).
-  for (const b of BOUTS) if (b.medals.includes('wellSpin')) assert.ok(BOUTS.indexOf(b) >= 3, `bout ${b.id} asks for a cup only after cups are taught`);
   const p = new Progress(null);
   assert.equal(nextBout(p.bouts)?.id, '1-1', 'a new smith starts at 1-1');
   assert.ok(!boutOpen(BOUTS[1], p.bouts), '1-2 waits for 1-1');

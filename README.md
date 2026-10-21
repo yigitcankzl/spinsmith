@@ -12,7 +12,7 @@ Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming,
 2. Press **ENTER** and allow spatial data. The arena rises on your real table (a labelled table or desk, or any flat unlabelled surface at desk height); with none it stands on a floating tray and says so.
 3. Pinch your top, pinch near it, pull back and let go: the rip launches it.
 4. The first match teaches one move a round: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — the rival is steered to your real desk edge and flies off it (**DESK KO**); **round 3** slap your palm down for the Anvil Strike. Flick a tired top with your fingertip any time after the forge lesson.
-5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, Ember Rivet, Spin Rub, Crossguard, ...).
+5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, cup and sling, Ember Rivet, Spin Rub, Crossguard, ...).
 6. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
 
 **If something goes wrong:** no table found → floating tray (it says so); hands not tracked → keep them in view, a held move waits 0.28 s before it cancels; a refused move says why on the card ("No charge yet", "Strike not ready").
@@ -37,7 +37,7 @@ gesture (rip, ramp, cup, strike) works with either hand (left-hand rip and ramp 
 
 Sit at a table, enable hand tracking, and allow spatial data so the arena can stand on your
 table. Everything is done with a pinch: carry your top from its dock into the arena, pinch near
-it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (every later match adds one more hand move with its own card; from the seventh, press a fingertip in for a cup, then pinch, pull and let go to sling what it caught). Pinch the small anvil to forge your top, the blueprint to build
+it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (every later match adds one more hand move with its own card; from the fourth, press a fingertip in for a cup, then pinch, pull and let go to sling what it caught). Pinch the small anvil to forge your top, the blueprint to build
 an arena. First to 4 heat wins a match.
 
 - **Shared headset:** add `?fresh` to the address to start as a new player, or `?demo` for a
@@ -50,7 +50,7 @@ an arena. First to 4 heat wins a match.
   the spot in front of you is used when none is labelled (`npm run check:room-matrix` probes
   this in IWER with synthesised planes; not yet tried in a real room). Persistent anchors have only been exercised in
   IWSDK's browser emulator (IWER). Depth occlusion is switched off under IWER (it has no camera
-  depth), so it has not run anywhere yet. Gaze: a real gaze input source (Meta VR Glasses) is a full pointer; on Quest, which has none, the head ray only assists buttons (look at one for 0.4 s, it lights up, a pinch of either hand presses it); neither has run on a headset. The
+  depth), so it has not run anywhere yet. Gaze: a real gaze input source (Meta VR Glasses) is a full pointer; on Quest, which has none, the head ray only assists buttons (look at one for 0.4 s, it lights up, a pinch of either hand away from the bowl presses it); neither has run on a headset. The
   online duel has been run between two browser windows, not two headsets.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
@@ -242,14 +242,14 @@ an arena. First to 4 heat wins a match.
   score shows on the match bar.
 - **Real-edge cue:** in a duel fight on a detected table, up to two faint red-orange arcs glow on
   the rim in the directions where the real table edge is within about 25 cm of it; an arc brightens
-  while the rival is near the rim inside it. From the second match on, a one-time label (REAL
+  while the rival is near the rim inside it; in the first match's forge round the nearest arc pulses for the staged DESK KO. From the second match on, a one-time label (REAL
   EDGE) explains it. Unverified on a headset.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
   burst, topple and result jingles.
 - **Arena moves during the fight:** pinch the floor and a ramp
   rises there at once (after a 0.12 s hold, full size, about 11 cm across); keep holding and drag
-  to aim which way it throws a top. From the seventh match, press a fingertip into the floor to open a cup that catches
+  to aim which way it throws a top. From the fourth match, press a fingertip into the floor to open a cup that catches
   the first top to roll in; pinch it, pull back and let go to sling it the other way (snapped
   into a slag pit within 20°). A cup with nothing in it, or a catch not slung, lets go after 2 s. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
   shape affects both tops. In the opening match every finish scores one heat (a desk KO adds its bonus one) so all three lessons
@@ -266,11 +266,11 @@ an arena. First to 4 heat wins a match.
   forge lesson is done (or in its third round), a tired rival near the rim calls for a flick.
 - **One new move per match:** after the first match's lessons (ramp, Arena Forge, strike, Flick)
   each completed match releases exactly one more hand verb, most useful first, and ends with its
-  card (NEW MOVE: name, one line on the gesture): Rim Spring for match 2, Forge Gust 3, Ember
-  Rivet 4, Spin Rub 5, Crossguard 6, cup and sling 7, Finger Groove 8, Forge Wheel 9
+  card (NEW MOVE: name, one line on the gesture): Rim Spring for match 2, Forge Gust 3, cup and
+  sling 4 (campaign bout 1-4 teaches it), Ember Rivet 5, Spin Rub 6, Crossguard 7, Finger Groove 8, Forge Wheel 9
   (`VERB_RELEASE` in `src/game/progress.ts`, checked by `npm run check:sim`). Online, brawls and
   the `?demo` save (level 8) have every verb.
-- **Spin Rub (direct touch, from the fifth match):** run the same fingertip slowly along your own
+- **Spin Rub (direct touch, from the sixth match):** run the same fingertip slowly along your own
   top's rim, mostly sideways rather than into it (below flick speed). The first rub spends one
   charge and opens a 1.2 s window: rubbing the way the top turns adds up to 0.3 spin a second
   (0.28 per window, never above full spin), rubbing against it brakes at 40% of that rate. The top
@@ -284,7 +284,7 @@ an arena. First to 4 heat wins a match.
   there is slung along the wall toward its nearest pocket. In the headless sweep with human
   reaction lag and aim error, gust moved from +0.1 to +8.9 win points over doing nothing and the
   spring from -1.6 to +10; random sweeping or springing gains about +2.
-- **Crossguard and Ember Rivet (from the sixth and fourth match):** two open palms make a rail; the first
+- **Crossguard and Ember Rivet (from the seventh and fifth match):** two open palms make a rail; the first
   time your top crosses it (or the rival crosses it on its way out) it costs a charge, and the
   rail then stays live 0.8 s. Every save of your own top refunds that charge, and the rival's
   escape is sent on toward its nearest pocket. A caught hot rivet planted in the bowl is a live
