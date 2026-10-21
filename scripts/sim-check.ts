@@ -24,7 +24,7 @@ import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, ranki
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
-import { targetWinner } from '../src/game/brawl.ts';
+import { brawlSlots, spinStep, targetWinner } from '../src/game/brawl.ts';
 import { deskSectors, inSector } from '../src/game/desk-edge.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
@@ -1663,6 +1663,17 @@ assert.equal(edgeOf('defense', 'defense'), 0);
   // Centre off the table, or no table: none.
   assert.equal(deskSectors(square(2, 0, 0.5), 0.15, 0.1).length, 0, 'off table: no sectors');
   assert.equal(deskSectors(null, 0.15, 0.1).length, 0, 'no table: no sectors');
+}
+
+{
+  // The match bar's brawl row: 3 and 4 equal slots filling the plate between its margins.
+  const three = brawlSlots(3, 1400, 48, 28);
+  assert.deepEqual(three.map((s) => Math.round(s.x)), [48, 492, 936], 'three brawl slots start');
+  assert.ok(Math.abs(three[0].w - 1248 / 3) < 1e-9 && Math.abs(three[2].x + three[2].w - 1352) < 1e-9, 'three brawl slots fill the plate');
+  const four = brawlSlots(4, 1400, 48, 28);
+  assert.equal(four[0].w, 305, 'four brawl slots width');
+  assert.equal(four[3].x + four[3].w, 1352, 'four brawl slots end at the margin');
+  assert.deepEqual([spinStep(-1), spinStep(0.024), spinStep(0.5), spinStep(1.4)], [0, 0, 10, 20], 'spin steps');
 }
 
 console.log('sim-check: all passed');
