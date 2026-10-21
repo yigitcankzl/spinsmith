@@ -28,7 +28,7 @@ Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming,
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
 | **Online duel (beta)**, tested in two browser windows | Pinch the brass pegs past four (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE` (both after the first session). |
 | **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |
-| **Comfort and accessibility** | The brass dial: Calm, Quiet, Assist (80% speed), One hand (forge with one hand), High contrast, Left-handed and Colour-safe (blue/orange/yellow warnings; your rings are round, the rival's hexagons). Every gameplay sound has a visual twin (a stamp or the card), so Quiet loses no information. Left-handed: a dial mode (kept like the others; `?lefty` once still holds it in every mode, `?lefty=0` undoes) swaps the near-rim stations to the other side. |
+| **Comfort and accessibility** | Independent toggles that combine (left-handed and high contrast and quiet at once): Quiet (sound off), No flashes, Press to strike, Assist (80% speed), One hand (forge with one hand), High contrast, Left-handed and Colour-safe (blue/orange/yellow warnings; your rings are round, the rival's hexagons), plus the presets Calm (no flashes + press to strike) and Standard (all off but the hand). Hands only: pinch the brass dial to pick a setting, then pinch the plate in front of it, which shows ON/OFF, to toggle it. Each toggle is kept; an old single-mode save becomes its matching toggles. Every gameplay sound has a visual twin (a stamp or the card), so Quiet loses no information. Left-handed swaps the near-rim stations to the other side; `?lefty` once still holds it on, `?lefty=0` undoes. |
 
 All interactions are pinches, palm presses or grabs. Nothing needs a controller, and every one-hand
 gesture (rip, ramp, cup, strike) works with either hand (left-hand rip and ramp checked in IWER).
@@ -53,11 +53,13 @@ an arena. First to 4 heat wins a match.
   depth), so it has not run anywhere yet. Gaze: a real gaze input source (Meta VR Glasses) is a full pointer; on Quest, which has none, the head ray only assists buttons (look at one for 0.4 s, it lights up, a pinch of either hand away from the bowl presses it); neither has run on a headset. The
   online duel has been run between two browser windows, not two headsets.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
-  steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
-  slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
-  80% speed, calm); and One hand: hold the rim with one hand for a moment and a mirrored partner
-  appears on the far rim, so turning, pushing in or out and lifting that one hand twist, squeeze,
-  stretch and tilt the arena (calm); High contrast: each top's team ring wide and solid (calm); and Left-handed: the home stations swap sides.
+  picks a setting; the plate in front of it shows ON/OFF and a pinch on it toggles that setting, so
+  they combine: Quiet (sound off); No flashes; Press to strike (a palm pressed and held instead of
+  slapped, for trays and shared spaces); Assist (fights at 80% speed); One hand: hold the rim with
+  one hand for a moment and a mirrored partner appears on the far rim, so turning, pushing in or
+  out and lifting that one hand twist, squeeze, stretch and tilt the arena; High contrast: each
+  top's team ring wide and solid; Left-handed: the home stations swap sides; Colour-safe. Presets
+  set several at once: Calm (no flashes + press to strike) and Standard.
 
 ## What is in the game
 

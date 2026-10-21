@@ -1,7 +1,7 @@
 import { AdditiveBlending, NormalBlending, BoxGeometry, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish, playRub } from './audio.js';
-import { COMFORT, COMFORT_MODES, comfortMode, nextComfort, SAFE_COLORS, warnColor } from './comfort.js';
+import { COMFORT, comfortSummary, nextComfort, SAFE_COLORS, toggleComfort, warnColor } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -1393,7 +1393,7 @@ export class MatchSystem extends createSystem({
     this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.root.add(this.stamp.mesh);
     this.root.add(this.handle, this.stage, this.outerRail, this.label.mesh, this.builder.root, this.forge.root, this.hub.root, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, ...this.deckButtons.map((b) => b.mesh));
-    this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
+    this.hub.setComfort();
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
     this.openOnline();
@@ -2593,8 +2593,15 @@ export class MatchSystem extends createSystem({
       this.labelTimer = 3;
       playTick();
     } else if (action.kind === 'comfort') {
-      const lefty = COMFORT.lefty;
+      // The dial only picks a setting; its plate shows ON/OFF and a pinch there toggles it.
       const name = nextComfort();
+      this.hub.setComfort(5);
+      this.label.set(`Comfort: ${name}\nPinch the plate to toggle · the dial for the next`);
+      this.labelTimer = 3;
+      if (import.meta.env.DEV) console.log(`[HUB] comfort dial ${name}`);
+    } else if (action.kind === 'comfortToggle') {
+      const lefty = COMFORT.lefty;
+      const name = toggleComfort();
       applySound();
       if (COMFORT.lefty !== lefty) {
         // The stations swap sides: home is built again on the other hand's side.
@@ -2605,10 +2612,11 @@ export class MatchSystem extends createSystem({
         this.root.add(this.hub.root);
         this.toHub();
       }
-      this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
-      this.label.set(`Comfort: ${name}\nPinch the dial again for the next`);
+      this.hub.setComfort(5);
+      this.label.set(`Comfort: ${name}\nOn: ${comfortSummary()}`);
       this.labelTimer = 3;
-      if (import.meta.env.DEV) console.log(`[HUB] comfort ${name}`);
+      playTick();
+      if (import.meta.env.DEV) console.log(`[HUB] comfort toggle ${name} · on: ${comfortSummary()}`);
     } else if (action.kind === 'armReset') {
       this.label.set('Start over as a new smith?\nPinch the level plate again');
       this.labelTimer = 3;

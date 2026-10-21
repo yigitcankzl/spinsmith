@@ -30,7 +30,7 @@ export const RAIL = { z: 0.16, y: 0.03 };
 export const DOCK_AT: Spot = { x: -0.14, y: 0, z: 0.165 };
 export const FORGE_AT: Spot = { x: 0.14, y: 0, z: 0.165 };
 export const BLUEPRINT_AT: Spot = { x: 0.08, y: 0, z: 0.185 };
-/** The comfort dial (sound, flashes, the strike's gesture), between the dock and the level plate. */
+/** The comfort dial (picks a setting; the plate in front of it toggles it), between the dock and the level plate. */
 export const COMFORT_AT: Spot = { x: -0.075, y: 0, z: 0.2 };
 /** The brawl pegs: how many tops share the next match (two to four). */
 export const BRAWL_AT: Spot = { x: -0.052, y: 0, z: 0.19 };
@@ -116,6 +116,7 @@ export function touchTargets(layouts: ArenaLayout[] = []): [string, Spot][] {
     ['anvil', { ...FORGE_AT, y: TABLE_Y + 0.06 }],
     ['blueprint', { ...BLUEPRINT_AT, y: TABLE_Y + 0.02 }],
     ['comfort dial', { ...COMFORT_AT, y: TABLE_Y + 0.012 }],
+    ['comfort plate', { x: COMFORT_AT.x - 0.012, y: TABLE_Y + 0.02, z: COMFORT_AT.z + 0.026 }],
     ['brawl pegs', { ...BRAWL_AT, y: TABLE_Y + 0.012 }],
     ...layouts.flatMap((l) => forgeGrips(l).map((g, i): [string, Spot] => [`${l.name} forge grip ${i ? 'right' : 'left'}`, g])),
   ];
