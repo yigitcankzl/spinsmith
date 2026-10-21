@@ -9,13 +9,13 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 1 | Polish: text (stale claims) | 4 → pending re-score | README:85 4 heat, desk-KO bonus in tutorial line, echo.ts comment, index.html showcase line | 152a1f1 |
 | 1 | Solid / bug-free (flaky probe) | 6 → pending | check:combat-readability 1/3 → 4/4 after holding the tops during the ramp approach and finishing inside the 1.5 s cause window | 5316d93 |
 | 1 | 60 fps evidence | 4 → pending | `?demo` save: hub 98, fight 103 draw calls/eye (the old 172–200 were both eyes); fresh fight 102/eye; game update CPU p50 0.6–0.7 ms, p95 1.0–1.2 ms, max 2.9–5.8 ms (laptop CPU, IWER); lowest fps 89–118 (IWER, not Quest) | ba7b64e |
-
 | 1 | Scene understanding / untested rooms | 5 → pending | Unlabelled and orientation-less horizontal planes 0.45–1.15 m count as tables (IWER sets orientation from the label only, so 'other' planes had none). `check:room-matrix` 5/5 in IWER: office_small table, living_room 0.455 m table, no table → tray, 50×40 cm table, unlabelled table | 5d98f5c, 145bd4f |
 | 1 | Onboarding / First Five Minutes (verb cliff) | 5 → pending | One verb per completed match (`VERB_RELEASE`): Flick in match 1, then Spring, Gust, Ember, Rub, Crossguard, cup+sling, Groove, Wheel; NEW MOVE card each; palm brace removed | 0118617 |
 | 1 | Purposeful passthrough / wow (staged DESK KO) | 5 → pending | Match 1 round 2 (forge lesson) steers the rival to the nearest real edge, pulses the arc, "WRENCH IT OFF YOUR DESK"; `check:desk-ko-first` in IWER: squeeze → off desk → DESK KO, slow-mo peak 1.06 s | 62786d0 |
 | 1 | Seated 2 ft / FoV / gaze / lefty | 6 / 4 / 2 / 6 → pending | Forge grips 45°→65°, in touchTargets, ≤0.61 m at tray drops 0.30–0.40 (0.64 m at the deepest tray); FoV sim-check ±35° v / ±40° h for every read surface (3 labels moved in); head-ray dwell 0.4 s + pinch for buttons on Quest; Left-handed in the comfort dial | 40a262d, 43560bf, 3ec0d69, 407e601 |
 | 1 | Solid / bug-free (gesture collisions found by probes after the merges) | 6 → pending | Arena Forge tilt release formed a cup (2 charges); a Spin Rub reach fired Forge Gust (2 charges); groove probe flake; fixed: cup blocked 0.45 s after a pinch release, gust not fired onto your own top or during a rub window, rail posts not built during a rub. Hands suite 22/23 in sequence; outer-ring fails only right after palm-forge (passes 3/3 alone) — open | 41cf1b6 |
 | 1 | Hand tracking (One-Euro filter) | 6 → dropped | Filtering the pinch point cut rip power on the release and broke dual-rip 2/2; reverted. Needs device tuning (raw vs smoothed paths for rip/flick) | — |
+
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
 - [x] Unlabelled horizontal planes 0.45–1.15 m count as tables (Untested rooms 6, scene understanding 6)
