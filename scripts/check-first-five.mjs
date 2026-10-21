@@ -128,6 +128,7 @@ export default async function run({ page, frame }) {
           all: prompts.map((p) => `${p.at}s ${p.kind}: ${p.text.replace(/\n/g, ' / ')}`),
         },
         verbs: { taught: ff.taught, performed: ff.performed },
+        autoPlaced: !!ff.autoPlaced,
         rounds: ff.events,
         resultCards: ff.afterMatch.map((c) => c.text.replace(/\n/g, ' / ')),
         comeBackCard: ff.afterMatch.some((c) => /STREAK/i.test(c.text)),
@@ -152,7 +153,10 @@ export default async function run({ page, frame }) {
         drive.key('KeyP');
         await sleep(100);
       }
-      if (g.phase !== 'placing') throw new Error(`expected placement after ENTER, got ${g.phase}`);
+      // On a detected table the arena can rise and settle before this lease starts: the clock then
+      // starts at the ready card (placement time is not counted, and the summary says so).
+      ff.autoPlaced = g.phase === 'ready';
+      if (g.phase !== 'placing' && !ff.autoPlaced) throw new Error(`expected placement after ENTER, got ${g.phase}`);
       g.settle = 0;
       ff.t0 = g.time;
       ff.started = true;

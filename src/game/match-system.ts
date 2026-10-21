@@ -3469,6 +3469,9 @@ export class MatchSystem extends createSystem({
   /** On entry: an interrupted match goes straight back to ready for the round it stopped in. */
   private tryResume(snap: MatchSnapshot) {
     if (this.phase !== 'hub' || this.online) return;
+    // The first match is the lessons in order: it restarts rather than resuming past one. (This
+    // also drops a snapshot a fresh save's reload wrote on its way out.)
+    if (this.progress.matches === 0) return clearSnapshot(localStorage);
     const rival = RIVALS.find((r) => r.name === snap.rival);
     const layout = this.arenas.find((a) => a.name === snap.arena);
     if (!rival || !layout) return clearSnapshot(localStorage);
