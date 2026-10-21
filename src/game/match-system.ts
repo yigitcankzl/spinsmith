@@ -64,16 +64,12 @@ import { brawlModeName, targetWinner } from './brawl.js';
 import { clearSnapshot, loadSnapshot, RESUME_VERSION, saveSnapshot } from './match-resume.js';
 import type { MatchSnapshot } from './match-resume.js';
 import type { BrawlMode } from './brawl.js';
+import { commitBlocker, FLICK_AFTER_RELEASE, FLICK_FOLLOW_THROUGH, GROOVE_COMMIT_DELAY, heldElsewhere, mayCommit, mayListen, RELEASE_LOCK, SHAPING_RELEASE_LOCK } from './gesture-owner.js';
+import type { HandFacts, HeldTool } from './gesture-owner.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 
 /** The arena (and everything on the table) is drawn this much larger than its simulation size. */
 const ARENA_SCALE = TUNE.scale;
-/** Seconds after a flick before the same hand can flick again (its follow-through). */
-const FLICK_FOLLOW_THROUGH = 0.4;
-/** Seconds a lifted finger groove waits for a pinch that would make it a reach for a ramp instead. */
-const GROOVE_COMMIT_DELAY = 0.25;
-/** Seconds after a pinch lets go before that hand can flick (the release pull-back). */
-const FLICK_AFTER_RELEASE = 0.45;
 /** Seconds one shaping charge keeps a Spin Rub open, and the pause before rubbing can spend another. */
 const RUB_WINDOW = 1.2;
 const RUB_REOPEN = 0.4;
@@ -134,8 +130,6 @@ const INTRO_TIME = 2.5;
 const HAND_LOSS_GRACE = 0.28;
 /** A one-hand rim pull waits this long for the other hand before it can become a spring. */
 const RIM_SPRING_INTENT = 0.25;
-/** A finished pinch tool owns the whole withdrawal, so opening/parking fingers cannot draw. */
-const SHAPING_RELEASE_LOCK = 0.65;
 /** An open palm must sweep this fast above the bowl before it becomes a deliberate forge gust. */
 const PALM_GUST_SPEED = 0.34;
 /** A palm must settle in the bowl before its next motion can count as a deliberate gust. */
@@ -861,6 +855,10 @@ export class MatchSystem extends createSystem({
   private handAt = new Vector3();
   /** The fingertip has its own target: an open-hand press catches beside a top while pinch shapes. */
   private handTipAt = new Vector3();
+  /** handFacts() scratch: never shared with a caller's vectors. */
+  private factTip = new Vector3();
+  private factWrist = new Vector3();
+  private factPalm = new Vector3();
   /** The pinch ring between each thumb and index: it closes as the fingers do, and lights when they meet. */
   private pinchRings = (['left', 'right'] as const).map(() => {
     const m = new Mesh(new RingGeometry(0.8, 1, 32), new MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, depthTest: false }));
@@ -5165,7 +5163,7 @@ export class MatchSystem extends createSystem({
       // this frame, so set the shared open-palm guard here; otherwise the same release can become
       // Forge Gust or Crossguard and spend a second charge.
       for (const side of ['left', 'right'] as const) {
-        this.palmGustBlockedUntil[side] = this.elapsed + 0.35;
+        this.palmGustBlockedUntil[side] = this.elapsed + RELEASE_LOCK;
         this.palmGustSampled[side] = false;
         this.palmGustAge[side] = 0;
       }
@@ -5387,8 +5385,8 @@ export class MatchSystem extends createSystem({
         this.tipFresh[side] = true;
         continue;
       }
-      // A pinching hand that owns the forge seal must not also author a ramp underneath it.
-      if (this.overforgeHeld === side || this.overforgeControl?.side === side || this.forgeWheelHeld === side || this.emberHeld === side) continue;
+      // A hand holding a tool another system updates (seal, rivet, wheel) authors nothing underneath it.
+      if (heldElsewhere(this.handFacts(side))) continue;
       this.updateCup(side);
       if (!h.tracked) {
         if ((this.shapeLost[side] += this.frameDt) < HAND_LOSS_GRACE) continue;
@@ -5405,7 +5403,7 @@ export class MatchSystem extends createSystem({
       this.shapeLost[side] = 0;
       const l = this.toLocal(h.pinch);
       if (h.justReleased) {
-        this.palmGustBlockedUntil[side] = this.elapsed + 0.35;
+        this.palmGustBlockedUntil[side] = this.elapsed + RELEASE_LOCK;
         this.palmGustSampled[side] = false;
         this.palmGustAge[side] = 0;
       }
@@ -5542,8 +5540,8 @@ export class MatchSystem extends createSystem({
       // Grooves arrive with the other defensive tools: in the first matches an open finger skimming
       // the floor on its way to pinch a ramp must not draw one and spend the lesson's charge.
       // A finger circling your own top's rim is a Spin Rub, never a groove drawn on the floor.
-      const rubbing = this.time < this.rubUntil || (this.mine.alive
-        && Math.hypot(tip.x - this.mine.x, tip.z - this.mine.z) <= this.mine.spec.radius + FINGER_RADIUS + RUB_SLACK + 0.012);
+      // (gesture-owner.ts: an open Spin Rub window or a fingertip on the rub ring owns the hand.)
+      const rubbing = !mayListen(this.handFacts(side), 'groove');
       if (rubbing) this.grooving[side] = null;
       const touching = open && !rubbing && this.taught('groove') && this.arena.inside(tip.x, tip.z) && depth > -0.012 && depth < 0.024;
       let groove = this.grooving[side];
@@ -5571,14 +5569,11 @@ export class MatchSystem extends createSystem({
         // With the strike armed, a palm coming down outside the rim is a slap, not a cup at the edge.
         // (Not toLocal(): it would overwrite `tip`, which shares its vector.) Only a hand down at the
         // table counts as a slap, so cups reached in over the rim still work with the bar full.
-        const palm = this.root.worldToLocal(this.handAt.copy(h.wrist)).lerp(tip, 0.5);
-        const atTable = h.low < this.root.position.y - PEDESTAL * this.rootK + 0.05;
-        const slapping = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, palm.x, palm.z) > SLAP_MIN_N;
-        if (slapping) {
-          if (import.meta.env.DEV) console.log('[SHAPE] well ignored: a slap outside the rim');
-        } else if (this.time < this.flickReadyAt[side]) {
-          // A hand that just let go of a pinch (a forge, ramp or spring) settling onto the bowl is not a cup.
-          if (import.meta.env.DEV) console.log('[SHAPE] well ignored: just released a pinch');
+        // A hand that just let go of a pinch (a forge, ramp or spring) or just flicked, settling
+        // onto the bowl, is not a cup either (gesture-owner.ts 'follow' and 'slap' claims).
+        const cupBlocked = commitBlocker(this.handFacts(side), 'cup');
+        if (cupBlocked) {
+          if (import.meta.env.DEV) console.log(`[SHAPE] well ignored: ${cupBlocked === 'slap' ? 'a slap outside the rim' : 'just released a pinch'}`);
         } else if (down >= TUNE.wellSpeed && this.elapsed - this.rampAt[side] > TUNE.wellAfterRamp && this.taught('cup')) {
           let target: Top | null = null;
           let gap = MAGNET_CATCH;
@@ -5723,6 +5718,56 @@ export class MatchSystem extends createSystem({
     this.crossguardBeam.visible = this.crossguardGlow.visible = false;
     for (const post of this.crossguardPosts) post.visible = false;
     this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
+  }
+
+  /** The tool a hand holds this frame, for gesture ownership (Arena Forge holds both hands). */
+  private heldTool(side: Side): HeldTool | null {
+    if (this.overforgeHeld === side || this.overforgeControl?.side === side) return 'overforge';
+    if (this.emberHeld === side) return 'ember';
+    if (this.forgeWheelHeld === side) return 'wheel';
+    if (this.arenaMorphing) return 'forge';
+    if (this.rimPulls[side]) return 'grip';
+    if (this.slings[side]) return 'sling';
+    if (this.shaping[side]) return 'ramp';
+    return null;
+  }
+
+  /**
+   * This frame's facts about one hand for gesture-owner.ts. Built fresh at each verb's entry point
+   * (a verb earlier in the frame may just have set a claim) with its own scratch vectors.
+   */
+  private handFacts(side: Side): HandFacts {
+    const h = this.hands[side];
+    const tip = this.root.worldToLocal(this.factTip.copy(h.index));
+    const wrist = this.root.worldToLocal(this.factWrist.copy(h.wrist));
+    const mine = this.mine;
+    // The Crossguard palm (wrist→fingertip 0.45) decides a reserved Forge grip, as the rail does.
+    // Hand marks classify the pinch target while the rail uses the palm: either saying FORGE counts.
+    const grip = this.factPalm.copy(wrist).lerp(tip, 0.45);
+    const gripN = normRadius(this.arena.layout, grip.x, grip.z);
+    const onForgeGrip = this.handHoverClaim[side] === 'FORGE' || (this.taught('forge') && forgeGripIntent(gripN, Math.atan2(grip.z, grip.x)));
+    // A palm (wrist→fingertip 0.5) down at the table outside the rim, with the strike ready, is a slap.
+    const slap = this.factPalm.copy(wrist).lerp(tip, 0.5);
+    const atTable = h.low < this.root.position.y - PEDESTAL * this.rootK + 0.05;
+    const slapPose = this.forgeBar.full && this.taught('strike') && atTable && normRadius(this.arena.layout, slap.x, slap.z) > SLAP_MIN_N;
+    return {
+      tracked: h.tracked,
+      pinching: h.pinching,
+      held: this.heldTool(side),
+      releaseLock: this.palmGustBlockedUntil[side] - this.elapsed,
+      shapingLock: this.shapingBlockedUntil[side] - this.elapsed,
+      needsClearance: this.shapingNeedsClearance[side],
+      followLock: this.flickReadyAt[side] - this.time,
+      railPost: this.palmRailAngles[side] !== null,
+      crossguardUp: this.crossguardActive,
+      pressing: this.pressing[side],
+      gustSweep: this.palmGustTime > 0 && this.palmGustSide === side,
+      rubWindow: this.time < this.rubUntil,
+      tipToOwnTop: mine.alive ? Math.hypot(tip.x - mine.x, tip.z - mine.z) : Infinity,
+      ownTopRing: mine.spec.radius + FINGER_RADIUS + RUB_SLACK,
+      onForgeGrip,
+      slapPose,
+    };
   }
 
   /** One physical release may finish one tool; its opening fingers cannot author a second tool. */
@@ -6036,21 +6081,16 @@ export class MatchSystem extends createSystem({
       // this ownership window, releasing two-hand Arena Forge can accidentally build Crossguard
       // and spend a second charge on the same physical gesture.
       // A Spin Rub is one open hand low over the bowl too; while its window is open no rail is built.
-      if (h.tracked && !h.pinching && this.elapsed >= this.palmGustBlockedUntil[side] && this.time >= this.rubUntil
-        && this.overforgeControl?.side !== side && this.overforgeHeld !== side) {
+      // The two glowing Forge grips are reserved for that verb (gesture-owner.ts 'grip'), so
+      // approaching them cannot spend a charge as Crossguard first.
+      if (mayListen(this.handFacts(side), 'crossguard')) {
         const wrist = this.handAt.copy(this.toLocal(h.wrist));
         const index = this.root.worldToLocal(this.local.copy(h.index));
         const palm = wrist.lerp(index, 0.45);
         const n = normRadius(this.arena.layout, palm.x, palm.z);
         const floor = this.arena.height(palm.x, palm.z);
-        // Hand marks classify the pinch target (the actual authored contact) while the rail uses
-        // the palm midpoint. Reserve the grip when either view says FORGE; their offsets differ.
-        const reservedForgeGrip = this.handHoverClaim[side] === 'FORGE'
-          || (this.taught('forge') && forgeGripIntent(n, Math.atan2(palm.z, palm.x)));
-        // A rail post needs a low, flat open hand; a relaxed upright hand near the rim does not
-        // count. The two glowing Forge grips are reserved for that verb, so approaching them
-        // cannot spend a charge as Crossguard first.
-        accepted = !reservedForgeGrip && n >= 0.78 && n <= 1.22 && palm.y >= floor - 0.025 && palm.y <= floor + 0.065 && Math.abs(wrist.y - index.y) <= 0.07;
+        // A rail post needs a low, flat open hand; a relaxed upright hand near the rim does not count.
+        accepted = n >= 0.78 && n <= 1.22 && palm.y >= floor - 0.025 && palm.y <= floor + 0.065 && Math.abs(wrist.y - index.y) <= 0.07;
         if (accepted) {
           this.palmRailAngles[side] = Math.atan2(palm.z, palm.x);
           this.palmRailGrace[side] = 0.22;
@@ -6162,10 +6202,9 @@ export class MatchSystem extends createSystem({
       const vel = this.flickVel[side];
       vel.lerp(this.flickRaw.set((tip.x - prev.x) / dt, (tip.y - prev.y) / dt, (tip.z - prev.z) / dt), 0.6);
       prev.copy(tip);
-      const owned = this.palmRailAngles[side] !== null || this.pressing[side] || this.arenaMorphing
-        || this.elapsed < this.palmGustBlockedUntil[side]
-        || this.overforgeControl?.side === side || this.overforgeHeld === side
-        || (this.palmGustTime > 0 && this.palmGustSide === side);
+      // Rail posts, presses, a forge, a released pinch, a seal and this hand's own gust own it first.
+      const facts = this.handFacts(side);
+      const owned = !mayListen(facts, 'flick');
       const along = Math.hypot(vel.x, vel.z);
       // A fingertip coming down onto the table is a press (cup), not a swing.
       if (owned || -vel.y > along) continue;
@@ -6173,7 +6212,8 @@ export class MatchSystem extends createSystem({
       // Only a fingertip down at the tops' own height (about 5 cm real) touches them; a hand passing over does not.
       if (tip.y < floor - 0.012 || tip.y > floor + 0.022) continue;
       if (!this.arena.inside(tip.x, tip.z)) continue;
-      const armed = this.charges.charges >= 1 && this.time >= this.flickReadyAt[side];
+      const ready = mayCommit(facts, 'flick');
+      const armed = this.charges.charges >= 1 && ready;
       glow.visible = !this.photo;
       glow.position.copy(tip);
       glow.scale.setScalar(armed ? 0.0065 + Math.min(0.004, along * 0.008) : 0.005);
@@ -6190,7 +6230,7 @@ export class MatchSystem extends createSystem({
       for (const top of this.tops) {
         const approach = fingerTouches(top, tip.x, tip.z, vel.x, vel.z);
         if (!approach) continue;
-        if (this.time < this.flickReadyAt[side]) break;
+        if (!ready) break;
         // Only the finger's own swing makes a flick: a top running into a still finger just rebounds.
         const gap = Math.hypot(top.x - tip.x, top.z - tip.z) || 1;
         const swing = (vel.x * (top.x - tip.x) + vel.z * (top.z - tip.z)) / gap;
@@ -6349,7 +6389,8 @@ export class MatchSystem extends createSystem({
 
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      if (!this.taught('gust') || !h.tracked || h.pinching || this.elapsed < this.palmGustBlockedUntil[side] || this.overforgeControl?.side === side || this.overforgeHeld === side) {
+      const facts = this.handFacts(side);
+      if (!this.taught('gust') || !mayListen(facts, 'gust')) {
         this.palmGustSampled[side] = false;
         this.palmGustAge[side] = 0;
         continue;
@@ -6359,7 +6400,7 @@ export class MatchSystem extends createSystem({
       const palm = wrist.lerp(index, 0.48);
       const floor = this.arena.height(palm.x, palm.z);
       const n = normRadius(this.arena.layout, palm.x, palm.z);
-      const valid = this.time >= this.rubUntil && n < 0.74 && palm.y >= floor + 0.025 && palm.y <= floor + 0.12 && Math.abs(wrist.y - index.y) <= 0.075;
+      const valid = n < 0.74 && palm.y >= floor + 0.025 && palm.y <= floor + 0.12 && Math.abs(wrist.y - index.y) <= 0.075;
       if (!valid) {
         this.palmGustSampled[side] = false;
         this.palmGustAge[side] = 0;
@@ -6400,7 +6441,7 @@ export class MatchSystem extends createSystem({
       if (this.palmGustCooldown > 0 || speed < PALM_GUST_SPEED || path * ARENA_SCALE < 0.105) continue;
       // A fingertip arriving on your own top is a Spin Rub reaching in, not a sweep (a sweep that
       // crosses your top still fires once it is past it).
-      if (this.mine.alive && Math.hypot(index.x - this.mine.x, index.z - this.mine.z) < FINGER_RADIUS + this.mine.spec.radius + 0.01) continue;
+      if (!mayCommit(facts, 'gust')) continue;
       const strength = Math.max(0.65, Math.min(1.5, speed / 0.75));
       this.doPalmGust(side, origin.x, origin.z, palm.x, palm.z, strength);
       this.palmGustSampled[side] = false;
@@ -6657,9 +6698,8 @@ export class MatchSystem extends createSystem({
       const l = h.tracked ? this.slapAt.copy(this.toLocal(h.wrist)).lerp(this.toLocal(h.index), 0.5) : null;
       const outside = l !== null && normRadius(this.arena.layout, l.x, l.z) > SLAP_MIN_N;
       const openPalm = h.tracked && !h.pinching && Math.abs(h.wrist.y - h.index.y) <= 0.08;
-      const ownsAnotherGesture = this.arenaMorphing || !!this.rimPulls[side] || !!this.shaping[side] || !!this.slings[side]
-        || this.overforgeHeld === side || this.overforgeControl?.side === side
-        || this.palmRailAngles[side] !== null || this.crossguardActive;
+      // Any held tool, a Crossguard post or the beam owns the palm first (gesture-owner.ts).
+      const ownsAnotherGesture = !mayListen(this.handFacts(side), 'slap');
       // The open-palm press is a delayed accessibility fallback for the seal stamp. Keeping its
       // detector live before the fallback appears made the two open hands approaching Arena Forge
       // count as a hidden ultimate slap.

@@ -273,6 +273,7 @@ an arena. First to 4 heat wins a match.
   sling 4 (campaign bout 1-4 teaches it), Ember Rivet 5, Spin Rub 6, Crossguard 7, Finger Groove 8, Forge Wheel 9
   (`VERB_RELEASE` in `src/game/progress.ts`, checked by `npm run check:sim`). Online, brawls and
   the `?demo` save (level 8) have every verb.
+- **One owner per hand:** `src/game/gesture-owner.ts` is the single priority table (held tool, release locks, Crossguard post, cup press, own gust, Spin Rub, Forge grip, slap) that decides which verb owns a hand each frame and which verbs may listen or fire; every colliding pair is a row in `npm run check:sim`.
 - **Spin Rub (direct touch, from the sixth match):** run the same fingertip slowly along your own
   top's rim, mostly sideways rather than into it (below flick speed). The first rub spends one
   charge and opens a 1.2 s window: rubbing the way the top turns adds up to 0.3 spin a second

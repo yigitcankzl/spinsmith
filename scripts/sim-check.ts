@@ -32,6 +32,8 @@ import { brawlSlots, spinStep, targetWinner } from '../src/game/brawl.ts';
 import { CARD_HOW_WORDS, CLAIM, LESSON, lessonText, PROMPT_WORDS, promptWords } from '../src/game/lessons.ts';
 import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/game/desk-edge.ts';
 import { FpsBook, fpsPhase, QUALITY_MAX, QualityGuard, qualityThresholds } from '../src/game/quality.ts';
+import { commitBlocker, FLICK_AFTER_RELEASE, FREE_HAND, gestureOwner, heldElsewhere, listenBlocker, mayCommit, mayListen, RELEASE_LOCK, RUB_TIP_GUST, RUB_TOUCH_SLACK, SHAPING_RELEASE_LOCK } from '../src/game/gesture-owner.ts';
+import type { GestureOwner, HandFacts, HandVerb } from '../src/game/gesture-owner.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
 const FORGE = ARENAS[0];
@@ -2112,6 +2114,52 @@ if (DESK_DROP_ON) {
   book.add('hub', 70);
   assert.equal(book.summary('hub'), 'n=2 mean 71.0 min 70 last 72,70', 'phase summary');
   assert.deepEqual(['hub', 'pulling', 'result', 'build', 'placing'].map(fpsPhase), ['hub', 'fight', 'fight', 'forge', null], 'phase buckets');
+}
+
+// Gesture ownership (src/game/gesture-owner.ts): every pair of hand verbs that can share one hand
+// near the bowl floor, and the single verb that must own it.
+{
+  const ring = 0.03 + FINGER_RADIUS + 0.004;
+  const hand = (o: Partial<HandFacts>): HandFacts => ({ ...FREE_HAND, ownTopRing: ring, ...o });
+  const cases: { name: string; f: HandFacts; owner: GestureOwner; listen?: HandVerb[]; deaf?: HandVerb[]; fire?: HandVerb[]; hold?: HandVerb[] }[] = [
+    { name: 'a free open hand', f: hand({}), owner: null, listen: ['flick', 'groove', 'gust', 'crossguard', 'rub', 'slap'], fire: ['flick', 'cup', 'gust', 'groove'] },
+    // A flick's swing started a floor stroke: the stroke is not also a Finger Groove (blockShapingRelease + follow-through).
+    { name: 'flick vs groove', f: hand({ releaseLock: SHAPING_RELEASE_LOCK, shapingLock: SHAPING_RELEASE_LOCK, needsClearance: true, followLock: 0.4 }), owner: 'release', deaf: ['groove', 'cup', 'flick', 'gust'] },
+    { name: 'flick vs groove, lock run out, fingertip still down', f: hand({ needsClearance: true }), owner: 'release', deaf: ['groove', 'cup'], listen: ['flick'] },
+    { name: 'rub window vs gust', f: hand({ rubWindow: true }), owner: 'rub', deaf: ['gust', 'groove', 'crossguard'], listen: ['flick', 'rub'] },
+    { name: 'fingertip arriving on own top vs gust', f: hand({ tipToOwnTop: RUB_TIP_GUST * 0.6 }), owner: 'rub', listen: ['gust'], hold: ['gust'], deaf: ['groove'] },
+    // A sweep that crosses its own top still fires once the fingertip is past it.
+    { name: 'gust sweep crossing own top, past it', f: hand({ tipToOwnTop: RUB_TIP_GUST + 0.005 }), owner: 'rub', fire: ['gust'], deaf: ['groove'] },
+    { name: 'gust sweep clear of own top', f: hand({ tipToOwnTop: ring + RUB_TOUCH_SLACK + 0.01 }), owner: null, fire: ['gust', 'groove'] },
+    { name: 'rub vs crossguard', f: hand({ rubWindow: true, onForgeGrip: false }), owner: 'rub', deaf: ['crossguard'] },
+    // Arena Forge release: both hands get the open-palm lock and the release pull-back.
+    { name: 'forge release vs cup', f: hand({ releaseLock: RELEASE_LOCK, followLock: FLICK_AFTER_RELEASE }), owner: 'release', hold: ['cup'], listen: ['groove'] },
+    { name: 'forge release vs crossguard', f: hand({ releaseLock: RELEASE_LOCK, followLock: FLICK_AFTER_RELEASE }), owner: 'release', deaf: ['crossguard', 'gust', 'flick', 'rub'] },
+    { name: 'forge release vs cup after the open-palm lock', f: hand({ followLock: 0.05 }), owner: 'release', hold: ['cup', 'flick'], fire: ['gust'], listen: ['crossguard'] },
+    { name: 'rim spring release vs flick', f: hand({ releaseLock: SHAPING_RELEASE_LOCK, shapingLock: SHAPING_RELEASE_LOCK, needsClearance: true, followLock: FLICK_AFTER_RELEASE }), owner: 'release', deaf: ['flick', 'rub', 'cup', 'groove', 'ramp', 'grip'] },
+    { name: 'slap vs cup', f: hand({ slapPose: true }), owner: 'slap', hold: ['cup'], listen: ['slap'] },
+    { name: 'two-hand forge grip vs crossguard', f: hand({ onForgeGrip: true }), owner: 'grip', deaf: ['crossguard'], listen: ['slap', 'flick'] },
+    { name: 'two-hand forge held vs crossguard', f: hand({ held: 'forge', pinching: true }), owner: 'forge', deaf: ['crossguard', 'gust', 'flick', 'rub', 'slap', 'cup', 'groove', 'ramp'] },
+    { name: 'one-hand forge: the free hand', f: hand({ held: 'forge' }), owner: 'forge', deaf: ['crossguard', 'gust', 'flick', 'slap'] },
+    { name: 'crossguard post vs flick and slap', f: hand({ railPost: true, crossguardUp: true }), owner: 'crossguard', deaf: ['flick', 'rub', 'slap'], listen: ['crossguard', 'gust'] },
+    { name: 'crossguard beam vs the other hand\'s slap', f: hand({ crossguardUp: true }), owner: 'crossguard', deaf: ['slap'], listen: ['flick'] },
+    { name: 'cup press vs flick', f: hand({ pressing: true }), owner: 'cup', deaf: ['flick', 'rub'], fire: ['cup'] },
+    { name: 'own gust sweep vs flick', f: hand({ gustSweep: true }), owner: 'gust', deaf: ['flick', 'rub'], listen: ['gust'] },
+    { name: 'held seal vs everything', f: hand({ held: 'overforge', pinching: true }), owner: 'overforge', deaf: ['ramp', 'cup', 'groove', 'crossguard', 'gust', 'flick', 'slap'] },
+    { name: 'held rim grip keeps its shaping upkeep', f: hand({ held: 'grip', pinching: true }), owner: 'grip', listen: ['grip', 'ramp'], deaf: ['flick', 'slap', 'gust', 'crossguard', 'cup'] },
+    { name: 'flick follow-through', f: hand({ followLock: 0.3 }), owner: 'release', listen: ['flick', 'rub'], hold: ['flick', 'cup'] },
+    { name: 'an untracked hand', f: hand({ tracked: false }), owner: null, deaf: ['flick', 'cup', 'gust', 'crossguard', 'slap', 'ramp'] },
+    { name: 'a plain pinch', f: hand({ pinching: true }), owner: null, deaf: ['flick', 'cup', 'groove', 'gust', 'crossguard', 'rub', 'slap'], listen: ['ramp', 'grip', 'sling'] },
+  ];
+  for (const c of cases) {
+    assert.equal(gestureOwner(c.f), c.owner, `${c.name}: owner`);
+    for (const v of c.listen ?? []) assert.ok(mayListen(c.f, v), `${c.name}: ${v} listens (blocked by ${listenBlocker(c.f, v)})`);
+    for (const v of c.deaf ?? []) assert.ok(!mayListen(c.f, v), `${c.name}: ${v} must not listen`);
+    for (const v of c.fire ?? []) assert.ok(mayCommit(c.f, v), `${c.name}: ${v} fires (blocked by ${commitBlocker(c.f, v)})`);
+    for (const v of c.hold ?? []) assert.ok(mayListen(c.f, v) && !mayCommit(c.f, v), `${c.name}: ${v} listens but must not fire`);
+  }
+  assert.ok(heldElsewhere(hand({ held: 'ember' })) && !heldElsewhere(hand({ held: 'ramp' })), 'held rivet skips shaping, a held ramp does not');
+  assert.equal(commitBlocker(hand({ slapPose: true, followLock: 0.2 }), 'cup'), 'follow', 'the first claim in the table names the blocker');
 }
 
 console.log('sim-check: all passed');
