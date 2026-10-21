@@ -281,6 +281,11 @@ an arena. First to 4 heat wins a match.
   there is slung along the wall toward its nearest pocket. In the headless sweep with human
   reaction lag and aim error, gust moved from +0.1 to +8.9 win points over doing nothing and the
   spring from -1.6 to +10; random sweeping or springing gains about +2.
+- **Arena Forge aim:** the two-hand forge hits the rival three times as hard when it is in the
+  outer band or heading out, and only a fifth as hard in the middle, so it rewards timing.
+  Squeeze pulls your own top in and throws the rival out, and the forging top's rim holds for
+  0.4 s. In the same headless sweep: squeeze -1.0 -> +7.4, stretch +3.3 -> +6.9, tilt
+  +0.1 -> +5.6, twist +0.3 -> +3.4 win points over doing nothing; random forging +2.8.
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on
   contact, lean into hits, wobble as spin drains, then topple.
 - **Far ramps:** point the hand ray at the floor during a fight and hold the pinch to
