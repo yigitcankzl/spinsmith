@@ -6375,7 +6375,7 @@ export class MatchSystem extends createSystem({
       if (this.palmGustCooldown > 0 || speed < PALM_GUST_SPEED || path * ARENA_SCALE < 0.105) continue;
       // A fingertip arriving on your own top is a Spin Rub reaching in, not a sweep (a sweep that
       // crosses your top still fires once it is past it).
-      if (this.mine.alive && Math.hypot(index.x - this.mine.x, index.z - this.mine.z) < 0.025) continue;
+      if (this.mine.alive && Math.hypot(index.x - this.mine.x, index.z - this.mine.z) < FINGER_RADIUS + this.mine.spec.radius + 0.01) continue;
       const strength = Math.max(0.65, Math.min(1.5, speed / 0.75));
       this.doPalmGust(side, origin.x, origin.z, palm.x, palm.z, strength);
       this.palmGustSampled[side] = false;
