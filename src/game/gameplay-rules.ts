@@ -27,8 +27,3 @@ export function suddenDeathProgress(elapsed: number) {
 export function suddenDeathPocketHalf(half: number, elapsed: number) {
   return half * (1 + suddenDeathProgress(elapsed) * 0.75);
 }
-
-/** A highlighted high-risk pocket scores the comeback-sized swing. */
-export function pocketScore(highRisk: boolean) {
-  return highRisk ? 3 : 1;
-}

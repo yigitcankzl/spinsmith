@@ -44,7 +44,7 @@ gesture (rip, ramp, cup, strike) works with either hand (left-hand rip and ramp 
 Sit at a table, enable hand tracking, and allow spatial data so the arena can stand on your
 table. Everything is done with a pinch: carry your top from its dock into the arena, pinch near
 it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (from your third match, press a fingertip in for a cup, then pinch, pull and let go to sling what it caught). Pinch the small anvil to forge your top, the blueprint to build
-an arena. First to 3 heat wins a match.
+an arena. First to 4 heat wins a match.
 
 - **Shared headset:** add `?fresh` to the address to start as a new player, or `?demo` for a
   prepared level-8 smith. In the headset, hold your level plate for 2 s, then pinch it again, to
@@ -52,9 +52,10 @@ an arena. First to 3 heat wins a match.
 - **Move the arena:** at home, pinch the brass handle on the pedestal's near face and carry it.
   Its new pose is saved; when persistent WebXR anchors are available, the room remembers it.
 - **Known limits:** nothing has been measured on a headset yet; table detection relies on the
-  room's Space Setup labelling a table or desk. Depth occlusion, persistent-anchor stability and
-  gaze input have only been exercised in IWSDK's browser emulator (IWER). The online duel has
-  been run between two browser windows, not two headsets.
+  room's Space Setup labelling a table or desk. Persistent anchors have only been exercised in
+  IWSDK's browser emulator (IWER). Depth occlusion is switched off under IWER (it has no camera
+  depth), so it has not run anywhere yet. Gaze is only a head-ray stand-in in the emulator. The
+  online duel has been run between two browser windows, not two headsets.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
   slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
@@ -145,7 +146,7 @@ an arena. First to 3 heat wins a match.
   arena; the anvil and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
   the rival where lifting would push it, until your first ramp. The first match lasts at least
-  three rounds and adds one move per round: ramp, then a two-hand arena squeeze, then the ultimate (its third
+  four rounds and adds one move per round: ramp, then a two-hand arena squeeze, then the ultimate (its third
   round starts with the bar nearly full); rival tells come after that. Finishing the first match, won or
   lost, earns the Spur tip: the anvil appears and calls for it, the forge highlights only that
   part, and after saving the dock calls you back for the rematch.
@@ -237,7 +238,11 @@ an arena. First to 3 heat wins a match.
   pull to resize; the rail steps away while a piece is carried. *Try* folds the tools away and
   plays an AI-vs-AI demo round in the draft (no points), then unfolds them; *Save* stores the
   arena in the browser, adds it to the rotation and starts a match in it.
-- **Heat, first to 3:** a knockout (SLAG into a pit, THROWN over the wall, SHATTER) scores 2 heat (3 when it leaves your real table: a DESK KO), OUTLAST (the other top stops first, or has less spin at the 45 s limit) scores 1. The
+- **Heat, first to 4:** a knockout (SLAG into a pit, THROWN over the wall, SHATTER) scores 2 heat;
+  the one glowing Crucible pocket in each walled arena scores 3, and so does a top thrown off your
+  real table (a DESK KO). OUTLAST (the other top stops first, or has less spin at the 45 s limit)
+  scores 1. From 15 s the pressure phase opens the pockets (up to 75% wider by 19 s) and heats the
+  outer rim, so rounds rarely run long. The
   score shows on the match bar.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
@@ -248,7 +253,7 @@ an arena. First to 3 heat wins a match.
   the first top to roll in; pinch it, pull back and let go to sling it the other way (snapped
   into a slag pit within 20°). A cup with nothing in it, or a catch not slung, lets go after 2 s. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
   shape affects both tops. In the opening match every finish scores one heat so all three lessons
-  get a round. Afterwards knockouts score two as normal. Three charges, shown as sparks on the near rim: a shape spends one, a strong clash or about 4 s refills one, a hand keeps one live shape, and nothing can be shaped in the first 2.5 s (6 s in the first three matches). A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
+  get a round. Afterwards knockouts score two as normal. Three charges, shown as sparks on the near rim: a shape spends one, 6 s refills one, a strong clash refills one only when your own shape caused it, a hand keeps one live shape, and nothing can be shaped in the first 1.8 s. In the first three matches the rim holds your top for 6 s (10 s in the first match's second round) and holds the rival only until you act, so the lesson's move is what can win the round. A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
 - **Flick (direct touch):** your open index fingertip is a body in the fight. Lower it to the
   tops' height (it glows orange while a charge can pay, grey when not) and swing it through a top:
   the top takes the finger's speed. A real swing spends one charge; a slow touch or a top running
@@ -265,7 +270,7 @@ an arena. First to 3 heat wins a match.
   emulator's play mode a left click is a pinch, so the game is playable by looking
   around with the mouse and click-holding.
 - **The duel layer:** a forge bar (the ring on the back of each hand)
-  starts each round a fifth full (a white hot rip adds a quarter), fills on its own in 24 s and from solid clashes, three times
+  starts each round almost half full (45%; a white hot rip adds a quarter), fills on its own in 24 s and from solid clashes, three times
   as fast while your top is behind on spin. Full, press
   your palm on the table beside the arena: your strike. The seal you engrave in the forge's
   Combat drawer picks it: the Anvil Strike (a shockwave from the middle that throws tops near the
