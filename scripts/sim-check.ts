@@ -18,6 +18,7 @@ import { TableTouch } from '../src/game/table-touch.ts';
 import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { clearSnapshot, decodeSnapshot, encodeSnapshot, loadSnapshot, RESUME_KEY, RESUME_MAX_AGE, RESUME_VERSION, saveSnapshot } from '../src/game/match-resume.ts';
 import type { MatchSnapshot } from '../src/game/match-resume.ts';
+import { addDays, boutLine, COME_BACK_WORDS, comeBackCard, dayStreak, streakTitle, tomorrowLine, wordsIn } from '../src/game/come-back.ts';
 import { PEDESTAL, pickTable, pickTablePlane, placeArena, polyArea, polyMinWidth, REACH, reachSpot, tableRank, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, hudAnchors, hudAnchorsOffMatch, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
@@ -1037,6 +1038,47 @@ TUNING.grace = 0;
   saveSnapshot(snap, st);
   freshSave(st);
   assert.ok(!mem.has(RESUME_KEY), 'freshSave clears the resume snapshot');
+}
+
+// Reason to come back: the day streak counts days in a row with a finished match (alive until
+// today is over), survives a reload, and the result card names tomorrow's order and the next bout,
+// every line at six words or fewer.
+{
+  assert.equal(addDays('2026-10-31', 1), '2026-11-01', 'tomorrow crosses a month');
+  assert.equal(addDays('2026-12-31', 1), '2027-01-01', 'tomorrow crosses a year');
+  assert.equal(addDays('2026-03-01', -1), '2026-02-28', 'yesterday crosses a month back');
+  assert.equal(dayStreak([], '2026-10-22'), 0, 'no play, no streak');
+  assert.equal(dayStreak(['2026-10-20', '2026-10-21', '2026-10-22'], '2026-10-22'), 3, 'three days in a row');
+  assert.equal(dayStreak(['2026-10-20', '2026-10-21'], '2026-10-22'), 2, 'a streak is alive until today is over');
+  assert.equal(dayStreak(['2026-10-19', '2026-10-21', '2026-10-22'], '2026-10-22'), 2, 'a missed day breaks the streak');
+  assert.equal(dayStreak(['2026-10-19', '2026-10-20'], '2026-10-22'), 0, 'two days away ends it');
+  assert.equal(streakTitle(1, true), 'DAY 1 STREAK');
+  assert.equal(streakTitle(3, false), '3-DAY STREAK · PLAY TODAY');
+  const mem = new Map<string, string>();
+  const st = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) };
+  const p = new Progress(st);
+  for (const d of ['2026-10-21', '2026-10-22', '2026-10-22']) p.playedOn(d);
+  const reloaded = new Progress(st);
+  assert.ok(reloaded.hasPlayed('2026-10-22') && reloaded.streak('2026-10-22') === 2 && reloaded.streak('2026-10-23') === 2 && reloaded.streak('2026-10-24') === 0, 'the streak is saved and read back');
+  reloaded.reset();
+  assert.equal(new Progress(st).streak('2026-10-22'), 0, 'a new smith has no streak');
+  // The demo save shows a live three-day streak on its board.
+  const demo = demoSave(st, new Date(2026, 9, 7));
+  assert.ok(demo.streak('2026-10-07') === 3 && !demo.hasPlayed('2026-10-07'), 'the demo smith has a streak to keep today');
+  // Tomorrow's order is a real order for tomorrow's date: deterministic, and what the card says.
+  const ctx = { rivals: RIVALS.map((r) => r.name), arenas: ARENAS, built: [], table: true };
+  const tomorrow = dailyOrder(addDays('2026-10-22', 1), ctx);
+  assert.equal(tomorrow.date, '2026-10-23');
+  assert.deepEqual(dailyOrder('2026-10-23', ctx), tomorrow, 'the teaser is the order tomorrow brings');
+  assert.equal(tomorrowLine(tomorrow), `Tomorrow: ${tomorrow.rival} in ${tomorrow.arena}`);
+  const card = comeBackCard(1, tomorrow, nextBout({}, true, 0));
+  assert.deepEqual(card.split('\n'), ['DAY 1 STREAK', `Tomorrow: ${tomorrow.rival} in ${tomorrow.arena}`, 'Next bout 1-1: Drifter'], 'the first card: streak, tomorrow, next bout');
+  assert.equal(comeBackCard(4, null, null), 'DAY 4 STREAK\nTomorrow: a new Smith Order', 'no order known, no bout left: still a pull');
+  // Every rival, arena and bout (and a long workshop arena name) stays within six words a line.
+  const lines: string[] = [streakTitle(12, true), streakTitle(12, false), tomorrowLine(null)];
+  for (const r of RIVALS) for (const a of [...ARENAS.map((x) => x.name), 'My Very Own Big Arena']) lines.push(tomorrowLine({ date: '2026-10-23', rival: r.name, arena: a, goal: 'burst', text: '' }));
+  for (const b of BOUTS) lines.push(boutLine(b));
+  for (const l of lines) assert.ok(wordsIn(l) <= COME_BACK_WORDS && wordsIn(l) > 0, `come-back line too long: ${l}`);
 }
 
 // 16. Reach: every target touched directly sits within a seated arm's comfortable reach and not

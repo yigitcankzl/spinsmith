@@ -54,6 +54,7 @@ import { ECHO_KEY } from './echo.js';
 import { popIn } from './rim.js';
 import { ARENA_SCALE, BRAWL_AT, COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
+import { localDate } from './orders.js';
 import { FEATS, MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
 import { bevelBox, BRASS, FORGED, GRAPHITE, GRAPHITE_AO, plastic, STEEL } from './materials.js';
@@ -286,6 +287,8 @@ export class Hub {
         ].join(' · '),
         feats: progress.feats.size,
         featsOf: Object.keys(FEATS).length,
+        streak: progress.streak(localDate(new Date())),
+        playedToday: progress.hasPlayed(localDate(new Date())),
       };
       this.board.draw(this.boardState, this.boardBack > 0);
       this.fillChampions(progress);

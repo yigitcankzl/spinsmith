@@ -21,6 +21,7 @@ import { CLAIM, LESSON, lessonText } from './lessons.js';
 import type { OpeningZone, ReleasedVerb } from './progress.js';
 import { rematchAdvice } from './mastery.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
+import { addDays, comeBackCard } from './come-back.js';
 import { nextArena } from './rotation.js';
 import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
@@ -504,6 +505,8 @@ export class MatchSystem extends createSystem({
   private reveal: { obj: Object3D; t: number } | null = null;
   /** One unlock shown per result card (the first session's part first); the rest wait for the next ones. */
   private revealedHere = false;
+  /** The come-back card (streak, tomorrow) still to show on this match's result. */
+  private comeBackPending = false;
   private rewardHold = 0;
   /** Home screen buttons, in front of the arena; and the small MENU plate during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
@@ -2361,19 +2364,11 @@ export class MatchSystem extends createSystem({
     this.mine.state = 'out';
     // Today's order, from the local date and what the player can meet and play now.
     this.orderMatch = false;
-    const now = new Date();
-    const today = localDate(now);
-    const ctx = {
-      rivals: RIVALS.filter((r) => r.level <= this.progress.level).map((r) => r.name),
-      arenas: ARENAS.filter((a) => this.progress.isUnlocked(`arena:${a.name}`)),
-      built: this.arenas.filter((a) => !ARENAS.includes(a)),
-      cup: this.taught('cup'),
-      table: !!ROOM.poly,
-      medal: medalOrder(this.progress.bouts, !!ROOM.poly) ?? undefined,
-    };
+    const today = localDate(new Date());
+    const ctx = this.orderContext();
     this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
     // A teaser of tomorrow's order once today's is done (as things stand now).
-    const tomorrow = this.progress.hasOrder(today) ? dailyOrder(localDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)), ctx) : null;
+    const tomorrow = this.progress.hasOrder(today) ? dailyOrder(addDays(today, 1), ctx) : null;
     this.hub.show(this.myBuild, this.progress, this.order, tomorrow, this.nextRival ? `${this.nextRival.name} in ${this.arenas[this.arenaIndex].name}${this.boutText(this.nextRival.name)}` : null);
     this.rebuildDeskMemory();
     if (import.meta.env.DEV) console.log(`[ORDER] today ${this.order.date}: ${this.order.text} in ${this.order.arena}${this.progress.hasOrder(this.order.date) ? ' (done)' : ''} · ${this.progress.stamps} stamps`);
@@ -2393,6 +2388,25 @@ export class MatchSystem extends createSystem({
     this.label.mesh.position.set(LABEL_AT.x, this.progress.guide === 'done' ? HOME_NOTE_Y : LABEL_AT.y, LABEL_AT.z);
     this.label.mesh.scale.setScalar(1.25);
     if (import.meta.env.DEV) this.hubLogPending = true;
+  }
+
+  /** What a Smith Order can ask of this player now (orders.ts OrderContext). */
+  private orderContext() {
+    return {
+      rivals: RIVALS.filter((r) => r.level <= this.progress.level).map((r) => r.name),
+      arenas: ARENAS.filter((a) => this.progress.isUnlocked(`arena:${a.name}`)),
+      built: this.arenas.filter((a) => !ARENAS.includes(a)),
+      cup: this.taught('cup'),
+      table: !!ROOM.poly,
+      medal: medalOrder(this.progress.bouts, !!ROOM.poly) ?? undefined,
+    };
+  }
+
+  /** The match result's last card: the day streak, tomorrow's Smith Order and the next bout. */
+  private comeBackText() {
+    const today = localDate(new Date());
+    const p = this.progress;
+    return comeBackCard(p.streak(today), dailyOrder(addDays(today, 1), this.orderContext()), nextBout(p.bouts, p.matches % 2 === 0, p.matches));
   }
 
   /** A ray from the arena centre to the known table polygon, pulled inward to keep the trophy on wood. */
@@ -8226,6 +8240,7 @@ export class MatchSystem extends createSystem({
       this.online.result(v, heat);
     }
     this.phase = 'result';
+    this.comeBackPending = false;
     this.deskKoScored = deskKo;
     if (deskKo) this.setDeskKoStage(3);
     this.resultTimer = RESULT_TIME;
@@ -8273,6 +8288,7 @@ export class MatchSystem extends createSystem({
         playMatch(youWon);
         this.matchLog.won = youWon;
         this.matchLog.score = `${this.myPoints} - ${this.theirPoints}`;
+        this.comeBackPending = !this.online;
         if (youWon && this.theirPoints === 0) this.featDone('flawless');
         if (youWon && this.wasDown) this.featDone('comeback');
         if (youWon && !this.demo && this.progress.wonMatchIn(this.arena.layout.name)) this.featDone('everyArena');
@@ -8295,6 +8311,8 @@ export class MatchSystem extends createSystem({
         this.resumeSnap = null;
         clearSnapshot(localStorage);
         this.markFirstFive(5);
+        // A finished match keeps the day streak; its last card says what waits tomorrow.
+        if (!this.demo && !this.online) this.progress.playedOn(localDate(new Date()));
         // The match becomes your echo: the board's challenge code carries it to a friend.
         if (!this.demo && !this.extras.length && !this.online && this.echoRec.rips.length) {
           try {
@@ -9251,6 +9269,10 @@ export class MatchSystem extends createSystem({
       this.label.set(revealText(key));
       // Keep the result up while it shows.
       this.resultTimer = Math.max(this.resultTimer, 2.8);
+    } else if (this.comeBackPending && !this.reveal && !this.replay && this.matchOver && !this.reveals.length && this.phase === 'result' && this.resultTimer < 1.2) {
+      // Once the result and every unlock have been read: why to come back tomorrow.
+      this.comeBackPending = false;
+      this.label.set(this.comeBackText());
     }
     const r = this.reveal;
     if (!r) return;

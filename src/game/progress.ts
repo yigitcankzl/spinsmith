@@ -9,6 +9,7 @@ import type { TopBuild } from './parts.ts';
 import { migrateBuild, migrateKey } from './parts.ts';
 import type { Order } from './orders.ts';
 import { BOUTS, boutOpen } from './campaign.ts';
+import { dayStreak } from './come-back.ts';
 import type { BoutRecord } from './campaign.ts';
 
 export const MAX_LEVEL = 20;
@@ -268,6 +269,8 @@ export interface Storage {
 }
 
 const KEY = 'spinsmith.progress.v1';
+/** Play dates kept for the day streak (a longer streak still counts up to this). */
+const DAYS_KEPT = 400;
 
 export class Progress {
   level = 1;
@@ -281,6 +284,8 @@ export class Progress {
   private quests = new Set<string>();
   /** Dates (YYYY-MM-DD) whose Smith Order was done: one stamp each. */
   private orders = new Set<string>();
+  /** Dates (YYYY-MM-DD) a match was finished on, the newest DAYS_KEPT: the day streak. */
+  private days = new Set<string>();
   /** Marks (MARK bits) per rival name. */
   private marks: Record<string, number> = {};
   /** What each rival saw in the player's recent openings. */
@@ -315,7 +320,7 @@ export class Progress {
     try {
       const raw = storage?.getItem(KEY);
       if (raw) {
-        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; openings?: Record<string, OpeningMemory>; scars?: Record<string, TopScars>; champions?: Champion[]; deskTrophies?: DeskTrophy[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[]; bouts?: BoutRecord; boutLosses?: Record<string, number>; secrets?: string[] };
+        const s = JSON.parse(raw) as { level: number; xp: number; unlocked: string[]; quests: string[]; matches?: number; guide?: Guide; orders?: string[]; marks?: Record<string, number>; openings?: Record<string, OpeningMemory>; scars?: Record<string, TopScars>; champions?: Champion[]; deskTrophies?: DeskTrophy[]; order?: Order; arenaPin?: string | null; recentArenas?: string[]; playedArenas?: string[]; records?: { rip?: number; fastestKo?: number }; feats?: string[]; wonIn?: string[]; bouts?: BoutRecord; boutLosses?: Record<string, number>; secrets?: string[]; days?: string[] };
         this.matches = s.matches ?? 0;
         // Saves from before the guide existed skip it.
         this.guide = s.guide ?? (this.matches > 0 || s.level > 1 ? 'done' : 'launch');
@@ -326,6 +331,7 @@ export class Progress {
         for (let lv = 2; lv <= this.level; lv++) for (const m of [LEVEL_UNLOCKS, ARENA_UNLOCKS, SEAL_UNLOCKS, RIVAL_UNLOCKS]) if (m[lv]) this.unlocked.add(m[lv]);
         for (const q of s.quests) this.quests.add(q);
         for (const d of s.orders ?? []) this.orders.add(d);
+        for (const d of s.days ?? []) if (typeof d === 'string') this.days.add(d);
         this.marks = { ...(s.marks ?? {}) };
         this.openings = { ...(s.openings ?? {}) };
         this.scars = { ...(s.scars ?? {}) };
@@ -450,6 +456,23 @@ export class Progress {
 
   hasOrder(date: string) {
     return this.orders.has(date);
+  }
+
+  /** A match was finished on this local date (YYYY-MM-DD): it counts toward the day streak. */
+  playedOn(date: string) {
+    if (this.days.has(date)) return;
+    this.days.add(date);
+    this.days = new Set([...this.days].sort().slice(-DAYS_KEPT));
+    this.save();
+  }
+
+  hasPlayed(date: string) {
+    return this.days.has(date);
+  }
+
+  /** Days in a row with a finished match, up to today (or yesterday while today is unplayed). */
+  streak(today: string): number {
+    return dayStreak(this.days, today);
   }
 
   /** Today's order is done: a stamp, its XP (with any level-ups) and any glow it earns. */
@@ -608,6 +631,7 @@ export class Progress {
     this.unlocked = new Set(STARTERS);
     this.quests.clear();
     this.orders.clear();
+    this.days.clear();
     this.marks = {};
     this.openings = {};
     this.scars = {};
@@ -637,7 +661,7 @@ export class Progress {
     try {
       this.storage?.setItem(
         KEY,
-        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, openings: this.openings, scars: this.scars, champions: this.champions, deskTrophies: this.deskTrophies, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn], bouts: this.bouts, boutLosses: this.boutLosses, secrets: [...this.secrets] }),
+        JSON.stringify({ level: this.level, xp: this.xp, unlocked: [...this.unlocked], quests: [...this.quests], matches: this.matches, guide: this.guide, orders: [...this.orders], marks: this.marks, openings: this.openings, scars: this.scars, champions: this.champions, deskTrophies: this.deskTrophies, order: this.order, arenaPin: this.arenaPin, recentArenas: this.recentArenas, playedArenas: this.playedArenas, records: this.records, feats: [...this.feats], wonIn: [...this.wonIn], bouts: this.bouts, boutLosses: this.boutLosses, secrets: [...this.secrets], days: [...this.days] }),
       );
     } catch {
       // Storage full or blocked (a private window): progress lives for this session only.

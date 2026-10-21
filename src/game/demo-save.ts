@@ -35,13 +35,18 @@ export function freshSave(storage: WritableStorage) {
   for (const k of keys) storage.removeItem(k);
 }
 
-/** A smith at level 8, past the first session, with three stamps, some marks, the first chapter cleared and two champions. */
+/** A smith at level 8, past the first session, with three stamps, a three-day streak, some marks, the first chapter cleared and two champions. */
 export function demoSave(storage: WritableStorage, today = new Date()): Progress {
   freshSave(storage);
   const p = new Progress(storage);
   while (p.level < 8) p.award({ won: true, finish: 'pocket', perfect: false, matchOver: true, matchWon: true });
   p.advance('done');
-  for (let d = 3; d >= 1; d--) p.completeOrder(localDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - d)));
+  for (let d = 3; d >= 1; d--) {
+    const day = localDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - d));
+    p.completeOrder(day);
+    // Played on each of those days too: a three-day streak, alive until today is played.
+    p.playedOn(day);
+  }
   p.mark('Rim Raider', MARK.beaten | MARK.knockout | MARK.shape);
   p.mark('Iron Keep', MARK.beaten | MARK.knockout);
   p.mark('Drifter', MARK.beaten);
