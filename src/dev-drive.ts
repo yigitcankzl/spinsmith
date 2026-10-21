@@ -830,16 +830,18 @@ export function installDriver() {
       for (let i = 0; i < 260 && (g.outerRingState !== 'rescue' || !g.outerRingGoal || g.outerRingGoal.lengthSq() < 1e-6); i++) await wait(0.016);
       if (g.outerRingState !== 'rescue' || !g.outerRingAt || !g.outerRingGoal) throw new Error(`Outer Ring did not arm (${g.outerRingState ?? 'unknown'})`);
       const start = g.root.localToWorld(g.outerRingAt.clone());
-      const goal = g.root.localToWorld(g.outerRingGoal.clone());
+      // The arena can still be sliding to its match size (after a forge), so the goal is re-read
+      // every frame instead of frozen in world space.
+      const goalNow = () => g.root.localToWorld(g.outerRingGoal!.clone());
       await setPinch(side, false);
       await glide(side, 'palm', above(start, 0.04), 0.22, 0);
       // Follow the drifting desk top with relaxed fingers; the game's palm midpoint, not a pinch,
       // performs the catch. The wider dev tolerance covers IWER's generic open-hand proportions.
       await glide(side, 'palm', () => g.root.localToWorld(g.outerRingAt!.clone()), 0.22, 0);
-      await glide(side, 'palm', goal, 0.65, 0, 'linear');
+      await glide(side, 'palm', goalNow, 0.65, 0, 'linear');
       for (let i = 0; i < 180 && String(g.outerRingState) !== 'returned'; i++) await wait(0.016);
       const returned = !!g.outerRingCompleted || String(g.outerRingState) === 'returned';
-      await glide(side, 'palm', above(goal, 0.08), 0.2, 0);
+      await glide(side, 'palm', above(goalNow(), 0.08), 0.2, 0);
       await park(side);
       // The visible return state intentionally fades back to idle after 1.2 game seconds. On a
       // slow headless run that fade can finish while the hand is merely parking, so remember the

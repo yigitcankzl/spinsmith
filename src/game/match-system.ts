@@ -6134,6 +6134,9 @@ export class MatchSystem extends createSystem({
           continue;
         }
         this.blockShapingRelease(side);
+        // The swing was a flick: the floor stroke it started is not also a Finger Groove.
+        this.grooving[side] = null;
+        this.pendingGroove[side] = null;
         this.flickReadyAt[side] = this.time + FLICK_FOLLOW_THROUGH;
         if (this.online?.role === 'guest' && this.online.peer) {
           const target = top === this.mine ? 'mine' : 'rival';
@@ -7838,7 +7841,7 @@ export class MatchSystem extends createSystem({
       this.outerRingState = 'failed';
       this.outerRail.visible = false;
       this.label.set(LESSON.edgeKo);
-      if (import.meta.env.DEV) console.log('[OUTER] rescue failed');
+      if (import.meta.env.DEV) console.log(`[OUTER] rescue failed: ${this.outerRingState} left ${this.outerRingLeft.toFixed(2)} offDesk ${this.myView.offDesk} resting ${this.myView.restingAt !== null} at ${!!at} rail ${this.outerRailLength.toFixed(3)}`);
       this.finish(-1);
       return true;
     }
