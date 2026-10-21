@@ -101,7 +101,15 @@ export default async function run({ page, frame }) {
     game.charges.charges = 3;
     Object.assign(game.mine, { x: -0.07, z: -0.04, vx: 0, vz: 0, spin: 1.1, state: 'spinning' });
     Object.assign(game.theirs, { x: 0.06, z: 0, vx: 0, vz: 0, spin: 1.1, state: 'spinning' });
-    await drive.ramp({ at: { x: 0.06, z: 0 }, angle: 0, hold: 0.4, side: 'right' });
+    // Live tops drift during the hand's approach; hold them in place until the ramp is drawn so
+    // the rival is still on the spot the hand aims at.
+    const pin = () => {
+      Object.assign(game.mine, { x: -0.07, z: -0.04, vx: 0, vz: 0 });
+      Object.assign(game.theirs, { x: 0.06, z: 0, vx: 0, vz: 0 });
+    };
+    const pinned = setInterval(() => (game.arena.shapes.some((s) => s.kind === 'ramp') ? clearInterval(pinned) : pin()), 16);
+    // The finish must land inside the 1.5 s cause window, so it is not held until the hand retreats.
+    const ramping = drive.ramp({ at: { x: 0.06, z: 0 }, angle: 0, hold: 0.4, side: 'right' }).finally(() => clearInterval(pinned));
     const impact = await waitFor(() => {
       const state = drive.state();
       return (state.diagnostics?.causeChain ?? 0) >= 2 ? state : null;
@@ -115,6 +123,7 @@ export default async function run({ page, frame }) {
       return state.diagnostics?.uiLayer === 4 ? state : null;
     }, 'result information layer did not take over after the finish');
     if (finish.diagnostics?.causeChain !== 3) throw new Error(`finish did not complete cause chain (${finish.diagnostics?.causeChain})`);
+    await ramping;
     return {
       tells,
       cause: {
