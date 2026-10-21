@@ -1861,7 +1861,8 @@ export class MatchSystem extends createSystem({
           break;
         }
         if (resultAction === 'menu') {
-          if (this.time - this.menuArmed < 3) {
+          // A finished match has nothing left to lose: MENU goes straight home.
+          if (this.matchOver || this.time - this.menuArmed < 3) {
             this.menuArmed = -10;
             this.menuButton.set('MENU', undefined, false);
             // Going home ends an online duel for both tables (the other side hears 'bye').
@@ -8161,6 +8162,9 @@ export class MatchSystem extends createSystem({
       // A finish within 1.5 s of the player's shape names it as the cause.
       const recent = this.recentPlayerCause();
       const theirs = this.elapsed - this.rivalShapeAt < CAUSE_WINDOW;
+      // Your own move is blamed for your knockout only when nothing the rival did could have caused
+      // it, and never a defensive one (a parry or palm wall cannot throw your top out).
+      const ownBackfired = !!recent && v === -1 && loser.finish !== 'spin' && !theirs && this.lastShape?.kind !== 'parry';
       if (!this.demo && this.progress.guide === 'done' && v === 1 && loser.finish !== 'spin' && this.progress.best('fastestKo', Math.round(this.elapsed * 10) / 10)) this.stamp.later('NEW BEST!', `Fastest knockout: ${this.elapsed.toFixed(1)} s`, 'mine', 1);
       if (v === 1 && loser.finish !== 'spin' && recent && this.lastShape) {
         const k = this.lastShape.kind;
@@ -8194,11 +8198,11 @@ export class MatchSystem extends createSystem({
           this.slowMo = SLOW_MO_TIME;
           this.sparks.burst(loser.x, this.arena.height(loser.x, loser.z), loser.z, 1);
         }
-      } else if (recent && v === -1 && loser.finish !== 'spin' && !(theirs && this.rivalShapeAt > this.lastShape!.t)) text = `YOUR ${recent} BACKFIRED\n${text.split('\n').pop()}`;
+      } else if (ownBackfired) text = `YOUR ${recent} BACKFIRED\n${text.split('\n').pop()}`;
       else if (theirs && v === -1 && loser.finish !== 'spin') text = `THEIR ${this.rivalShapeKind} → ${FINISH_WORD[loser.finish ?? 'spin']}\n${text.split('\n').pop()}`;
       if (decided && v === -1) {
         const rivalMove = theirs && loser.finish !== 'spin' ? this.rivalShapeKind : null;
-        const ownBackfire = recent && loser.finish !== 'spin' && !(theirs && this.rivalShapeAt > this.lastShape!.t) ? recent : null;
+        const ownBackfire = ownBackfired ? recent : null;
         this.rematchTip = rematchAdvice({
           openingOutcome: this.openingOutcome,
           zone: this.lastOpeningTrace?.zone ?? this.launchZoneKind,
