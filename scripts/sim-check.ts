@@ -20,7 +20,7 @@ import { PEDESTAL, pickTable, pickTablePlane, placeArena, polyArea, polyMinWidth
 import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, hudAnchors, hudAnchorsOffMatch, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { crossguard, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { DESK_DROP_ON, crossguard, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
@@ -1818,6 +1818,37 @@ assert.equal(edgeOf('defense', 'defense'), 0);
   // Centre off the table, or no table: none.
   assert.equal(deskSectors(square(2, 0, 0.5), 0.15, 0.1).length, 0, 'off table: no sectors');
   assert.equal(deskSectors(null, 0.15, 0.1).length, 0, 'no table: no sectors');
+}
+
+// The drop side: the rim facing a close real desk edge is lower for both tops, every round. A throw
+// the plain rim holds goes over it there (every wall kind, every top type), the same throw facing
+// away from it is held, the opening grace still holds, and no sectors (the tray) is the plain rim.
+if (DESK_DROP_ON) {
+  const thrown = (wall: ArenaLayout['wall'], a: number, v: number, drop: number | null, spec: TopSpec, elapsed = 5) => {
+    const arena = arenaWith({ wall, pockets: [], rails: [] });
+    arena.grace = 1.8;
+    arena.elapsed = elapsed;
+    if (drop !== null) arena.drops = [{ angle: drop, half: Math.PI / 4 }];
+    const t = new Top(spec);
+    const r = FORGE.radius * 0.6;
+    t.launch(Math.cos(a) * r, Math.sin(a) * r, Math.cos(a) * v, Math.sin(a) * v, 1, 1);
+    solo(arena, t, 0.6);
+    return t.finish;
+  };
+  const cases: [ArenaLayout['wall'], number][] = [['low', 0.7], ['standard', 0.9], ['high', 0.9], ['none', 0.8]];
+  for (const [wall, v] of cases)
+    for (const spec of [ATTACK, DEFENSE, STAMINA])
+      for (const a of [0.3, 2.2, -1.6]) {
+        if (wall !== 'none' || spec !== ATTACK) assert.equal(thrown(wall, a, v, null, spec), null, `${wall} wall holds a ${v} m/s ${spec.name} on the plain rim`);
+        assert.equal(thrown(wall, a, v, a, spec), 'over', `${wall} wall: a ${v} m/s ${spec.name} goes over the drop side at ${a}`);
+        assert.equal(thrown(wall, a, v, a + Math.PI, spec), wall === 'none' && spec === ATTACK ? 'over' : null, `${wall} wall: the rim across from the drop side is unchanged`);
+      }
+  assert.equal(thrown('standard', 1, 0.9, 1, ATTACK, 0), null, 'the opening grace holds the drop side too');
+  assert.equal(thrown('standard', 1, 0.5, 1, ATTACK), null, 'a soft roll stays in on the drop side');
+  const plain = arenaWith({});
+  assert.ok(!plain.dropAt(0) && !plain.dropAt(Math.PI), 'no sectors: no drop side (tray play unchanged)');
+  plain.drops = [{ angle: Math.PI - 0.1, half: 0.3 }];
+  assert.ok(plain.dropAt(-Math.PI + 0.1) && !plain.dropAt(0), 'drop side is wrap-safe');
 }
 
 // The first match's staged DESK KO: steered to the edge-facing rim, the forge wrench throws every

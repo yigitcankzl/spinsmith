@@ -33,3 +33,16 @@ line('human + hammer', reportShaping(humanStrike(humanBoth(), undefined, 'hammer
 line('human + ward', reportShaping(humanStrike(humanBoth(), undefined, 'ward'), 12), 'within 3 of the anvil');
 line('none vs a charging rival', reportShaping(POLICIES.none, 12, rivalWithMove('charge')));
 line('human + strike vs charging', reportShaping(humanStrike(humanBoth()), 12, rivalWithMove('charge')));
+// The drop side (sim.ts DESK_DROP_ESCAPE): a real desk edge close on the right of the arena (one
+// red arc, 90 degrees wide). Both tops leave over that rim more easily; points count its DESK KO.
+// Reading the arc must beat the same habit aimed at the plain rim across from it, and mashing.
+const deskSide = [{ angle: 0, half: Math.PI / 4 }];
+const desk = (name: string, r: ShapingResult, goal = '') => {
+  const f = r.finishes;
+  console.log(`desk: ${name.padEnd(24)} win ${pct(r.win)}, heat/round ${r.pointsPerRound.toFixed(2)}, median ${r.medianRound.toFixed(1)} s, finishes pocket ${pct(f.pocket)} / over ${pct(f.over)} (drop side ${pct(r.overDrop)}) / burst ${pct(f.burst)} / spin ${pct(f.spin)}${goal ? `   (target: ${goal})` : ''}`);
+};
+desk('none', reportShaping(POLICIES.none, 24, undefined, deskSide), 'win ~50, over < 70% of finishes');
+desk('masher (random)', reportShaping(POLICIES.random, 24, undefined, deskSide), 'win at most +3 over none');
+desk('human ramp', reportShaping(humanRamp(0.35), 24, undefined, deskSide));
+desk('human ramp, reads the arc', reportShaping(humanRamp(0.35, undefined, 0), 24, undefined, deskSide), 'beats the masher and the wrong-rim control');
+desk('control: wrong rim', reportShaping(humanRamp(0.35, undefined, Math.PI), 24, undefined, deskSide));
