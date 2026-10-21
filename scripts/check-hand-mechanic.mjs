@@ -75,7 +75,7 @@ export default async function run({ page, frame }) {
       const pinned = setInterval(pin, 16);
       action = (async () => {
         const ramp = await drive.hoverArena({ n: 0.7, angle: 0, side: 'right' });
-        const forge = await drive.hoverArena({ n: 0.86, angle: Math.PI / 4, side: 'right' });
+        const forge = await drive.hoverArena({ n: 0.86, angle: (65 * Math.PI) / 180, side: 'right' });
         const rim = await drive.hoverArena({ n: 0.94, angle: 0, side: 'right' });
         intentProof = { ramp, forge, rim };
         if (ramp.claim !== 'RAMP' || !ramp.label.includes('RAMP CLAIMED')) throw new Error(`floor preview disagreed with Ramp: ${JSON.stringify(ramp)}`);

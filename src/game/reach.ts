@@ -68,9 +68,13 @@ export function traySpot(i: number, n: number): Spot {
 
 /**
  * The two-hand forge grips: on the rim's near half, this far round toward the player from the
- * sides, just inside the rim. Grips at the sides (x = +-r) put the hands about 0.85 m from the eyes.
+ * sides, just inside the rim. Grips at the sides (x = +-r) put the hands about 0.85 m from the eyes;
+ * 65 degrees round (50 degrees apart, about 21 cm between the hands on the smallest arena) keeps
+ * every arena's grips within 2 ft (0.61 m) of a seated player's eyes for trays up to 0.4 m below them.
  */
-export const FORGE_GRIP = { angle: Math.PI / 4, n: 0.86 };
+export const FORGE_GRIP = { angle: (65 * Math.PI) / 180, n: 0.86 };
+/** Two rim pinches forge only when they are at least about 25 degrees apart (the cosine of the angle between them). */
+export const FORGE_GRIP_MAX_COS = 0.9;
 
 /** True only in the two authored inner-rim sectors that belong to two-hand Arena Forge. */
 export function forgeGripIntent(n: number, angle: number) {
@@ -96,8 +100,8 @@ export function eyeView(p: Spot, drop: number, reach = REACH): { distance: numbe
   return { distance: Math.hypot(across, y), below: (Math.atan2(-y, across) * 180) / Math.PI };
 }
 
-/** Every target touched directly: tab ends, rail ends, the tray's nearest and outer parts, the home stations. */
-export function touchTargets(): [string, Spot][] {
+/** Every target touched directly: tab ends, rail ends, the tray's nearest and outer parts, the home stations, the forge grips of `layouts` (floor level). */
+export function touchTargets(layouts: ArenaLayout[] = []): [string, Spot][] {
   const tabEnd = (n: number) => ((n - 1) / 2) * TAB_LINE.gap;
   return [
     ['tab, center', { x: 0, y: TAB_LINE.y, z: TAB_LINE.z }],
@@ -113,5 +117,6 @@ export function touchTargets(): [string, Spot][] {
     ['blueprint', { ...BLUEPRINT_AT, y: TABLE_Y + 0.02 }],
     ['comfort dial', { ...COMFORT_AT, y: TABLE_Y + 0.012 }],
     ['brawl pegs', { ...BRAWL_AT, y: TABLE_Y + 0.012 }],
+    ...layouts.flatMap((l) => forgeGrips(l).map((g, i): [string, Spot] => [`${l.name} forge grip ${i ? 'right' : 'left'}`, g])),
   ];
 }

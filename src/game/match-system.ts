@@ -9,7 +9,7 @@ import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { cloneLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance, validate } from './layout.js';
-import { forgeGripIntent, forgeGrips } from './reach.js';
+import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
@@ -4904,9 +4904,9 @@ export class MatchSystem extends createSystem({
       if (!a || !b || !left.tracked || !right.tracked || !left.pinching || !right.pinching) return false;
       const ar = Math.hypot(a.sx, a.sz) || 1;
       const br = Math.hypot(b.sx, b.sz) || 1;
-      // The grips sit 90 degrees apart on the near half (reach.ts FORGE_GRIP); anything wider than
-      // about 70 degrees counts, so a sloppy grip still forges but two pinches side by side do not.
-      if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > 0.3) return false;
+      // The grips sit 50 degrees apart on the near half (reach.ts FORGE_GRIP); anything wider than
+      // about 25 degrees counts, so a sloppy grip still forges but two pinches side by side do not.
+      if ((a.sx * b.sx + a.sz * b.sz) / (ar * br) > FORGE_GRIP_MAX_COS) return false;
       // Starting the grab is free. The charge is committed only after a deliberate release.
       if (this.charges.charges < 1) {
         this.locked('No charge yet\nCharges refill in a moment');
