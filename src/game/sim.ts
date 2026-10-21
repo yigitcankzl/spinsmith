@@ -699,6 +699,8 @@ export class Top {
   sinceBump = 99;
   /** Seconds since a hand last touched it (large = none recently). */
   sinceTouch = 99;
+  /** Arena time until which the rim holds this top alone and it cannot burst (a lesson's safety for the learner only). */
+  shieldUntil = 0;
   /** Seconds since a hard knock on the wall, and how hard it was (outward m/s): for scrape sparks. */
   sinceWall = 99;
   wallHit = 0;
@@ -739,7 +741,7 @@ export class Top {
   }
 
   launch(x: number, z: number, vx: number, vz: number, spin: number, hand: number) {
-    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sinceTouch: 99, sinceWall: 99, sincePad: 99, tell: 0, rushing: 0, charging: 0, chargeAngle: 0, hammer: 0, hammerX: 0, hammerZ: 0, guard: 0, guardAngle: 0, anchor: 0, damage: 0, pocketPoints: 2, finish: null, outAt: -1, state: 'spinning' as Outcome });
+    Object.assign(this, { x, z, vx, vz, spin, hand, angle: 0, wobble: 0, kick: 0, lifted: 0, sinceDash: 99, sinceBump: 99, sinceTouch: 99, shieldUntil: 0, sinceWall: 99, sincePad: 99, tell: 0, rushing: 0, charging: 0, chargeAngle: 0, hammer: 0, hammerX: 0, hammerZ: 0, guard: 0, guardAngle: 0, anchor: 0, damage: 0, pocketPoints: 2, finish: null, outAt: -1, state: 'spinning' as Outcome });
   }
 
   get alive() {
@@ -1499,7 +1501,7 @@ function wall(arena: Arena, t: Top) {
   const rim = rimRadius(L, angle);
   const r = Math.hypot(t.x, t.z);
   // Ward holds only the palm-authored rim sector; every other exit stays dangerous.
-  const open = arena.elapsed >= arena.grace && !wardCovers(t, angle);
+  const open = arena.elapsed >= Math.max(arena.grace, t.shieldUntil) && !wardCovers(t, angle);
   // No wall: crossing the edge is a ring-out (sumo).
   if (L.wall === 'none') {
     // Out once its center has crossed the edge (riding the berm is still in); during the opening
@@ -1662,9 +1664,9 @@ function collide(a: Top, b: Top, arena: Arena | null = null): Clash | null {
   const dB = (TUNING.burst * impulse * impulse * a.spec.punch * a.spec.chip * hitB) / b.spec.burstResist;
   a.damage += hitA > 1 ? Math.max(HAMMER_FLOOR, dA) : dA;
   b.damage += hitB > 1 ? Math.max(HAMMER_FLOOR, dB) : dB;
-  const burstOpen = !arena || arena.elapsed >= arena.grace;
-  if (burstOpen && a.damage >= 1) burstApart(a);
-  if (burstOpen && b.damage >= 1) burstApart(b);
+  const burstOpen = (t: Top) => !arena || arena.elapsed >= Math.max(arena.grace, t.shieldUntil);
+  if (burstOpen(a) && a.damage >= 1) burstApart(a);
+  if (burstOpen(b) && b.damage >= 1) burstApart(b);
   let shapeOwner: string | undefined;
   if (arena) {
     let influence = 0;

@@ -4365,6 +4365,7 @@ export class MatchSystem extends createSystem({
 
   /** Counts a player-authored arena change and marks the signature loop as reached. */
   private recordIntervention() {
+    this.theirs.shieldUntil = 0;
     this.interventionCount++;
     this.rootEntity?.setValue(FirstFiveState, 'interventions', this.interventionCount);
     this.markFirstFive(4);
@@ -4630,9 +4631,13 @@ export class MatchSystem extends createSystem({
     // The first three matches each teach one hand move; none should end before it can be tried.
     // The second round is the two-hand lesson. Its longer opening keeps the tops in view while the
     // mirrored hands demonstrate Squeeze; the third still leaves room to charge the ultimate.
-    this.arena.grace = !this.demo && this.progress.matches === 0 && this.tutorialRound === 2
+    // Lesson rounds: the rim holds your top so no round is lost before the move can be tried, and
+    // holds the rival only until you act (recordIntervention), so the lesson's own ramp, forge or
+    // strike is what may win the round, never a stray opening clash.
+    this.arena.grace = TUNING.grace;
+    this.mine.shieldUntil = !this.demo && this.progress.matches === 0 && this.tutorialRound === 2
       ? 10
-      : !this.demo && this.progress.matches < 3 ? LESSON_GRACE : TUNING.grace;
+      : !this.demo && this.progress.matches < 3 ? LESSON_GRACE : 0;
     const aiPower = this.rivalLaunchPower;
     this.rivalHeld = 0;
     this.rivalFeinting = false;
@@ -4650,6 +4655,7 @@ export class MatchSystem extends createSystem({
     const gd = net?.role === 'host' ? this.netRip?.dir : undefined;
     const heading = stableHeading(gd && Number.isFinite(gd[0]) && Number.isFinite(gd[1]) && Math.hypot(gd[0], gd[1]) > 1e-6 ? Math.atan2(gd[0], gd[1]) + LAUNCH_TILT * th : inward + aiDir);
     this.theirs.launch(rx, rz, Math.sin(heading) * aiSpeed, Math.cos(heading) * aiSpeed, launchSpin(aiPower), th);
+    this.theirs.shieldUntil = this.mine.shieldUntil;
     this.launchExtras();
     if (net?.role === 'host') {
       // Keep the guest's own paint in the reveal packet; the host renders that same build with the
@@ -7633,7 +7639,8 @@ export class MatchSystem extends createSystem({
       const mineVz = this.mine.vz;
       const rivalVx = this.theirs.vx;
       const rivalVz = this.theirs.vz;
-      const rivalReadsThreat = this.rivalLaunchPower >= 0.7 && (this.forgeBar.full || this.arenaMorphing || !!this.rimPulls.left || !!this.rimPulls.right);
+      // Reading the player is an advanced rival skill: it arrives with rival tells, not in the lessons.
+      const rivalReadsThreat = this.taught('tells') && this.rivalLaunchPower >= 0.7 && (this.forgeBar.full || this.arenaMorphing || !!this.rimPulls.left || !!this.rimPulls.right);
       if (rivalReadsThreat && this.theirs.alive) {
         this.theirs.rushing = Math.max(this.theirs.rushing, 0.14);
         if (!this.rivalBraceShown) {
