@@ -19,13 +19,14 @@ import { demoSave, freshSave, SAVE_KEYS } from '../src/game/demo-save.ts';
 import { PEDESTAL, pickTable, pickTablePlane, placeArena, polyArea, polyMinWidth, REACH, reachSpot, tableRank, TRAY_DROP } from '../src/game/placement.ts';
 import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, hudAnchors, hudAnchorsOffMatch, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
-import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
+import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, SEAL_NAMES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { crossguard, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge, deskWrenchImpulse } from '../src/game/arena-forge.ts';
 import { brawlSlots, spinStep, targetWinner } from '../src/game/brawl.ts';
+import { CARD_HOW_WORDS, CLAIM, LESSON, lessonText, PROMPT_WORDS, promptWords } from '../src/game/lessons.ts';
 import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/game/desk-edge.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
@@ -947,6 +948,36 @@ TUNING.grace = 0;
     assert.ok(name.length > 0 && name.length <= 16 && blurb.length > 0 && blurb.length <= 60, `${v} has one short unlock card`);
   }
   assert.equal(verbReleasedAt(order.length + 1), undefined);
+}
+
+// 14d. The first match teaches with ghost hands, not paragraphs: every prompt a new smith reads in
+// match 1 (and every NEW MOVE card's how-line) stays within its word budget.
+{
+  assert.equal(promptWords('PINCH + PULL: SPRING'), 3, 'symbols are not words');
+  const seals = Object.values(SEAL_NAMES);
+  const prompts: string[] = [
+    ...Object.values(LESSON),
+    ...Object.values(CLAIM),
+    lessonText.rival(RIVALS[0].name, RIVALS[0].title),
+    ...['SQUEEZE!', 'STRETCH!', 'TWIST!', 'TILT!'].map(lessonText.forgeLive),
+    ...seals.map(lessonText.strike),
+    ...seals.map(lessonText.overforge),
+    lessonText.strikeNotReady(100),
+  ];
+  let total = 0;
+  for (const p of prompts) {
+    const n = promptWords(p);
+    total += n;
+    assert.ok(n <= PROMPT_WORDS, `first-match prompt over ${PROMPT_WORDS} words (${n}): ${JSON.stringify(p)}`);
+  }
+  for (const [name, how] of Object.values(VERB_CARD)) {
+    const n = promptWords(how);
+    total += n;
+    assert.ok(n <= CARD_HOW_WORDS, `NEW MOVE ${name} card over ${CARD_HOW_WORDS} words (${n}): ${JSON.stringify(how)}`);
+  }
+  // The probes read these exact words.
+  for (const [text, key] of [[LESSON.forge, 'SQUEEZE INWARD'], [LESSON.forgeDesk, 'WRENCH IT OFF YOUR DESK'], [CLAIM.FORGE, 'PINCH BOTH GLOWS'], [CLAIM.RIM, 'PINCH + PULL: SPRING'], [CLAIM.RAMP, 'PINCH + DRAG: RAMP']]) assert.ok(text.includes(key), `${key} kept for the probes`);
+  console.log(`first-match prompts: ${prompts.length} + ${Object.keys(VERB_CARD).length} cards, ${total} words`);
 }
 
 // 15. Shared headsets: the demo save is a level-8 smith past the first session with stamps, marks
