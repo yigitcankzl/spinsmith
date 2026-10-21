@@ -29,7 +29,7 @@ import type { BrawlField } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
 import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
-import { deskSectors, inSector } from './desk-edge.js';
+import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from './desk-edge.js';
 import type { DeskSector } from './desk-edge.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
@@ -48,7 +48,7 @@ import type { Placement, Point } from './placement.js';
 import { applySpatialPose, loadSpatialPose, saveSpatialPose } from './spatial-state.js';
 import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
-import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge } from './arena-forge.js';
+import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge, deskWrenchImpulse } from './arena-forge.js';
 import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 import { clampGuestSpot, guestPointsBefore, linkFromAddress, sanitizeGuestEvent } from './online.js';
 import type { OnlineLink } from './online.js';
@@ -419,6 +419,12 @@ export class MatchSystem extends createSystem({
   });
   private deskEdgeSectors: DeskSector[] = [];
   private deskEdgeKey = '';
+  /**
+   * The first match's staged DESK KO: armed for the forge-lesson round, the rival is steered to
+   * the rim facing the nearest real edge and the first forge throws it straight across that edge.
+   * `fired` lengthens that DESK KO's slow motion.
+   */
+  private deskWrench = { armed: false, fired: false };
   /** progress.matches value of the match whose REAL EDGE hint has been shown. */
   private deskEdgeHintMatch = -1;
   private deskMemoryBatch: Group | null = null;
@@ -2013,6 +2019,24 @@ export class MatchSystem extends createSystem({
       this.aura.scale.setScalar(0.9);
       this.aura.rotation.y += dt * 6;
     }
+  }
+
+  /**
+   * Where the staged first DESK KO aims (stage frame), or null when it is not live: armed for the
+   * forge-lesson round, on a real table with a desk edge in reach (no table: a plain ring-out).
+   */
+  private deskWrenchAt(): number | null {
+    const sec = this.deskEdgeSectors[0];
+    if (!this.deskWrench.armed || this.phase !== 'fight' || !ROOM.poly || !this.onTable || !sec || !this.theirs.alive) return null;
+    // Sectors are root-local; the tops and pockets live on the stage, turned by its yaw.
+    return deskWrenchAngle({ ...sec, angle: sec.angle + this.stage.rotation.y }, this.arena.layout.pockets);
+  }
+
+  /** Until the staged forge fires, the rival drifts to the rim facing the nearest real edge. */
+  private steerToDeskEdge() {
+    const angle = this.deskWrenchAt();
+    if (angle === null) return;
+    deskWrenchSteer(this.theirs, angle, rimRadius(this.arena.layout, angle), STEP);
   }
 
   /** The rival's launch spot this round (arena-local), at the spawn distance on its far half. */
@@ -3838,7 +3862,7 @@ export class MatchSystem extends createSystem({
       arc.visible = !!sec;
       if (!sec) continue;
       arc.rotation.y = -stageYaw;
-      const now = rivalNear && inSector(sec, rivalAngle);
+      const now = (rivalNear && inSector(sec, rivalAngle)) || (i === 0 && this.deskWrenchAt() !== null);
       const m = arc.material;
       m.opacity = now ? 0.55 + 0.2 * Math.sin(this.time * 9) : 0.3 + 0.08 * Math.sin(this.time * 1.8 + i);
       // Red, not the bowl's orange: the warning must not melt into the rim it sits on.
@@ -4697,6 +4721,8 @@ export class MatchSystem extends createSystem({
     this.forgeBar.reset();
     this.resetEmber();
     if (this.progress.matches === 0 && !this.demo) this.tutorialRound++;
+    this.deskWrench.armed = this.progress.matches === 0 && !this.demo && this.tutorialRound === 2 && !this.extras.length && !this.online;
+    this.deskWrench.fired = false;
     // Round three teaches the ultimate; start it nearly full so the lesson arrives before the fight ends.
     if (this.progress.matches === 0 && this.tutorialRound >= 3 && !this.demo) this.forgeBar.value = 0.8;
     this.barWasFull = false;
@@ -4976,11 +5002,19 @@ export class MatchSystem extends createSystem({
         guest.sendEvent({ kind: 'forge', action, pull: gesture.pull, twist: gesture.twist, tilt: gesture.tilt, sign: sign < 0 ? -1 : 1, sx: -this.arenaMorphShove.x, sz: -this.arenaMorphShove.z, force });
       }
       const aim = arenaForgeAim(this.theirs.x, this.theirs.z, this.theirs.vx, this.theirs.vz, this.arena.radius);
+      // Inside the opening grace the rim still holds every top, so the staged throw waits for it.
+      const wrench = guest || this.arena.elapsed < this.arena.grace ? null : this.deskWrenchAt();
+      if (wrench !== null) {
+        this.deskWrench.armed = false;
+        this.deskWrench.fired = true;
+      }
       if (!guest && this.mine.alive) this.mine.shieldUntil = Math.max(this.mine.shieldUntil, this.arena.elapsed + ARENA_FORGE_SHIELD);
       for (const top of guest ? [] : this.tops) {
         if (!top.alive) continue;
         const own = top === this.mine;
-        const impulse = arenaForgeImpulse(own ? action : arenaForgeRivalAction(action), gesture, top.x, top.z, this.arena.radius, this.arenaMorphShove.x, this.arenaMorphShove.z, force * (own ? 0.4 : aim));
+        const plain = arenaForgeImpulse(own ? action : arenaForgeRivalAction(action), gesture, top.x, top.z, this.arena.radius, this.arenaMorphShove.x, this.arenaMorphShove.z, force * (own ? 0.4 : aim));
+        // The staged first DESK KO: whatever the forge, the rival runs out across the real edge.
+        const impulse = wrench !== null && top === this.theirs ? deskWrenchImpulse(top, plain, wrench, rimRadius(this.arena.layout, wrench)) : plain;
         const ix = impulse.x;
         const iz = impulse.z;
         top.vx += ix;
@@ -7781,7 +7815,9 @@ export class MatchSystem extends createSystem({
     }
     if (this.theirView.offDesk) {
       pending.edge = true;
-      pending.left = 0.6;
+      // The staged first DESK KO holds its slow motion longer, and the verdict waits it out.
+      const staged = this.deskWrench.fired;
+      pending.left = staged ? 1.4 : 0.6;
       this.offDeskShown = true;
       this.setDeskKoStage(3);
       const p = this.theirView.root.position;
@@ -7795,9 +7831,9 @@ export class MatchSystem extends createSystem({
       this.sparks.embers(p.x, p.y, p.z, 14, 0.26, 0.2, 1);
       this.impacts.hit(p.x, p.y, p.z, 1);
       this.impacts.shock(p.x, p.y, p.z, 1, 0xff8a2a);
-      this.slowMo = Math.max(this.slowMo, 0.6);
+      this.slowMo = Math.max(this.slowMo, staged ? 1.1 : 0.6);
       const cause = this.recentPlayerCause();
-      this.stamp.show('OFF THE DESK!', cause ? `YOUR ${cause} → REAL EDGE +1` : 'REAL EDGE · +1', 'mine', 0.55, 1.25);
+      this.stamp.show(staged ? 'DESK KO!' : 'OFF THE DESK!', cause ? `YOUR ${cause} → REAL EDGE +1` : 'REAL EDGE · +1', 'mine', staged ? 1.2 : 0.55, 1.25);
       this.featDone('offDesk');
       if (import.meta.env.DEV) console.log(`[DESK_KO] real edge crossed; +${DESK_KO_BONUS} bonus heat`);
       return true;
@@ -7850,6 +7886,7 @@ export class MatchSystem extends createSystem({
         this.stamp.show('PRESSURE!', 'POCKETS ARE OPENING', 'neutral', 0.75, 1.1);
         playTell();
       }
+      this.steerToDeskEdge();
       const mineVx = this.mine.vx;
       const mineVz = this.mine.vz;
       const rivalVx = this.theirs.vx;
@@ -8304,7 +8341,10 @@ export class MatchSystem extends createSystem({
       this.ghost.play([[0, x, fy + 0.05, z, 0], [0.4, x, fy + 0.006, z, 0], [0.6, x, fy + 0.006, z, 1], [1.2, x + ox * 0.05, fy + 0.006, z + oz * 0.05, 1], [1.35, x + ox * 0.05, fy + 0.03, z + oz * 0.05, 0], [2.2, x + ox * 0.05, fy + 0.05, z + oz * 0.05, 0]], this.frameDt);
       ghost = true;
     } else if (this.phase === 'fight' && !this.demo && this.progress.matches === 0 && this.tutorialRound === 2 && !this.morphedOnce && this.elapsed > TUNING.grace && this.labelTimer <= 0) {
-      this.label.set(COMFORT.oneHand ? 'HOLD ONE GLOWING RIM\nPUSH INWARD · RELEASE' : 'PINCH BOTH GLOWING RIMS\nSQUEEZE INWARD · RELEASE');
+      const desk = this.deskWrenchAt() !== null;
+      this.label.set(desk
+        ? COMFORT.oneHand ? 'WRENCH IT OFF YOUR DESK\nHOLD ONE RIM · PUSH INWARD' : 'WRENCH IT OFF YOUR DESK\nSQUEEZE INWARD · RELEASE'
+        : COMFORT.oneHand ? 'HOLD ONE GLOWING RIM\nPUSH INWARD · RELEASE' : 'PINCH BOTH GLOWING RIMS\nSQUEEZE INWARD · RELEASE');
       const grips = forgeGrips(this.arena.layout);
       const pulse = 1.15 + 0.15 * Math.sin(this.time * 6);
       for (let i = 0; i < this.rimSpringGuides.length; i++) {
