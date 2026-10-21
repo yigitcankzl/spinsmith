@@ -5,7 +5,8 @@ import { COMFORT, COMFORT_MODES, comfortMode, nextComfort, SAFE_COLORS, warnColo
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
-import { GUIDE, SIGN_TILT, titleMesh } from './ui.js';
+import { FONT, glass, GUIDE, SIGN_TILT, signTexture, TEXT, titleMesh } from './ui.js';
+import { FpsBook, fpsPhase, QUALITY_LEVELS, QualityGuard } from './quality.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { cloneLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance, validate } from './layout.js';
@@ -836,10 +837,16 @@ export class MatchSystem extends createSystem({
   private quenching: { t: number; build: TopBuild } | null = null;
   /** This match's rival intro (portal, VS) has played: a drawn 0-0 round does not repeat it. */
   private introDone = false;
-  /** The frame-rate guard: average frame time, how long it has been slow, and whether it lightened. */
-  private fpsAvg = 1 / 72;
-  private slowFor = 0;
-  private lite = false;
+  /** The frame-rate guard (src/game/quality.ts): steps rendering down and back up; never the sim. */
+  private quality = new QualityGuard();
+  private qualityLog: string[] = [];
+  private fpsBook = new FpsBook();
+  private lastFps = 0;
+  /** `?fps`: a world-locked readout beside MENU (fps, lowest, draw calls, quality level). */
+  private fpsOverlay: { mesh: Mesh; canvas: HTMLCanvasElement; tex: ReturnType<typeof signTexture> } | null = null;
+  private get lite() {
+    return this.quality.level >= 1;
+  }
   /** The last finish's cause, for the log ("YOUR RAMP → SLAG"). */
   private lastCause = '';
   /** When Menu was pinched once during a match (a second pinch within 3 s leaves). */
@@ -1402,6 +1409,19 @@ export class MatchSystem extends createSystem({
     this.menuButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.menuButton.set('MENU');
     this.menuButton.mesh.visible = false;
+    if (new URLSearchParams(location.search).has('fps')) {
+      // One plane, redrawn once a second: next to MENU, on the arena (world-locked, never on the head).
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 160;
+      const tex = signTexture(canvas);
+      const mesh = new Mesh(new PlaneGeometry(0.1, 0.03125), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+      mesh.rotation.set(-SIGN_TILT, 0, 0);
+      mesh.renderOrder = 6;
+      this.fpsOverlay = { mesh, canvas, tex };
+      this.root.add(mesh);
+      this.drawFpsOverlay();
+    }
     this.rematchButton.mesh.position.set(0.2, MENU_Y, 0.14);
     this.rematchButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.rematchButton.set('REMATCH', true, true);
@@ -1440,6 +1460,13 @@ export class MatchSystem extends createSystem({
       arenaForgeSwing: Math.round(this.arenaForgeSwing * 100) / 100,
       lowestFps: Math.round(this.lowestFps),
       liteMode: this.lite,
+      qualityLevel: QUALITY_LEVELS[this.quality.level],
+      qualitySteps: this.qualityLog.join(' | ') || 'none',
+      xrFrameRate: (this.world.renderer.xr.getSession() as (XRSession & { frameRate?: number }) | null)?.frameRate ?? 'not reported',
+      drawCalls: this.world.renderer.info.render.calls,
+      fpsHub: this.fpsBook.summary('hub'),
+      fpsFight: this.fpsBook.summary('fight'),
+      fpsForge: this.fpsBook.summary('forge'),
       matches: this.progress.matches,
       deskVerdict: !!this.deskVerdict,
       deskKoScored: this.deskKoScored,
@@ -1693,8 +1720,8 @@ export class MatchSystem extends createSystem({
       for (const button of this.deckButtons) button.mesh.visible = false;
       this.hub.photo();
     }
-    this.guardFrameRate(delta);
     this.updateFirstFiveFps(delta);
+    if (this.fpsOverlay) this.fpsOverlay.mesh.position.set(this.menuButton.mesh.position.x, MENU_Y, this.menuButton.mesh.position.z + 0.045);
     this.stamp.update(Math.min(delta, 0.1));
     this.updateCountdown(Math.min(delta, 0.1));
     this.updatePrints(Math.min(delta, 0.1));
@@ -3164,20 +3191,40 @@ export class MatchSystem extends createSystem({
     }
   }
 
-  /** Lightens once when the active headset misses its own refresh target for three seconds. */
-  private guardFrameRate(dt: number) {
-    // Not in the emulator (a desktop browser's frame rate says nothing about the headset).
-    if (this.lite || dt <= 0 || dt > 0.25 || 'IWER_DEVICE' in window) return;
-    this.fpsAvg += (dt - this.fpsAvg) * 0.02;
+  /**
+   * Feeds one 1 s fps window to the quality guard. Not in the emulator (a desktop browser's frame
+   * rate says nothing about the headset) unless `?fpsguard` asks for it, to test the steps there.
+   */
+  private guardFrameRate(fps: number, seconds: number) {
+    if ('IWER_DEVICE' in window && !new URLSearchParams(location.search).has('fpsguard')) return;
     const session = this.world.renderer.xr.getSession() as (XRSession & { frameRate?: number }) | null;
-    const target = session?.frameRate ?? 72;
-    // Allow brief compositor jitter, but catch 72 fps content drifting into the low sixties and
-    // 90 Hz devices drifting below about 80. A fixed 62 fps threshold hid the latter entirely.
-    this.slowFor = this.fpsAvg > 1 / (target * 0.89) ? this.slowFor + dt : 0;
-    if (this.slowFor < 3) return;
-    this.lite = true;
-    this.world.renderer.xr.setFoveation?.(1);
-    console.warn(`[PERF] averaging ${(1 / this.fpsAvg).toFixed(0)} / ${target.toFixed(0)} fps: lighter rendering (foveation 1, no room dimming)`);
+    const step = this.quality.sample(fps, seconds, session?.frameRate);
+    if (!step) return;
+    // Level 2 adds full fixed foveation (WebXR allows changing it mid-session); level 1 and up
+    // drop the room dimming. The framebuffer scale stays: WebXR fixes it at session start.
+    this.world.renderer.xr.setFoveation?.(step.to >= 2 ? 1 : 0.5);
+    const line = `${Math.round(performance.now() / 1000)}s ${this.phase} ${fps.toFixed(0)}fps ${QUALITY_LEVELS[step.from]}->${QUALITY_LEVELS[step.to]}`;
+    this.qualityLog.push(line);
+    if (this.qualityLog.length > 12) this.qualityLog.shift();
+    console.warn(`[PERF] quality ${step.reason === 'slow' ? 'down' : 'up'}: ${line} (target ${session?.frameRate ?? 72} Hz)`);
+  }
+
+  /** Redraws the `?fps` readout (once a second, after each fps window). */
+  private drawFpsOverlay() {
+    const o = this.fpsOverlay;
+    if (!o) return;
+    const g = o.canvas.getContext('2d')!;
+    const { width: W, height: H } = o.canvas;
+    glass(g, W, H);
+    const calls = this.world.renderer.info.render.calls;
+    g.fillStyle = TEXT;
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.font = `700 ${Math.round(H * 0.34)}px ${FONT}`;
+    g.fillText(`${Math.round(this.lastFps)} FPS  low ${Math.round(this.lowestFps)}`, W * 0.05, H * 0.3);
+    g.font = `600 ${Math.round(H * 0.26)}px ${FONT}`;
+    g.fillText(`draws ${calls}  ${QUALITY_LEVELS[this.quality.level]}`, W * 0.05, H * 0.72);
+    o.tex.needsUpdate = true;
   }
 
   /** A puff of steam off the forge's quench slot (pale sparks rising). */
@@ -4728,6 +4775,11 @@ export class MatchSystem extends createSystem({
     const fps = this.fpsWindowFrames / this.fpsWindowTime;
     this.lowestFps = this.lowestFps === 0 ? fps : Math.min(this.lowestFps, fps);
     this.rootEntity?.setValue(FirstFiveState, 'lowestFps', this.lowestFps);
+    this.lastFps = fps;
+    const bucket = fpsPhase(this.phase);
+    if (bucket) this.fpsBook.add(bucket, fps);
+    this.guardFrameRate(fps, this.fpsWindowTime);
+    this.drawFpsOverlay();
     this.fpsWindowTime = 0;
     this.fpsWindowFrames = 0;
   }

@@ -52,6 +52,7 @@ an arena. First to 4 heat wins a match.
   IWSDK's browser emulator (IWER). Depth occlusion is switched off under IWER (it has no camera
   depth), so it has not run anywhere yet. Gaze: a real gaze input source (Meta VR Glasses) is a full pointer; on Quest, which has none, the head ray only assists buttons (look at one for 0.4 s, it lights up, a pinch of either hand away from the bowl presses it); neither has run on a headset. The
   online duel has been run between two browser windows, not two headsets.
+- **Frame rate (`?fps`, `?diagnostics`):** not yet measured on a headset. `?fps` shows a world-locked readout beside MENU (1 s fps, lowest, draw calls, quality level); after 3 s below 66 fps (or 0.9× the session's refresh rate) the game drops room dimming, then sets full foveation, and steps back after 10 s comfortable (rendering only; the 120 Hz sim is untouched); `?diagnostics`' COPY QUEST TEST REPORT includes each step and fps per hub/fight/forge.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   steps through Standard; Calm (no hit flashes, the strike is a palm pressed and held instead of
   slapped, for trays and shared spaces); Quiet (sound off); Quiet and calm; Assist (fights at
