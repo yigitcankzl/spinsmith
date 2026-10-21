@@ -13,8 +13,11 @@ case "$cmd" in
   enter)
     active=0
     for _ in 1 2 3; do
-      $C xr enter --input-json '{}' >/dev/null 2>&1 || true
-      sleep 2
+      # Entering again while a session is live throws InvalidStateError into the game's error log.
+      if ! $C xr status 2>/dev/null | grep -q '"sessionActive": true'; then
+        $C xr enter --input-json '{}' >/dev/null 2>&1 || true
+        sleep 2
+      fi
       if $C xr status 2>/dev/null | grep -q '"sessionActive": true'; then
         active=1
         break
