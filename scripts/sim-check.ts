@@ -1484,6 +1484,19 @@ TUNING.grace = 0;
   }
   assert.ok(lefty, 'stepping the dial reaches the left-handed layout');
   assert.ok(COMFORT.sound && COMFORT.flashes && !COMFORT.gentle, 'a full turn is back to standard');
+  const { SAFE_COLORS, warnColor } = await import('../src/game/comfort.ts');
+  assert.ok(COMFORT_MODES.some((m) => m.colorSafe), 'the dial has a colour-safe mode');
+  assert.equal(warnColor(0xff2a3a, SAFE_COLORS.edge), 0xff2a3a, 'standard keeps the usual warning colour');
+  let safe = false;
+  for (let i = 0; i < COMFORT_MODES.length; i++) {
+    nextComfort();
+    if (COMFORT.colorSafe) {
+      safe = true;
+      assert.equal(warnColor(0xff2a3a, SAFE_COLORS.edge), SAFE_COLORS.edge, 'colour-safe swaps the desk-edge red');
+      assert.ok(COMFORT.sound && COMFORT.flashes, 'colour-safe keeps sound and flashes');
+    }
+  }
+  assert.ok(safe && !COMFORT.colorSafe, 'stepping the dial reaches colour-safe and a full turn leaves it');
 }
 
 // 26. The rip's speed is measured over a window: 3 mm of tracking jitter neither makes an honest

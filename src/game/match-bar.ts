@@ -6,6 +6,7 @@
  */
 import { CanvasTexture, Color, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
 import { brawlSlots, spinStep } from './brawl.js';
+import { SAFE_COLORS, warnColor } from './comfort.js';
 import { ARENA_SCALE } from './reach.js';
 import { addSlab, CYAN, GLASS_DEPTH, glass, ORANGE, pxPerM, setType, signTexture, STEEL, TEXT, TEXT_DIM } from './ui.js';
 
@@ -48,6 +49,7 @@ export class MatchBar {
   private chipAt: [number, number] = [1, 1];
   private chipWait: [number, number] = [0, 0];
   private flashT: [number, number] = [0, 0];
+  private lowT = 0;
   private readonly colors = [new Color(ORANGE), new Color(CYAN)];
   private readonly low = new Color('#e0574a');
   private readonly white = new Color('#ffffff');
@@ -104,8 +106,12 @@ export class MatchBar {
       this.chip[i].scale.x = Math.max(0.001, this.chipAt[i]);
       this.flashT[i] = Math.max(0, this.flashT[i] - dt);
       const m = this.fill[i].material as MeshBasicMaterial;
-      m.color.copy(this.flashT[i] > 0 ? this.white : v[i] > 0.25 ? this.colors[i] : this.low);
+      const low = v[i] <= 0.25 && v[i] > 0;
+      m.color.copy(this.flashT[i] > 0 ? this.white : v[i] > 0.25 ? this.colors[i] : this.low.setHex(warnColor(0xe0574a, SAFE_COLORS.edge)));
+      // Low spin is not colour alone (the top's rattle has a twin too): the fill throbs thinner.
+      this.fill[i].scale.y = low ? 0.7 + 0.3 * Math.abs(Math.cos(this.lowT * 6)) : 1;
     }
+    this.lowT += dt;
   }
 
   /**

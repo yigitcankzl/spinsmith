@@ -1,7 +1,7 @@
 import { AdditiveBlending, NormalBlending, BoxGeometry, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish, playRub } from './audio.js';
-import { COMFORT, COMFORT_MODES, comfortMode, nextComfort } from './comfort.js';
+import { COMFORT, COMFORT_MODES, comfortMode, nextComfort, SAFE_COLORS, warnColor } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -1060,7 +1060,7 @@ export class MatchSystem extends createSystem({
   /** The quiet forge loop: up at home and in the workshops, ducked under a fight. */
   private loop = new ForgeLoop();
   private rivalShapeAt = -9;
-  private rivalMarks = new ShapeMarks(0x4fd1ff, 6);
+  private rivalMarks = new ShapeMarks(0x4fd1ff, 6, 6);
   /** After a finish your shape caused, the visuals play slowly for a moment (real seconds left). */
   private slowMo = 0;
   private marks = new ShapeMarks(0xff8a2a, 10);
@@ -2687,7 +2687,7 @@ export class MatchSystem extends createSystem({
       old?.dispose();
       const view = new TopView(build, color);
       if (i === 0) view.scars(scars);
-      view.team(i === 0 ? TEAM_MINE : TEAM_RIVAL, ringOf(build).radius);
+      view.team(i === 0 ? TEAM_MINE : TEAM_RIVAL, ringOf(build).radius, true, i === 0 ? 40 : 6);
       // A top that lands on the desk scorches it.
       view.onLand = (x, y, z) => this.scorch(x, y, z);
       // A spun-out top clatters onto its side in a spray of sparks.
@@ -3946,7 +3946,7 @@ export class MatchSystem extends createSystem({
       const m = arc.material;
       m.opacity = now ? 0.55 + 0.2 * Math.sin(this.time * 9) : 0.3 + 0.08 * Math.sin(this.time * 1.8 + i);
       // Red, not the bowl's orange: the warning must not melt into the rim it sits on.
-      m.color.setHex(now ? 0xfff0c8 : 0xff2a3a);
+      m.color.setHex(now ? 0xfff0c8 : warnColor(0xff2a3a, SAFE_COLORS.edge));
     }
     if (sectors.length && this.progress.matches > 0 && this.deskEdgeHintMatch !== this.progress.matches && this.labelTimer <= 0) {
       this.deskEdgeHintMatch = this.progress.matches;
@@ -4276,6 +4276,8 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(rx, rz, 0, 0, 1, this.theirs.hand);
     this.planRivalLaunch();
     this.launchSafeZone.position.set(0, this.arena.height(0, 0) + 0.002, 0);
+    this.launchSafeZone.material.color.setHex(warnColor(0x49d8ff, SAFE_COLORS.safe));
+    this.launchDangerZone.material.color.setHex(warnColor(0xff3b24, SAFE_COLORS.danger));
     this.launchDangerZone.position.set(rx, this.arena.height(rx, rz) + 0.002, rz);
     this.puller = null;
     this.cord.set(null);
@@ -4388,7 +4390,9 @@ export class MatchSystem extends createSystem({
     const previousZone = this.launchZoneKind;
     const previousArena = this.launchArenaKind;
     this.classifyLaunch(from.x, from.z);
-    this.launchMarkerMaterial.color.setHex(this.launchZoneKind === 'ambush' ? 0xff3b24 : this.launchZoneKind === 'edge' ? 0xffd34d : this.launchZoneKind === 'center' ? 0x49d8ff : 0xff8a2a);
+    const zone = this.launchZoneKind;
+    // The zone is also named on the card (launchReadout), so colour is never the only signal.
+    this.launchMarkerMaterial.color.setHex(COMFORT.colorSafe ? (zone === 'ambush' ? SAFE_COLORS.danger : zone === 'edge' ? SAFE_COLORS.edge : zone === 'center' ? SAFE_COLORS.safe : SAFE_COLORS.neutral) : zone === 'ambush' ? 0xff3b24 : zone === 'edge' ? 0xffd34d : zone === 'center' ? 0x49d8ff : 0xff8a2a);
     if ((previousZone !== this.launchZoneKind || previousArena !== this.launchArenaKind) && this.progress.guide === 'done' && !this.entrance && !this.stamp.mesh.visible) this.label.set(this.launchReadout());
     return true;
   }
@@ -6178,6 +6182,8 @@ export class MatchSystem extends createSystem({
       if (this.time - this.rubSoundAt >= 0.3) {
         this.rubSoundAt = this.time;
         playTick();
+        // The wrong-way tick has a twin: the rub is slowing your own top.
+        if (!this.stamp.busy) this.stamp.show('WRONG WAY', 'RUB WITH YOUR SPIN', 'neutral', 0.4);
       }
       return true;
     }
