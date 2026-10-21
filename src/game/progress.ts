@@ -120,6 +120,31 @@ export const STAMP_UNLOCKS: Record<number, string> = {
   15: 'emblem:7',
 };
 
+/**
+ * Hand verbs past the first match's lessons (rip, ramp, Arena Forge, strike, Flick) arrive one per
+ * completed match, most useful first (headless win points over doing nothing: spring +10, gust
+ * +8.9, ember +7.4, rub +5.9, crossguard +5.1; cup, groove and wheel unmeasured). The value is the
+ * completed-match count that releases the verb; its card shows as that match ends. Online, brawl
+ * and the demo save (level 8) play with every verb.
+ */
+export const VERB_RELEASE = { spring: 1, gust: 2, ember: 3, rub: 4, crossguard: 5, cup: 6, groove: 7, wheel: 8 } as const;
+export type ReleasedVerb = keyof typeof VERB_RELEASE;
+/** The unlock card for each released verb: name, and what the hand does. */
+export const VERB_CARD: Record<ReleasedVerb, [string, string]> = {
+  spring: ['Rim Spring', 'Pinch the rim, pull inward, let go: it holds your top'],
+  gust: ['Forge Gust', 'Sweep an open palm over the bowl toward a pocket'],
+  ember: ['Ember Rivet', 'Pinch the hot rivet a clash throws out and plant it'],
+  rub: ['Spin Rub', 'Run a fingertip along your top\'s rim, the way it turns'],
+  crossguard: ['Crossguard', 'Two flat palms on the rim make a rail that saves you'],
+  cup: ['Cup and sling', 'Jab the floor to catch a top, then pull and let go'],
+  groove: ['Finger Groove', 'Slide an open fingertip along the floor, then lift'],
+  wheel: ['Forge Wheel', 'Turn the wheel by the near rim to steer the current'],
+};
+/** The verb whose card shows when the completed-match count reaches `matches`, if any. */
+export function verbReleasedAt(matches: number): ReleasedVerb | undefined {
+  return (Object.keys(VERB_RELEASE) as ReleasedVerb[]).find((v) => VERB_RELEASE[v] === matches);
+}
+
 /** XP for finishing a Smith Order. */
 export const ORDER_XP = 120;
 

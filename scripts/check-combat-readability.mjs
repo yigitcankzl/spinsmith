@@ -24,6 +24,7 @@ export default async function run({ page, frame }) {
 
     drive.rest();
     game.progress.matches = Math.max(3, game.progress.matches);
+    game.everyVerb = true;
     game.progress.guide = 'done';
     game.startMatch();
     await waitFor(() => drive.state().phase === 'ready', 'match did not reach ready');
@@ -85,6 +86,7 @@ export default async function run({ page, frame }) {
     // The authored path itself is real emulator hand input. Direct top placement only makes its
     // contact deterministic; it does not create the ramp or advance the cause-chain state.
     game.progress.matches = 0;
+    game.everyVerb = false;
     game.progress.guide = 'bump';
     game.startMatch();
     await waitFor(() => drive.state().phase === 'ready', 'tutorial match did not reach ready');

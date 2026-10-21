@@ -43,7 +43,7 @@ gesture (rip, ramp, cup, strike) works with either hand (left-hand rip and ramp 
 
 Sit at a table, enable hand tracking, and allow spatial data so the arena can stand on your
 table. Everything is done with a pinch: carry your top from its dock into the arena, pinch near
-it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (from your third match, press a fingertip in for a cup, then pinch, pull and let go to sling what it caught). Pinch the small anvil to forge your top, the blueprint to build
+it and pull back to launch, and during the fight pinch the floor and pull to raise a ramp (every later match adds one more hand move with its own card; from the seventh, press a fingertip in for a cup, then pinch, pull and let go to sling what it caught). Pinch the small anvil to forge your top, the blueprint to build
 an arena. First to 4 heat wins a match.
 
 - **Shared headset:** add `?fresh` to the address to start as a new player, or `?demo` for a
@@ -255,7 +255,7 @@ an arena. First to 4 heat wins a match.
   burst, topple and result jingles.
 - **Arena moves during the fight:** pinch the floor and a ramp
   rises there at once (after a 0.12 s hold, full size, about 11 cm across); keep holding and drag
-  to aim which way it throws a top. From the third match, press a fingertip into the floor to open a cup that catches
+  to aim which way it throws a top. From the seventh match, press a fingertip into the floor to open a cup that catches
   the first top to roll in; pinch it, pull back and let go to sling it the other way (snapped
   into a slag pit within 20°). A cup with nothing in it, or a catch not slung, lets go after 2 s. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
   shape affects both tops. In the opening match every finish scores one heat (a desk KO adds its bonus one) so all three lessons
@@ -268,27 +268,35 @@ an arena. First to 4 heat wins a match.
   headless sim a human-paced flicker (0.32 s lag, 15° aim error) wins 68% against an equal rival
   (no hands 51%, random flicking 52%) and comes back from a spin deficit in 18% of rounds instead
   of 7% (`npm run report:flick`, 6 rounds per arena and type pairing). Online, the guest's flick is sent as a
-  direction and swing speed and the host applies it.
-- **Spin Rub (direct touch, from the third match):** run the same fingertip slowly along your own
+  direction and swing speed and the host applies it. The first match teaches it too: once its
+  forge lesson is done (or in its third round), a tired rival near the rim calls for a flick.
+- **One new move per match:** after the first match's lessons (ramp, Arena Forge, strike, Flick)
+  each completed match releases exactly one more hand verb, most useful first, and ends with its
+  card (NEW MOVE: name, one line on the gesture): Rim Spring for match 2, Forge Gust 3, Ember
+  Rivet 4, Spin Rub 5, Crossguard 6, cup and sling 7, Finger Groove 8, Forge Wheel 9
+  (`VERB_RELEASE` in `src/game/progress.ts`, checked by `npm run check:sim`). Online, brawls and
+  the `?demo` save (level 8) have every verb.
+- **Spin Rub (direct touch, from the fifth match):** run the same fingertip slowly along your own
   top's rim, mostly sideways rather than into it (below flick speed). The first rub spends one
   charge and opens a 1.2 s window: rubbing the way the top turns adds up to 0.3 spin a second
   (0.28 per window, never above full spin), rubbing against it brakes at 40% of that rate. The top
   is eased off the finger but never pushed. Without a charge it does nothing. Online, the guest
   sends the spin it rubbed and the host caps it per window. Covered by `npm run check:sim` and
   `check:net`; not yet tried on a headset.
-- **Forge Gust and Rim Spring (from the third match):** a fast open-palm sweep over the bowl
+- **Forge Gust and Rim Spring (from the third and second match):** a fast open-palm sweep over the bowl
   pushes the tops it crosses but steers around your own; swept toward a pocket mouth, the rival
   is pushed twice as hard and lifted so the pocket takes it. Pinching the rim and pulling inward
   springs that sector: your own top is pulled in and the rim holds behind it for 1 s, and a rival
   there is slung along the wall toward its nearest pocket. In the headless sweep with human
   reaction lag and aim error, gust moved from +0.1 to +8.9 win points over doing nothing and the
   spring from -1.6 to +10; random sweeping or springing gains about +2.
-- **Crossguard and Ember Rivet (from the third match):** two open palms make a rail; the first
+- **Crossguard and Ember Rivet (from the sixth and fourth match):** two open palms make a rail; the first
   time your top crosses it (or the rival crosses it on its way out) it costs a charge, and the
   rail then stays live 0.8 s. Every save of your own top refunds that charge, and the rival's
   escape is sent on toward its nearest pocket. A caught hot rivet planted in the bowl is a live
   post for 3 s that kicks the rival outward. Headless sweep: crossguard -0.6 -> +5.1, ember
-  -0.8 -> +7.4 win points; random use +0.8 and +1.5. Palm brace is still about 0.
+  -0.8 -> +7.4 win points; random use +0.8 and +1.5. The single-palm brace (and its Counterflow riposte) measured about 0
+  and was removed.
 - **Arena Forge aim:** the two-hand forge hits the rival three times as hard when it is in the
   outer band or heading out, and only a fifth as hard in the middle, so it rewards timing.
   Squeeze pulls your own top in and throws the rival out, and the forging top's rim holds for

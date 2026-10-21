@@ -94,8 +94,7 @@ interface Game {
   rimExperiment?: boolean;
   /** Hand-first combat state exposed for deterministic emulator captures. */
   overforgeMode?: string;
-  palmBraceActive?: boolean;
-  palmBraceAngles: Record<Side, number | null>;
+  palmRailAngles: Record<Side, number | null>;
   palmGustBlockedUntil: Record<Side, number>;
   crossguardActive?: boolean;
   crossguardHits?: number;
@@ -107,13 +106,9 @@ interface Game {
   palmGustSide?: Side | null;
   palmGustDirection?: { x: number; y: number };
   palmGustHits?: number;
-  palmGustRiposte?: boolean;
   flickCount?: number;
   rubGain?: number;
   lastFlick?: { gain: number; dx: number; dz: number; rival: boolean };
-  riposteUntil?: number;
-  riposteSide?: Side | null;
-  riposteTop?: Game['mine'] | null;
   bracedLaunch?: boolean;
   palmLauncherSide?: Side | null;
   palmLauncherDebug?: string;
@@ -490,7 +485,6 @@ export function installDriver() {
         intent: { ...g.handHoverClaim },
         rimExperiment: !!g.rimExperiment,
         overforge: g.overforgeMode ?? 'idle',
-        palmBrace: !!g.palmBraceActive,
         crossguard: {
           active: !!g.crossguardActive,
           hits: g.crossguardHits ?? 0,
@@ -509,8 +503,6 @@ export function installDriver() {
           side: g.palmGustSide ?? null,
           direction: [+(g.palmGustDirection?.x ?? 0).toFixed(2), +(g.palmGustDirection?.y ?? 0).toFixed(2)],
           hits: g.palmGustHits ?? 0,
-          riposte: !!g.palmGustRiposte,
-          counterReady: !!g.riposteSide && (g.riposteUntil ?? -9) >= g.elapsed,
         },
         flick: { count: g.flickCount ?? 0, last: g.lastFlick ?? null },
         bracedLaunch: !!g.bracedLaunch,
@@ -972,20 +964,6 @@ export function installDriver() {
       if (g.forgeBar.value >= 0.999) throw new Error('seal stamp did not spend the armed ultimate');
     },
 
-    /** Hold an open hand at one rim sector so it becomes the physical Palm Brace wall. */
-    async palmBrace(opts: { angle?: number; hold?: number; side?: Side } = {}) {
-      const { angle = 60, hold = 1.2, side = 'left' } = opts;
-      const g = game();
-      if (g.phase !== 'fight') throw new Error('Palm Brace only exists during a fight');
-      const a = (angle * Math.PI) / 180;
-      const r = g.arena.radius * 0.98;
-      const at = local(Math.cos(a) * r, Math.sin(a) * r, 0.055);
-      await glide(side, 'pinch', above(at, 0.08), 0.3, 0);
-      await glide(side, 'pinch', at, 0.22, 0);
-      await wait(hold);
-      await park(side);
-    },
-
     /** Hold both palms at different rim sectors and drive one top through the finite Crossguard. */
     async crossguard(opts: { leftAngle?: number; rightAngle?: number; hold?: number } = {}) {
       const { leftAngle = 155, rightAngle = 25, hold = 0.8 } = opts;
@@ -1017,7 +995,7 @@ export function installDriver() {
         return;
       }
       if (!g.crossguardActive || !g.crossguardA || !g.crossguardB) {
-        throw new Error(`two open palms did not form Crossguard (elapsed ${g.elapsed.toFixed(2)}, blocked ${g.palmGustBlockedUntil.left.toFixed(2)}/${g.palmGustBlockedUntil.right.toFixed(2)}, angles ${g.palmBraceAngles.left}/${g.palmBraceAngles.right})`);
+        throw new Error(`two open palms did not form Crossguard (elapsed ${g.elapsed.toFixed(2)}, blocked ${g.palmGustBlockedUntil.left.toFixed(2)}/${g.palmGustBlockedUntil.right.toFixed(2)}, angles ${g.palmRailAngles.left}/${g.palmRailAngles.right})`);
       }
       const ax = g.crossguardA.x;
       const az = g.crossguardA.z;
@@ -1110,14 +1088,9 @@ export function installDriver() {
     },
 
     /** Sweep a relaxed open palm across the inner bowl so the real gesture drives Forge Gust. */
-    async palmGust(opts: { angle?: number; side?: Side; riposte?: boolean; settle?: number } = {}) {
-      const { angle = 0, side = 'right', riposte = false, settle = 0.55 } = opts;
+    async palmGust(opts: { angle?: number; side?: Side; settle?: number } = {}) {
+      const { angle = 0, side = 'right', settle = 0.55 } = opts;
       if (game().phase !== 'fight') throw new Error('Forge Gust only exists during a fight');
-      if (riposte) {
-        game().riposteSide = side;
-        game().riposteUntil = game().elapsed + 1;
-        game().riposteTop = game().theirs;
-      }
       const a = (angle * Math.PI) / 180;
       const r = game().arena.radius * 0.58;
       const start = local(-Math.cos(a) * r, -Math.sin(a) * r, 0.065);
@@ -1219,56 +1192,6 @@ export function installDriver() {
       }
       await park(side);
       return { before: +before.toFixed(3), after: +game().mine.spin.toFixed(3), gain: +(game().rubGain ?? 0).toFixed(3) };
-    },
-
-    /** Prepare one outward-moving rival, parry it with an open palm, then sweep that force inward. */
-    async counterflow(opts: { angle?: number; side?: Side } = {}) {
-      const { angle = 0, side = 'right' } = opts;
-      const g = game();
-      if (g.phase !== 'fight') throw new Error('Counterflow only exists during a fight');
-      // This driver is also the reusable proof shot. Keep an unrelated ready ultimate's raised
-      // seal from hiding the hand, the parried top, and the return corridor.
-      g.forgeBar.value = Math.min(g.forgeBar.value, 0.7);
-      const a = (angle * Math.PI) / 180;
-      const ux = Math.cos(a);
-      const uz = Math.sin(a);
-      const top = g.theirs;
-      const brace = local(ux * g.arena.radius * 0.98, uz * g.arena.radius * 0.98, 0.05);
-      const start = local(ux * g.arena.radius * 0.58, uz * g.arena.radius * 0.58, 0.065);
-      const end = local(-ux * g.arena.radius * 0.58, -uz * g.arena.radius * 0.58, 0.065);
-      const follow = end.clone().add(end.clone().sub(start).setLength(0.018));
-      const beforeCount = g.palmGustCount ?? 0;
-      const beforeCharges = g.charges.charges;
-      await setPinch(side, false);
-      // The parry window is timing-critical: arrive at the brace with constant speed so IWER's
-      // sparse low-fps samples still include the outward-moving contact frame.
-      await glide(side, 'palm', above(brace, 0.07), 0.2, 0, 'linear');
-      await glide(side, 'palm', brace, 0.12, 0, 'linear');
-      // Establish the visible palm wall before releasing the test top. Otherwise the top can reach
-      // the physical rail during the hand's approach and the arena—not the player's palm—rebounds it.
-      Object.assign(top, {
-        x: ux * g.arena.radius * 0.82,
-        z: uz * g.arena.radius * 0.82,
-        vx: ux * 0.24,
-        vz: uz * 0.24,
-        spin: Math.max(0.55, top.spin),
-        state: 'spinning',
-        sinceWall: 1,
-      });
-      for (let i = 0; i < 30 && g.riposteSide !== side; i++) await wait(0.01);
-      if (g.riposteSide !== side) throw new Error('open palm did not earn a riposte window');
-      await glide(side, 'palm', start, 0.18, 0, 'natural', 'grip');
-      // Settle at the sweep origin long enough for the real recognizer to distinguish an intended
-      // Counterflow from the preceding parry/reposition. This also gives the move a readable beat.
-      await wait(0.55);
-      await glide(side, 'palm', end, 0.3, 0, 'linear', 'force');
-      await glide(side, 'palm', follow, 0.1, 0, 'linear');
-      const countered = (g.palmGustCount ?? 0) > beforeCount && !!g.palmGustRiposte;
-      await park(side);
-      if (!countered) throw new Error('parry sweep did not trigger Counterflow');
-      if (g.charges.charges !== beforeCharges) {
-        throw new Error(`Counterflow changed shaping charges (${beforeCharges} -> ${g.charges.charges}; elapsed ${g.elapsed.toFixed(2)}; riposteUntil ${(g.riposteUntil ?? -9).toFixed(2)}; gustRiposte ${!!g.palmGustRiposte})`);
-      }
     },
 
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */
