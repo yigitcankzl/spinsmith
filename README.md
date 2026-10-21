@@ -82,7 +82,7 @@ an arena. First to 4 heat wins a match.
   drawer. In a match a fighting-game bar is set into the far rim
   (`src/game/match-bar.ts`: each top's spin draining as a health bar, points as pips, the
   round's result in the middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
-  the match ends back home when a side reaches 3 heat.
+  the match ends back home when a side reaches 4 heat.
 - **Rip-cord launch, from where you choose:** pinch over the arena (inside the dashed ring)
   and your top goes to that spot; pinch anywhere else and it launches from its usual spot near
   you. A cord runs from your top to your hand. The pull aims like a slingshot (the top goes the
@@ -256,7 +256,7 @@ an arena. First to 4 heat wins a match.
   to aim which way it throws a top. From the third match, press a fingertip into the floor to open a cup that catches
   the first top to roll in; pinch it, pull back and let go to sling it the other way (snapped
   into a slag pit within 20°). A cup with nothing in it, or a catch not slung, lets go after 2 s. A ghost shows the ramp for that first moment, contour rings shrink as a shape relaxes back to flat in 2–3 seconds, and every
-  shape affects both tops. In the opening match every finish scores one heat so all three lessons
+  shape affects both tops. In the opening match every finish scores one heat (a desk KO adds its bonus one) so all three lessons
   get a round. Afterwards knockouts score two as normal. Three charges, shown as sparks on the near rim: a shape spends one, 6 s refills one, a strong clash refills one only when your own shape caused it, a hand keeps one live shape, and nothing can be shaped in the first 1.8 s. In the first three matches the rim holds your top for 6 s (10 s in the first match's second round) and holds the rival only until you act, so the lesson's move is what can win the round. A finish within 1.5 s of your shape names it ("YOUR RAMP → SLAG").
 - **Flick (direct touch):** your open index fingertip is a body in the fight. Lower it to the
   tops' height (it glows orange while a charge can pay, grey when not) and swing it through a top:

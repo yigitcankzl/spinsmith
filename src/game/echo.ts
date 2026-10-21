@@ -27,7 +27,7 @@ export interface Echo {
   forges: EchoForge[];
 }
 
-/** Room on the code: five rounds of rips (a match is first to 3) and six forges. */
+/** Room on the code: the first five rounds of rips (later rounds rip like the rival) and six forges. */
 export const ECHO_RIPS = 5;
 export const ECHO_FORGES = 6;
 /** Where your last match's full code (build and echo) is kept for the board. */
