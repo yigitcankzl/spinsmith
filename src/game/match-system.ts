@@ -214,6 +214,8 @@ const KO_FREEZE = 0.12;
 const COUNT_BEAT = 0.6;
 /** A pointing ray this close to a button's center (m) presses it. */
 const BUTTON_REACH = 0.035;
+/** Head-ray assist (Quest has no gaze source): a button held under the head ray this long lights up, and a pinch anywhere presses it. */
+const HEAD_DWELL = 0.4;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
 /** Launch power at or above this is a perfect rip: extra starting spin. */
 const PERFECT = TUNE.perfect;
@@ -1044,6 +1046,8 @@ export class MatchSystem extends createSystem({
   private passHinted = false;
   private arenaMorphShove = { x: 0, z: 0, t: 0 };
   private gazeAssist = { active: false, target: '' };
+  /** The button under the head ray, since when, and when it was last seen there (pickButton runs per button set). */
+  private headDwell = { id: '', since: 0, seen: -1 };
   /** A fingertip pressed into the floor already made its well (until it lifts out). */
   private pressing: Record<Side, boolean> = { left: false, right: false };
   /** An open fingertip touching and sliding across the floor; it becomes a one-use groove on lift. */
@@ -1414,8 +1418,9 @@ export class MatchSystem extends createSystem({
       b.mesh.rotation.set(-SIGN_TILT, 0, 0);
       b.mesh.visible = false;
     }
-    // The gaze pointer stays dormant on Quest unless the runtime exposes a gaze input source. On
-    // Meta VR Glasses it combines that gaze ray with either hand's pinch; the hand path is unchanged.
+    // The gaze pointer stays dormant on Quest unless the runtime exposes a gaze input source (there
+    // its head ray only feeds the button dwell assist). On Meta VR Glasses it combines that gaze ray
+    // with either hand's pinch; the hand path is unchanged.
     this.pointers = [this.gazePointer, this.hands.right, this.hands.left];
     if (import.meta.env.DEV) {
       // A crosshair in the middle of the view shows where the gaze pointer aims.
@@ -2276,6 +2281,25 @@ export class MatchSystem extends createSystem({
         hovered ??= b;
         if (h === this.gazePointer) this.gazeAssist.target = b.id;
         if (h.justPinched && !pressed) pressed = b.id;
+      }
+    }
+    // Head-ray assist where no gaze pointer runs (Quest): look at a far button for a moment and it
+    // lights up; then a pinch of either hand, wherever it is, presses it. Hands still win.
+    const g = this.gazePointer;
+    if (!hovered && !g.tracked && g.hasRay && !this.gazeOff) {
+      for (const b of buttons) {
+        if (!b.mesh.visible) continue;
+        b.mesh.getWorldPosition(this.p);
+        const t = this.local.copy(this.p).sub(g.rayOrigin).dot(g.rayDir);
+        if (t <= 0 || this.local.copy(g.rayDir).multiplyScalar(t).add(g.rayOrigin).distanceTo(this.p) >= Math.max(BUTTON_REACH, b.height * 0.8)) continue;
+        const d = this.headDwell;
+        if (d.id !== b.id || this.time - d.seen > 0.15) Object.assign(d, { id: b.id, since: this.time });
+        d.seen = this.time;
+        if (this.time - d.since < HEAD_DWELL) break;
+        hovered = b;
+        this.gazeAssist.target = b.id;
+        if (g.justPinched && !pressed) pressed = b.id;
+        break;
       }
     }
     for (const b of buttons) b.highlight(b === hovered);
@@ -3238,7 +3262,8 @@ export class MatchSystem extends createSystem({
 
   /**
    * Meta VR Glasses expose gaze as a target ray and either hand supplies the pinch. In desktop
-   * IWER the head ray is the equivalent; on a Quest without gaze tracking this pointer sleeps.
+   * IWER the head ray is the equivalent; on a Quest without gaze tracking this pointer sleeps and
+   * its head ray only drives the dwell-then-pinch button assist in pickButton.
    */
   private updateGazePointer(frame: XRFrame, ref: XRReferenceSpace, session: XRSession) {
     const g = this.gazePointer;
