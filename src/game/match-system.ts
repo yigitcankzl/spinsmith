@@ -6214,7 +6214,9 @@ export class MatchSystem extends createSystem({
     this.blockShapingRelease(side);
     const power = Math.min(1.5, strength * force * (riposte ? 1.25 : 1));
     const candidates = riposte && this.riposteTop ? [this.riposteTop] : this.tops;
-    const struck = candidates.filter((top) => palmGustCrosses(this.arena, top, sx, sz, gustEx, gustEz));
+    // A paid gust steers around the player's own top; a riposte keeps its explicit target.
+    const own = riposte ? null : this.mine;
+    const struck = candidates.filter((top) => top !== own && palmGustCrosses(this.arena, top, sx, sz, gustEx, gustEz));
     this.palmGustDirection.set(dirX, dirZ);
     this.palmGustCooldown = PALM_GUST_COOLDOWN;
     this.palmGustTime = PALM_GUST_FX_TIME;
@@ -6236,7 +6238,7 @@ export class MatchSystem extends createSystem({
     if (this.online?.role === 'guest' && this.online.peer) {
       const target = riposte && this.riposteTop ? (this.riposteTop === this.mine ? 'mine' : 'rival') : undefined;
       this.online.sendEvent({ kind: 'gust', sx: -sx, sz: -sz, ex: -gustEx, ez: -gustEz, f: power, ...(target ? { target } : {}) });
-    } else palmGust(this.arena, candidates, sx, sz, gustEx, gustEz, power);
+    } else palmGust(this.arena, candidates, sx, sz, gustEx, gustEz, power, own);
     for (const top of struck) {
       const y = this.arena.height(top.x, top.z);
       const view = top === this.mine ? this.myView : top === this.theirs ? this.theirView : null;
@@ -8724,8 +8726,10 @@ export class MatchSystem extends createSystem({
       playThock();
     } else if (ev.kind === 'gust') {
       const targets = ev.target === 'mine' ? [this.theirs] : ev.target === 'rival' ? [this.mine] : this.tops;
-      const struck = targets.filter((top) => palmGustCrosses(this.arena, top, ev.sx, ev.sz, ev.ex, ev.ez));
-      const hits = palmGust(this.arena, targets, ev.sx, ev.sz, ev.ex, ev.ez, ev.f);
+      // An untargeted (paid) guest gust steers around the guest's own top, as it does locally.
+      const own = ev.target ? null : this.theirs;
+      const struck = targets.filter((top) => top !== own && palmGustCrosses(this.arena, top, ev.sx, ev.sz, ev.ex, ev.ez));
+      const hits = palmGust(this.arena, targets, ev.sx, ev.sz, ev.ex, ev.ez, ev.f, own);
       this.rivalHandMove(ev.ex, ev.ez, ev.ex - ev.sx, ev.ez - ev.sz);
       this.rivalShapeAt = this.elapsed;
       this.rivalShapeKind = 'FORGE GUST';

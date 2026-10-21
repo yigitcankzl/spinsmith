@@ -1268,34 +1268,53 @@ export function springRim(arena: Arena, tops: readonly Top[], sx: number, sz: nu
   return hits;
 }
 
+/** A paid gust sweeping a rival at a pocket (within this angle) hits harder and lifts it. */
+const GUST_AIM = 0.6;
+const GUST_AIMED_PUSH = 2;
+
 /**
  * A fast open-palm sweep pushes only tops crossed by the hand's path. It is directional rather
- * than an arena-wide spell: timing and the physical sweep line decide what moves.
+ * than an arena-wide spell: timing and the physical sweep line decide what moves. When `own` is
+ * given, the hand steers around that top (it is never pushed), and a rival swept toward a pocket
+ * mouth takes a doubled push and is lifted so the pocket is easier to clear.
  */
-export function palmGust(arena: Arena, tops: readonly Top[], sx: number, sz: number, ex: number, ez: number, strength = 1) {
+export function palmGust(arena: Arena, tops: readonly Top[], sx: number, sz: number, ex: number, ez: number, strength = 1, own: Top | null = null) {
   const dx = ex - sx;
   const dz = ez - sz;
   const length = Math.hypot(dx, dz);
   if (length < 1e-5) return 0;
   const nx = dx / length;
   const nz = dz / length;
+  const heading = Math.atan2(nz, nx);
   const reach = Math.max(arena.radius * 0.46, 0.065);
   let hits = 0;
   for (const top of tops) {
-    if (!palmGustCrosses(arena, top, sx, sz, ex, ez)) continue;
+    if (top === own || !palmGustCrosses(arena, top, sx, sz, ex, ez)) continue;
     const along = Math.max(0, Math.min(1, ((top.x - sx) * dx + (top.z - sz) * dz) / (length * length)));
     const gap = Math.hypot(top.x - (sx + dx * along), top.z - (sz + dz * along));
     const falloff = 1 - gap / reach;
-    const impulse = (0.075 + 0.055 * Math.max(0, Math.min(1.5, strength))) * (0.45 + falloff * 0.55);
+    const aimed = !!own && palmGustAimed(arena, top, heading);
+    const impulse = (aimed ? GUST_AIMED_PUSH : 1) * (0.075 + 0.055 * Math.max(0, Math.min(1.5, strength))) * (0.45 + falloff * 0.55);
     top.vx += nx * impulse;
     top.vz += nz * impulse;
     top.kick = Math.min(1, top.kick + impulse * 2.2);
     top.kickX = nx;
     top.kickZ = nz;
     top.charging = 0;
+    if (aimed) top.lifted = Math.max(top.lifted, LIFT_TIME);
     hits++;
   }
   return hits;
+}
+
+/** True when a sweep heading points this top at a pocket mouth. */
+export function palmGustAimed(arena: Arena, top: Top, heading: number) {
+  for (const p of arena.layout.pockets) {
+    const r = rimRadius(arena.layout, p.angle);
+    const a = Math.atan2(Math.sin(p.angle) * r - top.z, Math.cos(p.angle) * r - top.x);
+    if (Math.abs(Math.atan2(Math.sin(a - heading), Math.cos(a - heading))) < GUST_AIM) return true;
+  }
+  return false;
 }
 
 /** True when the hand's physical sweep corridor crosses this live top. */
