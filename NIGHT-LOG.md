@@ -16,27 +16,38 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 1 | Solid / bug-free (gesture collisions found by probes after the merges) | 6 → pending | Arena Forge tilt release formed a cup (2 charges); a Spin Rub reach fired Forge Gust (2 charges); groove probe flake; fixed: cup blocked 0.45 s after a pinch release, gust not fired onto your own top or during a rub window, rail posts not built during a rub. Hands suite 22/23 in sequence; outer-ring fails only right after palm-forge (passes 3/3 alone) — open | 41cf1b6 |
 | 1 | Hand tracking (One-Euro filter) | 6 → dropped | Filtering the pinch point cut rip power on the release and broke dual-rip 2/2; reverted. Needs device tuning (raw vs smoothed paths for rip/flick) | — |
 | 1 re-score (02:15) | Fresh judge on the touched rows | passthrough 5→8, take-it-away 4→8, FoV 4→7, gaze 2→4, onboarding 5→6, first five minutes 5→6, scene understanding 5→6, submission text 4→5; seated 6→6, untested rooms 5→5, solid 6→5, 60 fps 4→3 (stricter reviewer) | Regressions found: bout 1-4 taught the cup before its release; a head-ray dwell + any pinch could press MENU; gust's own-top guard too wide. All three fixed | 243bc4f |
+| 2 (02:15–02:45) | Passthrough every round (drop sides) | 8 → pending | Under each red arc the rim is a lower drop side for both tops (`DESK_DROP_ESCAPE` 0.55). Harness 24 rounds/pair: masher +0.5 win; ramp aimed at the arc beats the same habit at the wrong rim by +3.0 win / +0.18 heat (side desk), +2.4 / +0.10 (far desk); over-the-wall ≤20% of finishes; median round 14.8 → 11.2 s. Online and brawls off | 1efe7b3 |
+| 2 | Onboarding text (hand ghosts) | 6 → pending | First-match prompt words 359 → 152 (prompts 272 → 120, cards 87 → 32), cap 5 words; shared-mesh ghost hands for rip, seal stamp, slap, flick | 6a7247b |
+| 2 | First Five Minutes (probe) | 6 → pending | `check:first-five` in IWER from a fresh save: first KO = first DESK KO at 46.2 s game time (round 2), match end 133 s (6 rounds, 4-3); 55 distinct prompts / 258 words incl. stamps; come-back card shown. Headless: median first KO 15.6 s, match 61 s | 15d5716 |
+| 2 | Reason to Come Back | 8 → pending | Day streak + "Tomorrow: <order>" + next bout on the result card and the board (no new meshes) | a57873c |
+| 2 | Easy in/out + accessibility | 7 / 6 → pending | Interrupted matches resume at the round start (not the first match; 12 h stale rule); colour-safe dial mode (Okabe-Ito); rival rings/marks hexagonal; wrong-way rub stamp, low-spin bar throb | 7a91c36, f507218 |
+| 2 | Solid / bug-free | 5 → pending | Found by probes: resume replayed a pre-fresh tutorial (fixed: never resume match 1); flick swing also committed a groove (fixed); outer-ring driver aimed at a stale goal while the arena slid (fixed). Full `check:hands` passes in one sequence; desk-ko-first, desk-ko, desk-guard, combat-readability, room-matrix 5/5 pass | 61fe076 |
 
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
 - [x] Unlabelled horizontal planes 0.45–1.15 m count as tables (Untested rooms 6, scene understanding 6)
-- [ ] Desk-edge sectors shape every round, harness-measured, beats random use (Passthrough 5)
+- [x] Desk-edge sectors shape every round, harness-measured, beats random use (Passthrough 5)
 - [x] One verb per match with one card, Flick in match 1, palm brace removed (Onboarding 6, First Five Minutes 6)
 - [x] Forge grips inside the 2 ft reach check (Seated 6)
 - [x] Headless FoV check, essential labels within ±35° vertical (FoV 6)
 - [ ] One-Euro filter on pinch/index — tried, dropped (rip power regression); needs device
 - [x] Head-ray gaze assist or drop the gaze claim (Gaze 3)
 - [x] Lefty in the comfort dial (Accessibility 7)
-- [ ] Save match state on pause (Easy in/out 7)
+- [x] Save match state on pause (Easy in/out 7)
 - [x] `?demo` under 150 draws/eye: already 98 hub / 103 fight per eye (measured)
 - [x] IWER room matrix probe: living_room, office_small, no table, small table, unlabelled table (Untested rooms 6)
-- [ ] Scripted `?fresh` first-five-minutes probe: time to first KO < 90 s, words shown, verbs taught (First Five Minutes 6)
-- [ ] Replace instruction text with hand ghosts (Onboarding 6)
-- [ ] Tomorrow's order on the exit card, visible streak (Reason to Come Back 8)
-- [ ] Captions / visual twin for every audio cue, colour-blind palette (Accessibility 7)
+- [x] Scripted `?fresh` first-five-minutes probe: time to first KO < 90 s, words shown, verbs taught (First Five Minutes 6)
+- [x] Replace instruction text with hand ghosts (Onboarding 6)
+- [x] Tomorrow's order on the exit card, visible streak (Reason to Come Back 8)
+- [x] Captions / visual twin for every audio cue, colour-blind palette (Accessibility 7)
 - [x] Frame-time probe in IWER (update CPU ms); heap metric dropped, Chromium buckets performance.memory
 - [ ] Run every check 3× and fix flaky ones — combat-readability 4/4, groove 4/4, rub/gust collisions fixed; outer-ring after palm-forge open
-- [ ] README top 15 lines matching the code (README:85, echo.ts:30, index.html:88 fixed in 152a1f1)
-- [ ] Rewrite docs/SUBMISSION.md from the current game (Submission text 6)
+- [x] README top 15 lines matching the code (README:85, echo.ts:30, index.html:88 fixed in 152a1f1)
+- [x] Rewrite docs/SUBMISSION.md from the current game (Submission text 6)
 - [ ] Refresh IWER-labelled stills (Images 5)
 - [ ] Last: IWER-labelled trailer recut opening on the DESK KO (Video 4)
+- [ ] FPS overlay + automatic quality fallback (60 fps 3)
+- [ ] One gesture arbitration table for the open fingertip / palm verbs, tested (Solid 5)
+- [ ] Comfort modes as combinable toggles (Accessibility 6)
+- [ ] Fewer stamps in match 1 (55 prompts / 258 words) (First Five Minutes)
+- [ ] Room matrix: tilted plane, two desks, coffee table, table at the edge of reach (Untested rooms 5)
