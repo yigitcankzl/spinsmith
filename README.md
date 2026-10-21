@@ -6,22 +6,16 @@ battlefield while the tops fight. Throw the rival off the real edge of your desk
 A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with the Immersive
 Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming, New Experience).
 
-## Try it (judges): the hero move in the first match
+## Try it (judges): five minutes, seated, hands only
 
-1. Sit at a table with a Meta Quest 3 or 3S, hands free (no controllers), and open the hosted URL
-   in the Quest Browser.
-2. Press **ENTER** and allow spatial data. Look at the table and pinch, or press your palm on it:
-   the arena rises there. Without a usable surface it stands on a floating tray and says so.
-3. Pinch your top in its dock and drop it in the arena, then pinch near it, pull back and let go
-   to rip it.
-4. The first match teaches one move per round: pinch the floor for a ramp; then **grab the rim
-   with both hands and squeeze, stretch, twist or tilt** (the two-hand arena forge); then slap
-   your palm down for the Anvil Strike.
-5. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
+1. Sit at a table with a Meta Quest 3 or 3S, no controllers, and open the hosted URL in the Quest Browser.
+2. Press **ENTER** and allow spatial data. The arena rises on your real table (a labelled table or desk, or any flat unlabelled surface at desk height); with none it stands on a floating tray and says so.
+3. Pinch your top, pinch near it, pull back and let go: the rip launches it.
+4. The first match teaches one move a round: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — the rival is steered to your real desk edge and flies off it (**DESK KO**); **round 3** slap your palm down for the Anvil Strike. Flick a tired top with your fingertip any time after the forge lesson.
+5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, Ember Rivet, Spin Rub, Crossguard, ...).
+6. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
 
-**If something goes wrong:** no table found → the arena stands on a floating tray (it says so);
-hands not tracked → keep them in view, a held move waits 0.28 s before it cancels; a refused
-move says why on the card ("No charge yet", "Strike not ready").
+**If something goes wrong:** no table found → floating tray (it says so); hands not tracked → keep them in view, a held move waits 0.28 s before it cancels; a refused move says why on the card ("No charge yet", "Strike not ready").
 
 ## Modes, and where to find them in the headset
 
