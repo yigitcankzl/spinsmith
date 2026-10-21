@@ -1409,6 +1409,8 @@ export function sealStrike(arena: Arena, mine: Top, rival: Top, seal: Seal, ox =
     mine.vx = (dx / d) * RUSH_SPEED;
     mine.vz = (dz / d) * RUSH_SPEED;
     mine.rushing = 0.6;
+    // The rim catches your own rushing top: a missed Rush is a wasted strike, not a self-knockout.
+    mine.shieldUntil = Math.max(mine.shieldUntil, arena.elapsed + 0.6);
     mine.charging = PARRY_WINDOW;
     mine.chargeAngle = Math.atan2(mine.z, mine.x);
     mine.kick = Math.min(1, mine.kick + 0.4);
