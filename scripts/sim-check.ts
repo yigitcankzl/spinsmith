@@ -24,9 +24,9 @@ import { crossguard, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
-import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge } from '../src/game/arena-forge.ts';
+import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge, deskWrenchImpulse } from '../src/game/arena-forge.ts';
 import { brawlSlots, spinStep, targetWinner } from '../src/game/brawl.ts';
-import { deskSectors, inSector } from '../src/game/desk-edge.ts';
+import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/game/desk-edge.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
 const FORGE = ARENAS[0];
@@ -1719,6 +1719,32 @@ assert.equal(edgeOf('defense', 'defense'), 0);
   // Centre off the table, or no table: none.
   assert.equal(deskSectors(square(2, 0, 0.5), 0.15, 0.1).length, 0, 'off table: no sectors');
   assert.equal(deskSectors(null, 0.15, 0.1).length, 0, 'no table: no sectors');
+}
+
+// The first match's staged DESK KO: steered to the edge-facing rim, the forge wrench throws every
+// rival over the Forge Bowl rim (a thrown ring-out, never a pocket) toward the real edge.
+{
+  for (let deg = 0; deg < 360; deg += 15) {
+    const sector = { angle: (deg * Math.PI) / 180, halfWidth: Math.PI / 4, distance: 0.2 };
+    const angle = deskWrenchAngle(sector, FORGE.pockets);
+    assert.ok(inSector(sector, angle), `wrench at ${deg}deg stays in its sector`);
+    assert.ok(FORGE.pockets.every((p) => Math.abs(Math.atan2(Math.sin(angle - p.angle), Math.cos(angle - p.angle))) > p.half), `wrench at ${deg}deg avoids pockets`);
+    for (const rival of RIVALS) {
+      const arena = arenaWith({});
+      arena.elapsed = 5;
+      const top = new Top(specFromBuild(rival.build));
+      top.launch(0, -0.08, 0.3, 0.2, 0.9, rival.build.spin);
+      solo(arena, top, 1.5, () => deskWrenchSteer(top, angle, FORGE.radius, STEP));
+      assert.ok(top.alive && Math.hypot(top.x, top.z) > FORGE.radius * 0.45, `${rival.name} steered to the rim at ${deg}deg`);
+      const kick = deskWrenchImpulse(top, { x: 0, z: 0 }, angle, FORGE.radius);
+      top.vx += kick.x;
+      top.vz += kick.z;
+      solo(arena, top, 0.6);
+      assert.equal(top.finish, 'over', `${rival.name} wrenched at ${deg}deg finished ${top.finish}`);
+      const exit = Math.atan2(top.z, top.x);
+      assert.ok(Math.abs(Math.atan2(Math.sin(exit - angle), Math.cos(exit - angle))) < 0.35, `${rival.name} left toward the desk edge at ${deg}deg (${exit.toFixed(2)})`);
+    }
+  }
 }
 
 // Fight calls: one card, priorities, no quick repeats.

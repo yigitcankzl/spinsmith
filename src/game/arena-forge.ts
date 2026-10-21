@@ -90,3 +90,20 @@ export function arenaForgeAim(x: number, z: number, vx: number, vz: number, aren
 export function arenaForgeRivalAction(action: ArenaForgeAction): ArenaForgeAction {
   return action === 'squeeze' ? 'stretch' : action;
 }
+
+/** Outward speed of the staged first DESK KO: clear of a standard rim (escape 1.1) with margin. */
+export const DESK_WRENCH_SPEED = 1.45;
+
+/**
+ * The first match's staged DESK KO: the forge kick that replaces the rival's velocity with a run
+ * at a point half a rim beyond the rim along `angle` (toward the nearest real desk edge; `rim` is
+ * the rim's distance there): steep enough to clear the wall, close enough to cross it on `angle`.
+ * Never weaker than the plain kick.
+ */
+export function deskWrenchImpulse(top: { x: number; z: number; vx: number; vz: number }, plain: ArenaForgeImpulse, angle: number, rim: number): ArenaForgeImpulse {
+  const speed = Math.max(DESK_WRENCH_SPEED, Math.hypot(plain.x, plain.z));
+  const dx = Math.cos(angle) * rim * 1.5 - top.x;
+  const dz = Math.sin(angle) * rim * 1.5 - top.z;
+  const d = Math.hypot(dx, dz) || 1;
+  return { x: (dx / d) * speed - top.vx, z: (dz / d) * speed - top.vz };
+}

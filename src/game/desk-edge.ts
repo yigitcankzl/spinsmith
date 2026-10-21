@@ -82,3 +82,26 @@ export function inSector(s: DeskSector, angle: number): boolean {
   const d = Math.atan2(Math.sin(angle - s.angle), Math.cos(angle - s.angle));
   return Math.abs(d) <= s.halfWidth;
 }
+
+/**
+ * The first match's staged DESK KO aims through the nearest sector, at the direction closest to
+ * its middle that stays clear of every slag pocket (a pocket finish never reaches the real desk).
+ * Angles are in the same frame as the pockets; falls back to the sector's middle.
+ */
+export function deskWrenchAngle(s: DeskSector, pockets: { angle: number; half: number }[]): number {
+  const clear = (a: number) => pockets.every((p) => Math.abs(Math.atan2(Math.sin(a - p.angle), Math.cos(a - p.angle))) > p.half + 0.15);
+  const step = Math.PI / 72;
+  for (let d = 0; d <= s.halfWidth * 0.8; d += step) {
+    if (clear(s.angle + d)) return s.angle + d;
+    if (clear(s.angle - d)) return s.angle - d;
+  }
+  return s.angle;
+}
+
+/** One fixed step of the staged DESK KO's steer: the rival drifts to 80% of `rim` along `angle`. */
+export function deskWrenchSteer(top: { x: number; z: number; vx: number; vz: number }, angle: number, rim: number, dt: number) {
+  const r = rim * 0.8;
+  const k = Math.min(1, 8 * dt);
+  top.vx += ((Math.cos(angle) * r - top.x) * 6 - top.vx) * k;
+  top.vz += ((Math.sin(angle) * r - top.z) * 6 - top.vz) * k;
+}
