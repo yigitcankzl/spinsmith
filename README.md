@@ -264,8 +264,8 @@ an arena. First to 4 heat wins a match.
   into a still finger only nudges it, free, at most twice a second. A fast-spinning top shrugs most
   of a flick off, a tired, wobbling one is thrown, so the timing matters as much as the aim. In the
   headless sim a human-paced flicker (0.32 s lag, 15° aim error) wins 68% against an equal rival
-  (no hands 50%, random flicking 48%) and comes back from a spin deficit in 33% of rounds instead
-  of 5% (`npm run report:flick`, 6 rounds per arena and type pairing). Online, the guest's flick is sent as a
+  (no hands 51%, random flicking 52%) and comes back from a spin deficit in 18% of rounds instead
+  of 7% (`npm run report:flick`, 6 rounds per arena and type pairing). Online, the guest's flick is sent as a
   direction and swing speed and the host applies it.
 - **Spin Rub (direct touch, from the third match):** run the same fingertip slowly along your own
   top's rim, mostly sideways rather than into it (below flick speed). The first rub spends one
