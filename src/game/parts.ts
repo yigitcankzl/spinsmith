@@ -188,7 +188,7 @@ export const TIPS: Tip[] = [
   { id: 'chisel', name: 'Chisel', spinDrain: 0.0535, roam: 0.6, cruise: 0.66, drive: 3, maxSpeed: 2, seek: 3, center: 0, gear: 1.15, weight: 4, blurb: 'Fast and aggressive, burns spin' },
   { id: 'spur', name: 'Spur', spinDrain: 0.0533, roam: 0.45, cruise: 0.58, drive: 2.6, maxSpeed: 1.9, seek: 4, center: 0, gear: 1.25, weight: 4, blurb: 'Turns toward the rival sooner; Chisel runs wide on the rim' },
   { id: 'awl', name: 'Awl', spinDrain: 0.053, roam: 0.35, cruise: 0.45, drive: 2, maxSpeed: 1.8, seek: 1.5, center: 1.2, gear: 0.95, weight: 4, blurb: 'Balanced: roams, then settles' },
-  { id: 'dome', name: 'Dome', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 7.84, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
+  { id: 'dome', name: 'Dome', spinDrain: 0.0536, roam: 0.1, cruise: 0.29, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 6.4, gear: 0.85, weight: 5, blurb: 'Holds the middle' },
   { id: 'pin', name: 'Pin', spinDrain: 0.0493, roam: 0.2, cruise: 0.42, drive: 1.45, maxSpeed: 1.75, seek: 0, center: 0, gear: 0.55, weight: 3, blurb: 'Stays still and conserves spin, but gives up dash and movement' },
   { id: 'bead', name: 'Bead', spinDrain: 0.0525, roam: 0.15, cruise: 0.32, drive: 1.5, maxSpeed: 1.6, seek: 0, center: 2, gear: 0.7, weight: 6, blurb: 'Slow drift, long spin' },
 ];
