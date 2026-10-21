@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, FORGE_GRIP, forgeGripIntent, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
@@ -319,6 +319,28 @@ TUNING.grace = 0;
   palmGust(pitArena, [atPit], -0.11, 0, 0.11, 0, 1, ownTop);
   palmGust(pitArena, [offPit], 0, -0.11, 0, 0.11, 1, ownTop);
   assert.ok(atPit.lifted > 0 && atPit.vx > offPit.vz * 1.5 && offPit.lifted === 0, 'a gust that sweeps the rival at a pocket hits harder and lifts it');
+
+  // Rim spring: your own top is pulled in and shielded; a rival in the sector is slung toward a pocket.
+  const springArena = arenaWith({ floor: 'flat', rails: [] });
+  const pocket = springArena.layout.pockets[0];
+  assert.ok(pocket, 'the default spring arena has a pocket to sling toward');
+  const sa = pocket.angle + 0.3;
+  const sr = springArena.radius * 0.85;
+  const own = new Top(ATTACK);
+  const foe = new Top(DEFENSE);
+  const far = new Top(DEFENSE);
+  own.launch(Math.cos(sa) * sr, Math.sin(sa) * sr, 0, 0, 0.8, 1);
+  foe.launch(Math.cos(sa - 0.1) * sr, Math.sin(sa - 0.1) * sr, 0, 0, 0.8, -1);
+  far.launch(-Math.cos(sa) * sr, -Math.sin(sa) * sr, 0, 0, 0.8, -1);
+  const rimX = Math.cos(sa) * springArena.radius;
+  const rimZ = Math.sin(sa) * springArena.radius;
+  assert.equal(springRim(springArena, own, [foe, far], rimX, rimZ, rimX * 0.85, rimZ * 0.85, 1), 2, 'a rim spring reaches only tops in its sector');
+  assert.ok(own.vx * Math.cos(sa) + own.vz * Math.sin(sa) < -0.1, 'a rim spring pulls your own top inward');
+  assert.ok(own.shieldUntil >= springArena.elapsed + SPRING_SHIELD - 1e-9, 'a rim spring holds the wall shut behind your own top');
+  const pocketX = Math.cos(pocket.angle) * springArena.radius - foe.x;
+  const pocketZ = Math.sin(pocket.angle) * springArena.radius - foe.z;
+  assert.ok((foe.vx * pocketX + foe.vz * pocketZ) / Math.hypot(pocketX, pocketZ) > 0.2, 'a rim spring slings the rival along the wall toward its nearest pocket');
+  assert.ok(foe.shieldUntil === 0 && far.vx === 0 && far.vz === 0, 'the rival gets no shield and tops outside the sector are untouched');
 
   const guarded = new Top(ATTACK);
   guarded.launch(0, 0.004, 0, -0.35, 0.8, 1);

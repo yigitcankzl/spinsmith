@@ -5390,13 +5390,13 @@ export class MatchSystem extends createSystem({
       playThock();
       return;
     }
-    const hits = springRim(this.arena, this.tops, sx, sz, x, z, f);
+    const hits = springRim(this.arena, this.mine, [this.theirs], sx, sz, x, z, f);
     this.arenaView.flashRail(sx, sz);
     this.impacts.shock(sx, this.arena.height(sx, sz), sz, hits ? 0.75 : 0.35);
     this.sparks.burst(sx, this.arena.height(sx, sz), sz, hits ? 0.9 : 0.35);
     this.lastShape = hits ? { t: this.elapsed, kind: 'parry' } : this.lastShape;
     this.progress.advance('match');
-    this.stamp.show(hits ? 'RIM SPRING!' : 'MISSED SPRING', hits ? `${hits} top${hits === 1 ? '' : 's'} pulled in` : 'no top in that sector', hits ? 'mine' : 'neutral', 0.55);
+    this.stamp.show(hits ? 'RIM SPRING!' : 'MISSED SPRING', hits ? `${hits} top${hits === 1 ? '' : 's'} sprung` : 'no top in that sector', hits ? 'mine' : 'neutral', 0.55);
     playThock();
     if (import.meta.env.DEV) console.log(`[RIM] spring at ${sx.toFixed(3)},${sz.toFixed(3)} pull ${pull.toFixed(3)} hits ${hits}`);
   }
@@ -8365,7 +8365,7 @@ export class MatchSystem extends createSystem({
       ghost = forgeGhost = true;
     } else if (this.phase === 'fight' && !this.demo && !this.cuppedOnce && this.taught('cup') && this.progress.matches === 1 && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       this.label.set(this.rimExperiment
-        ? 'New: pinch the glowing rim, pull it inward, release\nits spring can save a top near that edge'
+        ? 'New: pinch the glowing rim, pull it inward, release\nit saves your top there and slings a rival toward a pocket'
         : 'JAB THE FLOOR → CUP\nCATCH A TOP, THEN SLING');
     } else if (this.bumpHintShown && g !== 'bump') {
       // The first move is made: the hint goes.
@@ -8717,7 +8717,7 @@ export class MatchSystem extends createSystem({
       this.stamp.show('THEIR SLING', 'LIVE HANDS', 'rival', 0.6);
       playSling(t.x, t.z);
     } else if (ev.kind === 'rim') {
-      const hits = springRim(this.arena, this.tops, ev.sx, ev.sz, ev.x, ev.z, Math.max(0, Math.min(1.5, ev.f)));
+      const hits = springRim(this.arena, this.theirs, [this.mine], ev.sx, ev.sz, ev.x, ev.z, Math.max(0, Math.min(1.5, ev.f)));
       this.arenaView.flashRail(ev.sx, ev.sz);
       this.impacts.shock(ev.sx, this.arena.height(ev.sx, ev.sz), ev.sz, hits ? 0.75 : 0.35);
       if (hits) this.stamp.show('THEIR RIM SPRING', 'LIVE HANDS', 'rival', 0.6);
