@@ -11,6 +11,16 @@ The capture always labels itself as emulator footage. The bundled background is
 **Comfy Cafe** by Sergej Majboroda from Poly Haven, licensed CC0:
 https://polyhaven.com/a/comfy_cafe
 
+Captures get their table from the emulator's room, not from the capture layer: the dev server
+loads IWER's `office_small` scene capture, whose `table`-labelled XRPlane (1.60 m x 0.75 m, top at
+0.748 m, in front of the origin) reaches the game through `XRFrame.detectedPlanes` and the same
+`tables()` / `tableShape()` path a Quest uses. DESK KO, the DESK GUARD rival, the real-edge danger
+arcs and desk trophies therefore run against a detected plane in captures (check the log for
+`[MATCH] arena on table` and `[MATCH] fit ...` lines without `(no table)`). The head must be seated
+(y <= 1.49; `setup.sh` uses 1.45). The wooden box drawn by `shot.mjs` `devTable` is still only a
+visual stand-in under the arena, because the capture hides IWER's flat-shaded room; the game logic
+never reads it. Both the plane and the room are synthetic, so footage stays labelled as IWER.
+
 This rig is for presentation and regression comparison. It is not evidence of
 Quest performance, real passthrough, or physical-device hand tracking.
 
