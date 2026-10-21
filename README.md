@@ -274,6 +274,13 @@ an arena. First to 4 heat wins a match.
   is eased off the finger but never pushed. Without a charge it does nothing. Online, the guest
   sends the spin it rubbed and the host caps it per window. Covered by `npm run check:sim` and
   `check:net`; not yet tried on a headset.
+- **Forge Gust and Rim Spring (from the third match):** a fast open-palm sweep over the bowl
+  pushes the tops it crosses but steers around your own; swept toward a pocket mouth, the rival
+  is pushed twice as hard and lifted so the pocket takes it. Pinching the rim and pulling inward
+  springs that sector: your own top is pulled in and the rim holds behind it for 1 s, and a rival
+  there is slung along the wall toward its nearest pocket. In the headless sweep with human
+  reaction lag and aim error, gust moved from +0.1 to +8.9 win points over doing nothing and the
+  spring from -1.6 to +10; random sweeping or springing gains about +2.
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on
   contact, lean into hits, wobble as spin drains, then topple.
 - **Far ramps:** point the hand ray at the floor during a fight and hold the pinch to

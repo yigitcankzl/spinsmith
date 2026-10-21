@@ -1163,6 +1163,8 @@ export function installDriver() {
       const start = () => local(top.x - dx * back, top.z - dz * back, 0.008);
       const before = g.flickCount ?? 0;
       await setPinch(side, false);
+      // From above, like a hand: a straight reach from the parked hand skims the floor (a groove).
+      await glide(side, 'index', above(local(0, g.arena.radius * 1.2), 0.14), 0.3, 0, 'natural', 'reach');
       await glide(side, 'index', () => above(start(), 0.06), 0.3, 0, 'natural', 'reach');
       await glide(side, 'index', start, 0.16, 0, 'natural', 'grip');
       Object.assign(top, { vx: 0, vz: 0 });
