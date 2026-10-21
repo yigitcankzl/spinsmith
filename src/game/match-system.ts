@@ -6532,9 +6532,14 @@ export class MatchSystem extends createSystem({
     };
     // Seen from the far side the friend's low hand is on the other side: downhill flips in x.
     const downhill = -f.sign;
+    // The same forge rule as yours, with the rival as the forger: its own top is held and barely
+    // moved, and your top is hit hard only if it is exposed at the rim.
+    const aim = arenaForgeAim(this.mine.x, this.mine.z, this.mine.vx, this.mine.vz, this.arena.radius);
+    if (this.theirs.alive) this.theirs.shieldUntil = Math.max(this.theirs.shieldUntil, this.arena.elapsed + ARENA_FORGE_SHIELD);
     for (const top of this.tops) {
       if (!top.alive) continue;
-      const impulse = arenaForgeImpulse(f.action, gesture, top.x, top.z, this.arena.radius, downhill, 0);
+      const own = top === this.theirs;
+      const impulse = arenaForgeImpulse(own ? f.action : arenaForgeRivalAction(f.action), gesture, top.x, top.z, this.arena.radius, downhill, 0, own ? 0.4 : aim);
       top.vx += impulse.x;
       top.vz += impulse.z;
       top.kick = Math.max(top.kick, 0.55);
