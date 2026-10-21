@@ -1606,12 +1606,14 @@ export class MatchSystem extends createSystem({
           // Throw a top over the wall now, outward from the center, to see it land on the table.
           // Shift+O throws yours and arms the Outer Ring rescue path.
           const t = e.shiftKey ? this.mine : this.theirs;
-          const r = Math.hypot(t.x, t.z) || 1;
           // The rescue probe must land on the table; the faster rival shot remains the off-desk
           // showcase. Normal ring-outs always keep their real simulation velocity.
           const speed = e.shiftKey ? 0.3 : 0.8;
-          t.vx = (t.x / r) * speed;
-          t.vz = (t.z / r) * speed;
+          // The rescue probe throws away from any real table edge in reach, so the top lands on wood.
+          let a = Math.atan2(t.z, t.x);
+          if (e.shiftKey) for (let k = 0; k < 4 && this.deskEdgeSectors.some((sec) => inSector(sec, a)); k++) a += Math.PI / 2;
+          t.vx = Math.cos(a) * speed;
+          t.vz = Math.sin(a) * speed;
           t.state = 'out';
           t.finish = 'over';
         }
