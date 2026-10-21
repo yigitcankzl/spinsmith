@@ -47,7 +47,7 @@ import type { Placement, Point } from './placement.js';
 import { applySpatialPose, loadSpatialPose, saveSpatialPose } from './spatial-state.js';
 import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
-import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from './arena-forge.js';
+import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge } from './arena-forge.js';
 import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 import { clampGuestSpot, guestPointsBefore, linkFromAddress, sanitizeGuestEvent } from './online.js';
 import type { OnlineLink } from './online.js';
@@ -4962,9 +4962,12 @@ export class MatchSystem extends createSystem({
         const sign = action === 'twist' ? Math.sign(this.arenaMorphTwist) : action === 'tilt' ? Math.sign(this.arenaMorphShove.x) : 1;
         guest.sendEvent({ kind: 'forge', action, pull: gesture.pull, twist: gesture.twist, tilt: gesture.tilt, sign: sign < 0 ? -1 : 1, sx: -this.arenaMorphShove.x, sz: -this.arenaMorphShove.z, force });
       }
+      const aim = arenaForgeAim(this.theirs.x, this.theirs.z, this.theirs.vx, this.theirs.vz, this.arena.radius);
+      if (!guest && this.mine.alive) this.mine.shieldUntil = Math.max(this.mine.shieldUntil, this.arena.elapsed + ARENA_FORGE_SHIELD);
       for (const top of guest ? [] : this.tops) {
         if (!top.alive) continue;
-        const impulse = arenaForgeImpulse(action, gesture, top.x, top.z, this.arena.radius, this.arenaMorphShove.x, this.arenaMorphShove.z, force * (top === this.mine ? 0.4 : 1));
+        const own = top === this.mine;
+        const impulse = arenaForgeImpulse(own ? action : arenaForgeRivalAction(action), gesture, top.x, top.z, this.arena.radius, this.arenaMorphShove.x, this.arenaMorphShove.z, force * (own ? 0.4 : aim));
         const ix = impulse.x;
         const iz = impulse.z;
         top.vx += ix;
@@ -8789,9 +8792,15 @@ export class MatchSystem extends createSystem({
     } else if (ev.kind === 'forge') {
       const action = ev.action as ArenaForgeAction;
       const gesture: ArenaForgeGesture = { pull: ev.pull, twist: ev.twist, tilt: ev.tilt };
+      // The guest forged: its top (theirs, here on the host) is the forger, ours is the target.
+      const forger = this.theirs;
+      const target = this.mine;
+      const aim = arenaForgeAim(target.x, target.z, target.vx, target.vz, this.arena.radius);
+      if (forger.alive) forger.shieldUntil = Math.max(forger.shieldUntil, this.arena.elapsed + ARENA_FORGE_SHIELD);
       for (const top of this.tops) {
         if (!top.alive) continue;
-        const impulse = arenaForgeImpulse(action, gesture, top.x, top.z, this.arena.radius, ev.sx ?? -ev.sign, ev.sz ?? 0, ev.force ?? 1);
+        const own = top === forger;
+        const impulse = arenaForgeImpulse(own ? action : arenaForgeRivalAction(action), gesture, top.x, top.z, this.arena.radius, ev.sx ?? -ev.sign, ev.sz ?? 0, (ev.force ?? 1) * (own ? 0.4 : aim));
         top.vx += impulse.x;
         top.vz += impulse.z;
         top.kick = Math.max(top.kick, 0.55);

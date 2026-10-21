@@ -72,3 +72,21 @@ export function arenaForgeDanger(x: number, z: number, vx: number, vz: number, a
   const outward = (vx * x + vz * z) / radius;
   return radius / Math.max(0.01, arenaRadius) + Math.max(0, outward) * 0.8;
 }
+
+/** Seconds of rim shield the forging player's own top gets on release, so the forge is safe. */
+export const ARENA_FORGE_SHIELD = 0.4;
+
+/**
+ * Aim reward: a forge released while the rival is in the outer band or already heading out
+ * hits it three times harder; one mashed at a rival in mid-bowl barely nudges it. Timing, not
+ * frequency, is what makes the forge decide a round.
+ */
+export function arenaForgeAim(x: number, z: number, vx: number, vz: number, arenaRadius: number) {
+  const d = arenaForgeDanger(x, z, vx, vz, arenaRadius);
+  return d >= 0.8 ? 3 : 0.2;
+}
+
+/** Squeeze is an attack: it draws your own top in and throws the rival out. */
+export function arenaForgeRivalAction(action: ArenaForgeAction): ArenaForgeAction {
+  return action === 'squeeze' ? 'stretch' : action;
+}
