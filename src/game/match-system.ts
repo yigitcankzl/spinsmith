@@ -39,6 +39,7 @@ import { ArenaView, ChargePips, Cord, Impacts, Label, mergeByMaterial, miniArena
 import { BRASS } from './materials.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, SHAPING, ShapingCharges, StrikeBar } from './shaping.js';
+import { CALL, callAllowed } from './calls.js';
 import { PEDESTAL, pickTable, placeArena, TABLE_MAX_H, TABLE_MIN_H } from './placement.js';
 import { TUNE } from './tuning.js';
 import type { Placement, Point } from './placement.js';
@@ -1231,6 +1232,13 @@ export class MatchSystem extends createSystem({
   private launchZone = new Mesh(new BufferGeometry(), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.5, depthWrite: false, side: 2 }));
   /** Seconds left before a transient fight message clears. */
   private labelTimer = 0;
+  /** The fight call on the card (see call()): its key, text, priority and when it stops being fresh. */
+  private callKey = '';
+  private callText = '';
+  private callPriority = 0;
+  private callUntil = 0;
+  /** When each call key was last on the card, so the same call does not flash back. */
+  private callSeen = new Map<string, number>();
   private pullEnd = new Vector3();
   private handleWorld = new Vector3();
   /** Dev-only keyboard + gaze controls so the prototype can be played in the emulator without pinching. */
@@ -2395,6 +2403,28 @@ export class MatchSystem extends createSystem({
     if (guide === 'forge' || guide === 'fit') return 'New part: Spur tip!\nPinch the small anvil to forge';
     if (guide === 'rematch') return 'Your top is ready\nPut it in the arena for a rematch';
     return '';
+  }
+
+  /**
+   * A fight call to action on the instruction card. It shows only if nothing of higher (or equal,
+   * while still fresh) priority holds the card, and not again within CALL_REPEAT s of the same key
+   * last being on screen. Timed text set straight on the label counts as lesson priority.
+   * `seconds` 0 keeps the card up (never fresh: any call may replace it).
+   */
+  private call(text: string, priority: number, seconds: number, key = text) {
+    const ours = this.callText !== '' && this.label.current === this.callText;
+    if (ours) this.callSeen.set(this.callKey, this.time);
+    const slot = ours
+      ? { key: this.callKey, priority: this.callPriority, until: this.callUntil, onScreen: true }
+      : { key: '', priority: CALL.lesson, until: this.time + this.labelTimer, onScreen: this.labelTimer > 0 && this.label.current !== '' };
+    if (!callAllowed(slot, this.time, key, priority, this.callSeen.get(key))) return;
+    this.label.set(text);
+    this.labelTimer = seconds;
+    this.callKey = key;
+    this.callText = text;
+    this.callPriority = priority;
+    this.callUntil = this.time + seconds;
+    this.callSeen.set(key, this.time + seconds);
   }
 
   private updateHub(dt: number) {
@@ -3818,8 +3848,7 @@ export class MatchSystem extends createSystem({
     }
     if (sectors.length && this.progress.matches > 0 && this.deskEdgeHintMatch !== this.progress.matches && this.labelTimer <= 0) {
       this.deskEdgeHintMatch = this.progress.matches;
-      this.label.set('REAL EDGE\nTHROW THEM OFF YOUR DESK');
-      this.labelTimer = 2;
+      this.call('REAL EDGE\nTHROW THEM OFF YOUR DESK', CALL.tactic, 2);
     }
   }
 
@@ -5528,8 +5557,7 @@ export class MatchSystem extends createSystem({
     this.emberPickup.position.copy(this.emberFrom);
     this.emberPickup.visible = !this.photo;
     this.setEmberState(1);
-    this.label.set('HOT RIVET!\nPINCH IT · PLANT IT IN THE BOWL');
-    this.labelTimer = 1.7;
+    this.call('HOT RIVET!\nPINCH IT · PLANT IT IN THE BOWL', CALL.tactic, 1.7);
   }
 
   /** Catch the hot rivet, carry it through space, and release against the floor to forge a bumper. */
@@ -5878,8 +5906,7 @@ export class MatchSystem extends createSystem({
     if (!this.flickHintShown && this.flickCount === 0 && this.progress.matches >= 1 && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
       && this.elapsed > TUNING.grace && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) > 0.6 && this.labelTimer <= 0) {
       this.flickHintShown = true;
-      this.label.set('RIVAL IS TIRED\nSWING A FINGER THROUGH IT: FLICK');
-      this.labelTimer = 2.2;
+      this.call('RIVAL IS TIRED\nSWING A FINGER THROUGH IT: FLICK', CALL.tactic, 2.2);
     }
     // A guest's rubbed spin goes to the host in small batches, and the rest when the window closes.
     if (this.rubPending !== 0 && this.online?.role === 'guest' && this.online.peer
@@ -6360,8 +6387,7 @@ export class MatchSystem extends createSystem({
     const rivalAtRim = this.theirs.alive && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) >= 0.68;
     if (full && rivalAtRim && !this.strikeWindowShown && this.labelTimer <= 0) {
       this.strikeWindowShown = true;
-      this.label.set('RIM OPEN · STRIKE NOW\nSTAMP ACROSS FROM THE RIVAL');
-      this.labelTimer = 1.4;
+      this.call('RIM OPEN · STRIKE NOW\nSTAMP ACROSS FROM THE RIVAL', CALL.tactic, 1.4);
       this.stamp.show('STRIKE WINDOW', 'RIVAL EXPOSED AT THE RIM', 'mine', 0.6);
       playTick();
     }
@@ -6369,7 +6395,7 @@ export class MatchSystem extends createSystem({
     if (full && !this.struckOnce && !this.demo && this.progress.guide !== 'bump' && this.labelTimer <= 0) {
       this.strikeTaught = true;
       const seal = this.myBuild.seal ?? 'anvil';
-      this.label.set(`${SEAL_NAMES[seal].toUpperCase()} READY\nPINCH THE SEAL · STAMP THE ARENA`);
+      this.call(`${SEAL_NAMES[seal].toUpperCase()} READY\nPINCH THE SEAL · STAMP THE ARENA`, CALL.ultimate, 0, 'strike-ready');
     }
     const armed = full && this.elapsed - this.fullSince > 0.5;
     this.updateOverforge(armed, dt);
@@ -6680,8 +6706,7 @@ export class MatchSystem extends createSystem({
       const what = { charge: 'a charge', quake: 'a quake', pull: 'a pull' }[this.rival.move];
       if (!this.tellTaught) {
         this.tellTaught = true;
-        this.label.set(`${what.toUpperCase()} INCOMING\n${this.forgeBar.full ? ((this.myBuild.seal ?? 'anvil') === 'ward' ? 'WARD UP' : 'ULTIMATE NOW') : 'CUP YOUR TOP'}`);
-        this.labelTimer = 2.5;
+        this.call(`${what.toUpperCase()} INCOMING\n${this.forgeBar.full ? ((this.myBuild.seal ?? 'anvil') === 'ward' ? 'WARD UP' : 'ULTIMATE NOW') : 'CUP YOUR TOP'}`, CALL.danger, 2.5, 'tell');
       }
       if (import.meta.env.DEV) console.log(`[TELL] ${this.rival.name} ${this.rival.move} at t ${this.elapsed.toFixed(1)}`);
       return;
@@ -6707,8 +6732,7 @@ export class MatchSystem extends createSystem({
     this.barMessage = 'READY';
     if (this.rivalFeinting) {
       this.rivalFeinting = false;
-      this.label.set('FEINT!\nREAL MOVE STILL READY');
-      this.labelTimer = 0.9;
+      this.call('FEINT!\nREAL MOVE STILL READY', CALL.danger, 0.9);
       return;
     }
     if (!them.alive) return;
@@ -7841,8 +7865,7 @@ export class MatchSystem extends createSystem({
       this.elapsed += STEP;
       if (!this.pressureShown && this.elapsed >= SUDDEN_DEATH_AT) {
         this.pressureShown = true;
-        this.label.set('PRESSURE!\nPOCKETS OPEN · OUTER RIM HEATS');
-        this.labelTimer = 1.8;
+        this.call('PRESSURE!\nPOCKETS OPEN · OUTER RIM HEATS', CALL.ambient, 1.8);
         this.stamp.show('PRESSURE!', 'POCKETS ARE OPENING', 'neutral', 0.75, 1.1);
         playTell();
       }
