@@ -2281,6 +2281,8 @@ export class MatchSystem extends createSystem({
   /** Home: the arena waits with both tops; Play, Workshop, or switch arena. Pinching never launches here. */
   private toHub() {
     this.clearBrawl();
+    // A rivet thrown by the last clash of a fight must not linger over the hub.
+    this.resetEmber();
     this.bout = null;
     // ?online=… on a new headset waits for the first session; once it is over the room opens.
     if (!this.online && !this.onlineTried && this.progress.guide === 'done' && new URLSearchParams(location.search).has('online')) queueMicrotask(() => this.openOnline());
