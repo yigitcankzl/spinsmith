@@ -1286,6 +1286,31 @@ export function installDriver() {
       if (!held.left && !held.right && w.__game) w.__game.gazeOff = false;
     },
     /** Runs a list of [name, ...args] steps in order and returns the state after. */
+    /** Films the first match's staged DESK KO: a fresh first match, straight into the forge-lesson
+     * round, waiting until the rival is steered to the edge-facing rim (then squeeze with arenaForge). */
+    async stageFirstWrench() {
+      const g = game() as unknown as Record<string, any>;
+      api.rest();
+      g.progress.matches = 0;
+      g.progress.guide = 'match';
+      if (g.arena.layout.name !== 'Forge Bowl') g.setArena(g.arenas.find((a: { name: string }) => a.name === 'Forge Bowl'));
+      g.startMatch();
+      for (let i = 0; i < 200 && g.phase !== 'ready'; i++) await wait(0.025);
+      g.tutorialRound = 1;
+      g.launch(0.82, 0);
+      g.arena.elapsed = Math.max(g.arena.elapsed, g.arena.grace + 0.1);
+      g.elapsed = Math.max(g.elapsed, g.arena.grace + 0.1);
+      g.charges.charges = 3;
+      for (let i = 0; i < 160; i++) {
+        const aim = g.deskWrenchAt();
+        const a = Math.atan2(g.theirs.z, g.theirs.x);
+        if (aim !== null && Math.hypot(g.theirs.x, g.theirs.z) > g.arena.radius * 0.45 && Math.abs(Math.atan2(Math.sin(a - aim), Math.cos(a - aim))) < 0.5) break;
+        await wait(0.025);
+      }
+      g.labelTimer = 0;
+      return api.state();
+    },
+
     async run(steps: [string, ...unknown[]][]) {
       let out: unknown;
       for (const [name, ...args] of steps) {
