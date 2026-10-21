@@ -1093,6 +1093,48 @@ export function crossguardCrosses(top: Top, ax: number, az: number, bx: number, 
   return Math.abs(distance) <= 0.016 && Math.abs(crossing) >= 0.045;
 }
 
+/** Unit heading from (x, z) to the rim point of its nearest pocket mouth (straight out without pockets). */
+export function pocketHeading(arena: Arena, x: number, z: number): { x: number; z: number } {
+  const a0 = Math.atan2(z, x);
+  let best = a0;
+  let gap = Infinity;
+  for (const p of arena.layout.pockets) {
+    const d = Math.abs(Math.atan2(Math.sin(p.angle - a0), Math.cos(p.angle - a0)));
+    if (d < gap) {
+      gap = d;
+      best = p.angle;
+    }
+  }
+  const pr = rimRadius(arena.layout, best);
+  const ex = Math.cos(best) * pr - x;
+  const ez = Math.sin(best) * pr - z;
+  const el = Math.hypot(ex, ez) || 1;
+  return { x: ex / el, z: ez / el };
+}
+
+/** Seconds a paid Crossguard rail stays live after its first crossing. */
+export const CROSSGUARD_LIVE = 0.8;
+/** Least speed (arena m/s) a rival escaping across the rail is sent toward its pocket at. */
+export const CROSSGUARD_SLING = 0.5;
+
+/** An escaping rival crossing your rail is sent on toward its nearest pocket, never back to safety. */
+export function crossguardSling(arena: Arena, top: Top) {
+  const h = pocketHeading(arena, top.x, top.z);
+  const k = Math.max(Math.hypot(top.vx, top.vz), CROSSGUARD_SLING);
+  top.vx = h.x * k;
+  top.vz = h.z * k;
+  top.kick = Math.max(top.kick, 0.6);
+  top.kickX = h.x;
+  top.kickZ = h.z;
+  top.sinceWall = 0;
+  top.charging = 0;
+}
+
+/** True when a top is moving away from the arena centre. */
+export function movingOut(top: Top) {
+  return top.vx * top.x + top.vz * top.z > 0;
+}
+
 /** A two-palm Crossguard is a one-hit rail: it reflects the first top that crosses its chord. */
 export function crossguard(top: Top, ax: number, az: number, bx: number, bz: number, strength = 1) {
   if (!crossguardCrosses(top, ax, az, bx, bz)) return false;
@@ -1285,22 +1327,9 @@ export function springRim(arena: Arena, mine: Top, others: readonly Top[], sx: n
     if (top === mine) {
       top.shieldUntil = Math.max(top.shieldUntil, arena.elapsed + SPRING_SHIELD);
     } else {
-      const a0 = Math.atan2(top.z, top.x);
-      let best = a0;
-      let gap = Infinity;
-      for (const p of arena.layout.pockets) {
-        const d = Math.abs(Math.atan2(Math.sin(p.angle - a0), Math.cos(p.angle - a0)));
-        if (d < gap) {
-          gap = d;
-          best = p.angle;
-        }
-      }
-      const pr = rimRadius(arena.layout, best);
-      const ex = Math.cos(best) * pr - top.x;
-      const ez = Math.sin(best) * pr - top.z;
-      const el = Math.hypot(ex, ez) || 1;
-      dx = ex / el;
-      dz = ez / el;
+      const h = pocketHeading(arena, top.x, top.z);
+      dx = h.x;
+      dz = h.z;
       impulse *= SPRING_SLING;
     }
     top.vx += dx * impulse;

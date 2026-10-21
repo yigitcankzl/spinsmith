@@ -281,6 +281,12 @@ an arena. First to 4 heat wins a match.
   there is slung along the wall toward its nearest pocket. In the headless sweep with human
   reaction lag and aim error, gust moved from +0.1 to +8.9 win points over doing nothing and the
   spring from -1.6 to +10; random sweeping or springing gains about +2.
+- **Crossguard and Ember Rivet (from the third match):** two open palms make a rail; the first
+  time your top crosses it (or the rival crosses it on its way out) it costs a charge, and the
+  rail then stays live 0.8 s. Every save of your own top refunds that charge, and the rival's
+  escape is sent on toward its nearest pocket. A caught hot rivet planted in the bowl is a live
+  post for 3 s that kicks the rival outward. Headless sweep: crossguard -0.6 -> +5.1, ember
+  -0.8 -> +7.4 win points; random use +0.8 and +1.5. Palm brace is still about 0.
 - **Arena Forge aim:** the two-hand forge hits the rival three times as hard when it is in the
   outer band or heading out, and only a fifth as hard in the middle, so it rewards timing.
   Squeeze pulls your own top in and throws the rival out, and the forging top's rim holds for

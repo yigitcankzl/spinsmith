@@ -13,7 +13,7 @@ import { forgeGripIntent, forgeGrips } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_POST_TIME, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_POST_TIME, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmBrace, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress } from './progress.js';
@@ -601,6 +601,9 @@ export class MatchSystem extends createSystem({
   /** Two simultaneous palm braces join into one finite, one-hit rail across the bowl. */
   private crossguardActive = false;
   private crossguardConsumed = false;
+  /** A paid rail stays live until then (arena time); the rival can be slung across it once. */
+  private crossguardLiveUntil = -9;
+  private crossguardSlung = false;
   private crossguardHits = 0;
   private crossguardBreak = 0;
   private crossguardA = new Vector3();
@@ -5470,6 +5473,8 @@ export class MatchSystem extends createSystem({
     for (const foot of this.palmBraceFeet) foot.visible = false;
     this.crossguardActive = false;
     this.crossguardConsumed = false;
+    this.crossguardLiveUntil = -9;
+    this.crossguardSlung = false;
     this.crossguardBreak = 0;
     this.crossguardBeam.visible = this.crossguardGlow.visible = false;
     for (const post of this.crossguardPosts) post.visible = false;
@@ -7907,9 +7912,25 @@ export class MatchSystem extends createSystem({
       let braced = false;
       let bracedSide: Side | null = null;
       let bracedTop: Top | null = null;
-      if (this.crossguardActive && !this.crossguardConsumed) {
+      if (this.elapsed < this.crossguardLiveUntil) {
+        // A paid rail stays live a moment: every save of your top refunds its charge, and the
+        // rival's first escape across it is sent on toward a pocket.
         for (const top of this.tops) {
           if (!crossguardCrosses(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z)) continue;
+          if (top === this.mine) {
+            if (crossguard(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z)) this.charges.reward();
+          } else if (top === this.theirs && !this.crossguardSlung && movingOut(top)) {
+            this.crossguardSlung = true;
+            crossguardSling(this.arena, top);
+            this.impacts.dash(top.x, this.arena.height(top.x, top.z), top.z, top.vx, top.vz);
+          }
+        }
+      } else if (this.crossguardActive && !this.crossguardConsumed) {
+        for (const top of this.tops) {
+          if (!crossguardCrosses(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z)) continue;
+          // Only your top's save or the rival's escape counts; a rival heading inward passes.
+          const rivalEscape = top === this.theirs && movingOut(top);
+          if (top !== this.mine && !rivalEscape) continue;
           const force = this.charges.spend(this.elapsed, TUNING.grace);
           this.crossguardConsumed = true;
           this.crossguardActive = false;
@@ -7918,7 +7939,10 @@ export class MatchSystem extends createSystem({
             this.locked('CROSSGUARD BROKE\nWAIT FOR ONE SHAPING CHARGE');
             break;
           }
-          crossguard(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z, force);
+          this.crossguardLiveUntil = this.elapsed + CROSSGUARD_LIVE;
+          this.crossguardSlung = rivalEscape;
+          if (rivalEscape) crossguardSling(this.arena, top);
+          else if (crossguard(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z, force)) this.charges.reward();
           this.crossguardHits++;
           this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
           this.rootEntity?.setValue(FirstFiveState, 'crossguardHits', this.crossguardHits);
@@ -7927,7 +7951,7 @@ export class MatchSystem extends createSystem({
           const y = this.arena.height(top.x, top.z);
           this.impacts.shock(top.x, y, top.z, 0.95, 0xffa12d);
           this.sparks.burst(top.x, y, top.z, 1);
-          this.stamp.show('CROSSGUARD!', 'TWO PALMS · ONE HARD RETURN', 'mine', 0.72, 1.05);
+          this.stamp.show('CROSSGUARD!', rivalEscape ? 'THEIR ESCAPE → YOUR POCKET' : 'SAVED · CHARGE BACK', 'mine', 0.72, 1.05);
           this.label.set('RAIL SPENT — OPEN BOTH HANDS TO REARM');
           this.labelTimer = 1.25;
           this.roomLight.hit();

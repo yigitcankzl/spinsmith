@@ -20,7 +20,7 @@ import { PEDESTAL, placeArena, REACH, TRAY_DROP } from '../src/game/placement.ts
 import { eyeView, FORGE_GRIP, forgeGripIntent, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { crossguard, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
+import { crossguard, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
@@ -349,6 +349,14 @@ TUNING.grace = 0;
   const guardMiss = new Top(ATTACK);
   guardMiss.launch(0.13, 0.004, 0, -0.35, 0.8, 1);
   assert.equal(crossguard(guardMiss, -0.1, 0, 0.1, 0), false, 'Crossguard does not become an arena-wide wall');
+  // An escaping rival crossing a live rail is sent on toward its nearest pocket, at least CROSSGUARD_SLING fast.
+  const slingArena = arenaWith({ floor: 'flat', pockets: [{ angle: 0, half: 0.2, points: 2 }], rails: [] });
+  const escaping = new Top(ATTACK);
+  escaping.launch(slingArena.radius * 0.7, slingArena.radius * 0.3, 0.05, 0.05, 0.8, 1);
+  assert.ok(movingOut(escaping), 'a top heading away from the centre is moving out');
+  crossguardSling(slingArena, escaping);
+  const heading = pocketHeading(slingArena, escaping.x, escaping.z);
+  assert.ok(Math.abs(Math.hypot(escaping.vx, escaping.vz) - CROSSGUARD_SLING) < 1e-9 && escaping.vx * heading.x + escaping.vz * heading.z > CROSSGUARD_SLING * 0.999, 'the sling heads for the pocket mouth at least CROSSGUARD_SLING fast');
 
   const emberHit = new Top(ATTACK);
   emberHit.launch(0, 0.02, 0, -0.3, 0.8, 1);
