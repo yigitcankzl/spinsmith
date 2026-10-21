@@ -1,0 +1,84 @@
+/**
+ * Where the real table edge is close to the arena: the directions in which a top thrown over the
+ * rim would soon leave the real desk (a DESK KO). Pure geometry, no three.js.
+ *
+ * Everything is in arena-local x/z with the arena centre at the origin; angles follow
+ * Math.atan2(z, x), the same convention as normRadius/rimRadius.
+ */
+import { insidePoly } from './room.ts';
+import type { XZ } from './room.ts';
+
+export interface DeskSector {
+  /** Direction from the arena centre (radians, atan2(z, x)). */
+  angle: number;
+  /** Half the angular width of the sector (radians). */
+  halfWidth: number;
+  /** Shortest distance from the centre to the real table edge inside the sector. */
+  distance: number;
+}
+
+/** Angular sample count (5 degree steps). */
+const SAMPLES = 72;
+
+/** Distance from the origin along (dx, dz) to the polygon outline, or Infinity. */
+export function rayExit(poly: XZ[], dx: number, dz: number): number {
+  let best = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const ex = b.x - a.x;
+    const ez = b.z - a.z;
+    const den = dx * ez - dz * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = (a.x * ez - a.z * ex) / den;
+    const u = (a.x * dz - a.z * dx) / den;
+    if (t > 0 && u >= -1e-9 && u <= 1 + 1e-9) best = Math.min(best, t);
+  }
+  return best;
+}
+
+/**
+ * Danger sectors: runs of directions where the table edge is within `rim + reach` of the centre.
+ * Adjacent dangerous directions merge into one sector, so an arena tucked into a corner (both
+ * edges and the corner between them within reach) yields ONE wide sector spanning the corner;
+ * if the corner diagonal is out of reach it yields two. At most `max` sectors are returned,
+ * nearest edge first. An arena whose centre is off the table returns none.
+ */
+export function deskSectors(poly: XZ[] | null, rim: number, reach: number, max = 2): DeskSector[] {
+  if (!poly || poly.length < 3 || !insidePoly(poly, 0, 0)) return [];
+  const limit = rim + reach;
+  const step = (Math.PI * 2) / SAMPLES;
+  const near: number[] = [];
+  for (let i = 0; i < SAMPLES; i++) {
+    const a = i * step;
+    near.push(rayExit(poly, Math.cos(a), Math.sin(a)));
+  }
+  const hot = near.map((d) => d <= limit);
+  if (hot.every(Boolean)) return [{ angle: 0, halfWidth: Math.PI, distance: Math.min(...near) }];
+  // Start scanning just after a safe direction so runs never wrap.
+  const start = hot.indexOf(false);
+  const out: DeskSector[] = [];
+  let run: number[] = [];
+  const flush = () => {
+    if (!run.length) return;
+    const first = run[0];
+    const span = run.length;
+    let mid = (first + (span - 1) / 2) * step;
+    mid = Math.atan2(Math.sin(mid), Math.cos(mid));
+    out.push({ angle: mid, halfWidth: (span * step) / 2, distance: Math.min(...run.map((i) => near[i % SAMPLES])) });
+    run = [];
+  };
+  for (let k = 1; k <= SAMPLES; k++) {
+    const i = start + k;
+    if (hot[i % SAMPLES]) run.push(i);
+    else flush();
+  }
+  flush();
+  return out.sort((a, b) => a.distance - b.distance).slice(0, max);
+}
+
+/** True when `angle` is inside the sector (wrap-safe). */
+export function inSector(s: DeskSector, angle: number): boolean {
+  const d = Math.atan2(Math.sin(angle - s.angle), Math.cos(angle - s.angle));
+  return Math.abs(d) <= s.halfWidth;
+}

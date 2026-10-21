@@ -28,6 +28,8 @@ import { MatchBar } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
 import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
+import { deskSectors, inSector } from './desk-edge.js';
+import type { DeskSector } from './desk-edge.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
 import { allBuilds, buildName, edgeOf, NAMED_BUILDS, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
@@ -389,6 +391,21 @@ export class MatchSystem extends createSystem({
   private progress = new Progress(typeof localStorage === 'undefined' ? null : localStorage);
   /** The last three rivals thrown across the physical desk edge, batched into a small trophy row. */
   private deskMemory = new Group();
+  /**
+   * Real-edge cue: up to two warm arcs on the rim facing where the real table edge is close, so a
+   * DESK KO can be aimed. Sectors are in the arena root's local frame (see updateDeskEdge).
+   */
+  private deskArcs = [0, 1].map(() => {
+    const m = new Mesh(new RingGeometry(0.1, 0.11, 8), new MeshBasicMaterial({ color: 0xff5a1e, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }));
+    m.name = 'desk-edge-arc';
+    m.visible = false;
+    m.renderOrder = 3;
+    return m;
+  });
+  private deskEdgeSectors: DeskSector[] = [];
+  private deskEdgeKey = '';
+  /** progress.matches value of the match whose REAL EDGE hint has been shown. */
+  private deskEdgeHintMatch = -1;
   private deskMemoryBatch: Group | null = null;
   private deskMemoryViews: TopView[] = [];
   private deskMemoryKey = '';
@@ -1235,6 +1252,7 @@ export class MatchSystem extends createSystem({
     this.causeFx.add(this.causePath, this.causeOrigin, this.causeTarget);
     this.launchGuide.visible = false;
     this.launchMarker.visible = this.launchAim.visible = this.launchGhost.visible = this.openingEcho.visible = this.rivalIntent.visible = false;
+    this.stage.add(...this.deskArcs);
     this.stage.add(
       this.chargeRing,
       this.ghost.root,
@@ -1966,6 +1984,7 @@ export class MatchSystem extends createSystem({
     this.stage.rotation.order = guestTurn ? 'YXZ' : 'XYZ';
     this.stage.rotation.set(this.arena.tiltX, this.turn + this.arenaMorphTwist + guestTurn, this.arena.tiltZ + this.arenaMorph.tilt);
     this.stage.scale.set(this.viewK * this.arenaMorph.scaleX, this.viewK, this.viewK * this.arenaMorph.scaleZ);
+    this.updateDeskEdge(this.stage.rotation.y);
     // The bowl changes shape, not the physical tops. Their positions follow the forged floor but
     // their metal bodies counter-scale so they never become oval toy silhouettes.
     const invMorphX = 1 / Math.max(0.01, this.arenaMorph.scaleX);
@@ -3711,6 +3730,75 @@ export class MatchSystem extends createSystem({
       best = { y, poly };
     }
     return best;
+  }
+
+  /**
+   * The real-edge cue. The danger sectors are computed in the arena ROOT's local frame (the frame
+   * ROOM.poly and the tops share before the stage's own turn): each table corner goes world ->
+   * root-local through root.worldToLocal, exactly like setRoom, and only when the table outline or
+   * the root's pose/scale changes. The arcs live on the stage, so each one counter-rotates by the
+   * stage's yaw (replay turn, forge twist, an online guest's half turn) to stay on the real edge.
+   */
+  private updateDeskEdge(stageYaw: number) {
+    const arcs = this.deskArcs;
+    const show = this.phase === 'fight' && this.onTable && !!ROOM.poly && !this.photo && !this.extras.length && !this.demo;
+    if (!show) {
+      arcs[0].visible = arcs[1].visible = false;
+      return;
+    }
+    const L = this.arena.layout;
+    const root = this.root;
+    // Only a settled root (risen, at match size) has the pose the fight is played in.
+    if (this.rise >= 1 && this.sizeSettled) {
+      const s = root.scale.x;
+      const key = `${root.position.x.toFixed(3)},${root.position.z.toFixed(3)},${root.rotation.y.toFixed(3)},${s.toFixed(4)},${L.name},${ROOM.poly!.length},${ROOM.poly![0].x.toFixed(3)},${ROOM.poly![0].z.toFixed(3)}`;
+      if (key !== this.deskEdgeKey) {
+        this.deskEdgeKey = key;
+        const table = this.tableShape();
+        let poly: XZ[];
+        if (table) {
+          root.updateWorldMatrix(true, false);
+          poly = table.poly.map((p) => {
+            const l = root.worldToLocal(this.p.set(p.x, table.y, p.z));
+            return { x: l.x, z: l.z };
+          });
+        } else poly = ROOM.poly!; // DEV stand-in desk: already arena-local.
+        // 25 cm of real desk beyond the rim still counts as "soon off the edge".
+        this.deskEdgeSectors = deskSectors(poly, maxRim(L), 0.25 / s, arcs.length);
+        this.deskEdgeSectors.forEach((sec, i) => {
+          // RingGeometry turned flat (rotateX(-PI/2)) maps its theta to atan2 angle -theta.
+          // rimRadius/height read the stage's own frame: root angle + stage yaw.
+          const sa = sec.angle + stageYaw;
+          const r = rimRadius(L, sa);
+          const half = Math.min(sec.halfWidth, Math.PI * 0.45);
+          arcs[i].geometry.dispose();
+          arcs[i].geometry = new RingGeometry(r * 1.02, r * 1.1, 24, 1, -sec.angle - half, half * 2).rotateX(-Math.PI / 2);
+          arcs[i].position.y = this.arena.height(Math.cos(sa) * r * 0.97, Math.sin(sa) * r * 0.97) + WALL_HEIGHT[L.wall] + 0.002;
+        });
+        if (import.meta.env.DEV) console.log(`[DESK EDGE] ${this.deskEdgeSectors.map((d) => `${((d.angle * 180) / Math.PI).toFixed(0)}deg +-${((d.halfWidth * 180) / Math.PI).toFixed(0)} at ${(d.distance * s).toFixed(2)} m`).join('; ') || 'none'}`);
+      }
+    }
+    const sectors = this.deskEdgeSectors;
+    const top = this.theirs;
+    // The rival's direction in the root frame: the stage turns its local angles by -stageYaw.
+    const rivalAngle = Math.atan2(top.z, top.x) - stageYaw;
+    const rivalNear = top.alive && normRadius(L, top.x, top.z) > 0.75;
+    for (let i = 0; i < arcs.length; i++) {
+      const sec = sectors[i];
+      const arc = arcs[i];
+      arc.visible = !!sec;
+      if (!sec) continue;
+      arc.rotation.y = -stageYaw;
+      const now = rivalNear && inSector(sec, rivalAngle);
+      const m = arc.material;
+      m.opacity = now ? 0.55 + 0.2 * Math.sin(this.time * 9) : 0.14 + 0.06 * Math.sin(this.time * 1.8 + i);
+      m.color.setHex(now ? 0xff8a3a : 0xff5a1e);
+    }
+    if (sectors.length && this.progress.matches > 0 && this.deskEdgeHintMatch !== this.progress.matches && this.labelTimer <= 0) {
+      this.deskEdgeHintMatch = this.progress.matches;
+      this.label.set('REAL EDGE\nTHROW THEM OFF YOUR DESK');
+      this.labelTimer = 2;
+    }
   }
 
   /** The lowest horizontal plane labelled floor, else the floor of the local-floor space (0). */

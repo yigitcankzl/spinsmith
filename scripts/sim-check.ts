@@ -25,6 +25,7 @@ import { rematchAdvice } from '../src/game/mastery.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { arenaForgeDanger, arenaForgeImpulse, classifyArenaForge } from '../src/game/arena-forge.ts';
 import { targetWinner } from '../src/game/brawl.ts';
+import { deskSectors, inSector } from '../src/game/desk-edge.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
 const FORGE = ARENAS[0];
@@ -1600,6 +1601,34 @@ assert.equal(edgeOf('defense', 'defense'), 0);
     assert.ok(best >= 1.25 / n, `crowded bout ${bout.id}: some build is last spinning ${(best * 100).toFixed(0)}% of rounds (fair share ${(100 / n).toFixed(0)}%)`);
     console.log(`crowded bout ${bout.id}: best build last spinning ${(best * 100).toFixed(0)}% (fair share ${(100 / n).toFixed(0)}%)`);
   }
+}
+
+// Real-edge danger sectors: arena-local table outlines (arena centre at the origin).
+{
+  const square = (cx: number, cz: number, h: number) => [
+    { x: cx - h, z: cz - h },
+    { x: cx + h, z: cz - h },
+    { x: cx + h, z: cz + h },
+    { x: cx - h, z: cz + h },
+  ];
+  // 1 m table, arena 0.3 m right of its middle: only the +x edge (0.2 m away) is in reach.
+  const one = deskSectors(square(-0.3, 0, 0.5), 0.15, 0.1);
+  assert.equal(one.length, 1, `edge arena: ${one.length} sectors`);
+  assert.ok(Math.abs(one[0].angle) < 0.05 && Math.abs(one[0].distance - 0.2) < 1e-6, `edge sector points at +x: ${one[0].angle}`);
+  assert.ok(inSector(one[0], 0.3) && !inSector(one[0], Math.PI / 2), 'edge sector width');
+  // Centred on a 4 m table: nothing in reach.
+  assert.equal(deskSectors(square(0, 0, 2), 0.15, 0.1).length, 0, 'big table: no sectors');
+  // Corner, diagonal out of reach (0.283 > 0.25): two sectors, at +x and +z.
+  const two = deskSectors(square(-0.3, -0.3, 0.5), 0.15, 0.1);
+  assert.equal(two.length, 2, `corner arena: ${two.length} sectors`);
+  assert.ok(two.some((s) => Math.abs(s.angle) < 0.05) && two.some((s) => Math.abs(s.angle - Math.PI / 2) < 0.05), 'corner sectors at +x and +z');
+  // Corner with the diagonal in reach too: the runs join into one wide sector across the corner.
+  const wide = deskSectors(square(-0.3, -0.3, 0.5), 0.15, 0.15);
+  assert.equal(wide.length, 1, `tight corner: ${wide.length} sectors`);
+  assert.ok(Math.abs(wide[0].angle - Math.PI / 4) < 0.05 && wide[0].halfWidth > Math.PI / 4, 'tight corner sector spans the corner');
+  // Centre off the table, or no table: none.
+  assert.equal(deskSectors(square(2, 0, 0.5), 0.15, 0.1).length, 0, 'off table: no sectors');
+  assert.equal(deskSectors(null, 0.15, 0.1).length, 0, 'no table: no sectors');
 }
 
 console.log('sim-check: all passed');

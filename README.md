@@ -244,6 +244,10 @@ an arena. First to 4 heat wins a match.
   scores 1. From 15 s the pressure phase opens the pockets (up to 75% wider by 19 s) and heats the
   outer rim, so rounds rarely run long. The
   score shows on the match bar.
+- **Real-edge cue:** in a duel fight on a detected table, up to two faint red-orange arcs glow on
+  the rim in the directions where the real table edge is within about 25 cm of it; an arc brightens
+  while the rival is near the rim inside it. From the second match on, a one-time label (REAL
+  EDGE) explains it. Unverified on a headset.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
   burst, topple and result jingles.
