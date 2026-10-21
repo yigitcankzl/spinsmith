@@ -31,6 +31,7 @@ import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse,
 import { brawlSlots, spinStep, targetWinner } from '../src/game/brawl.ts';
 import { CARD_HOW_WORDS, CLAIM, LESSON, lessonText, PROMPT_WORDS, promptWords } from '../src/game/lessons.ts';
 import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/game/desk-edge.ts';
+import { FpsBook, fpsPhase, QUALITY_MAX, QualityGuard, qualityThresholds } from '../src/game/quality.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
 const FORGE = ARENAS[0];
@@ -2073,6 +2074,44 @@ if (DESK_DROP_ON) {
   assert.equal(four[0].w, 305, 'four brawl slots width');
   assert.equal(four[3].x + four[3].w, 1352, 'four brawl slots end at the margin');
   assert.deepEqual([spinStep(-1), spinStep(0.024), spinStep(0.5), spinStep(1.4)], [0, 0, 10, 20], 'spin steps');
+}
+{
+  // The frame-rate guard: 3 s of slow 1 s windows steps down once, 10 s comfortable steps back up.
+  assert.deepEqual(qualityThresholds(undefined), { slow: 66, comfort: 72 * 0.97 }, 'no frameRate: 72 Hz defaults');
+  assert.ok(Math.abs(qualityThresholds(90).slow - 81) < 1e-9, '90 Hz: slow below 0.9x');
+  const q = new QualityGuard();
+  assert.equal(q.sample(60, 1), null, 'one slow second is jitter');
+  assert.equal(q.sample(60, 1), null, 'two slow seconds still wait');
+  assert.deepEqual(q.sample(60, 1), { from: 0, to: 1, fps: 60, reason: 'slow' }, 'third slow second: lite');
+  assert.equal(q.sample(60, 1), null, 'the slow clock restarts after a step');
+  q.sample(60, 1);
+  assert.equal(q.sample(60, 1)?.to, 2, 'three more slow seconds: foveation');
+  for (let i = 0; i < 6; i++) assert.equal(q.sample(50, 1), null, 'no step below the lowest level');
+  assert.equal(q.level, QUALITY_MAX, 'stays at the lowest level');
+  for (let i = 0; i < 9; i++) assert.equal(q.sample(72, 1), null, 'comfort must last 10 s');
+  assert.deepEqual(q.sample(72, 1), { from: 2, to: 1, fps: 72, reason: 'comfortable' }, 'ten comfortable seconds: one step up');
+  for (let i = 0; i < 9; i++) q.sample(72, 1);
+  q.sample(68, 1);
+  assert.equal(q.level, 1, 'a merely-ok window (between thresholds) resets the comfort clock');
+  for (let i = 0; i < 10; i++) q.sample(72, 1);
+  assert.equal(q.level, 0, 'back to full');
+  for (let i = 0; i < 20; i++) assert.equal(q.sample(72, 1), null, 'never above full');
+  q.sample(60, 1);
+  q.sample(70, 1);
+  q.sample(60, 1);
+  q.sample(60, 1);
+  assert.equal(q.level, 0, 'slow seconds must be consecutive');
+  const r = new QualityGuard();
+  for (let i = 0; i < 3; i++) r.sample(85, 1, 90);
+  assert.equal(r.level, 0, '90 Hz session at 85 fps is fine');
+  for (let i = 0; i < 3; i++) r.sample(80, 1, 90);
+  assert.equal(r.level, 1, '90 Hz session at 80 fps steps down');
+  const book = new FpsBook();
+  assert.equal(book.summary('hub'), 'no samples', 'empty phase');
+  book.add('hub', 72);
+  book.add('hub', 70);
+  assert.equal(book.summary('hub'), 'n=2 mean 71.0 min 70 last 72,70', 'phase summary');
+  assert.deepEqual(['hub', 'pulling', 'result', 'build', 'placing'].map(fpsPhase), ['hub', 'fight', 'fight', 'forge', null], 'phase buckets');
 }
 
 console.log('sim-check: all passed');
