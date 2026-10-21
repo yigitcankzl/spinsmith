@@ -59,7 +59,7 @@ export default async function run({ page, frame }) {
       ['ramp', /PINCH THE FLOOR/],
       ['arenaForge', /SQUEEZE INWARD|PUSH INWARD/],
       ['deskKo', /WRENCH IT OFF YOUR DESK/],
-      ['strike', /PINCH THE SEAL · STAMP THE ARENA|STRIKE NOW/],
+      ['strike', /PINCH THE SEAL · STAMP THE ARENA|STRIKE NOW|: PINCH \+ STAMP/],
       ['flick', /FLICK/],
     ];
     const record = (kind, text) => {
@@ -241,7 +241,7 @@ export default async function run({ page, frame }) {
         } else if (/SQUEEZE INWARD|PUSH INWARD/.test(label) && !g.morphedOnce) {
           await gameWait(REACT);
           if (g.phase === 'fight') await act('arenaForge', () => drive.arenaForge({ squeeze: 0.04, twist: 0, tilt: 0, hold: 0.35 }));
-        } else if (/PINCH THE SEAL · STAMP THE ARENA|STRIKE NOW/.test(label) && g.forgeBar.value >= 0.999) {
+        } else if (/PINCH THE SEAL · STAMP THE ARENA|STRIKE NOW|: PINCH \+ STAMP/.test(label) && g.forgeBar.value >= 0.999) {
           await gameWait(REACT);
           if (g.phase === 'fight' && g.forgeBar.value >= 0.999) await act('strike', () => drive.stampUltimate({ at: 'rival' }));
         } else if (/PINCH THE FLOOR/.test(label) || (!forgeLesson && g.theirs.alive && charges >= 1 && t > 2.5 && t - lastRamp > 2.2 && r > 0.5)) {
