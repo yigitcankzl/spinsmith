@@ -1245,24 +1245,56 @@ export function spinRub(top: Top, x: number, z: number, vx: number, vz: number, 
   return gain;
 }
 
-/** Pulling a rim spring sends an inward impulse through the selected sector. */
-export function springRim(arena: Arena, tops: readonly Top[], sx: number, sz: number, x: number, z: number, strength = 1) {
+/** Seconds a rim spring holds the wall shut behind your own top. */
+export const SPRING_SHIELD = 1;
+/** A rival caught in the sector is slung this many times harder than your own top is pulled in. */
+export const SPRING_SLING = 2;
+
+/**
+ * Pulling a rim spring acts only through the selected sector (within 0.6 rad, outer half of the
+ * bowl). Your own top is pulled inward and the rim holds behind it for SPRING_SHIELD seconds; a
+ * rival there is slung along the wall toward its nearest pocket (outward when there are none).
+ */
+export function springRim(arena: Arena, mine: Top, others: readonly Top[], sx: number, sz: number, x: number, z: number, strength = 1) {
   const r = Math.hypot(sx, sz) || 1;
   const ix = -sx / r;
   const iz = -sz / r;
   const pull = (x - sx) * ix + (z - sz) * iz;
   let hits = 0;
-  for (const top of tops) {
+  for (const top of [mine, ...others]) {
     const tr = Math.hypot(top.x, top.z);
     if (!top.alive || tr < arena.radius * 0.5) continue;
     const sameSector = (top.x * sx + top.z * sz) / Math.max(1e-5, tr * r);
     if (sameSector < Math.cos(0.6)) continue;
-    const impulse = (0.13 + Math.min(0.07, pull * 2)) * strength;
-    top.vx += ix * impulse;
-    top.vz += iz * impulse;
+    let impulse = (0.13 + Math.min(0.07, pull * 2)) * strength;
+    let dx = ix;
+    let dz = iz;
+    if (top === mine) {
+      top.shieldUntil = Math.max(top.shieldUntil, arena.elapsed + SPRING_SHIELD);
+    } else {
+      const a0 = Math.atan2(top.z, top.x);
+      let best = a0;
+      let gap = Infinity;
+      for (const p of arena.layout.pockets) {
+        const d = Math.abs(Math.atan2(Math.sin(p.angle - a0), Math.cos(p.angle - a0)));
+        if (d < gap) {
+          gap = d;
+          best = p.angle;
+        }
+      }
+      const pr = rimRadius(arena.layout, best);
+      const ex = Math.cos(best) * pr - top.x;
+      const ez = Math.sin(best) * pr - top.z;
+      const el = Math.hypot(ex, ez) || 1;
+      dx = ex / el;
+      dz = ez / el;
+      impulse *= SPRING_SLING;
+    }
+    top.vx += dx * impulse;
+    top.vz += dz * impulse;
     top.kick = Math.min(1, top.kick + impulse * 1.5);
-    top.kickX = ix;
-    top.kickZ = iz;
+    top.kickX = dx;
+    top.kickZ = dz;
     hits++;
   }
   return hits;
