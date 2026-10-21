@@ -12,7 +12,7 @@
  * - Every station's name is a metal plate laid on the near rim at one pitch (SIGN_TILT).
  * Table things are arena-local (arena center at the origin, +Z toward the player).
  */
-import { COMFORT } from './comfort.js';
+import { COMFORT, COMFORT_DIAL, comfortMode, comfortStop } from './comfort.js';
 import {
   AdditiveBlending,
   InstancedMesh,
@@ -77,6 +77,7 @@ export type HubAction =
   | { kind: 'champion'; index: number }
   | { kind: 'reset' }
   | { kind: 'comfort' }
+  | { kind: 'comfortToggle' }
   | { kind: 'brawl' }
   | { kind: 'armReset' }
   | { kind: 'newSmith' }
@@ -96,10 +97,10 @@ const HAND_LOSS_GRACE = 0.28;
 // Home is a showcase, not a storage shelf: pull the side stations into the seated binocular view.
 // The interaction distances only get easier; the full forge/workshop retain their wider layouts.
 /**
- * Left-handed layout: the comfort dial's Left-handed mode (or ?lefty once, ?lefty=0 to undo) and the
+ * Left-handed layout: the comfort dial's Left-handed toggle (or ?lefty once, ?lefty=0 to undo) and the
  * near-rim stations swap sides (dock, anvil, blueprint, dial, pegs, champions). Every gesture works
  * with either hand already; this only moves where things sit. Distances are mirrored, so reach is
- * unchanged. Read when a Hub is built (the match rebuilds it when the dial changes it).
+ * unchanged. Read when a Hub is built (the match rebuilds it when the plate toggles it).
  */
 let SIDE = 1;
 export const FORGE_AT = new Vector3(REACH_FORGE.x * 0.88, REACH_FORGE.y, REACH_FORGE.z);
@@ -206,6 +207,11 @@ export class Hub {
   /** The blueprint, its cradle and name: the workshop comes after the first match. */
   private blueprint = new Group();
   private comfortKnob = new Group();
+  /** The comfort dial's plate: the dial's setting and ON/OFF; a pinch on it toggles that setting. */
+  private comfortPlate = new Nameplate(0.09, 0.026);
+  private comfortGroup = new Group();
+  /** Seconds the plate still shows (it shows while the dial or plate is pointed at, and a while after). */
+  private comfortShow = 0;
   private brawlPegs = new Group();
   /** An open online room waiting for a friend: its code leads the board's history line. */
   roomCode: string | null = null;
@@ -317,7 +323,7 @@ export class Hub {
   photo() {
     this.photoMode = true;
     this.board.mesh.visible = false;
-    for (const it of this.items) if (it.action.kind === 'reset' || it.action.kind === 'comfort' || it.action.kind === 'brawl') it.model.visible = false;
+    for (const it of this.items) if (it.action.kind === 'reset' || it.action.kind === 'comfort' || it.action.kind === 'comfortToggle' || it.action.kind === 'brawl') it.model.visible = false;
     this.beacon.visible = this.path.visible = false;
   }
   private photoMode = false;
@@ -380,6 +386,10 @@ export class Hub {
     for (const h of pointers) if (h.tracked) hovered ??= this.under(h);
     if (hovered && hovered !== this.hoverWas) playHover();
     this.hoverWas = hovered;
+    // The comfort plate lies beside the dial while either is pointed at, and a moment after.
+    if (hovered?.action.kind === 'comfort' || hovered?.action.kind === 'comfortToggle') this.comfortShow = Math.max(this.comfortShow, 1.5);
+    this.comfortShow = Math.max(0, this.comfortShow - dt);
+    this.comfortGroup.visible = !this.photoMode && this.comfortShow > 0;
     this.items.forEach((it, i) => {
       const on = it === hovered;
       // The three stations always say what they are; the rest only in the first session or when pointed at.
@@ -521,22 +531,31 @@ export class Hub {
     this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home, name: build });
   }
 
-  /** The comfort dial: a brass knob; each pinch turns it to the next mode (sound, flashes, the strike's gesture). */
+  /**
+   * The comfort dial: a brass knob; each pinch turns it to the next setting (or preset). The plate
+   * in front of it names that setting and shows ON or OFF; a pinch on the plate toggles it, so the
+   * settings combine (left-handed and high contrast and quiet, say).
+   */
   private buildComfort() {
     const knob = new Group();
     const brass = BRASS;
     knob.add(new Mesh(new CylinderGeometry(0.011, 0.012, 0.008, 20).translate(0, 0.004, 0), brass));
-    // The pointer notch shows the mode the dial is on.
+    // The pointer notch shows the setting the dial is on.
     const notch = new Mesh(new BoxGeometry(0.003, 0.002, 0.009).translate(0, 0.009, 0.005), new MeshBasicMaterial({ color: ORANGE }));
     knob.add(notch);
     const home = new Vector3(DIAL_AT.x, TABLE_Y, DIAL_AT.z);
     knob.position.copy(home);
     this.comfortKnob = knob;
     this.root.add(knob);
-    // Its name lies beside it, not on the knob (the knob turns).
-    const name = this.label('COMFORT', this.root, DIAL_AT.x, DIAL_AT.z + 0.03);
-    name.position.y += TABLE_Y;
-    this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, name, quiet: true });
+    // The plate lies in front of the knob, not on it (the knob turns); pinch it to toggle.
+    const at = new Vector3(DIAL_AT.x - 0.012 * SIDE, TABLE_Y + 0.008, DIAL_AT.z + 0.026);
+    this.comfortGroup.position.copy(at);
+    this.label('COMFORT', this.comfortGroup, 0, 0, this.comfortPlate);
+    this.root.add(this.comfortGroup);
+    this.comfortGroup.visible = false;
+    this.items.push({ action: { kind: 'comfort' }, carry: false, model: knob, home, quiet: true });
+    this.items.push({ action: { kind: 'comfortToggle' }, carry: false, model: this.comfortGroup, home: at.clone(), quiet: true });
+    this.setComfort();
   }
 
   /**
@@ -569,9 +588,12 @@ export class Hub {
     });
   }
 
-  /** Turns the dial's notch to mode i of n. */
-  setComfort(i: number, n: number) {
-    this.comfortKnob.rotation.y = -(i / n) * Math.PI * 1.5;
+  /** Turns the dial's notch to its setting and writes the plate (the setting and ON/OFF); `show` keeps the plate up a while. */
+  setComfort(show = 0) {
+    this.comfortKnob.rotation.y = -(comfortMode() / COMFORT_DIAL.length) * Math.PI * 1.5;
+    const s = comfortStop();
+    this.comfortPlate.set(`${s.name.toUpperCase()}: ${s.on ? 'ON' : 'OFF'}`, `${s.detail} · pinch ${s.preset ? (s.on ? 'to undo' : 'to apply') : `to turn ${s.on ? 'off' : 'on'}`}`.toUpperCase(), s.on ? ORANGE : TEXT_DIM);
+    this.comfortShow = Math.max(this.comfortShow, show);
   }
 
   /** The small anvil on the near rim: pinch it to turn the arena into the forge. */

@@ -1547,33 +1547,83 @@ TUNING.grace = 0;
   assert.equal(decodeBuild('ZZZZ-0'), null);
 }
 
-// 25. The comfort dial steps through every mode and wraps round.
+// 25. Comfort: the dial picks a setting and its plate toggles it, so the toggles combine; each is
+// saved and read back; an old single-mode save migrates to its matching toggles; ?lefty holds the
+// left-handed layout on and ?lefty=0 undoes it.
 {
-  const { COMFORT, COMFORT_MODES, nextComfort } = await import('../src/game/comfort.ts');
-  const seen = new Set<string>();
-  for (let i = 0; i < COMFORT_MODES.length; i++) seen.add(nextComfort());
-  assert.equal(seen.size, COMFORT_MODES.length, 'the dial reaches every mode');
-  assert.ok(COMFORT_MODES.some((m) => m.lefty), 'the dial has a left-handed mode');
-  let lefty = false;
-  for (let i = 0; i < COMFORT_MODES.length; i++) {
-    nextComfort();
-    lefty ||= !!COMFORT.lefty;
-  }
-  assert.ok(lefty, 'stepping the dial reaches the left-handed layout');
-  assert.ok(COMFORT.sound && COMFORT.flashes && !COMFORT.gentle, 'a full turn is back to standard');
-  const { SAFE_COLORS, warnColor } = await import('../src/game/comfort.ts');
-  assert.ok(COMFORT_MODES.some((m) => m.colorSafe), 'the dial has a colour-safe mode');
-  assert.equal(warnColor(0xff2a3a, SAFE_COLORS.edge), 0xff2a3a, 'standard keeps the usual warning colour');
-  let safe = false;
-  for (let i = 0; i < COMFORT_MODES.length; i++) {
-    nextComfort();
-    if (COMFORT.colorSafe) {
-      safe = true;
-      assert.equal(warnColor(0xff2a3a, SAFE_COLORS.edge), SAFE_COLORS.edge, 'colour-safe swaps the desk-edge red');
-      assert.ok(COMFORT.sound && COMFORT.flashes, 'colour-safe keeps sound and flashes');
-    }
-  }
-  assert.ok(safe && !COMFORT.colorSafe, 'stepping the dial reaches colour-safe and a full turn leaves it');
+  const { COMFORT, COMFORT_DIAL, LEGACY_COMFORT_MODES, comfortMode, comfortStop, loadComfort, nextComfort, toggleComfort, SAFE_COLORS, warnColor } = await import('../src/game/comfort.ts');
+  const memStore = (init: Record<string, string> = {}) => {
+    const mem = new Map(Object.entries(init));
+    return { mem, st: { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) } as unknown as Storage };
+  };
+  const turnTo = (name: string) => {
+    for (let i = 0; i < COMFORT_DIAL.length && comfortStop().name !== name; i++) nextComfort();
+    assert.equal(comfortStop().name, name, `the dial reaches ${name}`);
+  };
+  const std = { sound: true, flashes: true, gentle: false, assist: false, oneHand: false, contrast: false, lefty: false, colorSafe: false };
+  const { mem, st } = memStore();
+  loadComfort(st, '');
+  assert.deepEqual({ ...COMFORT }, std, 'a fresh smith starts standard');
+  const seen = new Set<number>();
+  for (let i = 0; i < COMFORT_DIAL.length; i++) seen.add((nextComfort(), comfortMode()));
+  assert.equal(seen.size, COMFORT_DIAL.length, 'the dial reaches every stop and wraps round');
+  assert.deepEqual({ ...COMFORT }, std, 'turning the dial alone changes nothing');
+  for (const s of ['Quiet', 'No flashes', 'Press to strike', 'Assist', 'One hand', 'High contrast', 'Left-handed', 'Colour-safe', 'Calm', 'Standard']) assert.ok(COMFORT_DIAL.some((d) => d.name === s), `the dial has ${s}`);
+  // Toggles combine: left-handed, high contrast and quiet at once.
+  turnTo('Left-handed');
+  assert.ok(!comfortStop().on && toggleComfort().includes('ON'), 'the plate turns left-handed on');
+  turnTo('High contrast');
+  toggleComfort();
+  turnTo('Quiet');
+  toggleComfort();
+  assert.ok(COMFORT.lefty && COMFORT.contrast && !COMFORT.sound && COMFORT.flashes && !COMFORT.gentle, 'left-handed, high contrast and quiet combine');
+  turnTo('Colour-safe');
+  toggleComfort();
+  assert.equal(warnColor(0xff2a3a, SAFE_COLORS.edge), SAFE_COLORS.edge, 'colour-safe swaps the desk-edge red');
+  toggleComfort();
+  assert.equal(warnColor(0xff2a3a, SAFE_COLORS.edge), 0xff2a3a, 'and toggling it again brings it back');
+  // A preset is a combination of toggles and keeps the others.
+  turnTo('Calm');
+  toggleComfort();
+  assert.ok(!COMFORT.flashes && COMFORT.gentle && COMFORT.lefty && COMFORT.contrast && !COMFORT.sound, 'Calm adds no flashes and press to strike to the rest');
+  assert.ok(comfortStop().on, 'the Calm plate reads ON');
+  // Persistence round trip: a reload reads back every toggle.
+  const before = { ...COMFORT };
+  assert.ok(mem.has('spinsmith.comfort.v2'), 'the toggles are saved under spinsmith.*');
+  loadComfort(st, '');
+  assert.deepEqual({ ...COMFORT }, before, 'every toggle survives a reload');
+  turnTo('Standard');
+  toggleComfort();
+  assert.ok(COMFORT.lefty && COMFORT.sound && COMFORT.flashes && !COMFORT.contrast, 'Standard resets all but the hand');
+  turnTo('Left-handed');
+  toggleComfort();
+  assert.deepEqual({ ...COMFORT }, std, 'and left-handed toggles off');
+  // Migration: each old dial mode becomes its matching toggles (and the old key goes).
+  LEGACY_COMFORT_MODES.forEach(({ name, ...mode }, i) => {
+    const old = memStore({ 'spinsmith.comfort.v1': String(i) });
+    loadComfort(old.st, '');
+    assert.deepEqual({ ...COMFORT }, { ...std, ...mode }, `old mode ${i} (${name}) migrates`);
+    assert.ok(!old.mem.has('spinsmith.comfort.v1') && old.mem.has('spinsmith.comfort.v2'), `old mode ${i} is saved as toggles`);
+    loadComfort(old.st, '');
+    assert.deepEqual({ ...COMFORT }, { ...std, ...mode }, `old mode ${i} stays migrated`);
+  });
+  loadComfort(memStore({ 'spinsmith.comfort.v1': 'junk' }).st, '');
+  assert.deepEqual({ ...COMFORT }, std, 'a broken old save is standard');
+  // ?lefty holds the left-handed layout on with other toggles; ?lefty=0 undoes it.
+  const q = memStore({ 'spinsmith.comfort.v2': JSON.stringify({ ...std, contrast: true }) });
+  loadComfort(q.st, '?lefty');
+  assert.ok(COMFORT.lefty && COMFORT.contrast, '?lefty turns the left-handed layout on with the saved toggles');
+  loadComfort(q.st, '');
+  assert.ok(COMFORT.lefty, '?lefty is kept once given');
+  loadComfort(q.st, '?lefty=0');
+  assert.ok(!COMFORT.lefty && COMFORT.contrast, '?lefty=0 undoes it and keeps the rest');
+  loadComfort(q.st, '?lefty=1');
+  turnTo('Left-handed');
+  assert.ok(comfortStop().on, 'the plate shows ?lefty as ON');
+  toggleComfort();
+  loadComfort(q.st, '');
+  assert.ok(!COMFORT.lefty, 'toggling left-handed off by hand also drops the ?lefty flag');
+  loadComfort(memStore().st, '');
 }
 
 // 26. The rip's speed is measured over a window: 3 mm of tracking jitter neither makes an honest
