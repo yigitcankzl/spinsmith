@@ -6,6 +6,7 @@
  * your top's challenge code. One machined plate, one canvas, one draw call.
  */
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
+import { streakTitle, tomorrowLine } from './come-back.js';
 import type { Order } from './orders.js';
 import { ARENA_SCALE } from './reach.js';
 import { addSlab, engrave, metalPlate, ORANGE, PLATE_DEPTH, pxPerM, setType, signTexture, STEEL, TEXT, TEXT_DIM, wrap } from './ui.js';
@@ -50,6 +51,9 @@ export interface BoardState {
   code: string;
   /** One compact persistent-history line that makes returning progress visible at a glance. */
   history: string;
+  /** Days in a row with a finished match (come-back.ts dayStreak), and whether today counts yet. */
+  streak: number;
+  playedToday: boolean;
 }
 
 const W = 1200;
@@ -98,7 +102,9 @@ export class SmithBoard {
 
   private drawOrder(g: CanvasRenderingContext2D, s: BoardState) {
     setType(g, 'caption', this.k, DIST);
-    engrave(g, s.done ? 'ORDER DONE' : "TODAY'S ORDER", W / 2, 62, TEXT_DIM);
+    // The order, and the streak it keeps alive: a reason to be back tomorrow, at a glance.
+    const head = s.done ? 'ORDER DONE' : "TODAY'S ORDER";
+    engrave(g, s.streak > 0 ? `${head} · ${streakTitle(s.streak, s.playedToday)}` : head, W / 2, 62, s.streak > 0 && !s.playedToday ? ORANGE : TEXT_DIM, W - 120);
     if (s.order) {
       const t = setType(g, 'title', this.k, DIST);
       const lines = wrap(g, s.order.text, W - 140, 2);
@@ -106,7 +112,7 @@ export class SmithBoard {
       lines.forEach((l, i) => engrave(g, l, W / 2, y0 + i * t * 1.15, s.done ? TEXT_DIM : TEXT, W - 140));
       setType(g, 'caption', this.k, DIST);
       // The board hangs out of reach: keep its one action short enough to read at a glance.
-      const next = s.tomorrow ? `TOMORROW: ${s.tomorrow.rival} ON ${s.tomorrow.arena}` : 'A NEW ORDER COMES TOMORROW';
+      const next = tomorrowLine(s.tomorrow);
       engrave(g, (s.done ? next : `${s.order.arena} · PINCH TO PLAY`).toUpperCase(), W / 2, 292, s.done ? STEEL : ORANGE, W - 120);
     }
     g.fillStyle = 'rgba(0,0,0,0.35)';
