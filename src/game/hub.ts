@@ -12,6 +12,7 @@
  * - Every station's name is a metal plate laid on the near rim at one pitch (SIGN_TILT).
  * Table things are arena-local (arena center at the origin, +Z toward the player).
  */
+import { COMFORT } from './comfort.js';
 import {
   AdditiveBlending,
   InstancedMesh,
@@ -94,24 +95,17 @@ const HAND_LOSS_GRACE = 0.28;
 // Home is a showcase, not a storage shelf: pull the side stations into the seated binocular view.
 // The interaction distances only get easier; the full forge/workshop retain their wider layouts.
 /**
- * Left-handed layout: open the game once with ?lefty (?lefty=0 to undo) and the near-rim stations
- * swap sides (dock, anvil, blueprint, dial, pegs, champions). Every gesture works with either hand
- * already; this only moves where things sit. Distances are mirrored, so reach is unchanged.
+ * Left-handed layout: the comfort dial's Left-handed mode (or ?lefty once, ?lefty=0 to undo) and the
+ * near-rim stations swap sides (dock, anvil, blueprint, dial, pegs, champions). Every gesture works
+ * with either hand already; this only moves where things sit. Distances are mirrored, so reach is
+ * unchanged. Read when a Hub is built (the match rebuilds it when the dial changes it).
  */
-const SIDE = (() => {
-  try {
-    const q = new URLSearchParams(location.search);
-    if (q.has('lefty')) localStorage.setItem('spinsmith.lefty.v1', q.get('lefty') === '0' ? '' : '1');
-    return localStorage.getItem('spinsmith.lefty.v1') ? -1 : 1;
-  } catch {
-    return 1;
-  }
-})();
-export const FORGE_AT = new Vector3(SIDE * REACH_FORGE.x * 0.88, REACH_FORGE.y, REACH_FORGE.z);
-const DOCK_AT = new Vector3(SIDE * REACH_DOCK.x * 0.88, REACH_DOCK.y, REACH_DOCK.z);
-const BLUEPRINT_AT = new Vector3(SIDE * REACH_BLUEPRINT.x * 0.86, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
-const DIAL_AT = new Vector3(SIDE * COMFORT_AT.x, COMFORT_AT.y, COMFORT_AT.z);
-const PEGS_AT = new Vector3(SIDE * BRAWL_AT.x, BRAWL_AT.y, BRAWL_AT.z);
+let SIDE = 1;
+export const FORGE_AT = new Vector3(REACH_FORGE.x * 0.88, REACH_FORGE.y, REACH_FORGE.z);
+const DOCK_AT = new Vector3(REACH_DOCK.x * 0.88, REACH_DOCK.y, REACH_DOCK.z);
+const BLUEPRINT_AT = new Vector3(REACH_BLUEPRINT.x * 0.86, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
+const DIAL_AT = new Vector3(COMFORT_AT.x, COMFORT_AT.y, COMFORT_AT.z);
+const PEGS_AT = new Vector3(BRAWL_AT.x, BRAWL_AT.y, BRAWL_AT.z);
 /**
  * The Smith's board, centred just over the far rim in the read band (about 1.2 m from the eyes), and
  * the champions' stands on the left rim.
@@ -126,7 +120,20 @@ const SIGN_Y = 0.012;
 const RANK_W = 1024;
 const RANK_H = 280;
 const RANK_SIZE = 0.1;
-const CHAMPION_AT = [new Vector3(-0.2 * SIDE, 0, 0.065), new Vector3(-0.21 * SIDE, 0, -0.01), new Vector3(-0.2 * SIDE, 0, -0.085)];
+const CHAMPION_AT = [new Vector3(-0.2, 0, 0.065), new Vector3(-0.21, 0, -0.01), new Vector3(-0.2, 0, -0.085)];
+
+/** Puts the stations on the right (1) or, left-handed, the left (-1) side. */
+function setSide(side: number) {
+  SIDE = side;
+  FORGE_AT.x = side * REACH_FORGE.x * 0.88;
+  DOCK_AT.x = side * REACH_DOCK.x * 0.88;
+  BLUEPRINT_AT.x = side * REACH_BLUEPRINT.x * 0.86;
+  DIAL_AT.x = side * COMFORT_AT.x;
+  PEGS_AT.x = side * BRAWL_AT.x;
+  CHAMPION_AT[0].x = -0.2 * side;
+  CHAMPION_AT[1].x = -0.21 * side;
+  CHAMPION_AT[2].x = -0.2 * side;
+}
 /** The anvil and the dock on the rim are small models of the full ones. */
 const RIM_SCALE = 0.42;
 /** Starting over: hold the level plate this long (s), then pinch it again within this long. */
@@ -217,6 +224,7 @@ export class Hub {
   private readonly center = new Vector3();
 
   constructor() {
+    setSide(COMFORT.lefty ? -1 : 1);
     this.root.name = 'smithy';
     this.buildAnvil();
     this.buildStand();

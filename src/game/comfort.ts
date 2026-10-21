@@ -1,7 +1,7 @@
 /**
- * Comfort settings, one dial on the home rim that steps through four modes: sound, flashes and the
- * strike's gesture (a slap, or a gentle press and hold for trays and shared spaces). Kept in
- * localStorage. No three.js here.
+ * Comfort settings, one dial on the home rim that steps through its modes: sound, flashes, the
+ * strike's gesture (a slap, or a gentle press and hold for trays and shared spaces), assist, one
+ * hand, contrast and the left-handed layout. Kept in localStorage. No three.js here.
  */
 export interface Comfort {
   sound: boolean;
@@ -14,9 +14,12 @@ export interface Comfort {
   oneHand?: boolean;
   /** High contrast: each top's team ring is wide and solid, so who is who reads at a glance. */
   contrast?: boolean;
+  /** Left-handed: the near-rim stations swap sides (also on in every mode after ?lefty, until ?lefty=0). */
+  lefty?: boolean;
 }
 
 const KEY = 'spinsmith.comfort.v1';
+const LEFTY_KEY = 'spinsmith.lefty.v1';
 
 /** The dial's modes, in order. */
 export const COMFORT_MODES: (Comfort & { name: string })[] = [
@@ -27,6 +30,7 @@ export const COMFORT_MODES: (Comfort & { name: string })[] = [
   { name: 'Assist: fights at 80% speed, calm', sound: true, flashes: false, gentle: true, assist: true },
   { name: 'One hand: hold the rim to forge, calm', sound: true, flashes: false, gentle: true, oneHand: true },
   { name: 'High contrast: bold team rings, calm', sound: true, flashes: false, gentle: true, contrast: true },
+  { name: 'Left-handed: home stations swap sides', sound: true, flashes: true, gentle: false, lefty: true },
 ];
 
 /** The live settings (read every frame where they matter). */
@@ -41,10 +45,21 @@ function storage(): Storage | null {
   }
 }
 
+/** The old ?lefty URL flag (?lefty=0 clears it): kept, and it holds the left-handed layout in every mode. */
+const leftyFlag = (() => {
+  try {
+    const q = typeof location === 'undefined' ? null : new URLSearchParams(location.search);
+    if (q?.has('lefty')) storage()?.setItem(LEFTY_KEY, q.get('lefty') === '0' ? '' : '1');
+    return !!storage()?.getItem(LEFTY_KEY);
+  } catch {
+    return false;
+  }
+})();
+
 function apply(i: number) {
   mode = (i + COMFORT_MODES.length) % COMFORT_MODES.length;
-  const { sound, flashes, gentle, assist = false, oneHand = false, contrast = false } = COMFORT_MODES[mode];
-  Object.assign(COMFORT, { sound, flashes, gentle, assist, oneHand, contrast });
+  const { sound, flashes, gentle, assist = false, oneHand = false, contrast = false, lefty = false } = COMFORT_MODES[mode];
+  Object.assign(COMFORT, { sound, flashes, gentle, assist, oneHand, contrast, lefty: lefty || leftyFlag });
 }
 
 apply(Number(storage()?.getItem(KEY) ?? 0) || 0);

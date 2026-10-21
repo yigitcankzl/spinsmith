@@ -2554,8 +2554,18 @@ export class MatchSystem extends createSystem({
       this.labelTimer = 3;
       playTick();
     } else if (action.kind === 'comfort') {
+      const lefty = COMFORT.lefty;
       const name = nextComfort();
       applySound();
+      if (COMFORT.lefty !== lefty) {
+        // The stations swap sides: home is built again on the other hand's side.
+        const old = this.hub;
+        this.root.remove(old.root);
+        this.hub = new Hub();
+        this.hub.roomCode = old.roomCode;
+        this.root.add(this.hub.root);
+        this.toHub();
+      }
       this.hub.setComfort(comfortMode(), COMFORT_MODES.length);
       this.label.set(`Comfort: ${name}\nPinch the dial again for the next`);
       this.labelTimer = 3;

@@ -1376,6 +1376,13 @@ TUNING.grace = 0;
   const seen = new Set<string>();
   for (let i = 0; i < COMFORT_MODES.length; i++) seen.add(nextComfort());
   assert.equal(seen.size, COMFORT_MODES.length, 'the dial reaches every mode');
+  assert.ok(COMFORT_MODES.some((m) => m.lefty), 'the dial has a left-handed mode');
+  let lefty = false;
+  for (let i = 0; i < COMFORT_MODES.length; i++) {
+    nextComfort();
+    lefty ||= !!COMFORT.lefty;
+  }
+  assert.ok(lefty, 'stepping the dial reaches the left-handed layout');
   assert.ok(COMFORT.sound && COMFORT.flashes && !COMFORT.gentle, 'a full turn is back to standard');
 }
 
