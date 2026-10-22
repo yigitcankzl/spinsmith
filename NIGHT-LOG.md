@@ -108,6 +108,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 |---|---|---|---|---|
 | 1 (01:25–02:20) | Reason to Come Back; Polish: video | 5.5 → 6; 5.5 → 6 (readability 6 → 6) | The streak / tomorrow card overlapped the bar's full plate on results: the card rides 0.012 higher there (new 'result card' anchor in the FoV check, sim-check passes). Reel: come-back card cropped in on camera, forge 3.2 s, workshop 5 s with the square arriving, end card "Your real desk is the ring-out". desk-ko-first, combat-readability pass | aea193d, merged |
 | 1 | Technical (perf evidence) | 6 → (with cycle 2 re-score) | IWER desktop GPU: ready 112 draws/eye, fight 95/eye, 137 k tris, update p50 0.6–0.7 / p95 0.8–1.0 / max 1.7–1.9 ms; README section labelled not-Quest | 21d1c6c |
+| 2 (02:20–02:55) | Reason to Come Back; video; technical | 6 → 6; 6 → 6; 6 → 6 | Tried: board streak line a size up when at risk; reel "THE NEXT VISIT" on the built-in demo save. A real DESK KO + reload left the trophy at the desk edge (progress.deskTrophies saved) but the hub-size arena hides it from every camera tried. Judge: still only tells the loop; wants an unlock payoff on camera | dropped (branch c2 deleted, no score rise) |
+| 3 (02:55–03:45) | Exp: feedback; readability; accessibility; technical | 7.5 → 7 → 8; 6 → 7; 6.5 → 7; 6 → 6 | Refused-for-charge moves flash the charge pips (scale 2.4× over 0.7 s, probed); every charge refusal goes through it, NO SPRING via locked() (never sound-only); reset arming has its own sound. Real-edge arcs wear hazard tape (pattern, not hue alone; before/after artifacts/look/hazard-ba.png). Perf: script fails over 150 draws/eye, divides by views (IWER: 2 cameras, no multiview, probed), saved runs artifacts/perf/ (hub 47, ready 75, fight 51 per eye; fps 88–97). desk-ko-first, desk-ko, desk-guard, combat-readability pass on a fresh page | 3b1ed87…08ad11a, merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -115,8 +117,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Cut first-five text where a ghost hand teaches (70–90 words)
 - [ ] Dead time between rounds (INTRO only delays the card; RESULT 4 s, pinch skip exists)
 - [ ] Pip-fill beat on a scored point (the rim gauge is hidden on results: the plate's pips would carry it)
-- [ ] Refused move points at the charge sparks
-- [ ] Desk-edge red arcs vs team orange, colour-safe mode too
+- [x] Refused move points at the charge sparks (cycle 3)
+- [x] Desk-edge red arcs vs team orange: hazard tape (cycle 3)
 - [ ] Waves floor relief faint
 - [ ] The table remembers: DESK KO notch and beaten top readable after reload, on camera (judge: show a day-2/day-5 return)
 - [ ] Forge / workshop near-silent
@@ -124,3 +126,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] IWER checks 3x on a fresh page; check:hands Outer Ring "ended idle"
 - [ ] Readability: one text layer per beat in the reel (caption vs in-game banner); small labels at reel size
 - [ ] Refresh IWER-labelled stills; final recut
+- [ ] Forge/builder sounds are ~1/5 of fight levels (pick 0.06, place 0.12 vs clash 0.55)
+- [ ] First match: VS stamp repeats the rival card; WATCH THE TOPS REACT lands under the DESK KO stamp (22 prompts / 92 words in the last run)
+- [ ] Colour-safe palette does not reach VERB_TINT or the gauge fills (judge c3)
+- [ ] Text-size comfort option (judge c3)
+- [ ] An unlock payoff on camera (judge c2)
