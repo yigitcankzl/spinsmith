@@ -74,10 +74,12 @@ else clip 09-workshop "$SHOW/05-arena-workshop.mp4" 16.5 3.0 "BUILD THE BATTLEGR
 clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.4 "TWENTY ARENAS" "Fifteen bouts / nine rivals"
 clip 11-return "$NEW/match-won-cards.mp4" 5.0 7.5 "ONE NEW MOVE A MATCH" "A streak and tomorrow on every result"
 card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.8
+# The story in one line, before the first shot.
+card 00-story "${STORY_TITLE:-YOU FIGHT WITH THE ARENA}" "${STORY_SUB:-Two tops spin on your desk / grab the bowl / bend it / throw the rival off}" 2.2
 # A full-width disclosure first: what the footage is, before anything else.
 card 00-disclose "EMULATOR FOOTAGE" "${DISCLOSE:-IWSDK emulator (IWER)  -  not headset footage}" 1.6
 
-segments=(00-disclose 00-hook 01-rise 02-rip 03-desk 04-flick)
+segments=(00-disclose 00-story 00-hook 01-rise 02-rip 03-desk 04-flick)
 for c in 05a-squeeze 05b-guard 05c-rub; do [ -s "$TMP/$c.mp4" ] && segments+=("$c"); done
 segments+=(06-strike)
 [ -s "$NEW/brawl.mp4" ] && segments+=(07-brawl)
