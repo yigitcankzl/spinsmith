@@ -55,9 +55,11 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 
 | Phase | Draw calls per eye | Lowest fps over 5 s | Game update per frame (p50 / p95 / max) |
 |---|---|---|---|
-| Hub | 47 | 97 | see the JSON |
-| Ready, first match | 75 (112 with the capture room and the desk-edge arcs up) | 88 | 0.6 / 0.8 / 1.7 ms |
-| Fight, first match | 51 (95 with the capture room up) | 86–88 | 0.7 / 1.0 / 1.9 ms |
+| Hub | 47 | 97 | 0.9 / 1.2 / 2 ms |
+| Ready, first match | 75 | 88 | 1.4 / 1.7 / 2.5 ms |
+| Fight, first match | 51 | 88 | 1.2 / 1.8 / 3.1 ms |
+
+With the capture room's planes and the desk-edge arcs up, earlier unsaved runs read 112 (ready) and 95 (fight) per eye; the gate fails the script above 150 in any state.
 
 The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rate on Quest has not been measured, because the game has not run on a headset yet. There, `?fps` shows the frame rate and lowest frame rate. When frames run long, a quality guard first turns off room dimming, then sets full fixed foveation (src/game/quality.ts).
 

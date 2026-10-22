@@ -39,7 +39,7 @@ import {
   TorusGeometry,
   Vector3,
 } from '@iwsdk/core';
-import { playHover, playLocked, playPick, playRemove } from './audio.js';
+import { playHover, playLocked, playPick, playRemove, playTell } from './audio.js';
 import type { Progress } from './progress.js';
 import { addSlab, engrave, GUIDE, metalPlate, Nameplate, ORANGE, PLATE_DEPTH, pxPerM, setType, SIGN_TILT, signTexture, STEEL as UI_STEEL, tag, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
@@ -377,7 +377,8 @@ export class Hub {
         if (this.hold.t < RESET_HOLD) return null;
         this.hold = null;
         this.armed = RESET_CONFIRM;
-        playLocked();
+        // Armed, not refused: its own warning tell, so the refusal clunk keeps one meaning.
+        playTell();
         return { kind: 'armReset' };
       }
       // A quick pinch (let go before the hold counts) turns the board round to the rivals, or back.
