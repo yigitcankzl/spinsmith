@@ -370,6 +370,11 @@ export class MatchSystem extends createSystem({
   private flickReadyAt: Record<Side, number> = { left: -9, right: -9 };
   /** When each hand last flicked (this.time). */
   private flickAt: Record<Side, number> = { left: -9, right: -9 };
+  /** A hand verb that swept the bowl (flick, rub, gust) ends the Finger Groove it started and keeps that hand quiet. */
+  quietGroove(side: Side) {
+    this.grooving[side] = this.pendingGroove[side] = null;
+    this.flickAt[side] = this.time;
+  }
   /** Spin Rub: the paid window's end and when the next charge may open one (this.time). */
   private rubUntil = -9;
   private rubReadyAt = -9;

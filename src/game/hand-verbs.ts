@@ -476,6 +476,8 @@ export class HandVerbs {
   }
 
   private doPalmGust(side: Side, sx: number, sz: number, ex: number, ez: number, strength: number) {
+    // The sweep's fingertips skim the floor too: that stroke is not also a Finger Groove.
+    this.m.quietGroove(side);
     const length = Math.hypot(ex - sx, ez - sz) || 1;
     const dirX = (ex - sx) / length;
     const dirZ = (ez - sz) / length;
