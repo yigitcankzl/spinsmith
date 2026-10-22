@@ -516,6 +516,8 @@ export class MatchSystem extends createSystem({
   private pointers: HandState[] = [];
   /** Dev: the hand driver holds the hands, so the gaze is not a pointer. */
   gazeOff = false;
+  /** Dev only: no faked gaze pointer, so the head-ray dwell assist (the Quest path) runs. */
+  devHeadRay = false;
   private gazePointer: HandState = {
     tracked: false,
     pinching: false,
@@ -3183,7 +3185,9 @@ export class MatchSystem extends createSystem({
     }
     g.hasRay = true;
     // Off while the hand driver (src/dev-drive.ts) steers the hands: it pinches where it means to.
-    g.tracked = !this.gazeOff && (!!pose || import.meta.env.DEV);
+    // Dev builds fake a gaze pointer from the head; `devHeadRay` turns that off so the Quest path
+    // (no gaze source: the head-ray dwell assist) runs in the emulator too.
+    g.tracked = !this.gazeOff && (!!pose || (import.meta.env.DEV && !this.devHeadRay));
     g.pinch.set(0, -100, 0);
     g.pinchSmooth.set(0, -100, 0);
     const was = g.pinching;
