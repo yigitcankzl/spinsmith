@@ -1276,15 +1276,15 @@ const PALETTES: Record<Theme, Palette> = {
   // Three layers at the rim: a dark body, a metal lip (walls and rails), one accent light.
   // The floor is satin plastic, clearly lighter than the painted shell around it.
   forge: { floor: 0x9ea2a8, pit: 0x171313, wall: STEEL_WALL, rail: 0x9aa1ad, railHot: 0xff8a2a, accent: 0xff6a1a, pedestal: BODY },
-  stone: { floor: 0xa9abae, pit: 0x26262b, wall: STONE, rail: 0x9aa1ad, railHot: 0xffe2b8, accent: 0xf2e6d2, pedestal: 0x3d3f45 },
-  clockwork: { floor: 0xb3a68c, pit: 0x2e2618, wall: BRASS_WALL, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0x463b2c },
-  ice: { floor: 0xaec4d2, pit: 0x22303e, wall: FROST, rail: 0xb8c6d2, railHot: 0xffffff, accent: 0xe8f4ff, pedestal: 0x3e4a56 },
-  lava: { floor: 0x86706a, pit: 0x3a0c04, wall: BASALT, rail: 0x8a7a72, railHot: 0xff5a10, accent: 0xff3a0a, pedestal: 0x2a201e },
-  void: { floor: 0x7a7596, pit: 0x120c22, wall: VOID_METAL, rail: 0x9a8ab8, railHot: 0xe0b8ff, accent: 0xb86cff, pedestal: 0x252238 },
+  stone: { floor: 0xa9abae, pit: 0x26262b, wall: STONE, rail: 0x9aa1ad, railHot: 0xffe2b8, accent: 0xf2e6d2, pedestal: 0xa39c90 },
+  clockwork: { floor: 0xb3a68c, pit: 0x2e2618, wall: BRASS_WALL, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0xa88d62 },
+  ice: { floor: 0xaec4d2, pit: 0x22303e, wall: FROST, rail: 0xb8c6d2, railHot: 0xffffff, accent: 0xe8f4ff, pedestal: 0x93abbd },
+  lava: { floor: 0x86706a, pit: 0x3a0c04, wall: BASALT, rail: 0x8a7a72, railHot: 0xff5a10, accent: 0xff3a0a, pedestal: 0x8a4f3c },
+  void: { floor: 0x7a7596, pit: 0x120c22, wall: VOID_METAL, rail: 0x9a8ab8, railHot: 0xe0b8ff, accent: 0xb86cff, pedestal: 0x6f6590 },
 };
 
 const plinths = new Map<number, MeshStandardMaterial>();
-/** A theme's plain plinth: matte machine body in the theme's dark color (shared, never freed). */
+/** A theme's plain plinth: matte painted enamel in the theme's light colour (shared, never freed). */
 function plinthMaterial(hex: number): MeshStandardMaterial {
   let m = plinths.get(hex);
   if (!m) {
