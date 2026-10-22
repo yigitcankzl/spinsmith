@@ -182,6 +182,10 @@ export default async function run({ page, frame }) {
       const g = window.__game;
       g.progress.matches = 0;
       g.progress.guide = 'match';
+      // A first match has none of the later verbs: drop the probe-only unlock and any rivet a
+      // previous probe's clash threw, or its card covers the lesson.
+      g.everyVerb = false;
+      g.resetEmber?.();
       g.tutorialRound = 2;
       g.morphedOnce = false;
       g.elapsed = 3.2;
