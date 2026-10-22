@@ -49,7 +49,7 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 - Nothing has been run or measured on a headset yet, including frame rate (`?fps` and `?diagnostics` are there for it).
 - Unlabelled-surface placement is probed only in IWER with synthesised planes (`npm run check:room-matrix`), not in a real room; a table or desk labelled in Space Setup is preferred.
 - Persistent anchors have only been exercised in IWER. Depth occlusion is off under IWER (no camera depth), so it has not run anywhere yet. Real hands hide the game behind them through invisible tracked-joint proxies (spheres, bone rods and a palm slab; on over passthrough, off with `?nohandocclude`), seen only in IWER.
-- Gaze (a full pointer on Meta VR Glasses; on Quest the head ray only assists buttons) has not run on a headset.
+- Head-ray assist: on Quest (no eye tracking) looking at a far button for 0.4 s lights it and a pinch away from the bowl presses it; a real gaze source (Meta VR Glasses) gets a full pointer. Neither has run on a headset.
 - The online duel (beta) has run between two browser windows and two browser processes on one machine, not between two headsets or two homes; public STUN only, so some strict networks will not connect.
 - Real-edge drop sides, Spin Rub and installing to the Quest library are unverified on a headset; the offline cache is checked in the browser only.
 
@@ -172,6 +172,15 @@ src/game/hands.ts          Pinch and fingertip input from WebXR hand joints
 src/game/visuals.ts        Generated matcaps, top shapes per type, burst debris, arena, sparks, cord, text card
 src/game/audio.ts          Synthesized sound effects and the spin hum
 src/game/match-system.ts   Placement, rip-cord launch, arena moves, AI launch, match flow
+src/game/desk-play.ts      Real-room play: desk-edge arcs and drop sides, the staged first DESK KO, desk verdict, Outer Ring
+src/game/hand-verbs.ts     Crossguard, Forge Gust and Ember Rivet
+src/game/gesture-owner.ts  One owner per hand per frame: the priority table between the open-hand verbs
+src/game/result-rewards.ts Result screen: level-up, unlock cards, streak and tomorrow's order
+src/game/online-duel.ts    Opening, joining and running an online duel
+src/game/placement.ts      Table choice (labelled and unlabelled planes), arena height and reach
+src/game/lessons.ts        First-match prompt copy (5-word cap) and hover cards
+src/game/quality.ts        Frame-rate guard and per-phase fps samples for ?fps / ?diagnostics
+src/game/one-euro.ts       One-Euro smoothing for aim and hit tests (speed verbs read raw joints)
 src/dev-hands.ts           Dev only: move one emulated hand with the mouse
 scripts/sim-check.ts       Headless simulation check (campaign, orders, parts, arenas included)
 scripts/sim-n-check.ts     Two-to-four-top simulation check (2-top equality, determinism, rounds end)
