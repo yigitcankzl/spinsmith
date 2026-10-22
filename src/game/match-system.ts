@@ -9,12 +9,12 @@ import { FONT, glass, GUIDE, SIGN_TILT, signTexture, TEXT, titleMesh } from './u
 import { FpsBook, fpsPhase, QUALITY_LEVELS, QualityGuard } from './quality.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
-import { cloneLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance, validate } from './layout.js';
+import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
 import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, loadBuild, saveBuild, sealModel } from './forge.js';
 import { FEATS, MARK, Progress, VERB_RELEASE } from './progress.js';
@@ -54,9 +54,8 @@ import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
 import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge, deskWrenchImpulse } from './arena-forge.js';
 import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
-import { clampGuestSpot, guestPointsBefore, linkFromAddress, sanitizeGuestEvent } from './online.js';
 import type { OnlineLink } from './online.js';
-import type { GuestEvent, PackedShape, Vec3 } from './net.js';
+import type { Vec3 } from './net.js';
 import { BOUTS, boutSkill, CHAPTERS, medalOrder, nextBout, nightBout } from './campaign.js';
 import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
@@ -69,12 +68,10 @@ import { commitBlocker, FLICK_AFTER_RELEASE, FLICK_FOLLOW_THROUGH, GROOVE_COMMIT
 import type { HandFacts, HeldTool } from './gesture-owner.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 import { HandVerbs } from './hand-verbs.js';
-import { ARENA_SCALE, HAND_LOSS_GRACE, DESK_KO_BONUS, RESULT_TIME, CAUSE_WINDOW, FINISH_WORD } from './match-constants.js';
+import { ARENA_SCALE, HAND_LOSS_GRACE, DESK_KO_BONUS, RESULT_TIME, CAUSE_WINDOW, FINISH_WORD, RUB_WINDOW, RUB_REOPEN, MAX_AIM, LAUNCH_MAX_N, LAUNCH_GAP, ARENA_FORGE_TITLE, SLING_SNAP } from './match-constants.js';
 import { DeskPlay } from './desk-play.js';
 import { ResultRewards } from './result-rewards.js';
-/** Seconds one shaping charge keeps a Spin Rub open, and the pause before rubbing can spend another. */
-const RUB_WINDOW = 1.2;
-const RUB_REOPEN = 0.4;
+import { OnlineDuel } from './online-duel.js';
 /** Fingertip distance from a live top that claims the magnetic catch gesture (arena-local m). */
 const MAGNET_CATCH = 0.052;
 /** Placing waits at least this long for planes, and places on the tray after SETTLE_MAX without a table (s). */
@@ -100,11 +97,6 @@ const MIN_POWER = 0.15;
 const LAUNCH_REACH = 1.0;
 /** Pulling farther than this releases automatically. */
 const MAX_PULL = 0.32;
-/** Launch direction is clamped to this many radians off straight-at-center. */
-const MAX_AIM = 0.6;
-/** A launch spot is kept this far inside the rim (fraction of the radius) and this far from the rival (arena-local). */
-const LAUNCH_MAX_N = 0.8;
-const LAUNCH_GAP = 0.05;
 /** A pinch this high above the floor still picks the launch spot under it (arena-local). */
 const LAUNCH_HOVER = 0.12;
 /** A straight-up pull launches this much slower and with this much more spin than a flat one. */
@@ -170,12 +162,6 @@ const RISE_TIME = 1.1;
 /** Early lesson rounds stay alive long enough for the newly unlocked hand move. */
 const LESSON_GRACE = 6;
 const ARENA_FORGE_CODE: Record<ArenaForgeAction, number> = { squeeze: 1, stretch: 2, twist: 3, tilt: 4 };
-const ARENA_FORGE_TITLE: Record<ArenaForgeAction, string> = {
-  squeeze: 'SQUEEZE!',
-  stretch: 'STRETCH!',
-  twist: 'TWIST!',
-  tilt: 'TILT!',
-};
 const ARENA_FORGE_EFFECT: Record<ArenaForgeAction, string> = {
   squeeze: 'FORCE A CLASH',
   stretch: 'RING-OUT PRESSURE',
@@ -215,8 +201,6 @@ const RAMP_NEAR_HOLD = 0.12;
 const SLING_GRAB = 0.025;
 const SLING_MIN = 0.01;
 const SLING_FULL = 0.05;
-/** A sling aimed within this of a slag pit's mouth goes straight in (rad). */
-const SLING_SNAP = (20 * Math.PI) / 180;
 /** A drag shorter than this (arena-local, about 1.2 cm in the world) does not turn the ramp. */
 const RAMP_AIM_DEADZONE = 0.005;
 /** How close a pinch must be to the floating seal, and how low it must be pressed to stamp. */
@@ -238,6 +222,8 @@ type RawPlane = { orientation?: string; semanticLabel?: string; polygon?: DOMPoi
 export class MatchSystem extends createSystem({
   planes: { required: [XRPlane] },
 }) {
+  /** Online duel: room opening, peer wait, guest events and the guest's fight loop (online-duel.ts). */
+  readonly duel = new OnlineDuel(this);
   /** Result rewards: XP, level-ups, marks, medals, orders, unlock reveals and the come-back card (result-rewards.ts). */
   readonly rewards = new ResultRewards(this);
   // Probe-visible names (scripts and dev-drive read these on the system).
@@ -339,7 +325,7 @@ export class MatchSystem extends createSystem({
   private printLabel = new Label(0.2, 1.25, 0.6);
   private touches: Record<Side, TableTouch> = { left: new TableTouch(TUNE.press), right: new TableTouch(TUNE.press) };
   /** The floor mesh needs one more sync (the arena was reset or a shape just ended). */
-  private arenaDirty = true;
+  arenaDirty = true;
   /** The XR session the arena was placed in; a new one (or a recenter) places it again. */
   private xrSession: XRSession | null = null;
   private needPlace = false;
@@ -395,10 +381,6 @@ export class MatchSystem extends createSystem({
   /** Guest only: rubbed spin not yet sent to the host, and when it last went. */
   private rubPending = 0;
   private rubSentAt = -9;
-  /** Host only: the guest's current rub window and the spin it has rubbed in it. */
-  private guestRubUntil = -9;
-  private guestRubSum = 0;
-  private guestRubSaidAt = -9;
   /** A released pinch owns the hand briefly, so withdrawing it cannot become a second gesture. */
   private palmGustBlockedUntil: Record<Side, number> = { left: -9, right: -9 };
   /** A released held tool owns its fingertip follow-through, so it cannot draw a Cup or Groove. */
@@ -425,7 +407,7 @@ export class MatchSystem extends createSystem({
   roomImprints = new RoomImprints((-PEDESTAL + 0.003) / ARENA_SCALE);
   /** Arenas in rotation (built-ins plus the player's own) and the one in play. */
   arenas: ArenaLayout[] = [...ARENAS, ...loadArenas()];
-  private arenaIndex = 0;
+  arenaIndex = 0;
   /** The arena builder and the button that opens it. */
   private builder = new Builder({
     preview: (layout) => this.showLayout(layout),
@@ -455,7 +437,7 @@ export class MatchSystem extends createSystem({
   /** The match bar on the far rim. */
   private bar = new MatchBar();
   /** The forge: build your own top from parts. */
-  private forge = new Forge({
+  forge = new Forge({
     done: (build) => this.leaveForge(build),
     // The first session's part counts once the top is quenched (saved), not just fitted.
     fitted: () => undefined,
@@ -501,7 +483,7 @@ export class MatchSystem extends createSystem({
   /** When the current ready phase began (for the intro before the first rip hint). */
   private readySince = 0;
   /** Seconds left of the simulation-only pause after a hard hit. */
-  private hitStop = 0;
+  hitStop = 0;
   private lastHardHit = -1;
   impacts = new Impacts();
   private trails = new Trails();
@@ -517,7 +499,7 @@ export class MatchSystem extends createSystem({
   private bumpHintShown = false;
   /** Home screen buttons, in front of the arena; and the small MENU plate during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
-  private hub = new Hub();
+  hub = new Hub();
   private menuButton = new Button('menu', 0.07, 0.026);
   private rematchButton = new Button('rematch', 0.105, 0.026);
   /** Pass and play: the next smith on this headset fights the top and the hands of the match just played. */
@@ -555,7 +537,7 @@ export class MatchSystem extends createSystem({
   /** One spin hum per top: yours, the rival's, and a brawl's two extra seats (silent otherwise). */
   private hums = [new SpinHum(230), new SpinHum(190), new SpinHum(260), new SpinHum(165)];
   private humLive = [false, false, false, false];
-  private cordTone = new CordTone();
+  cordTone = new CordTone();
   /** Seconds since the last clash sound, to keep grinding contacts from machine-gunning. */
   private sinceClashSound = 1;
   /** Builds for the coming round are chosen once per round, not on every reset. */
@@ -568,7 +550,7 @@ export class MatchSystem extends createSystem({
   myView!: TopView;
   theirView!: TopView;
   private viewKeys = ['', ''];
-  private cord = new Cord();
+  cord = new Cord();
   sparks = new Sparks();
   /** The ghost hand that shows the first moves. */
   private ghost = new GhostHand();
@@ -869,7 +851,7 @@ export class MatchSystem extends createSystem({
   label = new Label();
   private round = 0;
   /** Match score in heat: first to MATCH_HEAT wins the match. */
-  private myPoints = 0;
+  myPoints = 0;
   theirPoints = 0;
   elapsed = 0;
   private pressureShown = false;
@@ -879,7 +861,7 @@ export class MatchSystem extends createSystem({
   time = 0;
   frameDt = 0;
   /** Which hand holds the cord, and pull bookkeeping. */
-  private puller: Side | null = null;
+  puller: Side | null = null;
   private maxPull = 0;
   private peakSpeed = 0;
   private lastPull = 0;
@@ -937,7 +919,7 @@ export class MatchSystem extends createSystem({
   private lockedSaidAt = -9;
   private lockedAt = -9;
   private passHinted = false;
-  private arenaMorphShove = { x: 0, z: 0, t: 0 };
+  arenaMorphShove = { x: 0, z: 0, t: 0 };
   private gazeAssist = { active: false, target: '' };
   /** The button under the head ray, since when, and when it was last seen there (pickButton runs per button set). */
   private headDwell = { id: '', since: 0, seen: -1 };
@@ -961,7 +943,7 @@ export class MatchSystem extends createSystem({
   private tableMask = new Group();
   /** The quiet forge loop: up at home and in the workshops, ducked under a fight. */
   private loop = new ForgeLoop();
-  private rivalShapeAt = -9;
+  rivalShapeAt = -9;
   private rivalMarks = new ShapeMarks(0x4fd1ff, 6, 6);
   /** After a finish your shape caused, the visuals play slowly for a moment (real seconds left). */
   slowMo = 0;
@@ -970,7 +952,7 @@ export class MatchSystem extends createSystem({
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
   lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' | 'flick' | ArenaForgeAction } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
-  private forgeBar = new StrikeBar();
+  forgeBar = new StrikeBar();
   private parried = false;
   private tipFresh = { left: true, right: true };
   private slapAt = new Vector3();
@@ -1015,7 +997,7 @@ export class MatchSystem extends createSystem({
   private tellAt = -1;
   private tellTaught = false;
   /** What the rival last did to the floor or to you (for THEIR … → SLAG). */
-  private rivalShapeKind = 'RAMP';
+  rivalShapeKind = 'RAMP';
   /** Each hand's live cup (a held well that catches the first top to roll in), and when it was set. */
   private cups: Record<Side, { shape: FloorShape; at: number; caught: boolean } | null> = { left: null, right: null };
   /** A hand pulling a caught top back to sling it: the cup and where the pinch began (arena-local). */
@@ -1092,7 +1074,7 @@ export class MatchSystem extends createSystem({
   /** The Circuit Map bout picked for the next match, and the one being played (campaign.ts), with its medal bits so far. */
   private nextBoutPick: Bout | null = null;
   /** Tops in the next match: 2 is a duel; 3 or 4 a brawl (bots fill the extra seats; the last top spinning takes the heat). */
-  private seats = loadSeats();
+  seats = loadSeats();
   private brawlMode: BrawlMode = loadBrawlMode();
   private activeBrawlMode: BrawlMode = 'last';
   /** A brawl's extra tops and their views, and the foe that went out last in a won round. */
@@ -1110,18 +1092,11 @@ export class MatchSystem extends createSystem({
   private botShapeAt = [0, 0];
   /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
   online: OnlineLink | null = null;
-  private netRip: { power: number; aim: number; build?: string; at?: [number, number]; dir?: [number, number] } | null = null;
-  private netPending: Parameters<MatchSystem['launch']> | null = null;
-  private netGo = false;
-  private netShapes = new Map<number, FloorShape>();
-  /** Host: the online guest's cup, held here until slung or its hold runs out. */
-  private netCup: { shape: FloorShape; at: number; caught?: boolean } | null = null;
+  netRip: { power: number; aim: number; build?: string; at?: [number, number]; dir?: [number, number] } | null = null;
   /** Something that must wait for the arena to be placed (an online match starting). */
-  private afterPlace: (() => void) | null = null;
+  afterPlace: (() => void) | null = null;
   /** Something that waits until the player is home (an online duel while they forge or build). */
-  private afterHome: (() => void) | null = null;
-  /** The address's online room was opened (it waits for the first session to end). */
-  private onlineTried = false;
+  afterHome: (() => void) | null = null;
   bout: Bout | null = null;
   /** This match as an echo for a friend's game: each rip and each two-hand forge (echo.ts). */
   private echoRec: Echo = { rips: [], forges: [] };
@@ -1153,7 +1128,7 @@ export class MatchSystem extends createSystem({
   private rayHit = { ok: false, x: 0, z: 0 };
   private rayLocalO = new Vector3();
   private rayLocalD = new Vector3();
-  private chargeRing = new Mesh(
+  chargeRing = new Mesh(
     new TorusGeometry(0.036, 0.003, 8, 48).rotateX(Math.PI / 2),
     new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, blending: AdditiveBlending, depthWrite: false }),
   );
@@ -1289,7 +1264,7 @@ export class MatchSystem extends createSystem({
     this.hub.setComfort();
     // The hand driver (src/dev-drive.ts) reads the game through this.
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
-    this.openOnline();
+    this.duel.openOnline();
     // A plate laid on the left of the near rim at the touch band's one pitch, like every sign you pinch.
     this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14);
     this.menuButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
@@ -1817,7 +1792,7 @@ export class MatchSystem extends createSystem({
             this.menuArmed = -10;
             this.menuButton.set('MENU', undefined, false);
             // Going home ends an online duel for both tables (the other side hears 'bye').
-            if (this.online?.peer) this.endOnline();
+            if (this.online?.peer) this.duel.endOnline();
             this.toHub();
             break;
           }
@@ -1975,7 +1950,7 @@ export class MatchSystem extends createSystem({
   }
 
   /** The rival's launch spot this round (arena-local), at the spawn distance on its far half. */
-  private rivalSpot(): [number, number] {
+  rivalSpot(): [number, number] {
     return [Math.cos(this.rivalAngle) * this.SPAWN, Math.sin(this.rivalAngle) * this.SPAWN];
   }
 
@@ -2098,7 +2073,7 @@ export class MatchSystem extends createSystem({
   }
 
   /** Shows the rival physically authoring a move instead of explaining it with another card. */
-  private rivalHandMove(x: number, z: number, dx: number, dz: number) {
+  rivalHandMove(x: number, z: number, dx: number, dz: number) {
     const y = this.arena.height(x, z);
     this.rivalGhostKeys = [
       [0, x, y + 0.06, z, 0],
@@ -2239,7 +2214,7 @@ export class MatchSystem extends createSystem({
   }
 
   /** Home: the arena waits with both tops; Play, Workshop, or switch arena. Pinching never launches here. */
-  private toHub() {
+  toHub() {
     this.clearBrawl();
     // A rivet thrown by the last clash of a fight must not linger over the hub.
     this.verbs.resetEmber();
@@ -2248,7 +2223,7 @@ export class MatchSystem extends createSystem({
     this.resumeSnap = null;
     clearSnapshot(localStorage);
     // ?online=… on a new headset waits for the first session; once it is over the room opens.
-    if (!this.online && !this.onlineTried && this.progress.guide === 'done' && new URLSearchParams(location.search).has('online')) queueMicrotask(() => this.openOnline());
+    if (!this.online && !this.duel.onlineTried && this.progress.guide === 'done' && new URLSearchParams(location.search).has('online')) queueMicrotask(() => this.duel.openOnline());
     // Whatever waited for placement or for home (an online duel) starts now, on any path home.
     const home = this.afterHome ?? this.afterPlace;
     this.afterHome = this.afterPlace = null;
@@ -2412,13 +2387,13 @@ export class MatchSystem extends createSystem({
       }
       const online = this.online?.role === 'host';
       if (online) {
-        this.endOnline();
+        this.duel.endOnline();
         this.seats = 2;
         this.brawlMode = 'last';
         this.toHub();
       } else if (this.brawlMode === 'crucible' && !this.online) {
         this.seats = 2;
-        this.openOnline('host');
+        this.duel.openOnline('host');
         this.hub.setBrawl(4, true);
         playTick();
         return;
@@ -2477,7 +2452,7 @@ export class MatchSystem extends createSystem({
       this.slungOnce = false;
       this.flickHintShown = false;
       this.flickGhostUntil = -9;
-      this.endOnline();
+      this.duel.endOnline();
       for (const k of SAVE_KEYS) if (k !== 'spinsmith.progress.v1') localStorage.removeItem(k);
       this.myBuild = this.forge.allowed({ ...PRESETS[0].build });
       this.arenas = [...ARENAS];
@@ -2547,7 +2522,7 @@ export class MatchSystem extends createSystem({
   }
 
   /** Builds both sides' fight stats and views (views only rebuild when a build changed). */
-  private setBuilds(mine: TopBuild, theirs: TopBuild) {
+  setBuilds(mine: TopBuild, theirs: TopBuild) {
     this.mine.spec = specFromBuild(mine);
     this.theirs.spec = specFromBuild(theirs);
     this.mine.hand = mine.spin;
@@ -3356,14 +3331,14 @@ export class MatchSystem extends createSystem({
    * place closes, a rival is picked, the score and this round's builds are fresh.
    */
   /** `again`: a rematch, which keeps the bout (or the brawl) it repeats. */
-  private startMatch(rival?: Rival, again = false, resume?: MatchSnapshot) {
+  startMatch(rival?: Rival, again = false, resume?: MatchSnapshot) {
     // With a peer connected every match is against the other smith (never a bout, order or AI).
     if (this.online?.peer) {
-      rival = this.remoteRival();
+      rival = this.duel.remoteRival();
       again = false;
     }
     this.netRip = null;
-    this.netPending = null;
+    this.duel.netPending = null;
     const last = again ? this.bout : null;
     const lastSeats = again ? this.tops.length : 2;
     this.hub.hide();
@@ -4577,26 +4552,26 @@ export class MatchSystem extends createSystem({
    * Launches both tops. Yours from `from` (or its usual spot) along `dir` (or `aim` off straight
    * ahead, angled into its orbit); `steep` 0..1 trades launch speed for spin.
    */
-  private launch(power: number, aim: number, from: { x: number; z: number } | null = null, dir: { x: number; z: number } | null = null, steep = 0) {
+  launch(power: number, aim: number, from: { x: number; z: number } | null = null, dir: { x: number; z: number } | null = null, steep = 0) {
     if (this.secretDeckPending()) {
       this.locked('Pick one secret-deck top before you rip');
       return;
     }
     // Online: the guest only sends its rip and waits for the host's launch; the host waits for the guest's rip.
     const net = this.online?.peer ? this.online : null;
-    if (net && !this.netGo) {
+    if (net && !this.duel.netGo) {
       if (net.role === 'guest') {
         // The spot the guest picked (its own arena-local frame) goes in the host's frame: turned half round.
         net.sendEvent({ kind: 'rip', power, aim, steep, twist: this.launchTwist, build: encodeBuild(this.myBuild), ...(from ? { at: [-from.x, -from.z] as [number, number] } : {}), ...(dir ? { dir: [-dir.x, -dir.z] as [number, number] } : {}) });
-        this.netPending = [power, aim, from, dir, steep];
-        this.waitForPeer();
+        this.duel.netPending = [power, aim, from, dir, steep];
+        this.duel.waitForPeer();
         this.label.set(`Ripped\nWaiting for ${net.peerName || 'the host'}`);
         this.labelTimer = 0;
         return;
       }
       if (!this.netRip) {
-        this.netPending = [power, aim, from, dir, steep];
-        this.waitForPeer();
+        this.duel.netPending = [power, aim, from, dir, steep];
+        this.duel.waitForPeer();
         this.label.set(`Ripped\nWaiting for ${net.peerName || 'your guest'} to rip`);
         this.labelTimer = 0;
         return;
@@ -4748,7 +4723,7 @@ export class MatchSystem extends createSystem({
     const aiDir = aiAim + LAUNCH_TILT * th;
     // Online: the guest's own launch spot and pull direction, when it picked them (checked: inside
     // the launch ring, never on top of your spot).
-    const [rx, rz] = net?.role === 'host' && this.netRip?.at ? this.guestSpot(this.netRip.at, sx, sz) : this.rivalSpot();
+    const [rx, rz] = net?.role === 'host' && this.netRip?.at ? this.duel.guestSpot(this.netRip.at, sx, sz) : this.rivalSpot();
     const inward = Math.atan2(-rx, -rz);
     const gd = net?.role === 'host' ? this.netRip?.dir : undefined;
     const heading = stableHeading(gd && Number.isFinite(gd[0]) && Number.isFinite(gd[1]) && Math.hypot(gd[0], gd[1]) > 1e-6 ? Math.atan2(gd[0], gd[1]) + LAUNCH_TILT * th : inward + aiDir);
@@ -4763,7 +4738,7 @@ export class MatchSystem extends createSystem({
       net.launched(this.round, this.arena.layout.name, undefined, [encodeBuild(this.myBuild), guestCode]);
       this.netRip = null;
     }
-    this.netPending = null;
+    this.duel.netPending = null;
     playTouchdown(rx, rz, 0.6 + 0.4 * aiPower);
     this.phase = 'fight';
     this.markFirstFive(3);
@@ -6805,7 +6780,7 @@ export class MatchSystem extends createSystem({
     // Online guest: the host holds the cups; a pinch on one of this side's cups (from the snapshot,
     // turned half round into this frame) takes the sling, and the pull goes to the host on release.
     if (this.online?.role === 'guest' && this.online.peer) {
-      for (const cup of this.netShapes.values()) {
+      for (const cup of this.duel.netShapes.values()) {
         if (!cup.trap || !cup.caught || cup.owner !== 'left') continue;
         const other = side === 'left' ? 'right' : 'left';
         if (this.slings[other]?.cup === cup) continue;
@@ -7153,11 +7128,11 @@ export class MatchSystem extends createSystem({
 
   private updateFight(dt: number) {
     if (this.online?.role === 'guest' && this.online.peer) {
-      this.guestFight(dt);
+      this.duel.guestFight(dt);
       return;
     }
     // The guest's cup lets go like yours: after the hold (restarting when it catches a top).
-    const nc = this.netCup;
+    const nc = this.duel.netCup;
     // The hold clock restarts at the catch, as yours does.
     if (nc && nc.shape.caught && !nc.caught) {
       nc.caught = true;
@@ -7165,7 +7140,7 @@ export class MatchSystem extends createSystem({
     }
     if (nc && (!this.arena.shapes.includes(nc.shape) || this.elapsed - nc.at > TUNE.cupHold)) {
       if (this.arena.shapes.includes(nc.shape)) this.arena.free(nc.shape);
-      this.netCup = null;
+      this.duel.netCup = null;
     }
     if (this.online?.role === 'host') this.online.snapshot(performance.now(), [this.mine, this.theirs], [this.arena.tiltX, this.arena.tiltZ], this.arena.shapes);
     if (this.desk.updateDeskVerdict(dt)) return;
@@ -7728,139 +7703,6 @@ export class MatchSystem extends createSystem({
     if (!forgeGhost) this.forgeGhost.hide();
   }
 
-  /** Opens the online duel the address asks for (after the first session), and wires its messages. */
-  private openOnline(open?: 'host') {
-    if (this.progress.guide !== 'done') return;
-    if (!open) this.onlineTried = true;
-    // The hello only proves protocol compatibility. Exact parts travel with the committed rip, so
-    // neither table can counter-pick after seeing the other's deck choice.
-    const link = linkFromAddress(open ? `?online=host${new URLSearchParams(location.search).get('net') === 'bc' ? '&net=bc' : ''}` : location.search, encodeBuild(PRESETS[0].build), this.progress.rank);
-    if (!link) return;
-    this.online = link;
-    const say = (text: string, hold = 8) => {
-      this.label.set(text);
-      this.labelTimer = hold;
-    };
-    // The room code stays up until someone joins (on the card now, and on the board's front while home).
-    this.hub.roomCode = link.role === 'host' ? link.code : null;
-    if (this.phase === 'hub') this.toHub();
-    say(link.role === 'host' ? `Online room ${link.code}\nFriend opens ?online=${link.code} · pegs close` : `Joining room ${link.code}…`, 600);
-    link.onHello = () => {
-      this.hub.roomCode = null;
-      if (import.meta.env.DEV) console.log(`[ONLINE] ${link.role}: ${link.peerName} joined ${link.code}`);
-      if (link.role === 'host') {
-        const start = () => {
-          if (this.online !== link || !link.peer) return;
-          this.toHub();
-          this.startMatch(this.remoteRival());
-        };
-        // Never pull the host out of the forge or the workshop (unsaved work): start when they are home.
-        if (this.phase === 'placing') this.afterPlace = start;
-        else if (this.phase === 'build' || this.phase === 'forge' || this.demo) {
-          this.afterHome = start;
-          say(`${link.peerName || 'A smith'} joined\nThe duel starts when you are home`);
-        } else start();
-      } else say(`In room ${link.code}\n${link.peerName} starts the match`);
-    };
-    link.onLaunch = (round, arena, layout, builds) => {
-      if (round < 0 && this.phase === 'placing') {
-        this.afterPlace = () => {
-          if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout, builds);
-        };
-        return;
-      }
-      if (round < 0 && (this.phase === 'build' || this.phase === 'forge' || this.demo)) {
-        this.afterHome = () => {
-          if (this.online === link && link.peer) link.onLaunch?.(round, arena, layout, builds);
-        };
-        say(`${link.peerName || 'The host'} is ready\nThe duel starts when you are home`);
-        return;
-      }
-      if (round < 0) {
-        // A match begins: the host's arena (by name, or whole when it was built in the workshop), against the host's top.
-        // Home first: going home picks this device's own next bout and arena, which the host's replaces.
-        this.toHub();
-        const index = this.arenas.findIndex((a) => a.name === arena);
-        // Untrusted input: a layout that fails to clone or validate falls back to the name.
-        let sent: ArenaLayout | null = null;
-        try {
-          sent = layout && typeof layout === 'object' ? cloneLayout(layout as ArenaLayout) : null;
-          if (sent && validate(sent)) sent = null;
-        } catch {
-          sent = null;
-        }
-        let placed = false;
-        if (sent) {
-          try {
-            this.setArena(sent);
-            placed = true;
-          } catch {
-            placed = false;
-          }
-        }
-        if (placed) {
-          // Kept: going home inside the session must not swap in the guest's own arena.
-          this.arenas = [...this.arenas.filter((a) => a.name !== sent!.name), sent!];
-          this.arenaIndex = this.arenas.length - 1;
-        } else if (index >= 0) {
-          this.arenaIndex = index;
-          this.setArena(this.arenas[index]);
-        }
-        this.startMatch(this.remoteRival());
-        return;
-      }
-      // The host has launched: whatever this side is doing with the cord, its sent rip is the one that flies.
-      this.puller = null;
-      this.cord.set(null);
-      this.cordTone.update(null);
-      this.chargeRing.visible = false;
-      this.netGo = true;
-      if (builds) {
-        const hostBuild = decodeBuild(builds[0]);
-        const guestBuild = decodeBuild(builds[1]);
-        if (hostBuild && guestBuild) {
-          this.myBuild = this.forge.allowed({ ...guestBuild });
-          this.setBuilds(this.myBuild, { ...hostBuild, color: OPPONENT_COLOR });
-          this.stamp.show('DECKS REVEALED', `${roleOf(this.mine.spec).toUpperCase()} VS ${roleOf(this.theirs.spec).toUpperCase()}`, 'neutral', 0.65);
-        }
-      }
-      const [power, aim, from, dir, steep] = this.netPending ?? [0.75, 0, null, null, 0];
-      this.launch(power, aim, from, dir, steep);
-      this.netGo = false;
-    };
-    link.onEvent = (ev) => this.applyGuestEvent(ev);
-    link.onResult = (winner, heat) => {
-      if (this.phase !== 'fight') return;
-      this.guestFight(0, true);
-      const v = winner === 2 ? 2 : winner === 1 ? -1 : 1;
-      const loser = v === 1 ? this.theirs : this.mine;
-      if (v !== 2 && !loser.finish) loser.finish = 'spin';
-      // Take the host's heat (seen from this side), less the points finish() is about to add.
-      if (v !== 2) [this.myPoints, this.theirPoints] = guestPointsBefore(heat, v, finishPoints(loser, this.progress.matches === 0, false));
-      this.finish(v);
-    };
-    link.onLeft = () => {
-      // Close first, redraw home, then say it (a redraw would wipe the card).
-      this.endOnline();
-      if (this.phase === 'hub') this.toHub();
-      say(`${link.peerName || 'Your opponent'} left\nThe online duel is over`);
-    };
-    // WebRTC through public relays: a room nobody reaches, or a strict network, ends with a plain reason.
-    const t = link.transport as { onState?: (cb: (s: string) => void) => void; error?: string };
-    t.onState?.((state) => {
-      if (state === 'failed' && !link.peer) {
-        this.endOnline();
-        if (this.phase === 'hub') this.toHub();
-        say(`Room ${link.code}: no one connected\n${t.error ?? 'Check the code, or try another network'}`, 12);
-      }
-    });
-  }
-
-  /** Host: a guest's launch spot, kept finite, inside the launch ring and LAUNCH_GAP clear of yours. */
-  private guestSpot(at: [number, number], sx: number, sz: number): [number, number] {
-    return clampGuestSpot(at, sx, sz, LAUNCH_MAX_N * this.arena.radius, LAUNCH_GAP) ?? this.rivalSpot();
-  }
-
   /**
    * A refused move: the dull clunk, and the same news in words on the card (for anyone who plays
    * without sound), unless the card is already saying something.
@@ -7879,270 +7721,6 @@ export class MatchSystem extends createSystem({
     this.lockedSaidAt = this.time;
     this.label.set(why);
     this.labelTimer = 1.4;
-  }
-
-  /** Online: your rip is sent and held; drop the cord and wait in ready (MENU is there) until the other side rips. */
-  private waitForPeer() {
-    this.puller = null;
-    this.chargeRing.visible = false;
-    this.cord.set(null);
-    this.cordTone.update(null);
-    this.phase = 'ready';
-  }
-
-  /** Closes the online duel and returns to offline play (the pegs light for the seats again). */
-  private endOnline() {
-    // Whatever waited for the other smith (placement, home) is void with them gone.
-    this.afterPlace = this.afterHome = null;
-    this.netCup = null;
-    this.hub.roomCode = null;
-    if (!this.online) return;
-    this.online.close();
-    this.online = null;
-    this.netRip = null;
-    this.netPending = null;
-    this.netShapes.clear();
-    this.hub.setBrawl(this.seats);
-  }
-
-  /** The other smith's top, as a rival for the online duel. */
-  private remoteRival(): Rival {
-    const link = this.online!;
-    const build = decodeBuild(link.peerBuild) ?? { ...PRESETS[0].build };
-    const name = link.role === 'host' ? 'Guest' : 'Host';
-    return { name, move: 'charge', style: 'another smith, live', title: link.peerName || 'online', intro: 'Live from another table.', win: 'GG.', lose: 'GG.', tip: 'Watch their ramps; forge before they do', build: { ...build, color: OPPONENT_COLOR }, level: 1 };
-  }
-
-  /** Host: what the guest's hands did, from the far side. */
-  private applyGuestEvent(raw: GuestEvent) {
-    // A trust boundary: a guest's event is checked and clamped before it can touch the simulation.
-    const ev = sanitizeGuestEvent(raw, this.arena.radius, MAX_AIM);
-    if (!ev) return;
-    if (ev.kind === 'rip') {
-      // A rip that arrives mid-fight belongs to no round: the next one starts from a fresh rip.
-      if (this.phase === 'fight') return;
-      this.netRip = { power: ev.power, aim: ev.aim, ...(ev.build ? { build: ev.build } : {}), ...(ev.at ? { at: ev.at } : {}), ...(ev.dir ? { dir: ev.dir } : {}) };
-      // Only from ready: a host mid-pull finishes their own new rip, which then finds this one waiting.
-      if (this.netPending && this.phase === 'ready') {
-        const [power, aim, from, dir, steep] = this.netPending;
-        this.netGo = true;
-        this.launch(power, aim, from, dir, steep);
-        this.netGo = false;
-      }
-      return;
-    }
-    if (this.phase !== 'fight') return;
-    if (ev.kind === 'ramp') {
-      this.arena.addShape('ramp', ev.x, ev.z, SHAPE_SIZE.ramp, 'rival', ev.dx, ev.dz);
-      this.rivalHandMove(ev.x, ev.z, ev.dx, ev.dz);
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = 'RAMP';
-      playThock();
-    } else if (ev.kind === 'groove') {
-      const shape = this.arena.addGroove(ev.sx, ev.sz, ev.ex, ev.ez, 'rival');
-      if (!shape) return;
-      this.rivalHandMove(ev.ex, ev.ez, shape.dx, shape.dz);
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = 'GROOVE';
-      playThock();
-    } else if (ev.kind === 'cup') {
-      // The guest's cup, held here for them: it catches the first top in, then lets go after the hold.
-      if (this.netCup && this.arena.shapes.includes(this.netCup.shape)) this.arena.free(this.netCup.shape);
-      const shape = this.arena.addShape('well', ev.x, ev.z, CUP_DEPTH, 'rival-cup', 0, 0, CUP_SIGMA);
-      shape.trap = shape.held = true;
-      this.netCup = { shape, at: this.elapsed };
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = 'CUP';
-      playThock();
-    } else if (ev.kind === 'sling') {
-      const cup = this.netCup?.shape;
-      const t = cup?.caught;
-      if (!cup || !t || !this.arena.shapes.includes(cup)) return;
-      let a = Math.atan2(-ev.pz, -ev.px);
-      let gap = SLING_SNAP;
-      for (const p of this.arena.layout.pockets) {
-        const b = Math.atan2(Math.sin(p.angle) * this.arena.radius - t.z, Math.cos(p.angle) * this.arena.radius - t.x);
-        const d = Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)));
-        if (d < gap) {
-          gap = d;
-          a = b;
-        }
-      }
-      this.arena.sling(cup, Math.cos(a), Math.sin(a));
-      this.netCup = null;
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = 'SLING';
-      this.stamp.show('THEIR SLING', 'LIVE HANDS', 'rival', 0.6);
-      playSling(t.x, t.z);
-    } else if (ev.kind === 'rim') {
-      const hits = springRim(this.arena, this.theirs, [this.mine], ev.sx, ev.sz, ev.x, ev.z, Math.max(0, Math.min(1.5, ev.f)));
-      this.arenaView.flashRail(ev.sx, ev.sz);
-      this.impacts.shock(ev.sx, this.arena.height(ev.sx, ev.sz), ev.sz, hits ? 0.75 : 0.35);
-      if (hits) this.stamp.show('THEIR RIM SPRING', 'LIVE HANDS', 'rival', 0.6);
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = 'RIM SPRING';
-      playThock();
-    } else if (ev.kind === 'gust') {
-      const targets = ev.target === 'mine' ? [this.theirs] : ev.target === 'rival' ? [this.mine] : this.tops;
-      // An untargeted (paid) guest gust steers around the guest's own top, as it does locally.
-      const own = ev.target ? null : this.theirs;
-      const struck = targets.filter((top) => top !== own && palmGustCrosses(this.arena, top, ev.sx, ev.sz, ev.ex, ev.ez));
-      const hits = palmGust(this.arena, targets, ev.sx, ev.sz, ev.ex, ev.ez, ev.f, own);
-      this.rivalHandMove(ev.ex, ev.ez, ev.ex - ev.sx, ev.ez - ev.sz);
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = 'FORGE GUST';
-      this.impacts.shock((ev.sx + ev.ex) * 0.5, this.arena.floorHeight(0.6), (ev.sz + ev.ez) * 0.5, hits ? 0.6 : 0.3, TEAM_RIVAL);
-      for (const top of struck) {
-        const view = top === this.mine ? this.myView : top === this.theirs ? this.theirView : null;
-        view?.flash();
-        this.impacts.hit(top.x, this.arena.height(top.x, top.z), top.z, 0.75);
-      }
-      if (hits) this.stamp.show('THEIR FORGE GUST', 'LIVE HANDS', 'rival', 0.6);
-      playDash(ev.ex);
-    } else if (ev.kind === 'flick') {
-      // Guest-side 'mine' is the host's rival top.
-      const top = ev.target === 'mine' ? this.theirs : this.mine;
-      const reach = top.spec.radius + FINGER_RADIUS - 0.002;
-      top.sinceTouch = 99;
-      fingerContact(top, top.x - ev.dx * reach, top.z - ev.dz * reach, top.vx + ev.dx * ev.s, top.vz + ev.dz * ev.s, ev.f);
-      const y = this.arena.height(top.x, top.z);
-      (top === this.mine ? this.myView : this.theirView).flash();
-      this.impacts.hit(top.x, y, top.z, 0.8);
-      this.sparks.burst(top.x, y, top.z, 0.7);
-      this.stamp.show('THEIR FLICK', 'LIVE HANDS', 'rival', 0.55);
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = 'FLICK';
-      this.hitStop = Math.max(this.hitStop, 0.07);
-      playThock(top.x, top.z);
-    } else if (ev.kind === 'rub') {
-      // Guest-side 'mine' is the host's rival top; one window's worth of spin per RUB_WINDOW at most.
-      const top = this.theirs;
-      if (!top.alive) return;
-      if (this.time >= this.guestRubUntil) {
-        this.guestRubUntil = this.time + RUB_WINDOW + RUB_REOPEN;
-        this.guestRubSum = 0;
-      }
-      const gain = Math.min(ev.gain, RUB_WINDOW_MAX - this.guestRubSum);
-      this.guestRubSum += Math.max(0, gain);
-      top.spin = gain > 0 ? Math.max(top.spin, Math.min(1, top.spin + gain)) : Math.max(0, top.spin + gain);
-      if (gain > 0 && this.time - this.guestRubSaidAt >= 1) {
-        this.guestRubSaidAt = this.time;
-        this.theirView.flash();
-        this.stamp.show('THEIR SPIN RUB', 'LIVE HANDS', 'rival', 0.45);
-        this.rivalShapeAt = this.elapsed;
-        this.rivalShapeKind = 'SPIN RUB';
-      }
-    } else if (ev.kind === 'strike') {
-      // The guest's palm comes down: their seal (Anvil when unknown), centred where they slapped, their top the striker.
-      const seal = (SEALS as readonly string[]).includes(ev.seal ?? '') ? (ev.seal as Seal) : 'anvil';
-      sealStrike(this.arena, this.theirs, this.mine, seal, ev.x, ev.z);
-      const y = this.arena.height(ev.x, ev.z);
-      this.impacts.shock(ev.x, y, ev.z, 1, TEAM_RIVAL);
-      this.sparks.burst(ev.x, y, ev.z, 1);
-      this.stamp.show(`THEIR ${SEAL_NAMES[seal].toUpperCase()}`, 'LIVE HANDS', 'rival', 0.9);
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = 'STRIKE';
-      this.hitStop = Math.max(this.hitStop, 0.12);
-      playThock();
-    } else if (ev.kind === 'forge') {
-      const action = ev.action as ArenaForgeAction;
-      const gesture: ArenaForgeGesture = { pull: ev.pull, twist: ev.twist, tilt: ev.tilt };
-      // The guest forged: its top (theirs, here on the host) is the forger, ours is the target.
-      const forger = this.theirs;
-      const target = this.mine;
-      const aim = arenaForgeAim(target.x, target.z, target.vx, target.vz, this.arena.radius);
-      if (forger.alive) forger.shieldUntil = Math.max(forger.shieldUntil, this.arena.elapsed + ARENA_FORGE_SHIELD);
-      for (const top of this.tops) {
-        if (!top.alive) continue;
-        const own = top === forger;
-        const impulse = arenaForgeImpulse(own ? action : arenaForgeRivalAction(action), gesture, top.x, top.z, this.arena.radius, ev.sx ?? -ev.sign, ev.sz ?? 0, (ev.force ?? 1) * (own ? 0.4 : aim));
-        top.vx += impulse.x;
-        top.vz += impulse.z;
-        top.kick = Math.max(top.kick, 0.55);
-        top.kickX = impulse.x;
-        top.kickZ = impulse.z;
-      }
-      if (action === 'tilt' && ev.sx !== undefined) {
-        this.arenaMorphShove.x = ev.sx;
-        this.arenaMorphShove.z = ev.sz ?? 0;
-        this.arenaMorphShove.t = 1.35;
-        this.arena.shove = this.arenaMorphShove;
-      }
-      const [, g] = forgeGrips(this.arena.layout);
-      const d = Math.hypot(g.x, g.z) || 1;
-      this.rivalHandMove(-g.x, -g.z, g.x / d, g.z / d);
-      this.rivalShapeAt = this.elapsed;
-      this.rivalShapeKind = action.toUpperCase();
-      this.stamp.show(`THEIR ${ARENA_FORGE_TITLE[action]}`, 'LIVE HANDS', 'rival', 0.9);
-      this.impacts.shock(0, this.arena.height(0, 0), 0, 0.6);
-      playThock();
-    }
-  }
-
-  /** Guest: the fight as the host's snapshots show it, turned half round so your top is near you. */
-  private guestFight(dt: number, newest = false) {
-    const link = this.online!;
-    link.tick();
-    const s = link.buffer.sample(performance.now() + (newest ? 10000 : 0));
-    // Snapshot time is the host's game clock (monotonic across rounds); the fight clock runs here.
-    this.elapsed += dt;
-    if (!s) return;
-    if (newest) dt = 0;
-    // The stage is turned half round on the guest, so the host's own coordinates are drawn as they are.
-    const put = (t: Top, p: (typeof s.tops)[0]) => {
-      t.x = p.x;
-      t.z = p.z;
-      t.vx = p.vx;
-      t.vz = p.vz;
-      t.spin = p.spin;
-      t.angle = p.angle;
-      t.wobble = p.wobble;
-      t.damage = p.damage;
-      t.state = p.state;
-      t.finish = p.finish;
-    };
-    put(this.mine, s.tops[1]);
-    put(this.theirs, s.tops[0]);
-    this.arena.tiltX = s.tilt[0];
-    this.arena.tiltZ = s.tilt[1];
-    this.syncGuestShapes(link.shapes, dt);
-    // The guest's own charges and strike bar refill here (the host's sim loop does it there).
-    this.charges.update(dt);
-    this.forgeBar.update(dt, false);
-  }
-
-  /** Guest: the host's floor shapes, turned half round; a shape keeps its age while it lasts. */
-  private syncGuestShapes(packed: PackedShape[], dt: number) {
-    const live = new Set<number>();
-    const out: FloorShape[] = [];
-    for (const [id, kind, x, z, dx, dz, amp, owner, length] of packed) {
-      live.add(id);
-      let shape = this.netShapes.get(id);
-      // The host's 'rival' shapes are this guest's own; the host's hands' shapes are the rival's here.
-      const mine = owner === 'rival' || owner === 'rival-cup' || owner === 'rival-groove';
-      if (!shape) {
-        shape = { kind: kind === 0 ? 'ramp' : kind === 4 ? 'groove' : 'well', x, z, dx, dz, amp, age: 0, owner: mine ? 'left' : 'rival', ...(length === undefined ? {} : { length }), ...(kind === 4 ? { boost: -1 } : {}) };
-        this.netShapes.set(id, shape);
-        this.arenaDirty = true;
-      } else if (shape.dx !== dx || shape.dz !== dz || shape.amp !== amp || shape.length !== length) {
-        Object.assign(shape, { x, z, dx, dz, amp, length });
-        this.arenaDirty = true;
-      }
-      // A cup (2), or a cup holding a top (3), as the host says now: let go there, let go here.
-      const trap = kind === 2 || kind === 3;
-      if (!!shape.trap !== trap) this.arenaDirty = true;
-      shape.trap = shape.held = trap;
-      // The top it holds: the one nearest the cup (this side only needs it for the sling cord).
-      shape.caught = kind === 3 ? [this.mine, this.theirs].reduce((a, b) => (Math.hypot(a.x - x, a.z - z) <= Math.hypot(b.x - x, b.z - z) ? a : b)) : null;
-      shape.age += dt;
-      out.push(shape);
-    }
-    for (const id of [...this.netShapes.keys()]) if (!live.has(id)) {
-      this.netShapes.delete(id);
-      this.arenaDirty = true;
-    }
-    this.arena.shapes = out;
-    if (dt > 0) this.arenaDirty = true;
   }
 
   /** A duel just ended with your hands on record (the echo saved at match end): someone else can take the headset. */
