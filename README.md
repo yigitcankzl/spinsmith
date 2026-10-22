@@ -23,6 +23,7 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 - **Outer Ring catch:** once a round, when your own top is thrown over the wall onto a detected table, you have 5 s to catch it with an open palm and sweep it back to the rim (it returns with less spin).
 - **Wall portal:** the rival arrives through a portal on a detected wall behind the far rim (in the dark beyond it when there is no wall).
 - **Saved pose:** carry the arena by its brass handle; its pose is saved, and kept by persistent WebXR anchors where available.
+- **Without a table** (the floating tray): no edge arcs, no drop sides, no staged or bonus DESK KO, no Outer Ring catch and no table slap (the seal stamp still works); the bowl, verbs and campaign are the same.
 
 ## Hands
 
