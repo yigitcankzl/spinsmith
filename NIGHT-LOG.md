@@ -98,3 +98,29 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [x] Flick probe on the `?demo` save: passes 3/3 at 05:55 (scale 1.68) after the night's collision fixes; earlier misses were not reproduced. Notes kept:  a headless kinematic replay (all 20 arenas, scales 1.8/2.04/2.4, 24–72 fps) lands every time, so the gesture math is scale-correct; likely cause is the match state (level-8 rivals shaping the floor under the swing, or the rival moving) — needs one IWER run with the owner blockers logged
 - [ ] Head-ray press probe: the look lights REMATCH, but after the pinching hand moves the dwell target stays empty — check the hand-ray hover priority in pickButton with `devHeadRay`
 - [ ] Rim Spring double charge seen twice in long sequences (not reproduced alone, after finger-groove, or with the spend spy)
+
+# Night 2 — 2026-10-23, 01:25 → 08:00 Istanbul
+Same loop. Baseline: independent judge on the 10-23 reel (50.6 s) and HEAD 40a79a8: mean of the four criteria 6.4 (Innovation 7.5, Experience 6.5, Technical 6.0, Polish 5.8); lowest Polish: video 5.5, Reason to Come Back 5.5.
+First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
+
+## Cycles (night 2)
+| Cycle | Sub-criterion | Before → after | Measurements | Commit / outcome |
+|---|---|---|---|---|
+| 1 (01:25–02:20) | Reason to Come Back; Polish: video | 5.5 → 6; 5.5 → 6 (readability 6 → 6) | The streak / tomorrow card overlapped the bar's full plate on results: the card rides 0.012 higher there (new 'result card' anchor in the FoV check, sim-check passes). Reel: come-back card cropped in on camera, forge 3.2 s, workshop 5 s with the square arriving, end card "Your real desk is the ring-out". desk-ko-first, combat-readability pass | aea193d, merged |
+| 1 | Technical (perf evidence) | 6 → (with cycle 2 re-score) | IWER desktop GPU: ready 112 draws/eye, fight 95/eye, 137 k tris, update p50 0.6–0.7 / p95 0.8–1.0 / max 1.7–1.9 ms; README section labelled not-Quest | 21d1c6c |
+
+## Backlog (night 2)
+- [x] Show the come-back card on camera, fix its overlap with the result plate
+- [x] First accidental flick named: already true (every flick stamps FLICK!, match-system.ts:5838)
+- [ ] Cut first-five text where a ghost hand teaches (70–90 words)
+- [ ] Dead time between rounds (INTRO only delays the card; RESULT 4 s, pinch skip exists)
+- [ ] Pip-fill beat on a scored point (the rim gauge is hidden on results: the plate's pips would carry it)
+- [ ] Refused move points at the charge sparks
+- [ ] Desk-edge red arcs vs team orange, colour-safe mode too
+- [ ] Waves floor relief faint
+- [ ] The table remembers: DESK KO notch and beaten top readable after reload, on camera (judge: show a day-2/day-5 return)
+- [ ] Forge / workshop near-silent
+- [ ] Captions or visual twin for every audio cue (audit)
+- [ ] IWER checks 3x on a fresh page; check:hands Outer Ring "ended idle"
+- [ ] Readability: one text layer per beat in the reel (caption vs in-game banner); small labels at reel size
+- [ ] Refresh IWER-labelled stills; final recut
