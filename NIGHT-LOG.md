@@ -39,6 +39,8 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 5 | Video / images | 5 / 4 → pending | Reel re-cut 45.5 s with current-UI seal stamp and a fresh-save first-match win (LEVEL 2, BOUT WON, NEW MOVE: Rim Spring, DAY 1 STREAK); found and fixed the NEW MOVE card being covered after <1 s; 9 IWER-labelled stills in `~/Desktop/spinsmith-videos/night-2026-10-22/stills/` | night-trailer.sh |
 | 5 | Solid (crowd balance) | 6 → pending | Crowded bouts: best build last spinning 2-3 88% → 50%, 3-3 100% → 50% (crowd swaps only; assert ≤ 65%) | night-crowd merge |
 | 5 | Art / video | 6 / 5 → pending | Second cut over the CC0 360° café backdrop (wooden table, skinned hands; labelled as a backdrop): DESK KO front and side, first-match rip, flick, seal stamp, first-match win cards; `spinsmith-reel-room-1080p60.mp4` 45.5 s | night-trailer.sh |
+| 6 (03:45–04:17) | Solid / code structure | 6 → pending | match-system.ts 9,672 → 7,997 lines: hand-verbs.ts (Crossguard, Gust, Ember), desk-play.ts (edge arcs, drop sides, staged DESK KO, verdict, Outer Ring), result-rewards.ts, online-duel.ts; byte-identical bodies via a compiler-driven rewrite; desk-ko-first, desk-ko, desk-guard, combat-readability, room-matrix pass on the split | 97c74bc…6b9eba6 |
+| 6 | Solid (probe hygiene) | — | Found: hover cards are teaching copy (shown only while the guide runs), so intent-preview depended on the save; drive resets resurrected a match via the resume snapshot; flick/rub drivers reached through the bowl floor (a groove). All fixed in the probes/driver. `HANDS_ISOLATE=1` (fresh page per mode) exposed a cold-start forge-wheel failure (turn ≥0.35 reached, charge not spent) — open. Sequential `check:hands` still fails ~1 in 2 runs on a varying mode (rub / crossguard double charge) — open | several |
 
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
@@ -75,3 +77,4 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [ ] Flick + groove double charge in long check:hands sequences (1 in ~6)
 - [x] Hub/home label diet (UI/UX 7)
 - [x] Store stills from the current build, IWER-labelled (Images 4)
+- [ ] check:hands: rub / crossguard double charge in sequence (~1 in 2 runs), forge-wheel cold start under HANDS_ISOLATE=1
