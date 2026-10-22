@@ -2217,7 +2217,7 @@ export class MatchSystem extends createSystem({
           return normRadius(this.arena.layout, local.x, local.z) > 1.1 || local.y - this.arena.height(local.x, local.z) > 0.06;
         });
         // Not while a replay or a knockout freeze runs: a pinch then skips it, it does not leave.
-        if (g.justPinched && clear && !this.replay && this.koFreeze <= 0 && !pressed) pressed = b.id;
+        if (clear && !this.replay && this.koFreeze <= 0 && !pressed) pressed = b.id;
         break;
       }
     }
