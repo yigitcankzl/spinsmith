@@ -1127,6 +1127,8 @@ export function installDriver() {
       await glide(side, 'palm', follow, 0.1, 0, 'linear');
       await wait(0.22);
       await glide(side, 'palm', above(follow, 0.08), 0.26, 0, 'natural', 'release');
+      // Home over the rim, high: a straight line down to the lap would skim the bowl floor.
+      await glide(side, 'palm', above(local((side === 'left' ? -1 : 1) * game().arena.radius * 1.3, game().arena.radius * 1.7), 0.16), 0.25, 0, 'natural', 'release');
       await park(side);
       if ((game().palmGustCount ?? 0) <= before) throw new Error('open-palm sweep did not trigger Forge Gust');
     },
