@@ -2209,9 +2209,13 @@ export class MatchSystem extends createSystem({
         this.gazeAssist.target = b.id;
         // Only a pinch made away from the bowl presses it: a pinch over the arena (a ramp, a grip,
         // skipping a replay) belongs to the fight, not to the button you happen to be looking at.
-        const by = (['left', 'right'] as const).find((side) => this.hands[side].justPinched);
-        const local = by && this.root.worldToLocal(this.handAt.copy(this.hands[by].pinchSmooth));
-        const clear = !!local && normRadius(this.arena.layout, local.x, local.z) > 1.35;
+        // Any hand that just pinched counts if it is clear of the bowl: out past the rim, or well
+        // above it (a pinch in front of the chest is over the near rim seen from above).
+        const clear = (['left', 'right'] as const).some((side) => {
+          if (!this.hands[side].justPinched) return false;
+          const local = this.root.worldToLocal(this.handAt.copy(this.hands[side].pinchSmooth));
+          return normRadius(this.arena.layout, local.x, local.z) > 1.1 || local.y - this.arena.height(local.x, local.z) > 0.06;
+        });
         if (g.justPinched && clear && !pressed) pressed = b.id;
         break;
       }
