@@ -1065,9 +1065,15 @@ export function installDriver() {
         peakTurn = Math.max(peakTurn, Math.abs(g.forgeWheelTurn ?? 0));
       }
       await setPinch(side, false);
-      await wait(0.15);
+      // Watch for the current from the release on: on a slow page it can have run out by the time
+      // the hand is parked.
+      let fired = false;
+      for (let i = 0; i < 40 && !fired; i++) {
+        fired = (g.forgeWheelCurrentTime ?? 0) > 0;
+        await wait(0.025);
+      }
       await park(side);
-      if ((g.forgeWheelCurrentTime ?? 0) <= 0) throw new Error(`quarter turn did not fire the arena current (claimed=${claimed}, peak=${peakTurn.toFixed(2)}, gap=${(g.forgeWheelGrabGap ?? -1).toFixed(3)})`);
+      if (!fired) throw new Error(`quarter turn did not fire the arena current (claimed=${claimed}, peak=${peakTurn.toFixed(2)}, gap=${(g.forgeWheelGrabGap ?? -1).toFixed(3)})`);
     },
 
     /** Spawn the deterministic hard-hit rivet, catch it, and plant it low in the bowl. */
