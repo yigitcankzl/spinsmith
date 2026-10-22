@@ -145,7 +145,15 @@ export default async function run({ page, frame }) {
     } else if (gustCheck) {
       if (before.phase !== 'fight') throw new Error('palm-gust check requires a fight');
       stateKey = 'palmGust';
-      action = drive.palmGust({ angle: 0, side: check === 'palm-gust-left' ? 'left' : 'right' });
+      // The sweep runs through the middle of the bowl: a top cruising under the fingertips would be
+      // flicked first (and the flick owns the hand). Hold both tops off the sweep line; the probe is
+      // about the palm recognizer.
+      const g = window.__game;
+      const hold = setInterval(() => {
+        Object.assign(g.mine, { x: -0.05, z: -0.09, vx: 0, vz: 0 });
+        Object.assign(g.theirs, { x: 0.05, z: -0.09, vx: 0, vz: 0 });
+      }, 16);
+      action = drive.palmGust({ angle: 0, side: check === 'palm-gust-left' ? 'left' : 'right' }).finally(() => clearInterval(hold));
     } else if (check === 'palm-forge') {
       if (before.phase !== 'forge') throw new Error('palm-forge check requires the forge');
       stateKey = 'palmForge';
