@@ -1,48 +1,43 @@
 /**
- * Real hands in front of the game: an invisible copy of each tracked hand (a sphere per joint and a
- * rod per bone, at the joints' tracked radii) drawn first, into depth only. Virtual content behind
- * it fails the depth test and leaves those pixels clear, so passthrough shows the real fingers on
- * top of the arena, the tops and the forge parts. No depth sensing needed: any Quest with hands.
+ * Real hands in front of the game: an invisible copy of each tracked hand (a sphere per joint, a
+ * rod per bone at the joints' tracked radii, and a flat palm slab) drawn first, into depth only.
+ * Virtual content behind it fails the depth test and leaves those pixels clear, so passthrough
+ * shows the real fingers on top of the arena, the tops and the forge parts. No depth sensing
+ * needed: any Quest with hands. Two draw calls in all (both hands share each mesh), never picked.
+ *
+ * Hand UI that must stay on top of the real hand (pinch ring, flick glow, wrist bar) is drawn with
+ * depthTest off; IWSDK's own hand visual is a depth mask plus a rim outline at 1.05x the hand,
+ * outside these 0.95x proxies, so its rim still shows and its alpha-0 mask cannot z-fight visibly.
  */
-import { CylinderGeometry, InstancedMesh, Matrix4, MeshBasicMaterial, Object3D, Quaternion, SphereGeometry, Vector3 } from '@iwsdk/core';
-import { TUNE } from './tuning.js';
-
-/** The WebXR hand joints, in their standard order, and the bones between them. */
-const FINGERS = ['thumb', 'index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'];
-const JOINTS: XRHandJoint[] = ['wrist'];
-for (const f of FINGERS) {
-  const parts = f === 'thumb' ? ['metacarpal', 'phalanx-proximal', 'phalanx-distal', 'tip'] : ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'];
-  for (const p of parts) JOINTS.push(`${f}-${p}` as XRHandJoint);
-}
-const BONES: [number, number][] = [];
-for (let i = 1; i < JOINTS.length; i++) {
-  // Each joint links to the one before it in its finger, the first of a finger to the wrist.
-  const first = JOINTS[i].endsWith('metacarpal');
-  BONES.push([first ? 0 : i - 1, i]);
-}
+import { CylinderGeometry, InstancedMesh, Matrix4, MeshBasicMaterial, Object3D, SphereGeometry, Vector3 } from '@iwsdk/core';
+import { BONES, boneMatrix, JOINTS, PALM, palmMatrix } from './hand-proxy.js';
 
 export class HandOccluder {
   readonly joints: InstancedMesh;
   readonly bones: InstancedMesh;
+  /** Off outside passthrough, under real depth occlusion, or with ?nohandocclude (hand-proxy.ts). */
+  enabled = true;
+  /** How full the hand shape is, against the joints' tracked radii. */
+  scale = 0.95;
   private pos: Vector3[] = JOINTS.map(() => new Vector3());
   private rad = new Float32Array(JOINTS.length);
   private ok = new Uint8Array(JOINTS.length);
   private readonly m = new Matrix4();
-  private readonly q = new Quaternion();
-  private readonly s = new Vector3();
-  private readonly mid = new Vector3();
-  private readonly dir = new Vector3();
-  private readonly up = new Vector3(0, 1, 0);
+  private readonly arr: number[] = new Array(16);
 
   constructor() {
     // Depth only: the colour buffer (and its alpha, which is what keeps passthrough visible) is untouched.
-    const mask = new MeshBasicMaterial({ colorWrite: false });
-    this.joints = new InstancedMesh(new SphereGeometry(1, 8, 6), mask, JOINTS.length * 2);
+    const mask = new MeshBasicMaterial({ colorWrite: false, depthWrite: true });
+    // Joints plus one palm per hand share the sphere mesh.
+    this.joints = new InstancedMesh(new SphereGeometry(1, 8, 6), mask, (JOINTS.length + 1) * 2);
     this.bones = new InstancedMesh(new CylinderGeometry(1, 1, 1, 6), mask, BONES.length * 2);
     for (const mesh of [this.joints, this.bones]) {
+      mesh.name = 'hand-occluder';
       mesh.renderOrder = -10;
       mesh.frustumCulled = false;
       mesh.count = 0;
+      // Never a pointer or ray target.
+      mesh.raycast = () => {};
     }
   }
 
@@ -50,8 +45,8 @@ export class HandOccluder {
   update(frame: XRFrame, ref: XRReferenceSpace, session: XRSession, player: Object3D) {
     let nj = 0;
     let nb = 0;
-    if (TUNE.occluder > 0 && frame.getJointPose) {
-      const k = TUNE.occluderScale;
+    if (this.enabled && frame.getJointPose) {
+      const k = this.scale;
       for (const source of session.inputSources) {
         const hand = source.hand;
         if (!hand) continue;
@@ -70,17 +65,19 @@ export class HandOccluder {
         for (let i = 0; i < JOINTS.length; i++) {
           if (!this.ok[i]) continue;
           const r = this.rad[i];
-          this.joints.setMatrixAt(nj++, this.m.compose(this.pos[i], this.q.identity(), this.s.set(r, r, r)));
+          this.m.makeScale(r, r, r).setPosition(this.pos[i]);
+          this.joints.setMatrixAt(nj++, this.m);
         }
         for (const [a, b] of BONES) {
           if (!this.ok[a] || !this.ok[b]) continue;
-          this.dir.subVectors(this.pos[b], this.pos[a]);
-          const len = this.dir.length();
-          if (len < 1e-4) continue;
-          this.mid.addVectors(this.pos[a], this.pos[b]).multiplyScalar(0.5);
-          this.q.setFromUnitVectors(this.up, this.dir.multiplyScalar(1 / len));
-          const r = Math.min(this.rad[a], this.rad[b]);
-          this.bones.setMatrixAt(nb++, this.m.compose(this.mid, this.q, this.s.set(r, len, r)));
+          if (!boneMatrix(this.pos[a], this.pos[b], Math.min(this.rad[a], this.rad[b]), this.arr)) continue;
+          this.bones.setMatrixAt(nb++, this.m.fromArray(this.arr));
+        }
+        // The palm between the metacarpal rods, as thick as the wrist joint.
+        const { wrist, index, middle, pinky } = PALM;
+        if (this.ok[wrist] && this.ok[index] && this.ok[middle] && this.ok[pinky]
+          && palmMatrix(this.pos[wrist], this.pos[index], this.pos[middle], this.pos[pinky], this.rad[wrist], this.arr)) {
+          this.joints.setMatrixAt(nj++, this.m.fromArray(this.arr));
         }
       }
     }
