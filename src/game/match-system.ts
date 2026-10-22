@@ -1,4 +1,4 @@
-import { AdditiveBlending, NormalBlending, BoxGeometry, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
+import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish, playRub } from './audio.js';
 import { COMFORT, comfortSummary, nextComfort, SAFE_COLORS, toggleComfort, warnColor } from './comfort.js';
@@ -14,10 +14,10 @@ import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_POST_TIME, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, DESK_DROP_HALF_MAX, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, DESK_DROP_HALF_MAX, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, DropSide, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
-import { FEATS, GUIDE_ORDER, MARK, Progress, VERB_CARD, VERB_RELEASE, verbReleasedAt } from './progress.js';
+import { FEATS, MARK, Progress, VERB_CARD, VERB_RELEASE, verbReleasedAt } from './progress.js';
 import { CLAIM, LESSON, lessonText } from './lessons.js';
 import { HUB_NOTE } from './hub-copy.js';
 import type { OpeningZone, ReleasedVerb } from './progress.js';
@@ -49,7 +49,7 @@ import { CALL, callAllowed } from './calls.js';
 import { PEDESTAL, pickTable, pickTablePlane, placeArena, reachSpot, TABLE_MAX_H, TABLE_MIN_H, tableRank } from './placement.js';
 import type { TablePlane } from './placement.js';
 import { TUNE } from './tuning.js';
-import type { Placement, Point } from './placement.js';
+import type { Placement } from './placement.js';
 import { applySpatialPose, loadSpatialPose, saveSpatialPose } from './spatial-state.js';
 import { RoomImprints } from './room-imprints.js';
 import { FirstFiveState } from '../components.js';
@@ -69,9 +69,8 @@ import type { BrawlMode } from './brawl.js';
 import { commitBlocker, FLICK_AFTER_RELEASE, FLICK_FOLLOW_THROUGH, GROOVE_COMMIT_DELAY, heldElsewhere, mayCommit, mayListen, RELEASE_LOCK, SHAPING_RELEASE_LOCK } from './gesture-owner.js';
 import type { HandFacts, HeldTool } from './gesture-owner.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
-
-/** The arena (and everything on the table) is drawn this much larger than its simulation size. */
-const ARENA_SCALE = TUNE.scale;
+import { HandVerbs } from './hand-verbs.js';
+import { ARENA_SCALE, HAND_LOSS_GRACE } from './match-constants.js';
 /** Seconds one shaping charge keeps a Spin Rub open, and the pause before rubbing can spend another. */
 const RUB_WINDOW = 1.2;
 const RUB_REOPEN = 0.4;
@@ -128,19 +127,8 @@ const RIVAL_TELL_CODE: Record<RivalMove, number> = { charge: 1, quake: 2, pull: 
 const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', burst: 'SHATTER', spin: 'OUTLAST' };
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
-/** A hand lost this long (s) cancels what it was doing, instead of acting as a release. */
-const HAND_LOSS_GRACE = 0.28;
 /** A one-hand rim pull waits this long for the other hand before it can become a spring. */
 const RIM_SPRING_INTENT = 0.25;
-/** An open palm must sweep this fast above the bowl before it becomes a deliberate forge gust. */
-const PALM_GUST_SPEED = 0.34;
-/** A palm must settle in the bowl before its next motion can count as a deliberate gust. */
-const PALM_GUST_ARM_TIME = 0.12;
-const PALM_GUST_ARM_SPEED = 0.16;
-/** A gust is a committed move, not a free per-frame force; this keeps it tactical and readable. */
-const PALM_GUST_COOLDOWN = 1.8;
-/** Long enough to survive a slow emulator frame and still leave the hand's direction readable. */
-const PALM_GUST_FX_TIME = 0.65;
 /** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
 const SLAP_MIN_N = 1.18;
 /** Where round messages hang: small, over the arena's far rim (arena-local). */
@@ -263,6 +251,38 @@ type RawPlane = { orientation?: string; semanticLabel?: string; polygon?: DOMPoi
 export class MatchSystem extends createSystem({
   planes: { required: [XRPlane] },
 }) {
+  /** Crossguard, Forge Gust and Ember: state, meshes and per-frame updates (hand-verbs.ts). */
+  readonly verbs = new HandVerbs(this);
+  // Probe-visible names (scripts and dev-drive read these on the system).
+  get palmGustTime() { return this.verbs.palmGustTime; }
+  set palmGustTime(v) { this.verbs.palmGustTime = v; }
+  get palmGustCooldown() { return this.verbs.palmGustCooldown; }
+  set palmGustCooldown(v) { this.verbs.palmGustCooldown = v; }
+  get palmGustSide() { return this.verbs.palmGustSide; }
+  set palmGustSide(v) { this.verbs.palmGustSide = v; }
+  get palmGustDirection() { return this.verbs.palmGustDirection; }
+  set palmGustDirection(v) { this.verbs.palmGustDirection = v; }
+  get palmGustHits() { return this.verbs.palmGustHits; }
+  set palmGustHits(v) { this.verbs.palmGustHits = v; }
+  get palmGustCount() { return this.verbs.palmGustCount; }
+  set palmGustCount(v) { this.verbs.palmGustCount = v; }
+  get palmRailAngles() { return this.verbs.palmRailAngles; }
+  set palmRailAngles(v) { this.verbs.palmRailAngles = v; }
+  get crossguardActive() { return this.verbs.crossguardActive; }
+  set crossguardActive(v) { this.verbs.crossguardActive = v; }
+  get crossguardHits() { return this.verbs.crossguardHits; }
+  set crossguardHits(v) { this.verbs.crossguardHits = v; }
+  get crossguardA() { return this.verbs.crossguardA; }
+  set crossguardA(v) { this.verbs.crossguardA = v; }
+  get crossguardB() { return this.verbs.crossguardB; }
+  set crossguardB(v) { this.verbs.crossguardB = v; }
+  get emberState() { return this.verbs.emberState; }
+  set emberState(v) { this.verbs.emberState = v; }
+  get emberGrabGap() { return this.verbs.emberGrabGap; }
+  set emberGrabGap(v) { this.verbs.emberGrabGap = v; }
+  get emberPickup() { return this.verbs.emberPickup; }
+  set emberPickup(v) { this.verbs.emberPickup = v; }
+  spawnEmber(...a: Parameters<HandVerbs['spawnEmber']>) { return this.verbs.spawnEmber(...a); }
   private phase: Phase = 'placing';
   private settle = 0;
   /** A big arena: how much it shows shrunk (1 = full size) and how far it has slid back for a match (m). */
@@ -298,9 +318,9 @@ export class MatchSystem extends createSystem({
   /** The brass handle on the pedestal's near face, and the hand dragging the arena by it. */
   private handle = new Group();
   private dragging: { hand: HandState; from: Vector3; start: Vector3 } | null = null;
-  private hands = new HandInput();
-  private root = new Group();
-  private rootEntity?: Entity;
+  hands = new HandInput();
+  root = new Group();
+  rootEntity?: Entity;
   /** Session-only judge/tester evidence: placement → match → rip → intervention → result → forge. */
   private firstFiveStep = 0;
   /** Coarse information layer mirrored to ECS; avoids several panels competing in one phase. */
@@ -314,10 +334,6 @@ export class MatchSystem extends createSystem({
   private arenaForgeCancels = 0;
   private arenaForgeAction: ArenaForgeAction | 'none' = 'none';
   private arenaForgeSwing = 0;
-  /** Open-palm horizontal sweep: short state for readable feedback and a per-hand motion sample. */
-  private palmGustTime = 0;
-  private palmGustCooldown = 0;
-  private palmGustSide: Side | null = null;
   /** Fingertip collider: last arena-local tip and its smoothed velocity, per hand. */
   private flickPrev: Record<Side, Vector3 | null> = { left: null, right: null };
   private flickVel: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
@@ -350,27 +366,19 @@ export class MatchSystem extends createSystem({
   private guestRubUntil = -9;
   private guestRubSum = 0;
   private guestRubSaidAt = -9;
-  private palmGustDirection = new Vector2();
-  private palmGustLength = 0;
-  private palmGustHits = 0;
-  private palmGustLast: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
-  private palmGustOrigin: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
-  private palmGustAge: Record<Side, number> = { left: 0, right: 0 };
-  private palmGustSampled: Record<Side, boolean> = { left: false, right: false };
   /** A released pinch owns the hand briefly, so withdrawing it cannot become a second gesture. */
   private palmGustBlockedUntil: Record<Side, number> = { left: -9, right: -9 };
   /** A released held tool owns its fingertip follow-through, so it cannot draw a Cup or Groove. */
   private shapingBlockedUntil: Record<Side, number> = { left: -9, right: -9 };
   /** Release ownership lasts until the fingertip visibly leaves the surface, not just for a timer. */
   private shapingNeedsClearance: Record<Side, boolean> = { left: false, right: false };
-  private palmGustCount = 0;
   private lowestFps = 0;
   private fpsWindowTime = 0;
   private fpsWindowFrames = 0;
-  private arena = new Arena();
+  arena = new Arena();
   private arenaView = new ArenaView(PEDESTAL / ARENA_SCALE);
   /** Everything that tilts with a rocking dish: the arena and what is on it. */
-  private stage = new Group();
+  stage = new Group();
   private stageEntity?: Entity;
   /** A viewer hit-test probe. IWSDK moves it to the real surface under the player's gaze. */
   private placementProbe = Object.assign(new Group(), { visible: false });
@@ -495,7 +503,7 @@ export class MatchSystem extends createSystem({
   /** Seconds left of the simulation-only pause after a hard hit. */
   private hitStop = 0;
   private lastHardHit = -1;
-  private impacts = new Impacts();
+  impacts = new Impacts();
   private trails = new Trails();
   private fingerStreak = new FingerStreak();
   /** Per hand: the swing is above flick speed (for one whoosh per swing). */
@@ -549,9 +557,9 @@ export class MatchSystem extends createSystem({
     hasRay: false,
   };
   /** The player's top and the opponent's; their type (spec) changes between rounds. */
-  private mine = new Top(ATTACK);
-  private theirs = new Top(DEFENSE);
-  private tops = [this.mine, this.theirs];
+  mine = new Top(ATTACK);
+  theirs = new Top(DEFENSE);
+  tops = [this.mine, this.theirs];
   /** One spin hum per top: yours, the rival's, and a brawl's two extra seats (silent otherwise). */
   private hums = [new SpinHum(230), new SpinHum(190), new SpinHum(260), new SpinHum(165)];
   private humLive = [false, false, false, false];
@@ -565,11 +573,11 @@ export class MatchSystem extends createSystem({
   /** Your build (from the forge) and the opponent's; each side's view is rebuilt when its build changes. */
   private myBuild: TopBuild = loadBuild();
   private theirBuild: TopBuild = { ...PRESETS[1].build, spin: -1 };
-  private myView!: TopView;
-  private theirView!: TopView;
+  myView!: TopView;
+  theirView!: TopView;
   private viewKeys = ['', ''];
   private cord = new Cord();
-  private sparks = new Sparks();
+  sparks = new Sparks();
   /** The ghost hand that shows the first moves. */
   private ghost = new GhostHand();
   /** A second orange guide exists only for the first two-hand arena-forge lesson. */
@@ -581,7 +589,7 @@ export class MatchSystem extends createSystem({
   private rivalGhostKeys: number[][] = [[0, 0, 0, 0, 0], [1, 0, 0, 0, 0]];
   private rivalGhostFor = 0;
   /** Big stamped words over the arena: rounds, finishes, the rip. */
-  private stamp = new Stamp(0.2);
+  stamp = new Stamp(0.2);
   /** The arena forging up out of the table after placing (0..1), and the title over it. */
   private rise = 1;
   /** The strike's seal coin, rising off your top as it lands. */
@@ -599,31 +607,6 @@ export class MatchSystem extends createSystem({
   private overforgeControl: { side: Side; seal: Seal; t: number } | null = null;
   /** Public dev evidence: idle, ready, held, or the seal currently being steered. */
   private overforgeMode = 'idle';
-  /** Where each low, flat open hand rests on the rim (radians); two of them make a Crossguard. */
-  private palmRailAngles: Record<Side, number | null> = { left: null, right: null };
-  private palmRailGrace: Record<Side, number> = { left: 0, right: 0 };
-  /** Two flat palms on the rim join into one finite, one-hit rail across the bowl. */
-  private crossguardActive = false;
-  private crossguardConsumed = false;
-  /** A paid rail stays live until then (arena time); the rival can be slung across it once. */
-  private crossguardLiveUntil = -9;
-  private crossguardSlung = false;
-  private crossguardHits = 0;
-  private crossguardBreak = 0;
-  private crossguardA = new Vector3();
-  private crossguardB = new Vector3();
-  private crossguardBeam = Object.assign(
-    new Mesh(new BoxGeometry(1, 0.008, 0.006), new MeshBasicMaterial({ color: 0xffa12d, transparent: true, opacity: 0.82, blending: AdditiveBlending, depthWrite: false, toneMapped: false })),
-    { visible: false },
-  );
-  private crossguardGlow = Object.assign(
-    new Mesh(new BoxGeometry(1, 0.016, 0.014), new MeshBasicMaterial({ color: 0xff5a0a, transparent: true, opacity: 0.22, blending: AdditiveBlending, depthWrite: false, toneMapped: false })),
-    { visible: false },
-  );
-  private crossguardPosts = (['left', 'right'] as const).map(() => Object.assign(
-    new Mesh(new CylinderGeometry(0.01, 0.014, 0.032, 12), new MeshBasicMaterial({ color: 0xffc267, transparent: true, opacity: 0.86, blending: AdditiveBlending, depthWrite: false, toneMapped: false })),
-    { visible: false },
-  ));
   /** A literal wheel outside the near rim turns the arena current; it cannot collide with floor pinches. */
   private forgeWheel = Object.assign(forgeWheelModel.clone(true), { visible: false });
   private forgeWheelHandle = this.forgeWheel.getObjectByName('ForgeWheelHandle')!;
@@ -651,72 +634,6 @@ export class MatchSystem extends createSystem({
     }
     return group;
   })();
-  /** A hard clash throws one catchable rivet toward the player; carrying it back authors a bumper. */
-  private emberState: 0 | 1 | 2 | 3 = 0;
-  private emberSpawned = false;
-  private emberHeld: Side | null = null;
-  private emberFlight = 0;
-  private emberLost = 0;
-  private emberFrom = new Vector3();
-  private emberHome = new Vector3();
-  private emberHandLocal = new Vector3();
-  private emberWorld = new Vector3();
-  private emberBumperAt = new Vector3();
-  private emberPostUntil = 0;
-  private emberGrabGap = -1;
-  private emberPickup = (() => {
-    const group = Object.assign(new Group(), { visible: false });
-    const core = new Mesh(new OctahedronGeometry(0.01, 0), new MeshBasicMaterial({ color: 0xffd38a, toneMapped: false }));
-    const halo = new Mesh(new TorusGeometry(0.017, 0.0025, 6, 24), new MeshBasicMaterial({ color: 0xff5a0a, transparent: true, opacity: 0.75, blending: AdditiveBlending, depthWrite: false, toneMapped: false }));
-    halo.name = 'EmberCatchHalo';
-    core.renderOrder = halo.renderOrder = 10;
-    group.add(core, halo);
-    return group;
-  })();
-  private emberBumperFx = (() => {
-    const group = Object.assign(new Group(), { visible: false });
-    const rivet = new Mesh(new CylinderGeometry(0.012, 0.017, 0.024, 12), new MeshBasicMaterial({ color: 0xb96822, toneMapped: false }));
-    const ring = new Mesh(new RingGeometry(0.018, 0.025, 28).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.72, blending: AdditiveBlending, depthWrite: false, toneMapped: false }));
-    ring.position.y = -0.01;
-    rivet.renderOrder = ring.renderOrder = 9;
-    group.add(rivet, ring);
-    return group;
-  })();
-  /** One draw call: two true-width rails plus three chevrons show the exact gust corridor. */
-  private palmGustFx = (() => {
-    const vertices: number[] = [];
-    const bar = (ax: number, az: number, bx: number, bz: number, half: number) => {
-      const dx = bx - ax;
-      const dz = bz - az;
-      const d = Math.hypot(dx, dz) || 1;
-      const nx = (-dz / d) * half;
-      const nz = (dx / d) * half;
-      vertices.push(
-        ax + nx, 0, az + nz, ax - nx, 0, az - nz, bx + nx, 0, bz + nz,
-        bx + nx, 0, bz + nz, ax - nx, 0, az - nz, bx - nx, 0, bz - nz,
-      );
-    };
-    bar(0, -0.065, 1, -0.065, 0.003);
-    bar(0, 0.065, 1, 0.065, 0.003);
-    for (const x of [0.28, 0.52, 0.76]) {
-      bar(x - 0.035, -0.026, x + 0.018, 0, 0.004);
-      bar(x - 0.035, 0.026, x + 0.018, 0, 0.004);
-    }
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
-    return Object.assign(
-      new Mesh(geometry, new MeshBasicMaterial({ color: 0xffad42, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, toneMapped: false })),
-      { visible: false },
-    );
-  })();
-  /** A short rim pulse shows where the hand-authored force leaves the bowl. */
-  private palmGustRim = Object.assign(
-    new Mesh(
-      new RingGeometry(0.164, 0.172, 32, 1, -0.32, 0.64).rotateX(-Math.PI / 2),
-      new MeshBasicMaterial({ color: 0xff7a20, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, toneMapped: false }),
-    ),
-    { visible: false },
-  );
   /** A short-lived, arena-sized cause → target cue; unlike the seal coin it never covers the tops. */
   private ultimateCue = { t: 0, age: 0, seal: 'anvil' as Seal, ox: 0, oz: 0, fx: 0, fz: 0, tx: 0, tz: 0 };
   private ultimatePath = Object.assign(
@@ -862,7 +779,7 @@ export class MatchSystem extends createSystem({
   private portal = Object.assign(new Mesh(new RingGeometry(0.7, 1, 48), new MeshBasicMaterial({ color: 0x4fd1ff, transparent: true, depthWrite: false, blending: AdditiveBlending, side: DoubleSide })), { visible: false });
   private portalCore = Object.assign(new Mesh(new CircleGeometry(0.7, 48), new MeshBasicMaterial({ color: 0x0a1a24, transparent: true, opacity: 0.85, depthWrite: false, side: DoubleSide })), { visible: false });
   /** The exact pinch point projected onto the arena, so the preview and the eventual action agree. */
-  private handAt = new Vector3();
+  handAt = new Vector3();
   /** The fingertip has its own target: an open-hand press catches beside a top while pinch shapes. */
   private handTipAt = new Vector3();
   /** handFacts() scratch: never shared with a caller's vectors. */
@@ -969,18 +886,18 @@ export class MatchSystem extends createSystem({
   private afterTitle: (() => void) | null = null;
   /** A ring around your top while a Hammer is armed (gold) or a Ward holds (pale violet). */
   private aura = new Mesh(new TorusGeometry(0.024, 0.0025, 8, 48).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 0xffe066, transparent: true, depthWrite: false, blending: AdditiveBlending }));
-  private label = new Label();
+  label = new Label();
   private round = 0;
   /** Match score in heat: first to MATCH_HEAT wins the match. */
   private myPoints = 0;
   private theirPoints = 0;
-  private elapsed = 0;
+  elapsed = 0;
   private pressureShown = false;
   private strikeWindowShown = false;
   private accumulator = 0;
   private resultTimer = 0;
-  private time = 0;
-  private frameDt = 0;
+  time = 0;
+  frameDt = 0;
   /** Which hand holds the cord, and pull bookkeeping. */
   private puller: Side | null = null;
   private maxPull = 0;
@@ -1077,7 +994,7 @@ export class MatchSystem extends createSystem({
   private tipDown: Record<Side, number> = { left: 0, right: 0 };
   private rampAt: Record<Side, number> = { left: -9, right: -9 };
   /** The shaping economy, the marks for shapes and ghosts, the charge embers at the near rim. */
-  private charges = new ShapingCharges();
+  charges = new ShapingCharges();
   /** Rivals from level 6 shape too: their own charges, their last ramp, and its cyan marks. */
   private rivalCharges = new ShapingCharges();
   /** Real hands drawn in front of the game (a depth-only copy of each tracked hand). */
@@ -1095,7 +1012,7 @@ export class MatchSystem extends createSystem({
   private marks = new ShapeMarks(0xff8a2a, 10);
   private pips = new ChargePips(SHAPING.charges);
   /** The player's last shape (fight time and kind), to name it when it decides a round. */
-  private lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' | 'flick' | ArenaForgeAction } | null = null;
+  lastShape: { t: number; kind: ShapeKind | 'sling' | 'strike' | 'parry' | 'flick' | ArenaForgeAction } | null = null;
   /** The forge bar (docs/DUEL-DESIGN.md): full, a palm pressed on the table beside the arena is the Anvil Strike. */
   private forgeBar = new StrikeBar();
   private parried = false;
@@ -1161,7 +1078,7 @@ export class MatchSystem extends createSystem({
   private head = new Vector3();
   private fwd = new Vector3();
   private p = new Vector3();
-  private local = new Vector3();
+  local = new Vector3();
   private pullStart = new Vector3();
   private cordStart = new Vector3();
   /** Where your top launches from this round (arena-local), chosen by where you pinch over the arena. */
@@ -1236,7 +1153,7 @@ export class MatchSystem extends createSystem({
   /** When each brawl bot next raises a ramp (fight time). */
   private botShapeAt = [0, 0];
   /** The online duel (online.ts): the link, the guest's rip the host waits for, a launch held for the other side, and the guest's copy of the floor. */
-  private online: OnlineLink | null = null;
+  online: OnlineLink | null = null;
   private netRip: { power: number; aim: number; build?: string; at?: [number, number]; dir?: [number, number] } | null = null;
   private netPending: Parameters<MatchSystem['launch']> | null = null;
   private netGo = false;
@@ -1262,7 +1179,7 @@ export class MatchSystem extends createSystem({
   /** While ready: a faint line on the floor around where you can launch from. */
   private launchZone = new Mesh(new BufferGeometry(), new MeshBasicMaterial({ color: GUIDE, transparent: true, opacity: 0.5, depthWrite: false, side: 2 }));
   /** Seconds left before a transient fight message clears. */
-  private labelTimer = 0;
+  labelTimer = 0;
   /** The fight call on the card (see call()): its key, text, priority and when it stops being fresh. */
   private callKey = '';
   private callText = '';
@@ -1336,15 +1253,15 @@ export class MatchSystem extends createSystem({
       this.ultimateArrow,
       this.sealPop,
       this.overforgeSeal,
-      this.crossguardGlow,
-      this.crossguardBeam,
-      ...this.crossguardPosts,
+      this.verbs.crossguardGlow,
+      this.verbs.crossguardBeam,
+      ...this.verbs.crossguardPosts,
       this.forgeWheel,
       this.forgeWheelCurrent,
-      this.emberPickup,
-      this.emberBumperFx,
-      this.palmGustFx,
-      this.palmGustRim,
+      this.verbs.emberPickup,
+      this.verbs.emberBumperFx,
+      this.verbs.palmGustFx,
+      this.verbs.palmGustRim,
       ...this.rimSpringGuides,
       this.launcherBrace,
       this.reticle,
@@ -1376,9 +1293,9 @@ export class MatchSystem extends createSystem({
     this.overforgeSeal.add(this.overforgeRing);
     this.overforgeRing.position.y = -0.003;
     this.overforgeRing.renderOrder = 9;
-    this.crossguardGlow.renderOrder = this.crossguardBeam.renderOrder = 9;
-    for (const post of this.crossguardPosts) post.renderOrder = 9;
-    this.palmGustFx.renderOrder = this.palmGustRim.renderOrder = 8;
+    this.verbs.crossguardGlow.renderOrder = this.verbs.crossguardBeam.renderOrder = 9;
+    for (const post of this.verbs.crossguardPosts) post.renderOrder = 9;
+    this.verbs.palmGustFx.renderOrder = this.verbs.palmGustRim.renderOrder = 8;
     this.lane.renderOrder = this.rivalTellTarget.renderOrder = this.rivalTellGuard.renderOrder = this.causePath.renderOrder = this.causeOrigin.renderOrder = this.causeTarget.renderOrder = 8;
     for (const mesh of [...this.rivalTellChevrons, ...this.rivalTellQuake]) mesh.renderOrder = 8;
     for (const guide of this.rimSpringGuides) guide.renderOrder = 8;
@@ -1486,12 +1403,12 @@ export class MatchSystem extends createSystem({
       deskKoScored: this.deskKoScored,
       deskKoStage: this.deskKoStage,
       lastRoundHeat: this.lastRoundHeat,
-      crossguardActive: this.crossguardActive,
-      crossguardHits: this.crossguardHits,
+      crossguardActive: this.verbs.crossguardActive,
+      crossguardHits: this.verbs.crossguardHits,
       forgeWheelTurn: Math.round(this.forgeWheelTurn * 100) / 100,
       forgeWheelGrabGap: Math.round(this.forgeWheelGrabGap * 1000) / 1000,
-      emberState: this.emberState,
-      emberGrabGap: Math.round(this.emberGrabGap * 1000) / 1000,
+      emberState: this.verbs.emberState,
+      emberGrabGap: Math.round(this.verbs.emberGrabGap * 1000) / 1000,
       rivalTell: this.rivalTellCode,
       causeChain: this.causeCue.stage,
       uiLayer: this.uiLayerCode,
@@ -1711,14 +1628,14 @@ export class MatchSystem extends createSystem({
     if (paused) {
       // The system menu is up: nothing stays stuck to where the hands were.
       this.barRings.left.visible = this.barRings.right.visible = this.reticle.visible = this.slapMark.visible = false;
-      this.crossguardBeam.visible = this.crossguardGlow.visible = false;
-      for (const post of this.crossguardPosts) post.visible = false;
+      this.verbs.crossguardBeam.visible = this.verbs.crossguardGlow.visible = false;
+      for (const post of this.verbs.crossguardPosts) post.visible = false;
       this.forgeWheel.visible = this.forgeWheelCurrent.visible = false;
-      this.emberPickup.visible = this.emberBumperFx.visible = false;
-      this.palmGustFx.visible = false;
-      this.palmGustRim.visible = false;
-      this.palmGustSampled.left = this.palmGustSampled.right = false;
-      this.palmGustAge.left = this.palmGustAge.right = 0;
+      this.verbs.emberPickup.visible = this.verbs.emberBumperFx.visible = false;
+      this.verbs.palmGustFx.visible = false;
+      this.verbs.palmGustRim.visible = false;
+      this.verbs.palmGustSampled.left = this.verbs.palmGustSampled.right = false;
+      this.verbs.palmGustAge.left = this.verbs.palmGustAge.right = 0;
       this.cord.set(null);
       for (const m of this.pinchRings) m.visible = false;
       for (const m of this.handContactRings) m.visible = false;
@@ -1861,13 +1778,13 @@ export class MatchSystem extends createSystem({
       this.overforgeHeld = null;
       this.overforgeControl = null;
       this.overforgeMode = 'idle';
-      this.palmRailAngles.left = this.palmRailAngles.right = null;
-      this.palmGustFx.visible = false;
-      this.palmGustRim.visible = false;
-      this.palmGustTime = 0;
-      this.palmGustCooldown = 0;
-      this.palmGustSampled.left = this.palmGustSampled.right = false;
-      this.palmGustAge.left = this.palmGustAge.right = 0;
+      this.verbs.palmRailAngles.left = this.verbs.palmRailAngles.right = null;
+      this.verbs.palmGustFx.visible = false;
+      this.verbs.palmGustRim.visible = false;
+      this.verbs.palmGustTime = 0;
+      this.verbs.palmGustCooldown = 0;
+      this.verbs.palmGustSampled.left = this.verbs.palmGustSampled.right = false;
+      this.verbs.palmGustAge.left = this.verbs.palmGustAge.right = 0;
       this.outerRail.visible = false;
       this.arenaView.charge = 0;
     }
@@ -1969,16 +1886,16 @@ export class MatchSystem extends createSystem({
         break;
       case 'fight':
         if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set('');
-        this.updateEmber(dt);
+        this.verbs.updateEmber(dt);
         this.updateForgeWheel(dt);
         if (!this.deskVerdict && this.outerRingState !== 'rescue' && this.outerRingState !== 'palm') {
           this.updateStrike(dt);
           this.updateKnuckleKnock(dt);
           if (!this.updateArenaMorph(dt)) {
             this.updateShaping();
-            this.updateCrossguard();
+            this.verbs.updateCrossguard();
           }
-          this.updatePalmGust(dt);
+          this.verbs.updatePalmGust(dt);
           this.updateFlick(dt);
         }
         this.updateFight(dt);
@@ -2388,7 +2305,7 @@ export class MatchSystem extends createSystem({
   private toHub() {
     this.clearBrawl();
     // A rivet thrown by the last clash of a fight must not linger over the hub.
-    this.resetEmber();
+    this.verbs.resetEmber();
     this.bout = null;
     // Home ends the match: nothing to resume.
     this.resumeSnap = null;
@@ -2539,7 +2456,7 @@ export class MatchSystem extends createSystem({
    * last being on screen. Timed text set straight on the label counts as lesson priority.
    * `seconds` 0 keeps the card up (never fresh: any call may replace it).
    */
-  private call(text: string, priority: number, seconds: number, key = text) {
+  call(text: string, priority: number, seconds: number, key = text) {
     const ours = this.callText !== '' && this.label.current === this.callText;
     if (ours) this.callSeen.set(this.callKey, this.time);
     const slot = ours
@@ -3008,7 +2925,7 @@ export class MatchSystem extends createSystem({
         || !!this.rimPulls[side]
         || this.overforgeHeld === side
         || this.forgeWheelHeld === side
-        || this.emberHeld === side;
+        || this.verbs.emberHeld === side;
       // An idle tracked hand is already visible in passthrough. Do not decorate it with a large
       // floating reticle until the player is actually aiming at or manipulating the arena.
       m.visible = h.tracked && engaged && h.gap < 0.065 && this.phase !== 'placing';
@@ -4304,7 +4221,7 @@ export class MatchSystem extends createSystem({
 
   private toReady() {
     this.cancelActiveGestures();
-    this.resetEmber();
+    this.verbs.resetEmber();
     for (const t of this.extras) {
       t.state = 'out';
       t.finish = null;
@@ -4461,7 +4378,7 @@ export class MatchSystem extends createSystem({
     this.barPoints = [this.myPoints, this.theirPoints];
   }
 
-  private toLocal(world: Vector3) {
+  toLocal(world: Vector3) {
     return this.root.worldToLocal(this.local.copy(world));
   }
 
@@ -4769,7 +4686,7 @@ export class MatchSystem extends createSystem({
   }
 
   /** Counts a player-authored arena change and marks the signature loop as reached. */
-  private recordIntervention() {
+  recordIntervention() {
     this.theirs.shieldUntil = 0;
     this.interventionCount++;
     this.rootEntity?.setValue(FirstFiveState, 'interventions', this.interventionCount);
@@ -4936,7 +4853,7 @@ export class MatchSystem extends createSystem({
     this.lastPerfect = perfect;
     this.charges.reset();
     this.forgeBar.reset();
-    this.resetEmber();
+    this.verbs.resetEmber();
     if (this.progress.matches === 0 && !this.demo) this.tutorialRound++;
     this.deskWrench.armed = this.progress.matches === 0 && !this.demo && this.tutorialRound === 2 && !this.extras.length && !this.online;
     this.deskWrench.fired = false;
@@ -5087,12 +5004,12 @@ export class MatchSystem extends createSystem({
     this.strikeWindowShown = false;
     this.knuckleTapAt.left = this.knuckleTapAt.right = -9;
     this.knuckleUsed = false;
-    this.clearCrossguard();
+    this.verbs.clearCrossguard();
     this.palmGustBlockedUntil.left = this.palmGustBlockedUntil.right = -9;
     this.shapingBlockedUntil.left = this.shapingBlockedUntil.right = -9;
     this.shapingNeedsClearance.left = this.shapingNeedsClearance.right = false;
-    this.palmGustSampled.left = this.palmGustSampled.right = false;
-    this.palmGustAge.left = this.palmGustAge.right = 0;
+    this.verbs.palmGustSampled.left = this.verbs.palmGustSampled.right = false;
+    this.verbs.palmGustAge.left = this.verbs.palmGustAge.right = 0;
     this.lastHardHit = -1;
     this.accumulator = 0;
     this.clashes = 0;
@@ -5172,7 +5089,7 @@ export class MatchSystem extends createSystem({
       this.arenaMorphStart.angle = Math.atan2(dz, dx);
       this.arenaMorphPull = this.arenaMorphTwist = 0;
       this.arenaMorphing = true;
-      this.clearCrossguard();
+      this.verbs.clearCrossguard();
       this.arenaMorphHold = 0;
       this.arenaView.charge = 1;
       // Match 1's card and ghost hands teach the squeeze; later matches name all four actions.
@@ -5192,10 +5109,10 @@ export class MatchSystem extends createSystem({
       // Forge Gust or Crossguard and spend a second charge.
       for (const side of ['left', 'right'] as const) {
         this.palmGustBlockedUntil[side] = this.elapsed + RELEASE_LOCK;
-        this.palmGustSampled[side] = false;
-        this.palmGustAge[side] = 0;
+        this.verbs.palmGustSampled[side] = false;
+        this.verbs.palmGustAge[side] = 0;
       }
-      this.clearCrossguard();
+      this.verbs.clearCrossguard();
       this.rimSpringGuides[0].visible = false;
       this.rimSpringGuides[1].visible = false;
 
@@ -5440,8 +5357,8 @@ export class MatchSystem extends createSystem({
       const ls = this.root.worldToLocal(this.pinchAim.copy(h.pinchSmooth));
       if (h.justReleased) {
         this.palmGustBlockedUntil[side] = this.elapsed + RELEASE_LOCK;
-        this.palmGustSampled[side] = false;
-        this.palmGustAge[side] = 0;
+        this.verbs.palmGustSampled[side] = false;
+        this.verbs.palmGustAge[side] = 0;
       }
       if (h.pinching) {
         this.grooving[side] = null;
@@ -5724,7 +5641,7 @@ export class MatchSystem extends createSystem({
     return this.quietMatch && !this.demo;
   }
 
-  private taught(verb: 'forge' | 'strike' | 'tells' | ReleasedVerb) {
+  taught(verb: 'forge' | 'strike' | 'tells' | ReleasedVerb) {
     const m = this.progress.matches;
     // The two-hand forge is the first match's second lesson.
     if (verb === 'forge') return m >= 1 || (m === 0 && this.tutorialRound >= 2);
@@ -5744,19 +5661,6 @@ export class MatchSystem extends createSystem({
     (this.overforgeRing.material as MeshBasicMaterial).color.setHex(SEAL_COLOR[seal]);
   }
 
-  private clearCrossguard() {
-    this.palmRailAngles.left = this.palmRailAngles.right = null;
-    this.palmRailGrace.left = this.palmRailGrace.right = 0;
-    this.crossguardActive = false;
-    this.crossguardConsumed = false;
-    this.crossguardLiveUntil = -9;
-    this.crossguardSlung = false;
-    this.crossguardBreak = 0;
-    this.crossguardBeam.visible = this.crossguardGlow.visible = false;
-    for (const post of this.crossguardPosts) post.visible = false;
-    this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
-  }
-
   /** The tool a hand holds this frame, for gesture ownership (Arena Forge holds both hands). */
   private sealWorld = new Vector3();
   private heldTool(side: Side): HeldTool | null {
@@ -5764,7 +5668,7 @@ export class MatchSystem extends createSystem({
     // A pinch on the ready seal (it docks over the bowl floor) is the seal's, not a ramp.
     if (this.overforgeMode === 'ready' && this.overforgeSeal.visible
       && this.hands[side].pinchSmooth.distanceTo(this.overforgeSeal.getWorldPosition(this.sealWorld)) <= SEAL_GRAB) return 'overforge';
-    if (this.emberHeld === side) return 'ember';
+    if (this.verbs.emberHeld === side) return 'ember';
     if (this.forgeWheelHeld === side) return 'wheel';
     if (this.arenaMorphing) return 'forge';
     if (this.rimPulls[side]) return 'grip';
@@ -5777,7 +5681,7 @@ export class MatchSystem extends createSystem({
    * This frame's facts about one hand for gesture-owner.ts. Built fresh at each verb's entry point
    * (a verb earlier in the frame may just have set a claim) with its own scratch vectors.
    */
-  private handFacts(side: Side): HandFacts {
+  handFacts(side: Side): HandFacts {
     const h = this.hands[side];
     const tip = this.root.worldToLocal(this.factTip.copy(h.index));
     const wrist = this.root.worldToLocal(this.factWrist.copy(h.wrist));
@@ -5799,10 +5703,10 @@ export class MatchSystem extends createSystem({
       shapingLock: this.shapingBlockedUntil[side] - this.elapsed,
       needsClearance: this.shapingNeedsClearance[side],
       followLock: this.flickReadyAt[side] - this.time,
-      railPost: this.palmRailAngles[side] !== null,
-      crossguardUp: this.crossguardActive,
+      railPost: this.verbs.palmRailAngles[side] !== null,
+      crossguardUp: this.verbs.crossguardActive,
       pressing: this.pressing[side],
-      gustSweep: this.palmGustTime > 0 && this.palmGustSide === side,
+      gustSweep: this.verbs.palmGustTime > 0 && this.verbs.palmGustSide === side,
       rubWindow: this.time < this.rubUntil,
       tipToOwnTop: mine.alive ? Math.hypot(tip.x - mine.x, tip.z - mine.z) : Infinity,
       ownTopRing: mine.spec.radius + FINGER_RADIUS + RUB_SLACK,
@@ -5812,7 +5716,7 @@ export class MatchSystem extends createSystem({
   }
 
   /** One physical release may finish one tool; its opening fingers cannot author a second tool. */
-  private blockShapingRelease(side: Side) {
+  blockShapingRelease(side: Side) {
     this.shapingBlockedUntil[side] = this.elapsed + SHAPING_RELEASE_LOCK;
     this.shapingNeedsClearance[side] = true;
     this.palmGustBlockedUntil[side] = this.elapsed + SHAPING_RELEASE_LOCK;
@@ -5822,8 +5726,8 @@ export class MatchSystem extends createSystem({
     this.rimPulls[side] = null;
     this.pressing[side] = false;
     this.tipFresh[side] = true;
-    this.palmGustSampled[side] = false;
-    this.palmGustAge[side] = 0;
+    this.verbs.palmGustSampled[side] = false;
+    this.verbs.palmGustAge[side] = 0;
   }
 
   /** A pause, rescue, round end, or committed slap can never be mistaken for releasing a gesture. */
@@ -5836,8 +5740,8 @@ export class MatchSystem extends createSystem({
       this.rimPulls[side] = null;
       this.shapeLost[side] = 0;
       this.tipFresh[side] = true;
-      this.palmGustSampled[side] = false;
-      this.palmGustAge[side] = 0;
+      this.verbs.palmGustSampled[side] = false;
+      this.verbs.palmGustAge[side] = 0;
       this.palmGustBlockedUntil[side] = -9;
       this.shapingBlockedUntil[side] = -9;
       this.shapingNeedsClearance[side] = false;
@@ -5858,8 +5762,8 @@ export class MatchSystem extends createSystem({
     this.overforgeMode = 'idle';
     this.overforgeSeal.visible = false;
     this.rimSpringGuides[0].visible = this.rimSpringGuides[1].visible = false;
-    this.palmGustTime = 0;
-    this.palmGustFx.visible = this.palmGustRim.visible = false;
+    this.verbs.palmGustTime = 0;
+    this.verbs.palmGustFx.visible = this.verbs.palmGustRim.visible = false;
     this.forgeWheelHeld = null;
     this.forgeWheelTurn = 0;
     this.forgeWheelCurrentTime = 0;
@@ -5867,135 +5771,13 @@ export class MatchSystem extends createSystem({
     this.forgeWheel.rotation.z = 0;
     this.forgeWheel.visible = this.forgeWheelCurrent.visible = false;
     this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', 0);
-    if (this.emberHeld) {
-      this.emberHeld = null;
-      this.emberState = 1;
-      this.emberPickup.position.copy(this.emberHome);
+    if (this.verbs.emberHeld) {
+      this.verbs.emberHeld = null;
+      this.verbs.emberState = 1;
+      this.verbs.emberPickup.position.copy(this.verbs.emberHome);
       this.rootEntity?.setValue(FirstFiveState, 'emberState', 1);
     }
-    this.clearCrossguard();
-  }
-
-  private setEmberState(state: 0 | 1 | 2 | 3) {
-    this.emberState = state;
-    this.rootEntity?.setValue(FirstFiveState, 'emberState', state);
-  }
-
-  private resetEmber() {
-    this.emberSpawned = false;
-    this.emberHeld = null;
-    this.emberFlight = 0;
-    this.emberLost = 0;
-    this.setEmberState(0);
-    this.emberPickup.visible = this.emberBumperFx.visible = false;
-  }
-
-  /** The first hard clash throws a single earned rivet into reach instead of spawning random loot. */
-  private spawnEmber(x: number, z: number) {
-    if (this.emberSpawned || this.emberState !== 0 || !this.taught('ember')) return;
-    this.emberSpawned = true;
-    this.emberFlight = 0;
-    this.emberFrom.set(x, this.arena.height(x, z) + 0.025, z);
-    const radius = maxRim(this.arena.layout);
-    this.emberHome.set(Math.max(-0.08, Math.min(0.08, x)), this.arena.floorHeight(1) + 0.035, radius + 0.025);
-    this.emberPickup.position.copy(this.emberFrom);
-    this.emberPickup.visible = !this.photo;
-    this.setEmberState(1);
-    this.call('HOT RIVET!\nPINCH IT · PLANT IT IN THE BOWL', CALL.tactic, 1.7);
-  }
-
-  /** Catch the hot rivet, carry it through space, and release against the floor to forge a bumper. */
-  private updateEmber(dt: number) {
-    if (this.emberState === 0) return;
-    if (this.emberState === 1 && this.emberFlight < 0.65) {
-      this.emberFlight = Math.min(0.65, this.emberFlight + dt);
-      const t = this.emberFlight / 0.65;
-      this.emberPickup.position.lerpVectors(this.emberFrom, this.emberHome, t);
-      this.emberPickup.position.y += Math.sin(t * Math.PI) * 0.07;
-      this.emberPickup.rotation.x += dt * 8;
-      this.emberPickup.rotation.y += dt * 11;
-      if (t < 1) return;
-      playLand('table', this.emberHome.x, 0.45);
-    }
-    if (this.emberState === 1) {
-      this.emberPickup.visible = !this.photo;
-      this.emberPickup.rotation.z += dt * 2;
-      const pulse = 1 + Math.sin(this.time * 8) * 0.12;
-      this.emberPickup.scale.setScalar(pulse);
-      this.emberPickup.updateWorldMatrix(true, true);
-      this.emberPickup.getWorldPosition(this.emberWorld);
-      for (const side of ['left', 'right'] as const) {
-        const hand = this.hands[side];
-        if (hand.tracked && hand.pinching) this.emberGrabGap = hand.pinchSmooth.distanceTo(this.emberWorld);
-        // The waiting rivet is outside the bowl, so this Quest/IWER-tolerant catch volume cannot
-        // steal a ramp or cup pinch. Contact while already pinching also works, so one low-fps
-        // justPinched frame can never make the small airborne pickup feel intangible.
-        if (!hand.tracked || !hand.pinching || hand.pinchSmooth.distanceTo(this.emberWorld) > 0.1) continue;
-        this.emberHeld = side;
-        this.emberLost = 0;
-        this.setEmberState(2);
-        this.label.set('RIVET CAUGHT\nPRESS IT INTO THE ARENA');
-        this.labelTimer = 1.2;
-        playPick();
-        break;
-      }
-      return;
-    }
-    if (this.emberState === 2 && this.emberHeld) {
-      const hand = this.hands[this.emberHeld];
-      if (hand.tracked) {
-        this.emberLost = 0;
-        // Opening a tracked hand can move its reported pinch joint several centimetres in a
-        // single frame. Keep the rivet at the last closed-hand sample for the release test;
-        // otherwise a deliberate press into the bowl can jump above or outside it as the fingers
-        // open and feel randomly rejected on both Quest and IWER.
-        if (hand.pinching) {
-          this.emberHandLocal.copy(hand.pinch);
-          this.stage.worldToLocal(this.emberHandLocal);
-          this.emberPickup.position.copy(this.emberHandLocal);
-          return;
-        }
-        if (hand.justReleased) {
-          const side = this.emberHeld;
-          // Opening the hand after carrying the rivet moves IWER/Quest's reported index joint.
-          // Keep that release owned by Ember, so its follow-through cannot also draw a free Groove.
-          this.blockShapingRelease(side);
-          this.emberHandLocal.copy(this.emberPickup.position);
-          const floor = this.arena.height(this.emberHandLocal.x, this.emberHandLocal.z);
-          if (this.arena.inside(this.emberHandLocal.x, this.emberHandLocal.z) && Math.abs(this.emberHandLocal.y - floor) <= 0.085) {
-            this.emberBumperAt.set(this.emberHandLocal.x, floor, this.emberHandLocal.z);
-            this.emberBumperFx.position.set(this.emberBumperAt.x, floor + 0.012, this.emberBumperAt.z);
-            this.emberBumperFx.visible = !this.photo;
-            this.emberPickup.visible = false;
-            this.emberHeld = null;
-            this.setEmberState(3);
-            this.emberPostUntil = this.elapsed + EMBER_POST_TIME;
-            this.recordIntervention();
-            this.lastShape = { t: this.elapsed, kind: 'ramp' };
-            this.stamp.show('RIVET PLANTED!', 'A HOT POST FOR 3 S: IT KICKS THEIRS OUT', 'mine', 0.72, 1.05);
-            this.sparks.embers(this.emberBumperAt.x, floor, this.emberBumperAt.z, 8, 0.08, 0.08, 1);
-            playThock();
-            return;
-          }
-          this.emberHeld = null;
-          this.setEmberState(1);
-          this.emberPickup.position.copy(this.emberHome);
-          this.label.set('PLANT IT LOW, INSIDE THE BOWL');
-          this.labelTimer = 1.1;
-          return;
-        }
-      } else if ((this.emberLost += dt) >= HAND_LOSS_GRACE) {
-        this.emberHeld = null;
-        this.setEmberState(1);
-        this.emberPickup.position.copy(this.emberHome);
-      }
-      return;
-    }
-    if (this.emberState === 3) {
-      this.emberBumperFx.visible = !this.photo;
-      const pulse = 1 + 0.08 * Math.sin(this.time * 10);
-      this.emberBumperFx.scale.setScalar(pulse);
-    }
+    this.verbs.clearCrossguard();
   }
 
   /** Pinch the near wheel's handle and turn it: the bowl receives the same signed rotation. */
@@ -6102,99 +5884,6 @@ export class MatchSystem extends createSystem({
       playPick();
       break;
     }
-  }
-
-  /** Two low, flat open hands on the rim become the Crossguard rail between them. */
-  private updateCrossguard() {
-    const wasCrossguard = this.crossguardActive;
-    this.crossguardActive = false;
-    if (!this.taught('crossguard')) {
-      this.palmRailAngles.left = this.palmRailAngles.right = null;
-      this.crossguardBeam.visible = this.crossguardGlow.visible = false;
-      for (const post of this.crossguardPosts) post.visible = false;
-      this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
-      return;
-    }
-    for (const side of ['left', 'right'] as const) {
-      const h = this.hands[side];
-      let accepted = false;
-      // A hand that just released a pinch still looks like an open palm for a few frames. Without
-      // this ownership window, releasing two-hand Arena Forge can accidentally build Crossguard
-      // and spend a second charge on the same physical gesture.
-      // A Spin Rub is one open hand low over the bowl too; while its window is open no rail is built.
-      // The two glowing Forge grips are reserved for that verb (gesture-owner.ts 'grip'), so
-      // approaching them cannot spend a charge as Crossguard first.
-      if (mayListen(this.handFacts(side), 'crossguard')) {
-        const wrist = this.handAt.copy(this.toLocal(h.wrist));
-        const index = this.root.worldToLocal(this.local.copy(h.index));
-        const palm = wrist.lerp(index, 0.45);
-        const n = normRadius(this.arena.layout, palm.x, palm.z);
-        const floor = this.arena.height(palm.x, palm.z);
-        // A rail post needs a low, flat open hand; a relaxed upright hand near the rim does not count.
-        accepted = n >= 0.78 && n <= 1.22 && palm.y >= floor - 0.025 && palm.y <= floor + 0.065 && Math.abs(wrist.y - index.y) <= 0.07;
-        if (accepted) {
-          this.palmRailAngles[side] = Math.atan2(palm.z, palm.x);
-          this.palmRailGrace[side] = 0.22;
-        }
-      }
-      if (!accepted) {
-        this.palmRailGrace[side] = Math.max(0, this.palmRailGrace[side] - this.frameDt);
-        if (this.palmRailGrace[side] <= 0) this.palmRailAngles[side] = null;
-      }
-    }
-
-    const left = this.palmRailAngles.left;
-    const right = this.palmRailAngles.right;
-    if (left !== null && right !== null) {
-      const ar = rimRadius(this.arena.layout, left) * 0.88;
-      const br = rimRadius(this.arena.layout, right) * 0.88;
-      this.crossguardA.set(Math.cos(left) * ar, this.arena.floorHeight(1) + 0.026, Math.sin(left) * ar);
-      this.crossguardB.set(Math.cos(right) * br, this.arena.floorHeight(1) + 0.026, Math.sin(right) * br);
-      const dx = this.crossguardB.x - this.crossguardA.x;
-      const dz = this.crossguardB.z - this.crossguardA.z;
-      const length = Math.hypot(dx, dz);
-      if (length >= 0.08 && !this.crossguardConsumed) {
-        this.crossguardActive = true;
-        const mx = (this.crossguardA.x + this.crossguardB.x) * 0.5;
-        const mz = (this.crossguardA.z + this.crossguardB.z) * 0.5;
-        const angle = -Math.atan2(dz, dx);
-        const pulse = 1 + 0.06 * Math.sin(this.time * 11);
-        for (const beam of [this.crossguardGlow, this.crossguardBeam]) {
-          beam.visible = !this.photo;
-          beam.position.set(mx, this.crossguardA.y, mz);
-          beam.rotation.set(0, angle, 0);
-          beam.scale.set(length, pulse, pulse);
-        }
-        this.crossguardPosts.forEach((post, i) => {
-          post.visible = !this.photo;
-          post.position.copy(i ? this.crossguardB : this.crossguardA);
-          post.scale.setScalar(pulse);
-        });
-        if (!wasCrossguard) {
-          this.label.set('CROSSGUARD\nHOLD BOTH PALMS · ONE RETURN');
-          this.labelTimer = 1.1;
-          playTick();
-        }
-      }
-    } else {
-      this.crossguardConsumed = false;
-    }
-    if (!this.crossguardActive && this.crossguardBreak <= 0) {
-      this.crossguardBeam.visible = this.crossguardGlow.visible = false;
-      for (const post of this.crossguardPosts) post.visible = false;
-    }
-    if (this.crossguardBreak > 0) {
-      this.crossguardBreak = Math.max(0, this.crossguardBreak - this.frameDt);
-      const fade = this.crossguardBreak / 0.28;
-      this.crossguardBeam.visible = this.crossguardGlow.visible = !this.photo && fade > 0;
-      (this.crossguardBeam.material as MeshBasicMaterial).opacity = 0.82 * fade;
-      (this.crossguardGlow.material as MeshBasicMaterial).opacity = 0.3 * fade;
-      for (const post of this.crossguardPosts) post.visible = false;
-    } else {
-      (this.crossguardBeam.material as MeshBasicMaterial).opacity = 0.82;
-      (this.crossguardGlow.material as MeshBasicMaterial).opacity = 0.22;
-    }
-    this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', this.crossguardActive);
   }
 
   /**
@@ -6403,162 +6092,6 @@ export class MatchSystem extends createSystem({
       this.stamp.show('SPIN RUB!', 'YOUR TOP SPINS UP', 'mine', 0.5, 0.9);
     }
     return true;
-  }
-
-  private updatePalmGust(dt: number) {
-    this.palmGustCooldown = Math.max(0, this.palmGustCooldown - dt);
-    if (this.palmGustTime > 0) {
-      this.palmGustTime = Math.max(0, this.palmGustTime - dt);
-      const life = this.palmGustTime / PALM_GUST_FX_TIME;
-      const age = PALM_GUST_FX_TIME - this.palmGustTime;
-      const open = Math.min(1, age / 0.12);
-      const fade = age <= 0.12 ? 1 : Math.max(0, 1 - (age - 0.12) / (PALM_GUST_FX_TIME - 0.12));
-      this.palmGustFx.visible = !this.photo && life > 0;
-      this.palmGustFx.scale.set(this.palmGustLength * open, 1, 1);
-      (this.palmGustFx.material as MeshBasicMaterial).opacity = fade * 0.82;
-      const rimAge = age - 0.06;
-      this.palmGustRim.visible = !this.photo && this.palmGustHits > 0 && rimAge >= 0 && rimAge < 0.24;
-      if (this.palmGustRim.visible) {
-        const t = rimAge / 0.24;
-        const radius = maxRim(this.arena.layout) / 0.17;
-        this.palmGustRim.scale.setScalar(radius * (0.96 + t * 0.07));
-        (this.palmGustRim.material as MeshBasicMaterial).opacity = (1 - t) * 0.9;
-      }
-    } else {
-      this.palmGustFx.visible = false;
-      this.palmGustRim.visible = false;
-    }
-
-    for (const side of ['left', 'right'] as const) {
-      const h = this.hands[side];
-      const facts = this.handFacts(side);
-      if (!this.taught('gust') || !mayListen(facts, 'gust')) {
-        this.palmGustSampled[side] = false;
-        this.palmGustAge[side] = 0;
-        continue;
-      }
-      const wrist = this.handAt.copy(this.toLocal(h.wrist));
-      const index = this.root.worldToLocal(this.local.copy(h.index));
-      const palm = wrist.lerp(index, 0.48);
-      const floor = this.arena.height(palm.x, palm.z);
-      const n = normRadius(this.arena.layout, palm.x, palm.z);
-      const valid = n < 0.74 && palm.y >= floor + 0.025 && palm.y <= floor + 0.12 && Math.abs(wrist.y - index.y) <= 0.075;
-      if (!valid) {
-        this.palmGustSampled[side] = false;
-        this.palmGustAge[side] = 0;
-        continue;
-      }
-      if (!this.palmGustSampled[side]) {
-        this.palmGustSampled[side] = true;
-        this.palmGustLast[side].copy(palm);
-        this.palmGustOrigin[side].copy(palm);
-        this.palmGustAge[side] = -PALM_GUST_ARM_TIME;
-        continue;
-      }
-      const last = this.palmGustLast[side];
-      const dx = palm.x - last.x;
-      const dz = palm.z - last.z;
-      const speed = (Math.hypot(dx, dz) * ARENA_SCALE) / Math.max(1e-3, dt);
-      last.copy(palm);
-      const origin = this.palmGustOrigin[side];
-      const wasArming = this.palmGustAge[side] < 0;
-      this.palmGustAge[side] += dt;
-      if (wasArming) {
-        // Reaching across the bowl keeps moving the origin and never arms. A brief settled palm,
-        // followed by a new sweep, is both more intentional and easier to read on camera.
-        if (speed > PALM_GUST_ARM_SPEED) this.palmGustAge[side] = -PALM_GUST_ARM_TIME;
-        origin.copy(palm);
-        if (this.palmGustAge[side] < 0) continue;
-        this.palmGustAge[side] = 0;
-        continue;
-      }
-      const pathX = palm.x - origin.x;
-      const pathZ = palm.z - origin.z;
-      const path = Math.hypot(pathX, pathZ);
-      if (this.palmGustAge[side] > 0.5) {
-        origin.copy(palm);
-        this.palmGustAge[side] = 0;
-        continue;
-      }
-      if (this.palmGustCooldown > 0 || speed < PALM_GUST_SPEED || path * ARENA_SCALE < 0.105) continue;
-      // A fingertip arriving on your own top is a Spin Rub reaching in, not a sweep (a sweep that
-      // crosses your top still fires once it is past it).
-      if (!mayCommit(facts, 'gust')) continue;
-      const strength = Math.max(0.65, Math.min(1.5, speed / 0.75));
-      this.doPalmGust(side, origin.x, origin.z, palm.x, palm.z, strength);
-      this.palmGustSampled[side] = false;
-      this.palmGustAge[side] = 0;
-    }
-  }
-
-  private doPalmGust(side: Side, sx: number, sz: number, ex: number, ez: number, strength: number) {
-    const length = Math.hypot(ex - sx, ez - sz) || 1;
-    const dirX = (ex - sx) / length;
-    const dirZ = (ez - sz) / length;
-    // The hand only needs a short, comfortable sweep to declare its direction. Project that
-    // physical intent to the opposite rim so the player never has to reach across the whole table.
-    const maxTravel = maxRim(this.arena.layout) * 2.5;
-    let travel = maxTravel;
-    for (let i = 1; i <= 24; i++) {
-      const t = (maxTravel * i) / 24;
-      if (normRadius(this.arena.layout, sx + dirX * t, sz + dirZ * t) >= 1.04) {
-        travel = t;
-        break;
-      }
-    }
-    const gustEx = sx + dirX * travel;
-    const gustEz = sz + dirZ * travel;
-    const force = this.charges.spend(this.elapsed, TUNING.grace);
-    if (!force) {
-      this.palmGustCooldown = 0.35;
-      this.locked('Forge Gust needs one charge\nCharges refill in a moment');
-      return;
-    }
-    // The open index travels close to the bowl during the same physical sweep. Own that whole
-    // stroke as a Gust; otherwise updateShaping can retain its fingertip trail and commit a paid
-    // Finger Groove when the player lifts the hand after the sweep.
-    this.blockShapingRelease(side);
-    const power = Math.min(1.5, strength * force);
-    const candidates = this.tops;
-    // A gust steers around the player's own top.
-    const own = this.mine;
-    const struck = candidates.filter((top) => top !== own && palmGustCrosses(this.arena, top, sx, sz, gustEx, gustEz));
-    this.palmGustDirection.set(dirX, dirZ);
-    this.palmGustCooldown = PALM_GUST_COOLDOWN;
-    this.palmGustTime = PALM_GUST_FX_TIME;
-    this.palmGustLength = travel;
-    this.palmGustHits = struck.length;
-    this.palmGustSide = side;
-    this.palmGustCount++;
-    this.palmGustFx.visible = !this.photo;
-    this.palmGustFx.position.set(sx, this.arena.height(sx, sz) + 0.006, sz);
-    this.palmGustFx.rotation.y = -Math.atan2(this.palmGustDirection.y, this.palmGustDirection.x);
-    this.palmGustFx.scale.set(0.001, 1, 1);
-    (this.palmGustFx.material as MeshBasicMaterial).color.setHex(0xffad42);
-    (this.palmGustFx.material as MeshBasicMaterial).opacity = 0.82;
-    const exitAngle = Math.atan2(this.palmGustDirection.y, this.palmGustDirection.x);
-    this.palmGustRim.position.set(0, this.arena.floorHeight(1) + 0.003, 0);
-    this.palmGustRim.rotation.y = -exitAngle;
-    (this.palmGustRim.material as MeshBasicMaterial).color.setHex(0xff7a20);
-    if (this.online?.role === 'guest' && this.online.peer) {
-      this.online.sendEvent({ kind: 'gust', sx: -sx, sz: -sz, ex: -gustEx, ez: -gustEz, f: power });
-    } else palmGust(this.arena, candidates, sx, sz, gustEx, gustEz, power, own);
-    for (const top of struck) {
-      const y = this.arena.height(top.x, top.z);
-      const view = top === this.mine ? this.myView : top === this.theirs ? this.theirView : null;
-      view?.flash();
-      view?.hit(Math.min(1, 0.55 + power * 0.25), this.palmGustDirection.x, this.palmGustDirection.y, 0.04);
-      this.impacts.hit(top.x, y, top.z, Math.min(1, 0.5 + power * 0.25));
-      this.sparks.burst(top.x, y, top.z, 0.45 + power * 0.2);
-    }
-    this.lastShape = { t: this.elapsed, kind: 'parry' };
-    this.recordIntervention();
-    if (struck.length) this.impacts.shock(struck[0].x, this.arena.height(struck[0].x, struck[0].z), struck[0].z, 0.5, 0xffb04a);
-    this.stamp.show(struck.length ? 'FORGE GUST!' : 'GUST MISSED', struck.length ? `${struck.length} TOP${struck.length === 1 ? '' : 'S'} IN THE CORRIDOR` : 'SWEEP THROUGH A TOP', struck.length ? 'mine' : 'neutral', 0.6, 0.9);
-    this.label.set(struck.length ? 'YOUR HAND MOVED THE FIGHT' : 'THE CORRIDOR MISSED');
-    this.labelTimer = 1.1;
-    playDash(gustEx);
-    if (import.meta.env.DEV) console.log(`[GUST] ${side} ${sx.toFixed(3)},${sz.toFixed(3)} → ${gustEx.toFixed(3)},${gustEz.toFixed(3)} ×${power.toFixed(2)} hits ${struck.length}`);
   }
 
   /**
@@ -6883,10 +6416,10 @@ export class MatchSystem extends createSystem({
     const manipulating = !!this.shaping.left || !!this.shaping.right
       || !!this.slings.left || !!this.slings.right
       || !!this.rimPulls.left || !!this.rimPulls.right
-      || !!this.overforgeHeld || !!this.forgeWheelHeld || !!this.emberHeld;
-    const impacting = this.causeCue.stage >= 2 || this.palmGustTime > 0 || this.shockT < 1 || this.arenaMorphHold > 0;
+      || !!this.overforgeHeld || !!this.forgeWheelHeld || !!this.verbs.emberHeld;
+    const impacting = this.causeCue.stage >= 2 || this.verbs.palmGustTime > 0 || this.shockT < 1 || this.arenaMorphHold > 0;
     const pinching = this.hands.left.pinching || this.hands.right.pinching;
-    const aiming = this.handHover.left || this.handHover.right || this.crossguardActive || this.palmLauncherSide !== null;
+    const aiming = this.handHover.left || this.handHover.right || this.verbs.crossguardActive || this.palmLauncherSide !== null;
     const handCode = impacting ? 4
       : this.phase === 'pulling' || manipulating ? 3
         : pinching ? 2
@@ -8208,40 +7741,40 @@ export class MatchSystem extends createSystem({
       }
       const openingDx = this.theirs.x - this.mine.x;
       const openingDz = this.theirs.z - this.mine.z;
-      if (this.elapsed < this.crossguardLiveUntil) {
+      if (this.elapsed < this.verbs.crossguardLiveUntil) {
         // A paid rail stays live a moment: every save of your top refunds its charge, and the
         // rival's first escape across it is sent on toward a pocket.
         for (const top of this.tops) {
-          if (!crossguardCrosses(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z)) continue;
+          if (!crossguardCrosses(top, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z)) continue;
           if (top === this.mine) {
-            if (crossguard(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z)) this.charges.reward();
-          } else if (top === this.theirs && !this.crossguardSlung && movingOut(top)) {
-            this.crossguardSlung = true;
+            if (crossguard(top, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z)) this.charges.reward();
+          } else if (top === this.theirs && !this.verbs.crossguardSlung && movingOut(top)) {
+            this.verbs.crossguardSlung = true;
             crossguardSling(this.arena, top);
             this.impacts.dash(top.x, this.arena.height(top.x, top.z), top.z, top.vx, top.vz);
           }
         }
-      } else if (this.crossguardActive && !this.crossguardConsumed) {
+      } else if (this.verbs.crossguardActive && !this.verbs.crossguardConsumed) {
         for (const top of this.tops) {
-          if (!crossguardCrosses(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z)) continue;
+          if (!crossguardCrosses(top, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z)) continue;
           // Only your top's save or the rival's escape counts; a rival heading inward passes.
           const rivalEscape = top === this.theirs && movingOut(top);
           if (top !== this.mine && !rivalEscape) continue;
           const force = this.charges.spend(this.elapsed, TUNING.grace);
-          this.crossguardConsumed = true;
-          this.crossguardActive = false;
-          this.crossguardBreak = 0.28;
+          this.verbs.crossguardConsumed = true;
+          this.verbs.crossguardActive = false;
+          this.verbs.crossguardBreak = 0.28;
           if (!force) {
             this.locked('CROSSGUARD BROKE\nWAIT FOR ONE SHAPING CHARGE');
             break;
           }
-          this.crossguardLiveUntil = this.elapsed + CROSSGUARD_LIVE;
-          this.crossguardSlung = rivalEscape;
+          this.verbs.crossguardLiveUntil = this.elapsed + CROSSGUARD_LIVE;
+          this.verbs.crossguardSlung = rivalEscape;
           if (rivalEscape) crossguardSling(this.arena, top);
-          else if (crossguard(top, this.crossguardA.x, this.crossguardA.z, this.crossguardB.x, this.crossguardB.z, force)) this.charges.reward();
-          this.crossguardHits++;
+          else if (crossguard(top, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z, force)) this.charges.reward();
+          this.verbs.crossguardHits++;
           this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
-          this.rootEntity?.setValue(FirstFiveState, 'crossguardHits', this.crossguardHits);
+          this.rootEntity?.setValue(FirstFiveState, 'crossguardHits', this.verbs.crossguardHits);
           this.lastShape = { t: this.elapsed, kind: 'parry' };
           this.recordIntervention();
           const y = this.arena.height(top.x, top.z);
@@ -8276,14 +7809,14 @@ export class MatchSystem extends createSystem({
           playStamp();
         });
       } else clash = step(this.arena, this.mine, this.theirs);
-      if (this.emberState === 3 && this.elapsed > this.emberPostUntil) {
+      if (this.verbs.emberState === 3 && this.elapsed > this.verbs.emberPostUntil) {
         // The post cools after EMBER_POST_TIME.
-        this.setEmberState(0);
-        this.emberBumperFx.visible = false;
-      } else if (this.emberState === 3) {
+        this.verbs.setEmberState(0);
+        this.verbs.emberBumperFx.visible = false;
+      } else if (this.verbs.emberState === 3) {
         for (const top of this.tops) {
           const rivalTop = top === this.theirs;
-          if (!emberBumper(top, this.emberBumperAt.x, this.emberBumperAt.z, 0.014, rivalTop ? EMBER_RIVAL_KICK : 0)) continue;
+          if (!emberBumper(top, this.verbs.emberBumperAt.x, this.verbs.emberBumperAt.z, 0.014, rivalTop ? EMBER_RIVAL_KICK : 0)) continue;
           const y = this.arena.height(top.x, top.z);
           this.impacts.hit(top.x, y, top.z, 0.9);
           this.impacts.shock(top.x, y, top.z, 0.78, 0xff7a1a);
@@ -8355,7 +7888,7 @@ export class MatchSystem extends createSystem({
         this.sparks.burst(clash.x, y, clash.z, clash.strength);
         if (clash.strength > HARD_HIT && this.elapsed - this.lastHardHit > HIT_STOP_GAP) {
           this.lastHardHit = this.elapsed;
-          this.spawnEmber(clash.x, clash.z);
+          this.verbs.spawnEmber(clash.x, clash.z);
           // A hard hit: more sparks, a ring of light, both tops flash, and a brief hit stop.
           this.sparks.burst(clash.x, y, clash.z, 1);
           this.impacts.hit(clash.x, y, clash.z, clash.strength);
@@ -8960,7 +8493,7 @@ export class MatchSystem extends createSystem({
    * A refused move: the dull clunk, and the same news in words on the card (for anyone who plays
    * without sound), unless the card is already saying something.
    */
-  private locked(why: string) {
+  locked(why: string) {
     // A held refusal repeats every frame: say it at most every 0.6 s.
     if (this.time - this.lockedAt < 0.6) return;
     this.lockedAt = this.time;
