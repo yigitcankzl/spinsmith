@@ -60,7 +60,7 @@ else clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 2.6 "YOUR TABLE IS THE ARENA" "S
 clip 02-rip "$NEW/first-rip-ghost.mp4" 2.6 6.6 "PINCH  PULL  RIP" "A ghost hand shows each move once"
 clip 03-desk "$NEW/desk-ko-first-close.mp4" 1.2 4.4 "DESK KO IN YOUR FIRST MATCH" "The real edge glows  the squeeze throws"
 clip 04-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK IT" "Your fingertip is part of the physics"
-clip 06-strike "$NEW/seal-stamp.mp4" 1.4 4.6 "STAMP AN ULTIMATE" "Pinch the seal  press it into the bowl"
+clip 06-strike "$NEW/seal-stamp.mp4" 0.3 4.2 "STAMP AN ULTIMATE" "Pinch the seal  press it into the bowl"
 # Optional hand close-ups, when the new-shots folder has them.
 if [ -s "$NEW/close-squeeze.mp4" ]; then clip 05a-squeeze "$NEW/close-squeeze.mp4" 1.4 3.2 "TWO HANDS ON THE RIM" "Squeeze  stretch  tilt  twist the live bowl"; fi
 if [ -s "$NEW/close-crossguard.mp4" ]; then clip 05b-guard "$NEW/close-crossguard.mp4" 0.6 2.8 "CROSSGUARD" "Two still palms make a rail that saves you"; fi
