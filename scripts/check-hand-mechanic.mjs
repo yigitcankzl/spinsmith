@@ -35,6 +35,9 @@ export default async function run({ page, frame }) {
       game.everyVerb = true;
     }
     if (check.startsWith('arena-morph') && check !== 'arena-morph-tutorial') game.progress.matches = Math.max(1, game.progress.matches);
+    // The hover-claim geometry is pinned to the round Forge Bowl (a page can open on any arena in the
+    // rotation; Crucible Gate's wide mouth sits at angle 0).
+    if (check === 'intent-preview' && game.arena.layout.name !== 'Forge Bowl') game.setArena(game.arenas.find((a) => a.name === 'Forge Bowl'));
     const launchCheck = check === 'single-rip' || check === 'dual-rip';
     if (launchCheck && drive.state().phase !== 'ready') {
       window.__game.startMatch();

@@ -1220,6 +1220,8 @@ export function installDriver() {
     async hoverArena(opts: { n: number; angle: number; side?: Side }) {
       const { n, angle, side = 'right' } = opts;
       const g = game();
+      // Aim only once the arena has stopped sliding to its match size (slow on a freshly loaded page).
+      for (let i = 0; i < 160 && !g.sizeSettled; i++) await wait(0.025);
       const r = rimRadius(g.arena.layout, angle) * n;
       const target = local(Math.cos(angle) * r, Math.sin(angle) * r, 0.025);
       g.labelTimer = 0;
