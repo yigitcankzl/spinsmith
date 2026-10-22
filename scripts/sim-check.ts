@@ -1601,7 +1601,7 @@ TUNING.grace = 0;
 // saved and read back; an old single-mode save migrates to its matching toggles; ?lefty holds the
 // left-handed layout on and ?lefty=0 undoes it.
 {
-  const { COMFORT, COMFORT_DIAL, LEGACY_COMFORT_MODES, comfortMode, comfortStop, loadComfort, nextComfort, toggleComfort, SAFE_COLORS, warnColor } = await import('../src/game/comfort.ts');
+  const { COMFORT, COMFORT_DIAL, LEGACY_COMFORT_MODES, comfortMode, comfortStop, loadComfort, nextComfort, toggleComfort, SAFE_COLORS, warnColor, textScale, BIG_TEXT } = await import('../src/game/comfort.ts');
   const memStore = (init: Record<string, string> = {}) => {
     const mem = new Map(Object.entries(init));
     return { mem, st: { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) } as unknown as Storage };
@@ -1647,9 +1647,12 @@ TUNING.grace = 0;
   turnTo('Large text');
   toggleComfort();
   assert.ok(COMFORT.bigText, 'Large text toggles on');
+  assert.equal(textScale(), BIG_TEXT, 'Large text scales the read surfaces');
+  assert.ok(BIG_TEXT >= 1.25, 'Large text is a real step up');
   turnTo('Standard');
   toggleComfort();
   assert.ok(COMFORT.lefty && COMFORT.sound && COMFORT.flashes && !COMFORT.contrast && !COMFORT.bigText, 'Standard resets all but the hand');
+  assert.equal(textScale(), 1, 'Standard text is unscaled');
   turnTo('Left-handed');
   toggleComfort();
   assert.deepEqual({ ...COMFORT }, std, 'and left-handed toggles off');

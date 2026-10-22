@@ -30,6 +30,14 @@ export interface Comfort {
  */
 export const SAFE_COLORS = { danger: 0xe69f00, safe: 0x56b4e9, edge: 0xf0e442, neutral: 0xf2f2f2 } as const;
 
+/** Large text: how much bigger the card, stamps, bar and gauge labels read. */
+export const BIG_TEXT = 1.3;
+
+/** The read surfaces' scale for the Large text setting (1 when it is off). */
+export function textScale(): number {
+  return COMFORT.bigText ? BIG_TEXT : 1;
+}
+
 /** `normal` in the usual palette, `safe` in the colour-safe mode. */
 export function warnColor(normal: number, safe: number): number {
   return COMFORT.colorSafe ? safe : normal;

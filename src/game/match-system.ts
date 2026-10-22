@@ -1,7 +1,7 @@
 import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
 import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish, playRub } from './audio.js';
-import { COMFORT, comfortSummary, nextComfort, SAFE_COLORS, toggleComfort, warnColor } from './comfort.js';
+import { COMFORT, comfortSummary, nextComfort, SAFE_COLORS, textScale, toggleComfort, warnColor } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
@@ -116,8 +116,6 @@ const REC = 2 * REC_TOP + 3;
 const RIVAL_TELL_CODE: Record<RivalMove, number> = { charge: 1, quake: 2, pull: 3 };
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
-/** Large text (comfort dial): how much bigger the card, stamps and bar read. */
-const BIG_TEXT = 1.3;
 /** A one-hand rim pull waits this long for the other hand before it can become a spring. */
 const RIM_SPRING_INTENT = 0.25;
 /** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
@@ -1904,7 +1902,7 @@ export class MatchSystem extends createSystem({
         const L = this.arena.layout;
         const r = rimRadius(L, -Math.PI / 2);
         this.rimGauge.fit(r, this.arena.height(0, -r * 0.97) + WALL_HEIGHT[L.wall] + 0.002, this.stage.rotation.y, MATCH_HEAT);
-        this.rimGauge.update(this.mine.spin, this.theirs.spin, [this.bar.fillColor(0), this.bar.fillColor(1)], this.barPoints[0], this.barPoints[1], MATCH_HEAT, dt, COMFORT.bigText ? BIG_TEXT : 1);
+        this.rimGauge.update(this.mine.spin, this.theirs.spin, [this.bar.fillColor(0), this.bar.fillColor(1)], this.barPoints[0], this.barPoints[1], MATCH_HEAT, dt, textScale());
         this.rimGauge.setLabels(this.rival.name, MATCH_HEAT);
         this.rimGauge.root.visible = true;
       }
@@ -3684,7 +3682,7 @@ export class MatchSystem extends createSystem({
     // fitMatch may shrink the whole root to 70% to stay on a real table. Read surfaces cancel that
     // parent scale so type never becomes 30% smaller on the very tables that need it most.
     // Large text (comfort): the read surfaces grow together.
-    const readScale = (COMFORT.bigText ? BIG_TEXT : 1) / Math.max(0.7, this.rootK);
+    const readScale = textScale() / Math.max(0.7, this.rootK);
     this.label.mesh.scale.setScalar(1.25 * grow * readScale);
     this.bar.mesh.scale.setScalar(0.21 * grow * readScale);
     this.stamp.worldScale = readScale;

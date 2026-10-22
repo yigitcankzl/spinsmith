@@ -407,6 +407,9 @@ export class Hub {
     this.hoverWas = hovered;
     // The comfort plate lies beside the dial while either is pointed at, and a moment after.
     if (hovered?.action.kind === 'comfort' || hovered?.action.kind === 'comfortToggle') this.comfortShow = Math.max(this.comfortShow, 1.5);
+    // Through a new smith's first session home shows where comfort lives (Quiet, One hand, Large
+    // text...), without waiting for a hand to find the dial.
+    if (this.teaching) this.comfortShow = Math.max(this.comfortShow, 0.3);
     this.comfortShow = Math.max(0, this.comfortShow - dt);
     this.comfortGroup.visible = !this.photoMode && this.comfortShow > 0;
     this.items.forEach((it, i) => {
