@@ -121,7 +121,7 @@ own rays rarely line up with what you are looking at.
 
 ### Testing in the emulator (IWSDK CLI)
 
-**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human): first knockout 15.6–23.1 s and first DESK KO 36.1–38.1 s of game time, match over at 56.7–63.5 s, 20 distinct prompts and 72–74 words on screen before the match ends (two runs, 2026-10-22). Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes). `check:desk-ko-first` and `check:room-matrix` expect a freshly loaded page (other probes can leave the arena away from the desk edge); `scripts/clear-resume.mjs` then a browser reload gives one.
+**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human): first knockout 15.6–23.1 s and first DESK KO 36.1–38.7 s of game time, match over at 55.3–63.5 s, 19–20 distinct prompts and 70–74 words on screen before the match ends (three runs, 2026-10-22). Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes). `check:desk-ko-first` and `check:room-matrix` expect a freshly loaded page (other probes can leave the arena away from the desk edge); `scripts/clear-resume.mjs` then a browser reload gives one.
 
 **Hand driver** (`src/dev-drive.ts`, dev builds only): `window.drive` plays real hand motions on
 the emulated hands (tap, drag, rip, ramp, cup, sling, palm slap), so the game's own gesture
