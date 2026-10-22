@@ -29,7 +29,7 @@ export default async function run({ page, frame }) {
     }
     const gustCheck = check === 'palm-gust' || check === 'palm-gust-left';
     const expansionCheck = check === 'crossguard' || check === 'forge-wheel' || check === 'ember-plant' || check === 'flick' || check === 'rub';
-    if (check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || gustCheck || check === 'rim-spring' || expansionCheck) {
+    if (check === 'intent-preview' || check === 'ramp-release' || check === 'finger-groove' || check === 'outer-ring' || gustCheck || check === 'rim-spring' || expansionCheck) {
       // Verbs now arrive one per match; keep the old two-match lesson shields and unlock them all.
       game.progress.matches = Math.max(2, game.progress.matches);
       game.everyVerb = true;

@@ -1504,7 +1504,7 @@ export class MatchSystem extends createSystem({
           const t = e.shiftKey ? this.mine : this.theirs;
           // The rescue probe must land on the table; the faster rival shot remains the off-desk
           // showcase. Normal ring-outs always keep their real simulation velocity.
-          const speed = e.shiftKey ? 0.3 : 0.8;
+          let speed = e.shiftKey ? 0.3 : 0.8;
           // The rescue probe throws away from any real table edge in reach, so the top lands on wood.
           let a = Math.atan2(t.z, t.x);
           if (e.shiftKey && this.desk.deskEdgePoly) {
@@ -1517,6 +1517,8 @@ export class MatchSystem extends createSystem({
             }
             // The outline is in the root frame; the sim (stage) frame is turned by the stage's yaw.
             a += this.stage.rotation.y;
+            // A narrow desk gets a softer throw, so the top still lands on the wood.
+            speed = Math.min(speed, 0.6 * room);
           }
           t.vx = Math.cos(a) * speed;
           t.vz = Math.sin(a) * speed;
