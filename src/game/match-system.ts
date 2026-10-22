@@ -7112,7 +7112,7 @@ export class MatchSystem extends createSystem({
     this.rivalMarks.show(theirs, this.heightAt, this.time);
     this.marks.show(mine, this.heightAt, this.time);
     this.pips.root.visible = this.phase === 'fight' || this.phase === 'ready' || this.phase === 'pulling';
-    this.pips.set(this.charges.charges, this.charges.refilling);
+    this.pips.set(this.charges.charges, this.charges.refilling, this.frameDt);
     for (const s of this.arena.shapes) {
       if (Arena.strength(s) < 0.3) continue;
       for (const t of this.tops) {
@@ -7817,6 +7817,8 @@ export class MatchSystem extends createSystem({
     if (this.time - this.lockedAt < 0.6) return;
     this.lockedAt = this.time;
     playLocked();
+    // Refused for want of a charge: the charge pips at the near rim answer, so the eye finds them.
+    if (this.charges.charges < 1) this.pips.refuse();
     // The card is busy (or just said it): a short stamp carries the same news (never over a stamp
     // already showing), never sound alone.
     if (this.labelTimer > 0 || this.time - this.lockedSaidAt < 2) {

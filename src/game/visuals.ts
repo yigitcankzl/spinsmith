@@ -2957,9 +2957,20 @@ export class ChargePips {
     }
   }
 
-  set(charges: number, refilling: number) {
+  private ping = 0;
+  private readonly white = new Color(0xffffff);
+
+  /** A move was refused for want of a charge: the pips jump and flash, so the eye finds them. */
+  refuse() {
+    this.ping = 0.7;
+  }
+
+  set(charges: number, refilling: number, dt = 0) {
+    this.ping = Math.max(0, this.ping - dt);
+    const k = this.ping > 0 ? Math.abs(Math.sin((0.7 - this.ping) * Math.PI * 4)) : 0;
+    this.root.scale.setScalar(1 + 1.4 * k);
     this.mats.forEach((m, i) => {
-      m.color.copy(this.dim).lerp(this.lit, i < charges ? 1 : i === charges ? 0.35 * refilling : 0);
+      m.color.copy(this.dim).lerp(this.lit, i < charges ? 1 : i === charges ? 0.35 * refilling : 0).lerp(this.white, 0.6 * k);
     });
   }
 }
