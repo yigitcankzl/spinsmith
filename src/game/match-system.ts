@@ -3693,6 +3693,9 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift + (this.phase === 'result' ? HUD.resultLift : 0)) * grow;
     // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
     this.stamp.mesh.rotation.set(0, 0, 0);
+    // Pinned over the edge only while the fight plays out; on the result it moves to its slot above
+    // the card, so the result plate never covers it.
+    if (this.stamp.pin && this.phase !== 'fight') this.stamp.pin = null;
     if (this.stamp.pin) {
       // Pinned over the real edge, it turns to face the eyes, and comes back toward the arena
       // until it is inside a comfortable view.
