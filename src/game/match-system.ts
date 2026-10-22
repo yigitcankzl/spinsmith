@@ -4753,6 +4753,8 @@ export class MatchSystem extends createSystem({
     this.theirs.launch(rx, rz, Math.sin(heading) * aiSpeed, Math.cos(heading) * aiSpeed, launchSpin(aiPower), th);
     this.theirs.shieldUntil = this.mine.shieldUntil;
     this.pendingGroove.left = this.pendingGroove.right = null;
+    // A new round: no quiet carried over from the last round's flick, rub or gust.
+    this.grooveNeedsLift.left = this.grooveNeedsLift.right = false;
     this.launchExtras();
     if (net?.role === 'host') {
       // Keep the guest's own paint in the reveal packet; the host renders that same build with the
@@ -5068,7 +5070,8 @@ export class MatchSystem extends createSystem({
       // until its fingertip has left the floor once (and never within FLICK_GROOVE_QUIET).
       if (this.grooveNeedsLift[side]) {
         const t = this.root.worldToLocal(this.local.copy(h.index));
-        if (!this.arena.inside(t.x, t.z) || Math.abs(t.y - this.arena.height(t.x, t.z)) > GROOVE_LIFT) this.grooveNeedsLift[side] = false;
+        // Signed: a fingertip pressed deeper into the floor has not lifted.
+        if (!this.arena.inside(t.x, t.z) || t.y - this.arena.height(t.x, t.z) > GROOVE_LIFT) this.grooveNeedsLift[side] = false;
       }
       if (this.grooveNeedsLift[side] || this.time - this.flickAt[side] < FLICK_GROOVE_QUIET) this.grooving[side] = this.pendingGroove[side] = null;
       const pending = this.pendingGroove[side];
