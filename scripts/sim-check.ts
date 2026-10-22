@@ -34,6 +34,7 @@ import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/
 import { FpsBook, fpsPhase, QUALITY_MAX, QualityGuard, qualityThresholds } from '../src/game/quality.ts';
 import { commitBlocker, FLICK_AFTER_RELEASE, FREE_HAND, gestureOwner, heldElsewhere, listenBlocker, mayCommit, mayListen, RELEASE_LOCK, RUB_TIP_GUST, RUB_TOUCH_SLACK, SHAPING_RELEASE_LOCK } from '../src/game/gesture-owner.ts';
 import type { GestureOwner, HandFacts, HandVerb } from '../src/game/gesture-owner.ts';
+import { BONES, boneMatrix, handOcclusionOn, JOINTS, PALM, palmMatrix } from '../src/game/hand-proxy.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
 const FORGE = ARENAS[0];
@@ -2160,6 +2161,41 @@ if (DESK_DROP_ON) {
   }
   assert.ok(heldElsewhere(hand({ held: 'ember' })) && !heldElsewhere(hand({ held: 'ramp' })), 'held rivet skips shaping, a held ramp does not');
   assert.equal(commitBlocker(hand({ slapPose: true, followLock: 0.2 }), 'cup'), 'follow', 'the first claim in the table names the blocker');
+}
+
+// Hand occluder proxies (hand-proxy.ts): rods span their joints, the palm lies between wrist and knuckles, and the gate.
+{
+  assert.equal(JOINTS.length, 25, 'the 25 WebXR hand joints');
+  assert.equal(BONES.length, 24, 'one bone per joint past the wrist');
+  for (const [a, b] of BONES) assert.ok(a < b && (a === 0) === JOINTS[b].endsWith('metacarpal'), `bone ${JOINTS[a]} -> ${JOINTS[b]}`);
+  assert.ok(Object.values(PALM).every((i) => i >= 0), 'palm joints found');
+  const apply = (m: number[], x: number, y: number, z: number) => [m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]];
+  const near = (p: number[], q: number[], what: string) => assert.ok(Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) < 1e-9, `${what}: ${p} vs ${q}`);
+  for (const [a, b] of [[{ x: 0.1, y: 1, z: -0.3 }, { x: 0.13, y: 1.02, z: -0.33 }], [{ x: 0, y: 1, z: 0 }, { x: 0, y: 1.04, z: 0 }], [{ x: 0, y: 1, z: 0 }, { x: 0, y: 0.97, z: 0 }]]) {
+    const m = boneMatrix(a, b, 0.008)!;
+    near(apply(m, 0, -0.5, 0), [a.x, a.y, a.z], 'rod bottom on joint a');
+    near(apply(m, 0, 0.5, 0), [b.x, b.y, b.z], 'rod top on joint b');
+    for (const [x, z] of [[1, 0], [0, 1]]) {
+      const p = apply(m, x, 0, z);
+      const d = [p[0] - m[12], p[1] - m[13], p[2] - m[14]];
+      assert.ok(Math.abs(Math.hypot(d[0], d[1], d[2]) - 0.008) < 1e-9, 'rod radius is the joint radius');
+      assert.ok(Math.abs(d[0] * (b.x - a.x) + d[1] * (b.y - a.y) + d[2] * (b.z - a.z)) < 1e-12, 'rod radius is across the bone');
+    }
+  }
+  assert.equal(boneMatrix({ x: 0, y: 1, z: 0 }, { x: 0, y: 1, z: 0 }, 0.01), null, 'a zero-length bone draws nothing');
+  const w = { x: 0, y: 1, z: 0 }, ix = { x: -0.04, y: 1, z: -0.09 }, mid = { x: -0.015, y: 1, z: -0.095 }, pk = { x: 0.03, y: 1, z: -0.08 };
+  const pm = palmMatrix(w, ix, mid, pk, 0.012)!;
+  near(apply(pm, 0, 0, -1), [w.x, w.y, w.z], 'palm reaches the wrist');
+  near(apply(pm, 0, 0, 1), [mid.x, mid.y, mid.z], 'palm reaches the middle knuckle');
+  const up = apply(pm, 0, 1, 0);
+  assert.ok(Math.abs(Math.abs(up[1] - pm[13]) - 0.012) < 1e-9, 'a flat palm is wrist-thick, facing up or down');
+  assert.equal(palmMatrix(w, ix, ix, ix, 0.012), null, 'collapsed knuckles draw no palm');
+  const gate = { blend: 'alpha-blend', depthOcclusion: false, optOut: false, knob: 1 };
+  assert.ok(handOcclusionOn(gate), 'on over passthrough with no depth');
+  assert.ok(!handOcclusionOn({ ...gate, blend: 'opaque' }), 'off in VR');
+  assert.ok(handOcclusionOn({ ...gate, depthOcclusion: true }), 'still on under real depth occlusion (tops are not depth-occluded)');
+  assert.ok(!handOcclusionOn({ ...gate, optOut: true }), 'off with ?nohandocclude');
+  assert.ok(!handOcclusionOn({ ...gate, knob: 0 }), 'off with ?occluder=0');
 }
 
 console.log('sim-check: all passed');

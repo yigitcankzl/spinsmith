@@ -30,6 +30,7 @@ import { anvilModel, Hub, standModel } from './hub.js';
 import { MatchBar } from './match-bar.js';
 import type { BrawlField } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
+import { handOcclusionOn } from './hand-proxy.js';
 import { RoomLight } from './room-light.js';
 import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector, rayExit } from './desk-edge.js';
@@ -875,7 +876,8 @@ export class MatchSystem extends createSystem({
   );
   /** The armed fingertip: hot while a charge can pay for a flick, cold grey when only a nudge is left. */
   private flickGlows = (['left', 'right'] as const).map(() => {
-    const m = new Mesh(new OctahedronGeometry(1, 2), new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false }));
+    // depthTest off: it sits at the real fingertip, so the hand occluder would hide it.
+    const m = new Mesh(new OctahedronGeometry(1, 2), new MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.85, blending: AdditiveBlending, depthWrite: false, depthTest: false }));
     m.renderOrder = 14;
     m.visible = false;
     return m;
@@ -1515,7 +1517,8 @@ export class MatchSystem extends createSystem({
     for (const side of ['left', 'right'] as const) {
       const g = this.barRings[side];
       for (let i = 0; i < 10; i++) {
-        const mat = new MeshBasicMaterial({ color: 0x8a8f99, transparent: true, opacity: 0.18, depthWrite: false, side: DoubleSide });
+        // The wrist bar floats over the real hand: depthTest off so the hand occluder never cuts it.
+        const mat = new MeshBasicMaterial({ color: 0x8a8f99, transparent: true, opacity: 0.18, depthWrite: false, depthTest: false, side: DoubleSide });
         this.barSegs.push(mat);
         g.add(new Mesh(new RingGeometry(0.014, 0.019, 6, 1, Math.PI / 2 - (i + 1) * ((Math.PI * 2) / 10) + 0.04, (Math.PI * 2) / 10 - 0.08), mat));
       }
@@ -1760,6 +1763,17 @@ export class MatchSystem extends createSystem({
     }
     // A new XR session (leaving and coming back) or a recenter puts the arena in front again.
     if (session !== this.xrSession) {
+      // The proxy hands (hand-occluder.ts) cover for missing depth: only over passthrough, not
+      // where Quest's depth occlusion runs (it is never registered under IWER, see index.ts).
+      this.handOccluder.enabled = handOcclusionOn({
+        blend: session.environmentBlendMode,
+        depthOcclusion: !('IWER_DEVICE' in window) && !!session.enabledFeatures?.includes('depth-sensing'),
+        optOut: new URLSearchParams(location.search).has('nohandocclude'),
+        knob: TUNE.occluder,
+      });
+      this.handOccluder.scale = TUNE.occluderScale;
+      this.handOccluder.joints.visible = this.handOccluder.bones.visible = this.handOccluder.enabled;
+      console.log(`[MATCH] hand occluder ${this.handOccluder.enabled ? 'on' : 'off'} (blend ${session.environmentBlendMode}, depth ${session.enabledFeatures?.includes('depth-sensing') ? 'granted' : 'none'})`);
       this.anchorPoseApplied = false;
       this.anchorRequestedAt = this.time;
       this.anchorState = 'restoring';

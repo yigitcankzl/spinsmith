@@ -48,7 +48,7 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 
 - Nothing has been run or measured on a headset yet, including frame rate (`?fps` and `?diagnostics` are there for it).
 - Unlabelled-surface placement is probed only in IWER with synthesised planes (`npm run check:room-matrix`), not in a real room; a table or desk labelled in Space Setup is preferred.
-- Persistent anchors have only been exercised in IWER. Depth occlusion is off under IWER (no camera depth), so it has not run anywhere yet.
+- Persistent anchors have only been exercised in IWER. Depth occlusion is off under IWER (no camera depth), so it has not run anywhere yet. Real hands hide the game behind them through invisible tracked-joint proxies (spheres, bone rods and a palm slab; on over passthrough, off with `?nohandocclude`), seen only in IWER.
 - Gaze (a full pointer on Meta VR Glasses; on Quest the head ray only assists buttons) has not run on a headset.
 - The online duel (beta) has run between two browser windows and two browser processes on one machine, not between two headsets or two homes; public STUN only, so some strict networks will not connect.
 - Real-edge drop sides, Spin Rub and installing to the Quest library are unverified on a headset; the offline cache is checked in the browser only.
