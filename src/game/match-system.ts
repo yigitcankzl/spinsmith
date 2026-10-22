@@ -374,7 +374,9 @@ export class MatchSystem extends createSystem({
   quietGroove(side: Side) {
     this.grooving[side] = this.pendingGroove[side] = null;
     this.flickAt[side] = this.time;
+    this.grooveNeedsLift[side] = true;
   }
+  private grooveNeedsLift: Record<Side, boolean> = { left: false, right: false };
   /** Spin Rub: the paid window's end and when the next charge may open one (this.time). */
   private rubUntil = -9;
   private rubReadyAt = -9;
@@ -5062,8 +5064,13 @@ export class MatchSystem extends createSystem({
     const open = this.elapsed >= TUNING.grace;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      // A flick's follow-through skims the floor too: no Finger Groove from it.
-      if (this.time - this.flickAt[side] < FLICK_GROOVE_QUIET) this.grooving[side] = this.pendingGroove[side] = null;
+      // A flick's, rub's or gust's follow-through skims the floor too: no Finger Groove from that hand
+      // until its fingertip has left the floor once (and never within FLICK_GROOVE_QUIET).
+      if (this.grooveNeedsLift[side]) {
+        const t = this.root.worldToLocal(this.local.copy(h.index));
+        if (!this.arena.inside(t.x, t.z) || Math.abs(t.y - this.arena.height(t.x, t.z)) > GROOVE_LIFT) this.grooveNeedsLift[side] = false;
+      }
+      if (this.grooveNeedsLift[side] || this.time - this.flickAt[side] < FLICK_GROOVE_QUIET) this.grooving[side] = this.pendingGroove[side] = null;
       const pending = this.pendingGroove[side];
       if (pending) {
         // "Slide, then lift": a fingertip still down in the bowl may be swinging on into a top (a
@@ -5748,9 +5755,7 @@ export class MatchSystem extends createSystem({
         }
         this.blockShapingRelease(side);
         // The swing was a flick: the floor stroke it started is not also a Finger Groove.
-        this.grooving[side] = null;
-        this.pendingGroove[side] = null;
-        this.flickAt[side] = this.time;
+        this.quietGroove(side);
         this.flickReadyAt[side] = this.time + FLICK_FOLLOW_THROUGH;
         if (this.online?.role === 'guest' && this.online.peer) {
           const target = top === this.mine ? 'mine' : 'rival';
@@ -5810,8 +5815,7 @@ export class MatchSystem extends createSystem({
     const step = rubStrokeStep(stroke, this.time, this.rubUntil, this.rubReadyAt);
     // Circling your own top runs the fingertip along the floor too: that is not a Finger Groove,
     // now or when the finger lifts (the same quiet a flick gets).
-    this.grooving[side] = this.pendingGroove[side] = null;
-    this.flickAt[side] = this.time;
+    this.quietGroove(side);
     if (step === 'hold') {
       // A stroke that ran past its window pays no more until the finger lifts: say so, not silence.
       if (this.time >= this.rubReadyAt && this.labelTimer <= 0) {
