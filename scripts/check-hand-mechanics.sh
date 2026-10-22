@@ -27,6 +27,7 @@ fi
 # probe's leftover tops, locks, cards or save state must not decide the next probe's result.
 isolate() {
   [ "${HANDS_ISOLATE:-0}" = 1 ] || return 0
+  "${CLI[@]}" browser run scripts/clear-resume.mjs --timeout 20000 >/dev/null 2>&1 || true
   "${CLI[@]}" browser reload >/dev/null 2>&1 || true
   "${CLI[@]}" runtime wait --timeout 60000 >/dev/null 2>&1 || true
   for _ in 1 2 3; do

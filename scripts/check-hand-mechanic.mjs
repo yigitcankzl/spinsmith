@@ -43,9 +43,10 @@ export default async function run({ page, frame }) {
     if (launchCheck) window.__game.deckChoice = 0;
     if (check === 'intent-preview' || check === 'ramp-release' || check === 'outer-ring' || check === 'finger-groove' || expansionCheck || gustCheck || check === 'rim-spring' || check.startsWith('arena-morph')) {
       window.__game.startMatch();
-      for (let i = 0; i < 200 && drive.state().phase !== 'ready'; i++) await sleep(25);
+      // A freshly loaded page can take several seconds (shader compiles) to reach the fight.
+      for (let i = 0; i < 400 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
-      for (let i = 0; i < 120 && drive.state().phase !== 'fight'; i++) await sleep(25);
+      for (let i = 0; i < 400 && drive.state().phase !== 'fight'; i++) await sleep(25);
       if (drive.state().phase === 'fight') drive.key('KeyU');
     }
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do
