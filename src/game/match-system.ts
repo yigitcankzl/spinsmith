@@ -19,6 +19,7 @@ import type { Clash, DropSide, FloorShape, RivalMove, Seal, ShapeKind } from './
 import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
 import { FEATS, GUIDE_ORDER, MARK, Progress, VERB_CARD, VERB_RELEASE, verbReleasedAt } from './progress.js';
 import { CLAIM, LESSON, lessonText } from './lessons.js';
+import { HUB_NOTE } from './hub-copy.js';
 import type { OpeningZone, ReleasedVerb } from './progress.js';
 import { rematchAdvice } from './mastery.js';
 import { dailyOrder, localDate, orderMet } from './orders.js';
@@ -2435,7 +2436,7 @@ export class MatchSystem extends createSystem({
     this.label.set(this.guideNote());
     // Modes introduce themselves once, after three matches, so the first session stays one verb.
     if (this.progress.guide === 'done' && this.progress.matches >= 3 && !this.demo && once('brawl')) {
-      this.label.set('New: the brass pegs by your level plate\nPinch: 3- or 4-top brawl, or online');
+      this.label.set(HUB_NOTE.brawl);
       this.labelTimer = 6;
     }
     // Notes hang over the far rim; the beacon marks the dock or the anvil. Once the Smith's board
@@ -2524,11 +2525,11 @@ export class MatchSystem extends createSystem({
     const guide = this.progress.guide;
     if (guide === 'launch') return LESSON.hubLaunch;
     if (guide === 'bump') return this.progress.matches > 0
-      ? 'One lesson remains: raise a ramp\nPut your top in the arena and shape the floor'
+      ? HUB_NOTE.ramp
       : LESSON.hubMatch;
     if (guide === 'match') return LESSON.hubMatch;
-    if (guide === 'forge' || guide === 'fit') return 'New part: Spur tip!\nPinch the small anvil to forge';
-    if (guide === 'rematch') return 'Your top is ready\nPut it in the arena for a rematch';
+    if (guide === 'forge' || guide === 'fit') return HUB_NOTE.forge;
+    if (guide === 'rematch') return HUB_NOTE.rematch;
     return '';
   }
 

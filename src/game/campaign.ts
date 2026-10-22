@@ -128,16 +128,23 @@ export function nextBout(rec: BoutRecord, medalTurn = true, rotate = 0): Bout | 
   return missing.length ? missing[turn % missing.length] : null;
 }
 
-/** What blocks the next chapter, for the map ('8 medals to open the Iron Circuit'), or '' when nothing does. */
-export function nextGate(rec: BoutRecord): string {
+/** What blocks the next chapter: its boss still to beat, or the medals still short; null when nothing does. */
+export function gateOf(rec: BoutRecord): { c: number; boss: string } | { c: number; chapter: string; short: number } | null {
   for (let c = 2; c <= CHAPTERS.length; c++) {
     if (chapterOpen(c, rec)) continue;
-    const short = CHAPTERS[c - 1].need - medalCount(rec);
     const boss = BOUTS.find((x) => x.chapter === c - 1 && x.boss)!;
-    if (!((rec[boss.id] ?? 0) & WIN)) return `Beat ${boss.rival} to reach ${chapterName(c)}`;
-    return `${short} more medal${short === 1 ? '' : 's'} to open ${chapterName(c)}`;
+    if (!((rec[boss.id] ?? 0) & WIN)) return { c, boss: boss.rival };
+    return { c, chapter: CHAPTERS[c - 1].name, short: CHAPTERS[c - 1].need - medalCount(rec) };
   }
-  return '';
+  return null;
+}
+
+/** What blocks the next chapter, for the map ('8 medals to open the Iron Circuit'), or '' when nothing does. */
+export function nextGate(rec: BoutRecord): string {
+  const g = gateOf(rec);
+  if (!g) return '';
+  if ('boss' in g) return `Beat ${g.boss} to reach ${chapterName(g.c)}`;
+  return `${g.short} more medal${g.short === 1 ? '' : 's'} to open ${chapterName(g.c)}`;
 }
 
 /** 'the Iron Circuit', 'The Crown'. */

@@ -7,6 +7,7 @@
  */
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
 import { streakTitle, tomorrowLine } from './come-back.js';
+import { boardHead, ledgerLine, mapHead, ORDER_DONE_SUB, orderShort } from './hub-copy.js';
 import type { Order } from './orders.js';
 import { ARENA_SCALE } from './reach.js';
 import { addSlab, engrave, metalPlate, ORANGE, PLATE_DEPTH, pxPerM, setType, signTexture, STEEL, TEXT, TEXT_DIM, wrap } from './ui.js';
@@ -21,6 +22,8 @@ export interface BoardBout {
   boss: boolean;
   /** The bout the map offers next. */
   next: boolean;
+  /** Its medals still to earn ('ramp KO · no heat lost'), or '' (shown while the bout is pointed at). */
+  left: string;
 }
 
 export interface BoardMap {
@@ -30,8 +33,8 @@ export interface BoardMap {
   of: number;
   /** What opens the next chapter, or ''. */
   gate: string;
-  /** The next bout's medals still to earn ('next 2-2 · medals: ramp KO · no heat lost'), or ''. */
-  todo: string;
+  /** The gate at rest, within HUB_WORDS ('BEAT IRON KEEP', 'IRON CIRCUIT: 3 MEDALS'), or ''. */
+  gateShort: string;
 }
 
 export interface BoardState {
@@ -60,6 +63,8 @@ const W = 1200;
 const H = 480;
 /** Seen from about this far (m): over the far rim, in the read band. */
 const DIST = 1.2;
+/** The medallion row and its one caption end above this canvas y (the map's pointable band). */
+const MAP_ROW_BOTTOM = 230;
 /** A finished ledger and a top with every mark: white-hot steel, not gold (gold teaches). */
 const GILT = '#ffffff';
 
@@ -71,7 +76,7 @@ export class SmithBoard {
   private readonly k: number;
 
   /** `width` in arena-local units (ARENA_SCALE world metres each). */
-  constructor(width = 0.3) {
+  constructor(private readonly width = 0.3) {
     this.canvas.width = W;
     this.canvas.height = H;
     this.tex = signTexture(this.canvas);
@@ -81,9 +86,22 @@ export class SmithBoard {
     addSlab(this.mesh, width, (width * H) / W, 0.06, PLATE_DEPTH / ARENA_SCALE);
   }
 
-  /** Draws the order side, or (back) the rivals and the ledger; redraws only on change. */
-  draw(s: BoardState, back = false) {
-    const key = JSON.stringify(s) + back;
+  /** A point on the board's plane in its own space (x, y) as canvas px, or null off the plate. */
+  pxAt(x: number, y: number): [number, number] | null {
+    const u = x / this.width + 0.5;
+    const v = 0.5 - (y * W) / (this.width * H);
+    return u >= 0 && u <= 1 && v >= 0 && v <= 1 ? [u * W, v * H] : null;
+  }
+
+  /**
+   * Draws the order side, or (back) the Circuit Map and the ledger; redraws only on change. `at` is
+   * where a hand points on the board (canvas px), or null: at rest every line keeps to HUB_WORDS and
+   * the map names one bout; pointed at, the board shows its detail (on the map, the pointed bout's).
+   */
+  draw(s: BoardState, back = false, at: readonly [number, number] | null = null) {
+    // Only which bout is pointed at matters on the back, and only pointed-or-not on the front.
+    const bout = back && at ? this.boutAt(s, at) : -1;
+    const key = JSON.stringify(s) + back + (at !== null) + bout;
     if (key === this.key) return;
     this.key = key;
     const g = this.canvas.getContext('2d')!;
@@ -95,36 +113,49 @@ export class SmithBoard {
     }
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    if (back) this.drawBack(g, s);
-    else this.drawOrder(g, s);
+    if (back) this.drawBack(g, s, at !== null, bout);
+    else this.drawOrder(g, s, at !== null);
     this.tex.needsUpdate = true;
   }
 
-  private drawOrder(g: CanvasRenderingContext2D, s: BoardState) {
+  private drawOrder(g: CanvasRenderingContext2D, s: BoardState, hover: boolean) {
     setType(g, 'caption', this.k, DIST);
-    // The order, and the streak it keeps alive: a reason to be back tomorrow, at a glance.
+    // At rest: a streak at risk (or the order's state), the goal and the rival; pointed at, the
+    // whole order, the streak it keeps alive and its one action. PLAY stays the call to action.
+    const risk = s.streak > 0 && !s.playedToday;
     const head = s.done ? 'ORDER DONE' : "TODAY'S ORDER";
-    engrave(g, s.streak > 0 ? `${head} · ${streakTitle(s.streak, s.playedToday)}` : head, W / 2, 62, s.streak > 0 && !s.playedToday ? ORANGE : TEXT_DIM, W - 120);
+    const top = hover ? (s.streak > 0 ? `${head} · ${streakTitle(s.streak, s.playedToday)}` : head) : boardHead(risk ? streakTitle(s.streak, false) : null, s.done);
+    engrave(g, top, W / 2, 62, risk ? ORANGE : TEXT_DIM, W - 120);
     if (s.order) {
+      const [title, sub] = orderShort(s.order);
       const t = setType(g, 'title', this.k, DIST);
-      const lines = wrap(g, s.order.text, W - 140, 2);
+      const lines = hover ? wrap(g, s.order.text, W - 140, 2) : [title];
       const y0 = 168 - ((lines.length - 1) * t * 1.15) / 2;
       lines.forEach((l, i) => engrave(g, l, W / 2, y0 + i * t * 1.15, s.done ? TEXT_DIM : TEXT, W - 140));
       setType(g, 'caption', this.k, DIST);
-      // The board hangs out of reach: keep its one action short enough to read at a glance.
       const next = tomorrowLine(s.tomorrow);
-      engrave(g, (s.done ? next : `${s.order.arena} · PINCH TO PLAY`).toUpperCase(), W / 2, 292, s.done ? STEEL : ORANGE, W - 120);
+      const line = hover ? (s.done ? next : `${s.order.arena} · PINCH TO PLAY`) : s.done ? ORDER_DONE_SUB : sub;
+      engrave(g, line.toUpperCase(), W / 2, 292, hover && !s.done ? ORANGE : STEEL, W - 120);
     }
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(80, 334, W - 160, 3);
     this.drawStamps(g, s, 398);
   }
 
-  private drawBack(g: CanvasRenderingContext2D, s: BoardState) {
-    // The Circuit Map: this chapter's five bouts as medallions, three medal notches each.
-    setType(g, 'caption', this.k, DIST);
-    engrave(g, `${s.map.chapter} · ${s.map.medals} OF ${s.map.of} MEDALS`.toUpperCase(), W / 2, 44, TEXT_DIM, W - 120);
+  /** The map's bout column under canvas point `at`, or -1 (only over the medallion row). */
+  private boutAt(s: BoardState, at: readonly [number, number]): number {
     const n = s.map.bouts.length;
+    const i = Math.floor(((at[0] - 40) / (W - 80)) * n);
+    return at[1] < MAP_ROW_BOTTOM && i >= 0 && i < n ? i : -1;
+  }
+
+  private drawBack(g: CanvasRenderingContext2D, s: BoardState, hover: boolean, pointed: number) {
+    // The Circuit Map: this chapter's five bouts as medallions, three medal notches each. One bout
+    // is named at a time: the one pointed at, else the next one.
+    setType(g, 'caption', this.k, DIST);
+    engrave(g, mapHead(s.map.chapter, s.map.medals, s.map.of), W / 2, 44, TEXT_DIM, W - 120);
+    const n = s.map.bouts.length;
+    const focus = pointed >= 0 ? pointed : s.map.bouts.findIndex((b) => b.next);
     const col = (W - 80) / n;
     s.map.bouts.forEach((b, i) => {
       const R = b.boss ? 46 : 38;
@@ -151,23 +182,24 @@ export class SmithBoard {
       }
       const t = setType(g, 'caption', this.k, DIST);
       engrave(g, b.boss ? 'BOSS' : b.id, cx, cy + 8, b.open ? TEXT : TEXT_DIM, R * 1.6);
+      if (i !== focus) return;
       const lines = b.open ? wrap(g, b.rival.toUpperCase(), col - 12, 2) : ['?'];
       lines.forEach((l, j) => engrave(g, l, cx, cy + R + 28 + j * t * 1.1, b.open ? TEXT : TEXT_DIM, col - 8));
     });
-    // One line under the map: medals short of the next chapter is news; otherwise what the next bout
-    // still asks for, and only then the plain "beat the boss" gate.
-    const short = s.map.gate.includes('more medal');
-    const line = short ? s.map.gate : s.map.todo || s.map.gate;
+    // One line under the map: the pointed bout's medals still to earn; at rest, what opens the next chapter.
+    const b = s.map.bouts[pointed];
+    const line = b ? (b.open ? b.left || 'EVERY MEDAL WON' : 'LOCKED') : s.map.gateShort;
     if (line) {
       setType(g, 'caption', this.k, DIST);
-      engrave(g, line.toUpperCase(), W / 2, 244, line === s.map.gate ? ORANGE : TEXT_DIM, W - 120);
+      engrave(g, line.toUpperCase(), W / 2, 244, b ? TEXT_DIM : ORANGE, W - 120);
     }
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(80, 268, W - 160, 3);
     this.drawStamps(g, s, 304);
     setType(g, 'caption', this.k, DIST);
     const glow = s.nextGlow ? ` · NEXT EMBLEM GLOW AT ${s.nextGlow}` : '';
-    engrave(g, `${s.stamps} STAMP${s.stamps === 1 ? '' : 'S'}${glow} · ${s.feats} OF ${s.featsOf} FEATS`, W / 2, 362, STEEL, W - 120);
+    const ledger = hover ? `${s.stamps} STAMP${s.stamps === 1 ? '' : 'S'}${glow} · ${s.feats} OF ${s.featsOf} FEATS` : ledgerLine(s.stamps, s.feats, s.featsOf);
+    engrave(g, ledger, W / 2, 362, STEEL, W - 120);
     // Your top as a short code for a friend's game: shown here, on request, never as an address.
     const label = 'CHALLENGE CODE';
     setType(g, 'caption', this.k, DIST);
