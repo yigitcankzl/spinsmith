@@ -22,6 +22,12 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 2 | Reason to Come Back | 8 → pending | Day streak + "Tomorrow: <order>" + next bout on the result card and the board (no new meshes) | a57873c |
 | 2 | Easy in/out + accessibility | 7 / 6 → pending | Interrupted matches resume at the round start (not the first match; 12 h stale rule); colour-safe dial mode (Okabe-Ito); rival rings/marks hexagonal; wrong-way rub stamp, low-spin bar throb | 7a91c36, f507218 |
 | 2 | Solid / bug-free | 5 → pending | Found by probes: resume replayed a pre-fresh tutorial (fixed: never resume match 1); flick swing also committed a groove (fixed); outer-ring driver aimed at a stale goal while the arena slid (fixed). Full `check:hands` passes in one sequence; desk-ko-first, desk-ko, desk-guard, combat-readability, room-matrix 5/5 pass | 61fe076 |
+| 2 re-score (02:50) | Fresh full judge | accessibility 6→8, scene understanding 6→7, seated 6→7, habit 7→8, repeat usage 8; passthrough 8→6 and take-it-away 8→5 (this judge: the tray loop is otherwise the same) | Bugs found: bouts 1-2/1-3 taught forge/strike while cards announced Spring/Gust; rub-tip gust guard too small; drop side live in match 1; README step 4 lacked the table caveat. All fixed | 3d…, see below |
+| 3 (02:50–03:05) | Solid / bug-free (arbitration) | 6 → pending | One rule table (`src/game/gesture-owner.ts`) owns each hand per frame; 25 table-driven sim-check cases; flick follow-through no longer leaves a groove (found by check:hands); full `check:hands` passes, desk-ko-first, desk-ko, desk-guard, combat-readability, room-matrix pass | 9f32128 + fixes |
+| 3 | First Five Minutes (stamp diet) | 6 → pending | IWER first session: prompts 55 → 22, words 258 → 81; first KO 19.2 s, first DESK KO 41.7 s, match end 110 s; come-back card shown | 33d0418 |
+| 3 | Accessibility (combinable comfort) | 8 → pending | Dial selects, plate toggles; any combination; v1 → v2 migration | 74bb5c1 |
+| 3 | 60 fps (overlay + guard) | 4 → pending | `?fps` world-locked readout; QualityGuard steps full → lite → lite+foveation after 3 slow seconds, back after 10 good; per-phase fps in the Quest test report | b37a58a |
+| 3 | Untested rooms | 6 → pending | Room matrix 10 cases incl. tilted 30° surface (tray), two desks (near wins), 0.38 m coffee table (tray), table 1.7 m away (tray), rebuilt-plane control | e1de6cd |
 
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
@@ -46,8 +52,12 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [x] Rewrite docs/SUBMISSION.md from the current game (Submission text 6)
 - [ ] Refresh IWER-labelled stills (Images 5)
 - [ ] Last: IWER-labelled trailer recut opening on the DESK KO (Video 4)
-- [ ] FPS overlay + automatic quality fallback (60 fps 3)
-- [ ] One gesture arbitration table for the open fingertip / palm verbs, tested (Solid 5)
-- [ ] Comfort modes as combinable toggles (Accessibility 6)
-- [ ] Fewer stamps in match 1 (55 prompts / 258 words) (First Five Minutes)
-- [ ] Room matrix: tilted plane, two desks, coffee table, table at the edge of reach (Untested rooms 5)
+- [x] FPS overlay + automatic quality fallback (60 fps 3)
+- [x] One gesture arbitration table for the open fingertip / palm verbs, tested (Solid 5)
+- [x] Comfort modes as combinable toggles (Accessibility 6)
+- [x] Fewer stamps in match 1 (55 prompts / 258 words) (First Five Minutes)
+- [x] Room matrix: tilted plane, two desks, coffee table, table at the edge of reach (Untested rooms 5)
+- [ ] Real hands occlude the arena (joint capsules writing depth) (passthrough / polish)
+- [ ] One-Euro again, only on aim/hover paths; rip and flick keep raw joints (hand tracking 5)
+- [ ] README condensed for a 5-minute judge (text 5)
+- [ ] First-five driver: "seal stamp did not spend the armed ultimate" twice — driver or game?
