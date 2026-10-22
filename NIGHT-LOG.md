@@ -37,6 +37,8 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 5 (03:30–04:00) | Solid (seal) | — | Probe found pinching the ready seal raised a ramp under it (3/3); fixed: a pinch on the ready seal belongs to the seal. First-five in IWER: first KO 15.6 s, DESK KO 38.1 s, match end 56.7 s, 20 prompts / 74 words, no driver errors | 564d802 |
 | 5 | UI/UX (hub diet) | 7 → pending | Hub at rest 45 → 18 words (longest 4), Circuit Map 41 → ~21 words; detail on hover; PLAY is the one orange call to action | 570e5c8 |
 | 5 | Video / images | 5 / 4 → pending | Reel re-cut 45.5 s with current-UI seal stamp and a fresh-save first-match win (LEVEL 2, BOUT WON, NEW MOVE: Rim Spring, DAY 1 STREAK); found and fixed the NEW MOVE card being covered after <1 s; 9 IWER-labelled stills in `~/Desktop/spinsmith-videos/night-2026-10-22/stills/` | night-trailer.sh |
+| 5 | Solid (crowd balance) | 6 → pending | Crowded bouts: best build last spinning 2-3 88% → 50%, 3-3 100% → 50% (crowd swaps only; assert ≤ 65%) | night-crowd merge |
+| 5 | Art / video | 6 / 5 → pending | Second cut over the CC0 360° café backdrop (wooden table, skinned hands; labelled as a backdrop): DESK KO front and side, first-match rip, flick, seal stamp, first-match win cards; `spinsmith-reel-room-1080p60.mp4` 45.5 s | night-trailer.sh |
 
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
