@@ -33,6 +33,10 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 4 | Passthrough polish (hand occlusion) | — | Existing joint-proxy occluder gated (AR only, `?nohandocclude`), palm slab, never pickable, flick glow / wrist bar drawn over it; kept on under depth sensing because tops are not depth-occluded | abaa5e7 |
 | 4 | Submission text | 5 → pending | README 469 → 179 lines (judge path, real-room list, hands table, honest limits); design notes moved to DESIGN.md | bc80a55 |
 | 4 | Solid / bug-free | — | Probes found: sim-check block left unclosed by a merge (caught: a piped `tail` had hidden the exit code; now checks keep exit codes); groove committing before a flick on a curved swing (fixed: a groove commits once the fingertip leaves the floor). `check:hands` 1 of 2 sequences clean (flick double-charge 1 in ~6 runs, open); desk-ko-first, desk-ko, desk-guard, combat-readability, room-matrix pass | 832a4d4 |
+| 4 re-score (03:30) | Fresh full judge | Mean of the four criteria 6.3 (baseline 5.75), assuming Stage One gaps closed: hand tracking 5→7, first five minutes 6→7, accessibility 7, video 3→5, submission text 5 | Found: strike described as a slap (it is a seal stamp with a slap fallback), SUBMISSION Outer Ring "pinch" (open palm), incomplete verb list, flick clip showing a match-4 card, crowd bout 3-3 at 100% — text fixed, crowd retune in progress | docs |
+| 5 (03:30–04:00) | Solid (seal) | — | Probe found pinching the ready seal raised a ramp under it (3/3); fixed: a pinch on the ready seal belongs to the seal. First-five in IWER: first KO 15.6 s, DESK KO 38.1 s, match end 56.7 s, 20 prompts / 74 words, no driver errors | 564d802 |
+| 5 | UI/UX (hub diet) | 7 → pending | Hub at rest 45 → 18 words (longest 4), Circuit Map 41 → ~21 words; detail on hover; PLAY is the one orange call to action | 570e5c8 |
+| 5 | Video / images | 5 / 4 → pending | Reel re-cut 45.5 s with current-UI seal stamp and a fresh-save first-match win (LEVEL 2, BOUT WON, NEW MOVE: Rim Spring, DAY 1 STREAK); found and fixed the NEW MOVE card being covered after <1 s; 9 IWER-labelled stills in `~/Desktop/spinsmith-videos/night-2026-10-22/stills/` | night-trailer.sh |
 
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
@@ -65,7 +69,7 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [x] Real hands occlude the arena (joint capsules writing depth) (passthrough / polish)
 - [x] One-Euro again, only on aim/hover paths; rip and flick keep raw joints (hand tracking 5)
 - [x] README condensed for a 5-minute judge (text 5)
-- [ ] First-five driver: "seal stamp did not spend the armed ultimate" twice — driver or game?
+- [x] First-five "seal stamp did not spend": both — the seal pinch raised a ramp (game, fixed) and the driver aimed at a settling seal (fixed)
 - [ ] Flick + groove double charge in long check:hands sequences (1 in ~6)
-- [ ] Hub/home label diet (UI/UX 7)
-- [ ] Store stills from the current build, IWER-labelled (Images 4)
+- [x] Hub/home label diet (UI/UX 7)
+- [x] Store stills from the current build, IWER-labelled (Images 4)
