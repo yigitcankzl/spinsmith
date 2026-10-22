@@ -4,7 +4,7 @@
  * draining toward the middle, points toward the match as pips (orange yours, cyan the rival's), the
  * round's word between the names, and after a round your smith level along the bottom.
  */
-import { CanvasTexture, Color, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
+import { BoxGeometry, CanvasTexture, Color, CylinderGeometry, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, Vector3 } from '@iwsdk/core';
 import { brawlSlots, spinStep } from './brawl.js';
 import { SAFE_COLORS, warnColor } from './comfort.js';
 import { ARENA_SCALE } from './reach.js';
@@ -25,6 +25,8 @@ const BAR_Y = 118;
 const BAR_H = 56;
 /** In a fight the plate ends under the heat pips; the XP row (and the full height) is for results. */
 const FIGHT_H = 272;
+/** A duel's fight: the plate is one word high (the spin sits on the rim gauge). */
+const COMPACT_H = 140;
 /** In a brawl: the gap between the tops' slots (px). */
 const BRAWL_GAP = 28;
 
@@ -41,7 +43,7 @@ export class MatchBar {
   readonly mesh: Mesh;
   private canvas = document.createElement('canvas');
   private tex: CanvasTexture;
-  private last = { ready: false, my: 0, their: 0, toWin: 0, n0: '', n1: '', msg: '', show: false, level: 0, fraction: 0, gained: 0 };
+  private last = { compact: false, ready: false, my: 0, their: 0, toWin: 0, n0: '', n1: '', msg: '', show: false, level: 0, fraction: 0, gained: 0 };
   /** The spin bars as meshes over the plate (animated every frame): fill, and the chip behind it. */
   private fill: [Mesh, Mesh];
   private chip: [Mesh, Mesh];
@@ -85,6 +87,11 @@ export class MatchBar {
     this.fill = [quad(0, 0xff8a2a, 0.002), quad(1, 0x4fd1ff, 0.002)];
   }
 
+  /** A side's spin fill colour this frame (team, white on a hit, warning red when low), for the rim gauge. */
+  fillColor(side: 0 | 1): Color {
+    return (this.fill[side].material as MeshBasicMaterial).color;
+  }
+
   /** A hard hit on a side (0 yours, 1 the rival's): its bar flashes white for a moment. */
   hit(side: 0 | 1) {
     this.flashT[side] = 0.06;
@@ -119,7 +126,7 @@ export class MatchBar {
    * right, points toward the match as pips, the round's word between the names (TITLE, never
    * dropped: a word too long for the gap is narrowed). Redraws only when something visible changed.
    */
-  bar(_mine: number, _theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string, xp: { level: number; rank: string; fraction: number; gained: number; show: boolean }, field?: BrawlField | null) {
+  bar(_mine: number, _theirs: number, myPoints: number, theirPoints: number, toWin: number, names: [string, string], message: string, xp: { level: number; rank: string; fraction: number; gained: number; show: boolean }, field?: BrawlField | null, compact = false) {
     // The spin fills are meshes (animate()); the plate redraws only for names, pips and words.
     // Compared field by field (no string built every frame).
     const k = this.last;
@@ -129,18 +136,27 @@ export class MatchBar {
     const n = field ? field.tops.length : 0;
     let fieldSame = n === this.lastStep.length;
     for (let i = 0; i < n && fieldSame; i++) fieldSame = this.lastStep[i] === this.seatStep(field!, i) && this.lastName[i] === this.seatName(field!, names, i) && this.lastColor[i] === field!.colors[i];
-    for (let i = 0; i < 2; i++) this.fill[i].visible = this.chip[i].visible = n === 0;
-    if (fieldSame && k.ready && k.my === myPoints && k.their === theirPoints && k.toWin === toWin && k.n0 === names[0] && k.n1 === names[1] && k.msg === message && k.show === xp.show && k.level === xp.level && k.fraction === fraction && k.gained === xp.gained) return;
+    // Compact (a duel's fight): the spin and points live on the rim gauge; the plate only carries a
+    // word worth reading (a rival's move), and is not drawn at all for the plain FIGHT.
+    const word = compact && !!message && message !== 'FIGHT';
+    (this.mesh.material as MeshBasicMaterial).visible = !compact || word;
+    this.slab.visible = !compact || word;
+    for (let i = 0; i < 2; i++) this.fill[i].visible = this.chip[i].visible = n === 0 && !compact;
+    if (compact && !word) {
+      k.ready = false;
+      return;
+    }
+    if (fieldSame && k.compact === compact && k.ready && k.my === myPoints && k.their === theirPoints && k.toWin === toWin && k.n0 === names[0] && k.n1 === names[1] && k.msg === message && k.show === xp.show && k.level === xp.level && k.fraction === fraction && k.gained === xp.gained) return;
     this.lastStep.length = this.lastName.length = this.lastColor.length = n;
     for (let i = 0; i < n; i++) {
       this.lastStep[i] = this.seatStep(field!, i);
       this.lastName[i] = this.seatName(field!, names, i);
       this.lastColor[i] = field!.colors[i];
     }
-    Object.assign(k, { ready: true, my: myPoints, their: theirPoints, toWin, n0: names[0], n1: names[1], msg: message, show: xp.show, level: xp.level, fraction, gained: xp.gained });
+    Object.assign(k, { compact, ready: true, my: myPoints, their: theirPoints, toWin, n0: names[0], n1: names[1], msg: message, show: xp.show, level: xp.level, fraction, gained: xp.gained });
     const g = this.canvas.getContext('2d')!;
     // A compact plate while the tops fight: no empty glass below the pips.
-    const h = xp.show ? CH : FIGHT_H;
+    const h = compact ? COMPACT_H : xp.show ? CH : FIGHT_H;
     g.clearRect(0, 0, CW, CH);
     glass(g, CW, h);
     this.slab.scale.y = h / CH;
@@ -166,7 +182,13 @@ export class MatchBar {
         g.fill();
       }
     }
-    if (field && n > 0) {
+    if (compact) {
+      setType(g, 'title', this.k, DIST);
+      g.fillStyle = TEXT;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(message, CW / 2, COMPACT_H / 2 + 6, CW - 2 * BAR_X);
+    } else if (field && n > 0) {
       this.brawlRow(g, field, names, myPoints, theirPoints, toWin, message);
     } else {
     g.save();
@@ -307,5 +329,109 @@ export class MatchBar {
       const gap = CW - 2 * (BAR_X + toWin * 62 + 40);
       g.fillText(message, CW / 2, pipY, Math.max(160, gap));
     }
+  }
+}
+
+/** The rim gauge: each side's band spans this much of the far wall (rad), past a centre gap for the points. */
+const GAUGE_SPAN = 0.9;
+const GAUGE_SEGS = 40;
+const PIP_STEP = 0.075;
+const PIP_MAX = 16;
+
+/**
+ * A duel's spin on the arena itself, the way a stadium paints its score: two bands along the far
+ * wall, yours (orange) left of centre and the rival's (cyan) right, each draining toward the middle
+ * like the bar's fills, with the points toward the match as pips in the centre gap. Colours follow
+ * the bar's fills (white on a hit, warning red with a throb when low). Five draws, while the
+ * floating plate (six) is off.
+ */
+export class RimGauge {
+  readonly root = new Group();
+  private fills: [Mesh, Mesh];
+  private tracks: [Mesh, Mesh];
+  private pips: InstancedMesh;
+  private key = '';
+  private t = 0;
+  private pipR = 0;
+  private pipY = 0;
+  private pipSize = 0;
+  private readonly m = new Matrix4();
+  private readonly v = new Vector3();
+  private readonly dark = new Color(0x3a3d44);
+  private readonly team = [new Color(ORANGE), new Color(CYAN)];
+
+  constructor() {
+    this.root.name = 'rim-gauge';
+    this.root.visible = false;
+    const mat = (color: number, opacity: number) => new MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: DoubleSide, toneMapped: false });
+    this.tracks = [new Mesh(new CylinderGeometry(), mat(0x15171b, 0.8)), new Mesh(new CylinderGeometry(), mat(0x15171b, 0.8))];
+    this.fills = [new Mesh(new CylinderGeometry(), mat(0xff8a2a, 1)), new Mesh(new CylinderGeometry(), mat(0x4fd1ff, 1))];
+    for (const i of [0, 1] as const) {
+      this.tracks[i].renderOrder = 2;
+      this.fills[i].renderOrder = 3;
+      this.root.add(this.tracks[i], this.fills[i]);
+    }
+    this.pips = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial({ toneMapped: false }), PIP_MAX);
+    this.pips.count = 0;
+    this.pips.renderOrder = 3;
+    this.pips.frustumCulled = false;
+    this.root.add(this.pips);
+  }
+
+  /**
+   * Fits the bands to a far rim `r` from the centre with its top at `y` (the stage's frame), and
+   * turns against the stage's `yaw` so the gauge stays on the player's far side.
+   */
+  fit(r: number, y: number, yaw: number, toWin: number) {
+    this.root.rotation.y = -yaw;
+    // The rim's height follows the live floor (a tilt) every frame; only a new size rebuilds.
+    this.root.position.y = y;
+    const key = `${r.toFixed(4)},${toWin}`;
+    if (key === this.key) return;
+    this.key = key;
+    const h = 0.011;
+    const gap = 0.05 + Math.min(PIP_MAX / 2, toWin) * PIP_STEP;
+    // CylinderGeometry puts theta at x = r sin, z = r cos: the far point (z = -r) is theta = PI and
+    // the player's left (-x) is larger theta. Its index runs along theta, so a drawRange from 0
+    // fills from the centre outward.
+    for (const side of [0, 1] as const) {
+      const start = side === 0 ? Math.PI + gap : Math.PI - gap;
+      const len = side === 0 ? GAUGE_SPAN : -GAUGE_SPAN;
+      this.tracks[side].geometry.dispose();
+      this.tracks[side].geometry = new CylinderGeometry(r * 1.05, r * 1.05, h * 1.5, GAUGE_SEGS, 1, true, start, len).translate(0, h * 0.75, 0);
+      this.fills[side].geometry.dispose();
+      this.fills[side].geometry = new CylinderGeometry(r * 1.04, r * 1.04, h, GAUGE_SEGS, 1, true, start, len).translate(0, h * 0.75, 0);
+    }
+    this.pipR = r * 1.045;
+    this.pipY = h * 0.75;
+    this.pipSize = h * 0.95;
+  }
+
+  /** Each frame: spin 0..1 per side, the bar's fill colours, and the points toward the match. */
+  update(mine: number, theirs: number, colors: [Color, Color], myPoints: number, theirPoints: number, toWin: number, dt: number) {
+    this.t += dt;
+    const v = [mine, theirs];
+    for (const i of [0, 1] as const) {
+      const k = Math.max(0, Math.min(1, v[i]));
+      this.fills[i].geometry.setDrawRange(0, Math.round(k * GAUGE_SEGS) * 6);
+      const mat = this.fills[i].material as MeshBasicMaterial;
+      mat.color.copy(colors[i]);
+      // Low spin is not colour alone: the band throbs.
+      mat.opacity = k <= 0.25 && k > 0 ? 0.55 + 0.45 * Math.abs(Math.cos(this.t * 6)) : 1;
+    }
+    const n = Math.min(PIP_MAX / 2, toWin);
+    this.pips.count = 2 * n;
+    const s = this.pipSize;
+    for (const side of [0, 1] as const) {
+      const pts = side === 0 ? myPoints : theirPoints;
+      for (let i = 0; i < n; i++) {
+        const a = side === 0 ? Math.PI + 0.05 + (i + 0.5) * PIP_STEP : Math.PI - 0.05 - (i + 0.5) * PIP_STEP;
+        this.m.makeRotationY(a).scale(this.v.set(s, s, s * 0.4)).setPosition(this.pipR * Math.sin(a), this.pipY, this.pipR * Math.cos(a));
+        this.pips.setMatrixAt(side * n + i, this.m);
+        this.pips.setColorAt(side * n + i, i < pts ? this.team[side] : this.dark);
+      }
+    }
+    this.pips.instanceMatrix.needsUpdate = true;
+    if (this.pips.instanceColor) this.pips.instanceColor.needsUpdate = true;
   }
 }

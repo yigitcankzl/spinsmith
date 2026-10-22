@@ -28,7 +28,7 @@ import { nextArena } from './rotation.js';
 import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
 import { anvilModel, Hub, standModel } from './hub.js';
-import { MatchBar } from './match-bar.js';
+import { MatchBar, RimGauge } from './match-bar.js';
 import type { BrawlField } from './match-bar.js';
 import { HandOccluder } from './hand-occluder.js';
 import { handOcclusionOn } from './hand-proxy.js';
@@ -446,6 +446,7 @@ export class MatchSystem extends createSystem({
   progress = new Progress(typeof localStorage === 'undefined' ? null : localStorage);
   /** The match bar on the far rim. */
   private bar = new MatchBar();
+  private rimGauge = new RimGauge();
   /** The forge: build your own top from parts. */
   forge = new Forge({
     done: (build) => this.leaveForge(build),
@@ -1411,6 +1412,7 @@ export class MatchSystem extends createSystem({
     this.bar.mesh.rotation.x = -0.55;
     this.bar.mesh.scale.setScalar(0.21);
     this.root.add(this.bar.mesh);
+    this.stage.add(this.rimGauge.root);
 
     if (import.meta.env.DEV) {
       const onKey = (e: KeyboardEvent) => {
@@ -1875,6 +1877,9 @@ export class MatchSystem extends createSystem({
       this.humLive[i] = !!t;
     });
     this.sinceClashSound += dt;
+    // A duel's fight reads spin and points off the rim gauge; the plate keeps only a rival's word.
+    const gauge = this.phase === 'fight' && !this.extras.length;
+    this.rimGauge.root.visible = false;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
       const p = this.progress;
       this.bar.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_HEAT, ['YOU', this.rival.name.toUpperCase()], this.phase === 'fight' && this.barMessage === 'READY' ? (this.extras.length ? `${this.tops.filter((t) => t.alive).length} LEFT` : 'FIGHT') : this.barMessage, {
@@ -1883,8 +1888,15 @@ export class MatchSystem extends createSystem({
         fraction: p.fraction,
         gained: this.phase === 'result' ? this.rewards.xpGained : 0,
         show: this.phase === 'result',
-      }, this.extras.length ? this.brawlBarField() : null);
+      }, this.extras.length ? this.brawlBarField() : null, gauge);
       this.bar.animate(this.mine.spin, this.theirs.spin, dt);
+      if (gauge && this.bar.mesh.visible) {
+        const L = this.arena.layout;
+        const r = rimRadius(L, -Math.PI / 2);
+        this.rimGauge.fit(r, this.arena.height(0, -r * 0.97) + WALL_HEIGHT[L.wall] + 0.002, this.stage.rotation.y, MATCH_HEAT);
+        this.rimGauge.update(this.mine.spin, this.theirs.spin, [this.bar.fillColor(0), this.bar.fillColor(1)], this.barPoints[0], this.barPoints[1], MATCH_HEAT, dt);
+        this.rimGauge.root.visible = true;
+      }
     }
     // Visuals only: after a finish your shape caused they slow down for a moment.
     // A knockout holds still for a beat first (visuals only: the simulation has already stopped).
