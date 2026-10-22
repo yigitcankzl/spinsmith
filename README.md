@@ -121,6 +121,8 @@ own rays rarely line up with what you are looking at.
 
 ### Testing in the emulator (IWSDK CLI)
 
+**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human): first knockout 15.6 s and first DESK KO 38.1 s of game time, match over at 56.7 s, 20 distinct prompts and 74 words on screen before the match ends. Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes).
+
 **Hand driver** (`src/dev-drive.ts`, dev builds only): `window.drive` plays real hand motions on
 the emulated hands (tap, drag, rip, ramp, cup, sling, palm slap), so the game's own gesture
 detection reads them, unlike the dev keys. From a shell (dev server started with
