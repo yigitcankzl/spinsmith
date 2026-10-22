@@ -73,7 +73,10 @@ card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.8
 
 segments=(00-hook 01-rise 02-rip 03-desk 04-flick 06-strike)
 [ -s "$NEW/brawl.mp4" ] && segments+=(07-brawl)
-segments+=(08-forge 09-workshop 10-arenas 11-return 13-end)
+segments+=(08-forge 09-workshop)
+# SKIP_ARENAS=1 drops the grey 10-16 arena-variety shot from a backdrop cut.
+[ "${SKIP_ARENAS:-0}" = 1 ] || segments+=(10-arenas)
+segments+=(11-return 13-end)
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
 mkdir -p "$(dirname "$FINAL")"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" \
