@@ -1202,6 +1202,9 @@ export function installDriver() {
           await glide(side, 'index', at(), 0.04, 0, 'linear');
         }
         await glide(side, 'index', above(at(), 0.1), 0.25, 0, 'natural', 'release');
+        // Home over the rim, high, as a hand does: a straight line down to the lap would skim the
+        // bowl and the rival in it.
+        await glide(side, 'index', above(local((side === 'left' ? -1 : 1) * g.arena.radius * 1.3, g.arena.radius * 1.7), 0.16), 0.25, 0, 'natural', 'release');
       } finally {
         clearInterval(pin);
       }
