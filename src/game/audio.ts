@@ -933,25 +933,26 @@ export class CordTone {
 /** Builder: picking a piece up from the tray or the arena. */
 export function playPick() {
   vary(0.06, () => {
-    crack(0.06, 0.003, 3000);
-    tone(1100, 0.05, 0.06, 'sine');
+    crack(0.14, 0.003, 3000);
+    tone(1100, 0.1, 0.06, 'sine');
   });
 }
 
 /** The forge's core locks on tooth by tooth: a ratchet whose pitch climbs as it seats. */
 export function playTooth(left: number) {
   vary(0.02, () => {
-    crack(0.08, 0.003, 3500);
-    ring(steel('', 2200), 0.07, 1 / (1 + 0.04 * left), 0, 0.02);
+    crack(0.16, 0.003, 3500);
+    ring(steel('', 2200), 0.14, 1 / (1 + 0.04 * left), 0, 0.02);
   });
 }
 
 /** Builder: a piece clicks into place. */
 export function playPlace() {
   vary(0.05, () => {
-    crack(0.12, 0.004, 2500);
-    hiss(0.12, 0.05, 600, 450, 1.5);
-    ring(steel('', 1400), 0.1, 1, 0.005, 0.05);
+    crack(0.26, 0.004, 2500);
+    thump(180, 110, 0.18, 0.08);
+    hiss(0.18, 0.05, 600, 450, 1.5);
+    ring(steel('', 1400), 0.2, 1, 0.005, 0.05);
   });
 }
 
@@ -976,7 +977,7 @@ export function playDip() {
 
 /** Builder: a piece dropped off the arena is thrown away. */
 export function playRemove() {
-  vary(0.06, () => hiss(0.18, 0.2, 1500, 300, 1.5));
+  vary(0.06, () => hiss(0.32, 0.2, 1500, 300, 1.5));
 }
 
 /** XP ticking up after a round: a soft rising blip. */
@@ -1166,9 +1167,9 @@ export function playMachine() {
 /** A forge drawer slides out: a short slide and a click. */
 export function playDrawer() {
   vary(0.05, () => {
-    hiss(0.14, 0.08, 2500, 1200, 1);
-    crack(0.08, 0.003, 3000, 0.13);
-    tone(900, 0.04, 0.04, 'sine', 0.13);
+    hiss(0.28, 0.08, 2500, 1200, 1);
+    crack(0.18, 0.003, 3000, 0.13);
+    tone(900, 0.08, 0.04, 'sine', 0.13);
   });
 }
 

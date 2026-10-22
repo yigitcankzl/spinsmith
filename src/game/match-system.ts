@@ -2795,7 +2795,8 @@ export class MatchSystem extends createSystem({
       this.impacts.hit(them.x, this.arena.height(them.x, them.z), them.z, 1);
       playLand('table', them.x, 1);
       duck(0.4, 0.3);
-      this.stamp.show(e.vs, this.quietFirst ? '' : e.sub, 'rival', 1.6);
+      // The first match's card already names the rival: its landing is the beat, not a second VS.
+      if (!this.quietFirst) this.stamp.show(e.vs, e.sub, 'rival', 1.6);
     }
     if (e.t > 2.1) {
       this.theirView.root.scale.setScalar(1);
@@ -4997,7 +4998,8 @@ export class MatchSystem extends createSystem({
       this.echoRec.forges.push({ round: this.echoRec.rips.length - 1, t: this.elapsed, action, sign: sign < 0 ? -1 : 1 });
       if (!this.quietFirst) this.stamp.show(ARENA_FORGE_TITLE[action], ARENA_FORGE_EFFECT[action], 'mine', 1.05, 1.15);
       // The stamp names the action and its effect; the card only points at the result.
-      this.label.set(LESSON.forgeDone);
+      // The staged DESK KO's own stamp follows within a second: the card stays quiet then.
+      this.label.set(this.desk.deskWrench.fired ? '' : LESSON.forgeDone);
       this.labelTimer = 1.65;
       this.sparks.burst(0, this.arena.height(0, 0), 0, 0.9);
       this.impacts.shock(0, this.arena.height(0, 0), 0, 0.75, VERB_TINT.forge);
