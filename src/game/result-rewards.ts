@@ -1,4 +1,4 @@
-import { CylinderGeometry, Group, Mesh, MeshBasicMaterial, Object3D } from '@iwsdk/core';
+import { CylinderGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, TorusGeometry } from '@iwsdk/core';
 import { playLevelUp, playUnlock, playXp, playStamp } from './audio.js';
 import { COMFORT } from './comfort.js';
 import { ARENAS } from './arenas.js';
@@ -66,10 +66,15 @@ function unlockModel(key: string, arenas: ArenaLayout[]): Object3D {
   if (kind === 'emblem' || kind === 'stamp' || kind === 'ledger' || kind === 'move') {
     // A struck medallion: the glow's color, the stamp's (or a new move's) orange, or the ledger's gold.
     const color = kind === 'emblem' ? EMBLEM_COLORS[Number(id)] : kind === 'stamp' || kind === 'move' ? 0xff8a2a : 0xffd34a;
+    // Struck metal with a raised rim and a sunk face, so it reads as a coin while it turns, never a flat blob.
     const g = new Group();
-    const coin = new Mesh(new CylinderGeometry(0.02, 0.02, 0.004, 32), new MeshBasicMaterial({ color }));
+    const metal = new MeshStandardMaterial({ color, metalness: 0.55, roughness: 0.3, emissive: color, emissiveIntensity: 0.15 });
+    const coin = new Mesh(new CylinderGeometry(0.02, 0.02, 0.003, 40), metal);
     coin.rotation.x = Math.PI / 2;
-    g.add(coin);
+    const rim = new Mesh(new TorusGeometry(0.0195, 0.0018, 8, 40), metal);
+    const boss = new Mesh(new CylinderGeometry(0.007, 0.008, 0.005, 24), new MeshStandardMaterial({ color: 0x2a2d33, metalness: 0.4, roughness: 0.5 }));
+    boss.rotation.x = Math.PI / 2;
+    g.add(coin, rim, boss);
     return g;
   }
   for (const [, items] of ROWS) for (const item of items) if (itemKey(item) === key) return itemModel(item);

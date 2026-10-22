@@ -2364,6 +2364,10 @@ export class MatchSystem extends createSystem({
   }
 
   private updateHub(dt: number) {
+    if (this.progress.saveWasReset && !this.stamp.occupied) {
+      this.progress.saveWasReset = false;
+      this.stamp.show('SAVE RESET', 'THE SAVED PROGRESS COULD NOT BE READ', 'neutral', 2.5);
+    }
     if (this.moveArena()) return;
     if (this.labelTimer > 0 && (this.labelTimer -= dt) <= 0) this.label.set(this.guideNote());
     this.player.head.getWorldPosition(this.p);
@@ -3701,7 +3705,7 @@ export class MatchSystem extends createSystem({
       this.stamp.mesh.lookAt(head);
     }
     // In a fight the stamp sits low, just over the far rim, inside the view that watches the tops.
-    else if (this.phase === 'fight') this.stamp.mesh.position.set(0, (this.arena.height(0, -far / this.viewK) + WALL_HEIGHT[L.wall]) * this.viewK + 0.075, -far);
+    else if (this.phase === 'fight') this.stamp.mesh.position.set(0, (this.arena.height(0, -far / this.viewK) + WALL_HEIGHT[L.wall]) * this.viewK + 0.12, -far);
     else if (this.phase === 'ready' || this.phase === 'result') {
       this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + HUD.stampLift, this.label.mesh.position.z + 0.01);
     }

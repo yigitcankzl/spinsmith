@@ -14,6 +14,10 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, cup and sling, Ember Rivet, Spin Rub, Crossguard, Finger Groove, Forge Wheel).
 6. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
 
+**No headset?** The game runs in the IWSDK Quest emulator in Chromium: `npm install`, `npm run dev` (it opens the emulator at https://localhost:8081), press **Enter XR**, enter play mode in the emulator toolbar, then hold and release `Space` to rip and hold `B` for a ramp ([all dev keys](#dev-keys-only-in-npm-run-dev)). The production build asks for the Quest Browser; only the dev server has the emulator.
+
+**The first match is guided:** your top is shielded for its first rounds and the rival waits until you act; in round 2 on a detected table the rival is steered to your desk edge, so any squeeze throws it (DESK KO). From match 2 the rival plays freely and a knockout is worth 2 heat.
+
 **If something goes wrong:** no table found → floating tray (it says so); hands not tracked → keep them in view, a held move waits 0.28 s before it cancels; a refused move says why on the card ("No charge yet", "Strike not ready").
 
 ## What uses your real room

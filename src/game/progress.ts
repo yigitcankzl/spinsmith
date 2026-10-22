@@ -359,9 +359,13 @@ export class Progress {
         }
       }
     } catch {
-      // A broken save starts over.
+      // A broken save starts over, and says so once (match-system's hub).
+      this.saveWasReset = true;
     }
   }
+
+  /** The stored save could not be read and progress started over (shown once at home). */
+  saveWasReset = false;
 
   get rank() {
     return rankOf(this.level);
