@@ -209,6 +209,8 @@ const COUNT_BEAT = 0.6;
 /** A pointing ray this close to a button's center (m) presses it. */
 const BUTTON_REACH = 0.035;
 /** Head-ray assist (Quest has no gaze source): a button held under the head ray this long lights up, and a pinch anywhere presses it. */
+/** How far (arena units, about 3 cm real) a fingertip must rise off the floor before its Finger Groove commits. */
+const GROOVE_LIFT = 0.012;
 /** Seconds after a flick in which the swinging hand cannot leave a Finger Groove. */
 const FLICK_GROOVE_QUIET = 0.8;
 const HEAD_DWELL = 0.4;
@@ -5381,8 +5383,12 @@ export class MatchSystem extends createSystem({
       if (this.time - this.flickAt[side] < FLICK_GROOVE_QUIET) this.grooving[side] = this.pendingGroove[side] = null;
       const pending = this.pendingGroove[side];
       if (pending) {
-        if (h.pinching || !h.tracked) this.pendingGroove[side] = null;
-        else if (this.elapsed - pending.at >= GROOVE_COMMIT_DELAY) {
+        // "Slide, then lift": a fingertip still down in the bowl may be swinging on into a top (a
+        // flick), so the stroke commits only once the finger has lifted clear of the floor.
+        const tipLocal = this.root.worldToLocal(this.local.copy(h.index));
+        const lifted = !this.arena.inside(tipLocal.x, tipLocal.z) || Math.abs(tipLocal.y - this.arena.height(tipLocal.x, tipLocal.z)) > GROOVE_LIFT;
+        if (h.pinching || !h.tracked || this.elapsed - pending.at > 1.5) this.pendingGroove[side] = null;
+        else if (this.elapsed - pending.at >= GROOVE_COMMIT_DELAY && lifted) {
           this.pendingGroove[side] = null;
           this.makeGroove(side, pending.sx, pending.sz, pending.ex, pending.ez);
         }
