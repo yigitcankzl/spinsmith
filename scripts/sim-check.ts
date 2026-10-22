@@ -8,7 +8,7 @@ import { ARENAS } from '../src/game/arenas.ts';
 import { cloneLayout, rimRadius, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { SHAPING, ShapingCharges, STRIKE_BAR, StrikeBar } from '../src/game/shaping.ts';
-import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, RIVAL_UNLOCKS, STAMP_UNLOCKS, VERB_CARD, VERB_RELEASE, verbReleasedAt, xpToNext } from '../src/game/progress.ts';
+import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, rankOf, RIVAL_UNLOCKS, STAMP_UNLOCKS, VERB_CARD, VERB_RELEASE, verbReleasedAt, xpToNext } from '../src/game/progress.ts';
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
@@ -29,6 +29,7 @@ import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
 import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse, arenaForgeRivalAction, classifyArenaForge, deskWrenchImpulse } from '../src/game/arena-forge.ts';
 import { brawlSlots, spinStep, targetWinner } from '../src/game/brawl.ts';
+import { boardHead, gateShort, HUB_NOTE, HUB_WORDS, ledgerLine, mapHead, ORDER_DONE_SUB, orderShort, playSub, rankLine } from '../src/game/hub-copy.ts';
 import { CARD_HOW_WORDS, CLAIM, LESSON, lessonText, PROMPT_WORDS, promptWords } from '../src/game/lessons.ts';
 import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/game/desk-edge.ts';
 import { FpsBook, fpsPhase, QUALITY_MAX, QualityGuard, qualityThresholds } from '../src/game/quality.ts';
@@ -1086,6 +1087,29 @@ TUNING.grace = 0;
   for (const r of RIVALS) for (const a of [...ARENAS.map((x) => x.name), 'My Very Own Big Arena']) lines.push(tomorrowLine({ date: '2026-10-23', rival: r.name, arena: a, goal: 'burst', text: '' }));
   for (const b of BOUTS) lines.push(boutLine(b));
   for (const l of lines) assert.ok(wordsIn(l) <= COME_BACK_WORDS && wordsIn(l) > 0, `come-back line too long: ${l}`);
+}
+
+// 15b. Home's label diet: every label shown at rest on the hub, the Smith's board and its Circuit
+// Map keeps to HUB_WORDS (secondary words wait for a point), for every rival, arena, goal, rank and chapter.
+{
+  const rest: string[] = ['PLAY', 'WORKSHOP', 'FORGE', 'CHALLENGE CODE', ORDER_DONE_SUB, LESSON.hubLaunch, LESSON.hubMatch];
+  for (const note of Object.values(HUB_NOTE)) rest.push(...note.split('\n'));
+  const rivals = [...new Set([...RIVALS.map((r) => r.name), ...BOUTS.map((b) => b.rival)])];
+  const arenas = [...ARENAS.map((a) => a.name), 'My Very Own Big Arena'];
+  const goals = ['rampKO', 'deskKO', 'burst', 'wellSpin', 'role', 'perfect', 'sweep', 'ownArena'] as const;
+  for (const r of rivals) {
+    for (const a of arenas) rest.push(playSub(`${r} in ${a}`));
+    for (const goal of goals) for (const role of ['attack', 'defense', 'stamina', 'balance'] as const) for (const bout of [undefined, ...BOUTS.map((b) => b.id)]) rest.push(...orderShort({ goal, role, rival: r, bout }));
+  }
+  for (const b of BOUTS) rest.push(b.boss ? 'BOSS' : b.id, b.rival.toUpperCase(), gateShort({ boss: b.rival }));
+  for (let n = 0; n <= 400; n++) rest.push(boardHead(n ? streakTitle(n, false) : null, n % 2 === 0), ledgerLine(n, n % 40, 40));
+  for (const c of CHAPTERS) for (let m = 0; m <= BOUTS.length * 3; m++) rest.push(mapHead(c.name, m, BOUTS.length * 3), gateShort({ chapter: c.name, short: m || 1 }));
+  for (let lv = 1; lv <= MAX_LEVEL; lv++) rest.push(...rankLine(lv, rankOf(lv)));
+  for (const l of rest) assert.ok(wordsIn(l) <= HUB_WORDS, `home label over ${HUB_WORDS} words at rest: ${l}`);
+  assert.equal(playSub('Rim Raider in Ember Ring'), 'VS RIM RAIDER', "PLAY names the rival at rest");
+  assert.deepEqual(orderShort({ goal: 'rampKO', rival: 'Rim Raider' }), ['RAMP KO', 'VS RIM RAIDER'], 'the order at rest: goal, then rival');
+  assert.equal(boardHead(streakTitle(3, false), false), '3-DAY STREAK · PLAY TODAY', 'a streak at risk leads the board');
+  assert.ok(rankLine(13, rankOf(13))[1] === 'MASTER SMITH' && gateShort({ chapter: 'Iron Circuit', short: 3 }) === 'IRON CIRCUIT: 3 MEDALS', 'rank and gate fit whole');
 }
 
 // 16. Reach: every target touched directly sits within a seated arm's comfortable reach and not

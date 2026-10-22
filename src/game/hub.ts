@@ -45,7 +45,8 @@ import { addSlab, engrave, GUIDE, metalPlate, Nameplate, ORANGE, PLATE_DEPTH, px
 import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
 import { buildName } from './parts.js';
-import { BOUTS, boutOpen, CHAPTERS, MEDAL_SHORT, medalCount, nextBout, nextGate } from './campaign.js';
+import { BOUTS, boutOpen, CHAPTERS, gateOf, MEDAL_SHORT, medalCount, nextBout, nextGate } from './campaign.js';
+import { gateShort, playSub, rankLine } from './hub-copy.js';
 import type { BoutRecord } from './campaign.js';
 import type { BoardMap } from './board.js';
 import { SmithBoard } from './board.js';
@@ -181,8 +182,14 @@ export class Hub {
   private standHolder = new Group();
   private items: Pickable[] = [];
   private labels: Mesh[] = [];
-  /** PLAY's plate: its second line names the next match. */
+  /** PLAY's plate, the one call to action: its second line names the next rival (the whole match while pointed at). */
   private playSign = new Nameplate(0.08, 0.026);
+  /** The next match in full ('Rim Raider in Ember Ring'), for PLAY's plate while pointed at. */
+  private matchLine = '';
+  /** What the level plate draws from, so pointing at it can redraw it with the level road. */
+  private rankFrom: { progress: Progress; nextMatch: string | null } | null = null;
+  /** The board was pointed at last frame (its detail shows only then). */
+  private boardHover = false;
   private boardState: Parameters<SmithBoard['draw']>[0] | null = null;
   /** Seconds the board still shows its back. */
   private boardBack = 0;
@@ -250,7 +257,8 @@ export class Hub {
 
   /** Refreshes what the stations show: your top, and one miniature per arena. */
   show(build: TopBuild, progress: Progress, order: Order | null, tomorrow: Order | null = null, nextMatch: string | null = null) {
-    this.drawRank(progress, nextMatch);
+    this.rankFrom = { progress, nextMatch };
+    this.drawRank(false);
     // Coming home, the stations pop up one after another.
     if (!this.root.visible) this.shownAt = this.time;
     this.root.visible = true;
@@ -297,6 +305,7 @@ export class Hub {
         playedToday: progress.hasPlayed(localDate(new Date())),
       };
       this.board.draw(this.boardState, this.boardBack > 0);
+      this.boardHover = false;
       this.fillChampions(progress);
     }
     const onAnvil = progress.guide === 'forge' || progress.guide === 'fit';
@@ -383,8 +392,18 @@ export class Hub {
     if (this.armed > 0) this.holdBar.scale.x = 1;
 
     let hovered: Pickable | null = null;
-    for (const h of pointers) if (h.tracked) hovered ??= this.under(h);
+    let pointer: HandState | null = null;
+    for (const h of pointers) if (h.tracked && !hovered && (hovered = this.under(h))) pointer = h;
     if (hovered && hovered !== this.hoverWas) playHover();
+    // Secondary words show only while their thing is pointed at: PLAY's whole match, the level
+    // road on the level plate, the board's detail (on the map, the pointed bout's).
+    if ((hovered?.action.kind === 'reset') !== (this.hoverWas?.action.kind === 'reset')) this.drawRank(hovered?.action.kind === 'reset');
+    if (hovered?.action.kind === 'play' || this.hoverWas?.action.kind === 'play') {
+      this.playSign.set('PLAY', hovered?.action.kind === 'play' ? this.matchLine.toUpperCase() : playSub(this.matchLine), ORANGE);
+    }
+    const onBoard = hovered?.action.kind === 'order' && pointer !== null;
+    if (this.boardState && (onBoard || this.boardHover)) this.board.draw(this.boardState, this.boardBack > 0, onBoard ? this.boardPoint(pointer!) : null);
+    this.boardHover = onBoard;
     this.hoverWas = hovered;
     // The comfort plate lies beside the dial while either is pointed at, and a moment after.
     if (hovered?.action.kind === 'comfort' || hovered?.action.kind === 'comfortToggle') this.comfortShow = Math.max(this.comfortShow, 1.5);
@@ -467,6 +486,22 @@ export class Hub {
     if (h.pinch.distanceTo(this.center) < 0.9 || !h.hasRay) return out.copy(h.pinch);
     const d = this.center.distanceTo(h.rayOrigin);
     return out.copy(h.rayDir).multiplyScalar(d).add(h.rayOrigin);
+  }
+
+  /** Where a hand points on the board, in canvas px: the pinch when near, else its ray on the board's plane. */
+  private boardPoint(h: HandState): [number, number] | null {
+    const m = this.board.mesh;
+    this.mat.copy(m.matrixWorld).invert();
+    const near = h.pinchSmooth.distanceTo(m.getWorldPosition(this.p)) < GRAB_NEAR || !h.hasRay;
+    if (near) {
+      const at = this.q.copy(h.pinchSmooth).applyMatrix4(this.mat);
+      return this.board.pxAt(at.x, at.y);
+    }
+    const o = this.q.copy(h.rayOrigin).applyMatrix4(this.mat);
+    const d = this.hit.copy(h.rayOrigin).add(h.rayDir).applyMatrix4(this.mat).sub(o);
+    if (Math.abs(d.z) < 1e-6) return null;
+    const t = -o.z / d.z;
+    return t > 0 ? this.board.pxAt(o.x + d.x * t, o.y + d.y * t) : null;
   }
 
   private under(h: HandState): Pickable | null {
@@ -615,11 +650,17 @@ export class Hub {
    * where the level road leads next, and (after the first session) the next bout on the Circuit Map.
    * The next match itself is PLAY's second line.
    */
-  private drawRank(progress: Progress, nextMatch: string | null) {
+  private drawRank(hover: boolean) {
+    if (!this.rankFrom) return;
+    const { progress, nextMatch } = this.rankFrom;
     const next = progress.next;
     const [match, bout] = nextMatch ? nextMatch.split(' · ') : ['', ''];
-    this.playSign.set('PLAY', match.toUpperCase());
-    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}|${bout}|${progress.guide}`;
+    this.matchLine = match;
+    // At rest PLAY names the rival only; pointed at, the whole match (update()).
+    this.playSign.set('PLAY', playSub(match), ORANGE);
+    // At rest the level, the rank and the bar; pointed at, also the level road and the map's pinch.
+    const detail = hover && progress.guide === 'done';
+    const key = `${progress.level}|${progress.rank}|${progress.fraction.toFixed(3)}|${next?.key}|${bout}|${progress.guide}|${detail}`;
     if (key === this.rankKey) return;
     this.rankKey = key;
     const g = this.rankCanvas.getContext('2d')!;
@@ -630,17 +671,17 @@ export class Hub {
     g.textBaseline = 'middle';
     g.textAlign = 'left';
     setType(g, 'title', k, D);
-    const lv = `LV ${progress.level}`;
+    const [lv, rank] = rankLine(progress.level, progress.rank);
     engrave(g, lv, 48, 60, TEXT);
     const lvW = g.measureText(lv).width;
     setType(g, 'caption', k, D);
-    engrave(g, progress.rank.toUpperCase(), 48 + lvW + 36, 64, UI_STEEL, RANK_W - 140 - lvW);
+    engrave(g, rank, 48 + lvW + 36, 64, UI_STEEL, RANK_W - 140 - lvW);
     g.fillStyle = 'rgba(0,0,0,0.45)';
     g.fillRect(48, 112, RANK_W - 96, 18);
     g.fillStyle = UI_STEEL;
     g.fillRect(48, 112, (RANK_W - 96) * progress.fraction, 18);
-    // The first session has one goal (its match); the level road shows after it.
-    if (progress.guide === 'done') {
+    // The first session has one goal (its match); after it the level road shows while pointed at.
+    if (detail) {
       setType(g, 'caption', k, D);
       engrave(g, (next ? `NEXT: ${unlockLabel(next.key)} at LV ${next.level}` : 'EVERY PART IS YOURS').toUpperCase(), 48, 176, UI_STEEL, RANK_W - 96);
       engrave(g, `${bout ? `${bout.toUpperCase()} · ` : ''}PINCH FOR THE MAP`, 48, 230, TEXT_DIM, RANK_W - 96);
@@ -880,14 +921,18 @@ function boardMap(rec: BoutRecord, matches: number): BoardMap {
   const chapter = next?.chapter ?? CHAPTERS.length;
   return {
     chapter: CHAPTERS[chapter - 1].name,
-    bouts: BOUTS.filter((b) => b.chapter === chapter).map((b) => ({ id: b.id, rival: b.rival, medals: rec[b.id] ?? 0, open: boutOpen(b, rec), boss: b.boss, next: b === next })),
+    bouts: BOUTS.filter((b) => b.chapter === chapter).map((b) => ({
+      id: b.id,
+      rival: b.rival,
+      medals: rec[b.id] ?? 0,
+      open: boutOpen(b, rec),
+      boss: b.boss,
+      next: b === next,
+      left: b.medals.filter((_, i) => !((rec[b.id] ?? 0) & (2 << i))).map((m) => MEDAL_SHORT[m]).join(' · '),
+    })),
     medals: medalCount(rec),
     of: BOUTS.length * 3,
     gate: nextGate(rec),
-    todo: next ? (() => {
-      const have = rec[next.id] ?? 0;
-      const left = next.medals.filter((_, i) => !(have & (2 << i))).map((m) => MEDAL_SHORT[m]);
-      return left.length ? `next ${next.id} · medals: ${left.join(' · ')}` : '';
-    })() : '',
+    gateShort: gateShort(gateOf(rec)),
   };
 }
