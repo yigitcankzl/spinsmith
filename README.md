@@ -10,8 +10,8 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 1. Sit at a table with a Meta Quest 3 or 3S, no controllers, and open the hosted URL in the Quest Browser.
 2. Press **ENTER** and allow spatial data. The arena rises on your real table (a labelled table or desk, or any flat unlabelled surface at desk height); with none it stands on a floating tray and says so.
 3. Pinch your top, pinch near it, pull back and let go: the rip launches it.
-4. The first match teaches one move a round: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — on a detected table the rival is steered to your real desk edge and flies off it (**DESK KO**; on the tray it is a normal ring-out); **round 3** slap your palm down for the Anvil Strike. Your fingertip can flick a top from the start; its hint comes after the forge lesson.
-5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, cup and sling, Ember Rivet, Spin Rub, Crossguard, ...).
+4. The first match teaches one move a round: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — on a detected table the rival is steered to your real desk edge and flies off it (**DESK KO**; on the tray it is a normal ring-out); **round 3** pinch the seal that rises from your top and stamp it into the bowl (the Anvil Strike; after 4 s a palm slap on the table works too). Your fingertip can flick a top from the start; its hint comes after the forge lesson.
+5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, cup and sling, Ember Rivet, Spin Rub, Crossguard, Finger Groove, Forge Wheel).
 6. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
 
 **If something goes wrong:** no table found → floating tray (it says so); hands not tracked → keep them in view, a held move waits 0.28 s before it cancels; a refused move says why on the card ("No charge yet", "Strike not ready").
@@ -19,7 +19,7 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 ## What uses your real room
 - **Placement:** the arena stands on a labelled table or desk, or on an unlabelled flat surface at desk height (at least 30 cm wide); with none it floats on a tray and says so.
 - **Real edges:** red-orange arcs on the rim face real table edges within about 25 cm; from the second match those sides are lower drop sides, and the first match stages a DESK KO across the nearest one.
-- **Strike on the real table:** with the bar full, slap your palm on the table beside the arena; it leaves a molten print that cools to a scorch.
+- **Strike on the real table:** with the bar full, pinch the seal and stamp it into the bowl; if you wait 4 s (or in gentle mode) a palm slap on the real table beside the arena does it instead and leaves a molten print that cools to a scorch.
 - **Outer Ring catch:** once a round, when your own top is thrown over the wall onto a detected table, you have 5 s to catch it with an open palm and sweep it back to the rim (it returns with less spin).
 - **Wall portal:** the rival arrives through a portal on a detected wall behind the far rim (in the dark beyond it when there is no wall).
 - **Saved pose:** carry the arena by its brass handle; its pose is saved, and kept by persistent WebXR anchors where available.
@@ -32,7 +32,7 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 | Flick | Swing an open fingertip through a top at its height | Start (hint after the first match's forge lesson) |
 | Ramp | Pinch the floor and hold; drag to aim | First match, round 1 |
 | Arena Forge | Grab the rim with both hands: squeeze, stretch, tilt, twist | First match, round 2 |
-| Strike | Full bar: slap your palm on the table beside the arena | First match, round 3 |
+| Strike | Full bar: pinch the seal, stamp it into the bowl (after 4 s, or gentle mode: slap the table) | First match, round 3 |
 | Rim Spring | Pinch rim, pull, release | Match 2 |
 | Forge Gust | Sweep palm toward pocket | Match 3 |
 | Cup and sling | Jab floor, catch, sling | Match 4 |
