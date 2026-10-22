@@ -208,6 +208,8 @@ const COUNT_BEAT = 0.6;
 /** A pointing ray this close to a button's center (m) presses it. */
 const BUTTON_REACH = 0.035;
 /** Head-ray assist (Quest has no gaze source): a button held under the head ray this long lights up, and a pinch anywhere presses it. */
+/** Seconds after a flick in which the swinging hand cannot leave a Finger Groove. */
+const FLICK_GROOVE_QUIET = 0.8;
 const HEAD_DWELL = 0.4;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
 /** Launch power at or above this is a perfect rip: extra starting spin. */
@@ -326,6 +328,8 @@ export class MatchSystem extends createSystem({
   private lastFlick = { gain: 0, dx: 0, dz: 0, rival: false };
   /** One swing is one flick: the follow-through cannot catch the same top again. */
   private flickReadyAt: Record<Side, number> = { left: -9, right: -9 };
+  /** When each hand last flicked (this.time). */
+  private flickAt: Record<Side, number> = { left: -9, right: -9 };
   /** Spin Rub: the paid window's end and when the next charge may open one (this.time). */
   private rubUntil = -9;
   private rubReadyAt = -9;
@@ -5352,6 +5356,8 @@ export class MatchSystem extends createSystem({
     const open = this.elapsed >= TUNING.grace;
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
+      // A flick's follow-through skims the floor too: no Finger Groove from it.
+      if (this.time - this.flickAt[side] < FLICK_GROOVE_QUIET) this.grooving[side] = this.pendingGroove[side] = null;
       const pending = this.pendingGroove[side];
       if (pending) {
         if (h.pinching || !h.tracked) this.pendingGroove[side] = null;
@@ -6254,6 +6260,7 @@ export class MatchSystem extends createSystem({
         // The swing was a flick: the floor stroke it started is not also a Finger Groove.
         this.grooving[side] = null;
         this.pendingGroove[side] = null;
+        this.flickAt[side] = this.time;
         this.flickReadyAt[side] = this.time + FLICK_FOLLOW_THROUGH;
         if (this.online?.role === 'guest' && this.online.peer) {
           const target = top === this.mine ? 'mine' : 'rival';
