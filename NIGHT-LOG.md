@@ -84,4 +84,4 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [x] Hub/home label diet (UI/UX 7)
 - [x] Stills from the current build, IWER-labelled: `~/Desktop/spinsmith-videos/night-2026-10-22/stills/` and `stills-room/` (the older store folder is untouched)
 - [x] check:hands double charges in sequence (rub groove-on-lift, forge-release rail, grip-approach rail, moving-palm rail) — 5 clean sequential runs; forge-wheel cold start under HANDS_ISOLATE=1 still open
-- [ ] Flick never lands in the probe when the match arena is fitted at 75% (scale 1.8) — check the contact band against root scale
+- [ ] Flick probe misses on the `?demo` save (75% fit): a headless kinematic replay (all 20 arenas, scales 1.8/2.04/2.4, 24–72 fps) lands every time, so the gesture math is scale-correct; likely cause is the match state (level-8 rivals shaping the floor under the swing, or the rival moving) — needs one IWER run with the owner blockers logged
