@@ -1,4 +1,4 @@
-import { AdditiveBlending, BufferGeometry, DoubleSide, Vector2, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, RingGeometry, Vector3 } from '@iwsdk/core';
+import { AdditiveBlending, BufferGeometry, CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace, Vector2, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, RingGeometry, Vector3 } from '@iwsdk/core';
 import { playDeskKo, playLocked, playPick, playDash, playSwish, playTick } from './audio.js';
 import { SAFE_COLORS, warnColor } from './comfort.js';
 import { Side } from './hands.js';
@@ -26,6 +26,29 @@ const OUTER_RAIL_WIDTH = 0.0045;
 /** Maximum real seconds to wait for a thrown rival to settle on, or leave, the detected table. */
 const DESK_VERDICT_TIME = 3.5;
 
+/** Diagonal hazard stripes (white and dark; the arc's colour tints the white), tiled across the planar ring UVs. */
+const HAZARD = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#1a1416';
+  for (let i = -64; i < 128; i += 32) {
+    g.beginPath();
+    g.moveTo(i, 0);
+    g.lineTo(i + 14, 0);
+    g.lineTo(i + 14 + 64, 64);
+    g.lineTo(i + 64, 64);
+    g.fill();
+  }
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.repeat.set(16, 16);
+  return t;
+})();
+
 /**
  * Real-room play on the physical table: the desk-edge arcs and drop sides, the staged first DESK KO
  * (desk wrench), the desk verdict that waits for the real table to accept a thrown top, the
@@ -41,7 +64,9 @@ export class DeskPlay {
    * DESK KO can be aimed. Sectors are in the arena root's local frame (see updateDeskEdge).
    */
   deskArcs = [0, 1].map(() => {
-    const m = new Mesh(new RingGeometry(0.1, 0.11, 8), new MeshBasicMaterial({ color: 0xff5a1e, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide, toneMapped: false }));
+    // Hazard tape: diagonal dark stripes over the warning colour, so the real edge differs from the
+    // team-orange rim by pattern as well as hue (and still reads in the colour-safe palette).
+    const m = new Mesh(new RingGeometry(0.1, 0.11, 8), new MeshBasicMaterial({ color: 0xff5a1e, map: HAZARD, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide, toneMapped: false }));
     m.name = 'desk-edge-arc';
     m.visible = false;
     m.renderOrder = 3;
