@@ -183,7 +183,7 @@ const BUTTON_REACH = 0.035;
 /** Head-ray assist (Quest has no gaze source): a button held under the head ray this long lights up, and a pinch anywhere presses it. */
 /** How far (arena units, about 3 cm real) a fingertip must rise off the floor before its Finger Groove commits. */
 const GROOVE_LIFT = 0.012;
-/** Seconds after a flick in which the swinging hand cannot leave a Finger Groove. */
+/** Seconds after a flick or a rub in which that hand cannot leave a Finger Groove. */
 const FLICK_GROOVE_QUIET = 0.8;
 const HEAD_DWELL = 0.4;
 /** Points needed to win a match (pocket and over finishes score 2, spin finishes 1). */
@@ -5791,6 +5791,10 @@ export class MatchSystem extends createSystem({
     if (tangential <= radial || tangential < RUB_MIN) return false;
     const stroke = this.rubStrokes[side];
     const step = rubStrokeStep(stroke, this.time, this.rubUntil, this.rubReadyAt);
+    // Circling your own top runs the fingertip along the floor too: that is not a Finger Groove,
+    // now or when the finger lifts (the same quiet a flick gets).
+    this.grooving[side] = this.pendingGroove[side] = null;
+    this.flickAt[side] = this.time;
     if (step === 'hold') return true;
     if (step === 'pay') {
       const force = this.charges.spend(this.elapsed, TUNING.grace);
