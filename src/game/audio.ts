@@ -686,10 +686,23 @@ export function playLand(on: 'table' | 'floor', x = 0, hard = 1) {
         hiss(0.15 * hard, 0.1, 500, 300, 1.5);
         ring(steel('', 1600), 0.08 * hard, 1, 0, 0.04);
       } else {
+        thump(120, 45, 0.3 * hard, 0.2);
         hiss(0.2 * hard, 0.08, 1800, 1500, 3);
         ring(steel('', 1600), 0.08 * hard, 0.9 + Math.random() * 0.2, 0.12, 0.03);
         ring(steel('', 1600), 0.05 * hard, 0.9 + Math.random() * 0.2, 0.25, 0.02);
       }
+    }),
+  );
+}
+
+/** DESK KO: the room goes quiet for a beat, then the top cracks off the real table's edge. */
+export function playDeskKo(x = 0) {
+  duck(0.05, 0.6);
+  at(x, () =>
+    vary(0.03, () => {
+      crack(0.7, 0.008, 1800, 0.15);
+      thump(160, 60, 0.55, 0.3, 0.15);
+      ring(anvil(), 0.22, 1.1, 0.15, 0.25);
     }),
   );
 }

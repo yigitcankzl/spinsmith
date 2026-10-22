@@ -697,6 +697,10 @@ export class TopView {
   private deskHand = 1;
   private travelled = 0;
   offDesk = false;
+  /** Off the real edge it tumbles head over heels along its flight (rad), then lies on the floor. */
+  private tumble = 0;
+  private tumbleX = 1;
+  private tumbleZ = 0;
   /** Called where a thrown top lands on the desk (for its scorch mark). */
   onLand: ((x: number, y: number, z: number) => void) | null = null;
   /** Picked off the desk by the player's hand: hidden until the next round. */
@@ -1092,6 +1096,7 @@ export class TopView {
       this.deskHand = top.hand;
       this.travelled = 0;
       this.offDesk = false;
+      this.tumble = 0;
     }
     this.outT += dt;
     this.shadow.visible = false;
@@ -1122,6 +1127,8 @@ export class TopView {
       }
       // It lands on the table, or past its edge, on the real floor.
       const ground = roomSurface(p.x, p.z);
+      // Past the real edge and below the table top: that is the moment, not the floor far below.
+      if (ground < TABLE_LEVEL && p.y < TABLE_LEVEL) this.goOffDesk();
       if (p.y <= ground) {
         p.y = ground;
         // Never inside the pedestal: a top dropping right by the rim lands just outside it.
@@ -1132,7 +1139,7 @@ export class TopView {
           p.z *= out / rr;
         }
         const floor = ground < TABLE_LEVEL;
-        if (floor && !this.offDesk) this.offDesk = true;
+        if (floor && !this.offDesk) this.goOffDesk();
         if (floor) this.deskSpin = 0;
         playLand(floor ? 'floor' : 'table', p.x, Math.min(1, Math.abs(v.y) * 2));
         if (!floor) this.onLand?.(p.x, p.y, p.z);
@@ -1175,12 +1182,24 @@ export class TopView {
       if (roomSurface(p.x, p.z) < p.y - 0.001) {
         // The real edge is the event. Report it while the top is still visible in the air,
         // rather than waiting until it reaches the physical floor below the table.
-        this.offDesk = true;
+        this.goOffDesk();
         this.landed = false;
         v.y = 0;
       }
     }
     this.root.position.copy(p);
+    if (this.offDesk) {
+      // Over the real edge it tumbles in the air, then rocks flat on the floor.
+      if (!this.landed) this.tumble += dt * 9;
+      else {
+        const flat = Math.round((this.tumble - Math.PI / 2) / Math.PI) * Math.PI + Math.PI / 2;
+        this.tumble += (flat - this.tumble) * Math.min(1, dt * 10);
+      }
+      this.root.rotation.set(this.tumble * this.tumbleZ, 0, -this.tumble * this.tumbleX);
+      this.blur.visible = false;
+      if (this.disc) this.disc.visible = false;
+      return;
+    }
     this.spinner.rotation.y += dt * (8 + 50 * this.deskSpin) * (1 - this.fall) * SPIN_DRAW * 0.6;
     // Its blur fades as it spins down on the desk, so it falls over crisp.
     if (this.disc) {
@@ -1199,6 +1218,16 @@ export class TopView {
     this.root.rotation.set(1.25 * f * this.fallZ, 0, -1.25 * f * this.fallX);
     this.shadow.visible = this.landed;
     this.shadow.position.set(p.x + 0.0024, p.y + 0.0008, p.z + 0.0018);
+  }
+
+  /** Over the real table's edge: tips forward along its flight. */
+  private goOffDesk() {
+    if (this.offDesk) return;
+    this.offDesk = true;
+    const v = this.throwVel;
+    const sp = Math.hypot(v.x, v.z) || 1;
+    this.tumbleX = v.x / sp;
+    this.tumbleZ = v.z / sp;
   }
 
   /** Burst: the parts fly apart, tumble, bounce on the floor and fade out. */
@@ -2972,6 +3001,8 @@ export class Stamp {
   /** Cancels the table-fit scale so result words keep the same readable world size. */
   worldScale = 1;
   private queue: [string, string, 'mine' | 'rival' | 'neutral', number, number][] = [];
+  /** Where this stamp hangs instead of its usual slot (world), e.g. over the real edge a top went off. Cleared by the next show. */
+  pin: Vector3 | null = null;
 
   /** Ends what shows now at once (a skipped replay's plate); what waits shows next. */
   cut() {
@@ -3011,6 +3042,7 @@ export class Stamp {
   /** Stamps `word` (and a small line under it) for `hold` seconds; side picks the colors; size weighs it (1.5 for a decided match, a level). */
   show(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1, weight = 1) {
     this.size = weight;
+    this.pin = null;
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, 1024, 256);
     g.textAlign = 'center';

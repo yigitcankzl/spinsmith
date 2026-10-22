@@ -170,6 +170,11 @@ const ARENA_FORGE_EFFECT: Record<ArenaForgeAction, string> = {
   tilt: 'SEND TOPS DOWNHILL',
 };
 const SLOW_MO = 0.3;
+const PIN_HEAD = new Vector3();
+const PIN_FWD = new Vector3();
+const PIN_AT = new Vector3();
+const PIN_HOME = new Vector3();
+const PIN_DIR = new Vector3();
 /** A clash this strong (0..1) is a hard hit: big feedback and a 70-110 ms simulation-only hit stop. */
 const HARD_HIT = 0.6;
 /** Hard hits closer together than this (s) do not stop the simulation again. */
@@ -3676,7 +3681,22 @@ export class MatchSystem extends createSystem({
     this.bar.mesh.position.y = (BAR_Y + lift) * grow;
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
     // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
-    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') {
+    this.stamp.mesh.rotation.set(0, 0, 0);
+    if (this.stamp.pin) {
+      // Pinned over the real edge, it turns to face the eyes, and comes back toward the arena
+      // until it is inside a comfortable view.
+      const head = this.player.head.getWorldPosition(PIN_HEAD);
+      const fwd = this.player.head.getWorldDirection(PIN_FWD).negate();
+      const p = PIN_AT.copy(this.stamp.pin);
+      const home = this.root.getWorldPosition(PIN_HOME);
+      home.y = p.y;
+      for (let i = 0; i < 6 && PIN_DIR.subVectors(p, head).normalize().dot(fwd) < 0.92; i++) p.lerp(home, 0.35);
+      this.root.worldToLocal(this.stamp.mesh.position.copy(p));
+      this.stamp.mesh.lookAt(head);
+    }
+    // In a fight the stamp sits low, just over the far rim, inside the view that watches the tops.
+    else if (this.phase === 'fight') this.stamp.mesh.position.set(0, (this.arena.height(0, -far / this.viewK) + WALL_HEIGHT[L.wall]) * this.viewK + 0.075, -far);
+    else if (this.phase === 'ready' || this.phase === 'result') {
       this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + HUD.stampLift, this.label.mesh.position.z + 0.01);
     }
     else this.stamp.mesh.position.set(0, 0.045, 0.03);

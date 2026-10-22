@@ -1,5 +1,5 @@
 import { AdditiveBlending, BufferGeometry, DoubleSide, Vector2, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, RingGeometry, Vector3 } from '@iwsdk/core';
-import { playLocked, playPick, playDash, playTick } from './audio.js';
+import { playDeskKo, playLocked, playPick, playDash, playSwish, playTick } from './audio.js';
 import { SAFE_COLORS, warnColor } from './comfort.js';
 import { Side } from './hands.js';
 import { maxRim, normRadius, rimRadius } from './layout.js';
@@ -522,6 +522,9 @@ export class DeskPlay {
     this.m.theirView.shake(1);
     this.m.theirView.hit(1, this.m.theirs.vx, this.m.theirs.vz, 0.09);
     this.m.koFreeze = Math.max(this.m.koFreeze, 0.09);
+    // The staged first DESK KO plays its whole flight across the desk in slow motion.
+    if (this.deskWrench.fired) this.m.slowMo = Math.max(this.m.slowMo, 0.5);
+    playSwish(1.2, this.m.theirs.x);
     this.m.roomLight.hit();
     if (cause && this.m.causeCue.stage) this.m.showCauseCue(3, cause, this.m.causeCue.sx, this.m.causeCue.sz, this.m.theirs.x, this.m.theirs.z);
     if (!this.m.quietFirst) this.m.stamp.show('EDGE RUN!', cause ? `YOUR ${cause} → REAL TABLE` : 'REAL TABLE DECIDES', 'mine', 0.65, 1.25);
@@ -545,6 +548,7 @@ export class DeskPlay {
       return true;
     }
     pending.left -= dt;
+    if (this.deskWrench.fired) this.m.slowMo = Math.max(this.m.slowMo, 0.1);
     if (this.deskKoStage === 1) this.setDeskKoStage(2);
     if ((this.deskKoTrailT -= dt) <= 0) {
       this.deskKoTrailT = 0.045;
@@ -570,8 +574,11 @@ export class DeskPlay {
       this.m.impacts.hit(p.x, p.y, p.z, 1);
       this.m.impacts.shock(p.x, p.y, p.z, 1, 0xff8a2a);
       this.m.slowMo = Math.max(this.m.slowMo, staged ? 1.1 : 0.6);
+      playDeskKo(p.x);
       const cause = this.m.recentPlayerCause();
-      this.m.stamp.show(staged ? 'DESK KO!' : 'OFF THE DESK!', cause ? `YOUR ${cause} → REAL EDGE +1` : 'REAL EDGE · +1', 'mine', staged ? 1.2 : 0.55, 1.25);
+      this.m.stamp.show(staged ? 'DESK KO!' : 'OFF THE DESK!', cause ? `YOUR ${cause} → REAL EDGE +1` : 'REAL EDGE · +1', 'mine', staged ? 1.2 : 0.75, 1.6);
+      // The word hangs over the real edge the top went off, not up by the card.
+      this.m.stamp.pin = this.m.theirView.root.getWorldPosition(new Vector3()).add(new Vector3(0, 0.2, 0));
       this.m.featDone('offDesk');
       if (import.meta.env.DEV) console.log(`[DESK_KO] real edge crossed; +${DESK_KO_BONUS} bonus heat`);
       return true;
