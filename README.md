@@ -51,7 +51,7 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 
 ## Measured performance (IWER on a desktop GPU, not a Quest)
 
-`npm run report:runtime-performance` on 2026-10-23 (RTX 4060 laptop, ANGLE/Vulkan; both eyes counted by the renderer):
+`npm run report:runtime-performance` on 2026-10-23 (RTX 4060 laptop, ANGLE/Vulkan). IWER renders the two eyes as two cameras without multiview, so `renderer.info.render.calls` counts both; the per-eye column is that raw count halved (raw: ready 224, fight 190). Lowest fps over five seconds: 87 ready, 86 fight (desktop, not Quest).
 
 | Phase | Draw calls per eye | Triangles | Game update per frame (p50 / p95 / max) |
 |---|---|---|---|
