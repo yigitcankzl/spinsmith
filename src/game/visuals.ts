@@ -607,6 +607,18 @@ function blurDiscTexture(d: RingDesign, reach: number, color: number): CanvasTex
     }
   }
   ctx.putImageData(img, 0, 0);
+  // Spin swooshes: three white crescents trailing around the blade's reach, as top games draw speed.
+  ctx.lineCap = 'round';
+  for (let k = 0; k < 3; k++) {
+    const a0 = (k / 3) * Math.PI * 2;
+    for (let i = 0; i < 12; i++) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.75 * (1 - i / 12)})`;
+      ctx.lineWidth = 5 - i * 0.3;
+      ctx.beginPath();
+      ctx.arc(63.5, 63.5, 56, a0 - (i + 1) * 0.09, a0 - i * 0.09);
+      ctx.stroke();
+    }
+  }
   const t = new CanvasTexture(cv);
   t.colorSpace = SRGBColorSpace;
   return t;
@@ -901,8 +913,9 @@ export class TopView {
   team(color: number, radius: number, ring = true, sides = 40) {
     if (ring) {
       const mesh = new Mesh(
-        new RingGeometry(radius * 1.25, radius * 1.55, sides).rotateX(-Math.PI / 2),
-        new MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: AdditiveBlending, depthWrite: false }),
+        new RingGeometry(radius * 1.2, radius * 1.6, sides).rotateX(-Math.PI / 2),
+        // Painted, not glowing: a solid team band reads on the light floor, where additive light washes out.
+        new MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }),
       );
       // The contact shadow is offset away from the back-left key. Counter-offset the team ring so it
       // remains centered on the top instead of inheriting the shadow's tiny directional bias.
@@ -1047,6 +1060,8 @@ export class TopView {
     if (this.disc) {
       (this.disc.material as MeshBasicMaterial).opacity = 0.85 * fast * fast * (3 - 2 * fast);
       this.disc.visible = (this.disc.material as MeshBasicMaterial).opacity > 0.01;
+      // The swooshes sweep round like the streaks, slower than the real rate so they read as motion.
+      this.disc.rotation.y = this.drawAngle * 0.1;
     }
     if (this.edge) {
       const m = this.edge.material as MeshBasicMaterial;
@@ -1717,9 +1732,9 @@ export class ArenaView {
       this.spinnerDisc = add(new Mesh(new CircleGeometry(center, 40).rotateX(-Math.PI / 2), mat));
     }
 
-    // A thin glowing line just inside the rim, at floor height, in the theme's accent.
+    // One bold accent band just inside the rim, at floor height (a stadium's single painted line).
     const rimY = new Arena(layout).floorHeight(0.97) + 0.0008;
-    add(tube(rimPath(layout, 0, Math.PI * 2, -0.005, rimY), 0.0011, accent));
+    add(tube(rimPath(layout, 0, Math.PI * 2, -0.005, rimY), 0.0026, accent));
     // A soft dark ring on the table where the pedestal stands, so the arena sits on it.
     const ao = add(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), own(new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0x000000, transparent: true, opacity: 0.7, depthWrite: false }))));
     ao.scale.set(0.15 * 4.2 * (layout.radius / 0.15) * (layout.shape === 'square' ? 1.12 : 1), 1, 0.15 * 4.2 * (layout.radius / 0.15) * (layout.shape === 'oval' ? 0.78 : 1));
