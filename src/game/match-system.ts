@@ -9485,6 +9485,9 @@ export class MatchSystem extends createSystem({
         if (m.isMesh) m.geometry.dispose();
       });
       this.reveal = null;
+      // Its card stays readable a moment after the model flies off (a stamp may have covered its start).
+      this.rewardHold = 1.5;
+      this.resultTimer = Math.max(this.resultTimer, 1.5 + 1.3);
     }
   }
 
