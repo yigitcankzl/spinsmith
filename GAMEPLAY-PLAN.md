@@ -143,3 +143,18 @@ Room: the emulator now loads IWER's `office_small` capture, whose desk is a real
 plane, so DESK KO, the rival's desk guard and the new red real-edge arcs on the rim run through
 the production table path (desk KO proof: 3 heat). Fresh starts clear every saved key; the
 first match's lessons can now win rounds (IWER: YOUR RAMP -> SLAG at 3.7 s).
+
+## Night pass, 2026-10-22 (measurements; details in NIGHT-LOG.md)
+
+| What | Before | After | How measured |
+|---|---|---|---|
+| Real-edge drop side (rim under each red arc, `DESK_DROP_ESCAPE` 0.55) | — | masher +0.5 win; ramp aimed at the arc beats the same habit at the wrong rim by +3.0 win / +0.18 heat (side desk), +2.4 / +0.10 (far desk); over-the-wall ≤ 20% of finishes; plain-ramp median round 14.8 → 11.2 s | `reportShaping`, HUMAN timing, 24 rounds per pair |
+| First session (fresh save, scripted newcomer, IWER office_small) | first KO 46 s (round 2), match 133 s, 55 prompts / 258 words | first KO 15.6–23.1 s, first DESK KO 36–38 s, match 57–64 s, 20 prompts / 72–74 words | `npm run check:first-five` |
+| First-match prompt copy (static) | 359 words | 152 words (cap 5 per prompt) | sim-check 14d |
+| Hub copy at rest | 45 words, longest 9 | 18 words, longest 4 | sim-check 15b |
+| Crowded bouts, best build last spinning | 2-3: 88%, 3-3: 100% | 50%, 50% (assert ≤ 65%) | sim-check |
+| One-Euro on aim/hover points | — | still-hand jitter −67%; 1.5 m/s sweep lag 13.8 mm | sim-check |
+| Draw calls per eye (IWER) | `?demo` quoted as 172–200 (both eyes) | fresh fight 102, `?demo` hub 98 / fight 103 | `report:render-budget` |
+| Game update CPU per frame (laptop, IWER) | — | p50 0.6–0.7 ms, p95 1.0–1.2 ms | `report:runtime-performance` |
+| `check:hands` sequential | ~1 clean run in 2 | 5 clean runs in a row (after the double-charge fixes) | IWER |
+| Room matrix | — | 10/10 cases (labelled, living room, none, small, unlabelled, tilted, two desks, coffee table, far table, control) | `check:room-matrix`, synthesised planes |
