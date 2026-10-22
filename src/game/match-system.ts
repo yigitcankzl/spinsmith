@@ -116,6 +116,8 @@ const REC = 2 * REC_TOP + 3;
 const RIVAL_TELL_CODE: Record<RivalMove, number> = { charge: 1, quake: 2, pull: 3 };
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
+/** Large text (comfort dial): how much bigger the card, stamps and bar read. */
+const BIG_TEXT = 1.3;
 /** A one-hand rim pull waits this long for the other hand before it can become a spring. */
 const RIM_SPRING_INTENT = 0.25;
 /** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
@@ -3681,7 +3683,8 @@ export class MatchSystem extends createSystem({
     const grow = hudGrow(far, this.pushed, TUNE.reach);
     // fitMatch may shrink the whole root to 70% to stay on a real table. Read surfaces cancel that
     // parent scale so type never becomes 30% smaller on the very tables that need it most.
-    const readScale = 1 / Math.max(0.7, this.rootK);
+    // Large text (comfort): the read surfaces grow together.
+    const readScale = (COMFORT.bigText ? BIG_TEXT : 1) / Math.max(0.7, this.rootK);
     this.label.mesh.scale.setScalar(1.25 * grow * readScale);
     this.bar.mesh.scale.setScalar(0.21 * grow * readScale);
     this.stamp.worldScale = readScale;

@@ -20,6 +20,8 @@ export interface Comfort {
   lefty?: boolean;
   /** Colour-safe: warnings and safe marks use a blue / orange / yellow palette (no red against green or orange). */
   colorSafe?: boolean;
+  /** Large text: the card, the stamps and the match bar read 1.3x bigger. */
+  bigText?: boolean;
 }
 
 /**
@@ -34,10 +36,10 @@ export function warnColor(normal: number, safe: number): number {
 }
 
 /** Every toggle, by its value in COMFORT. */
-export type Setting = 'sound' | 'flashes' | 'gentle' | 'assist' | 'oneHand' | 'contrast' | 'lefty' | 'colorSafe';
-const SETTINGS: Setting[] = ['sound', 'flashes', 'gentle', 'assist', 'oneHand', 'contrast', 'lefty', 'colorSafe'];
+export type Setting = 'sound' | 'flashes' | 'gentle' | 'assist' | 'oneHand' | 'contrast' | 'lefty' | 'colorSafe' | 'bigText';
+const SETTINGS: Setting[] = ['sound', 'flashes', 'gentle', 'assist', 'oneHand', 'contrast', 'lefty', 'colorSafe', 'bigText'];
 type Settings = Record<Setting, boolean>;
-const DEFAULTS: Settings = { sound: true, flashes: true, gentle: false, assist: false, oneHand: false, contrast: false, lefty: false, colorSafe: false };
+const DEFAULTS: Settings = { sound: true, flashes: true, gentle: false, assist: false, oneHand: false, contrast: false, lefty: false, colorSafe: false, bigText: false };
 
 /** The toggles (JSON, one boolean per setting). */
 const KEY = 'spinsmith.comfort.v2';
@@ -77,7 +79,8 @@ export const COMFORT_DIAL: DialStop[] = [
   { name: 'High contrast', detail: 'bold team rings', toggle: ['contrast', true] },
   { name: 'Left-handed', detail: 'home stations swap sides', toggle: ['lefty', true] },
   { name: 'Colour-safe', detail: 'blue and orange warnings', toggle: ['colorSafe', true] },
-  { name: 'Standard', detail: 'every setting off but the hand', preset: { sound: true, flashes: true, gentle: false, assist: false, oneHand: false, contrast: false, colorSafe: false } },
+  { name: 'Large text', detail: 'cards and calls 1.3x', toggle: ['bigText', true] },
+  { name: 'Standard', detail: 'every setting off but the hand', preset: { sound: true, flashes: true, gentle: false, assist: false, oneHand: false, contrast: false, colorSafe: false, bigText: false } },
 ];
 
 /** The live settings (read every frame where they matter). */
