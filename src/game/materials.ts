@@ -2,7 +2,7 @@
  * The forge's few lit materials, shared by every model, in three tiers:
  * - hero metal: polished STEEL (arena walls, anvil face, hammer, pillars) and hammered FORGED
  *   steel (the anvil's body);
- * - machine body: one dark graphite, matte (GRAPHITE) or machined (GUNMETAL);
+ * - machine body: a mid painted slate, matte (GRAPHITE), or dark machined metal (GUNMETAL);
  * - trim: BRASS, plus the orange heat lines (unlit, elsewhere).
  * All are lit by the environment map and the arena's key light, so highlights stay on the object
  * as the head moves (matcaps slid with the view). The detail maps are generated here once, small.
@@ -159,14 +159,14 @@ BRUSHED_NORMAL.repeat.set(4, 1);
 export const STEEL = new MeshStandardMaterial({ color: 0xb9bec8, metalness: 1, roughness: 0.32, normalMap: BRUSHED_NORMAL, normalScale: new Vector2(0.35, 0.35) });
 /** Hero metal, hammered: the anvil's body. */
 export const FORGED = new MeshStandardMaterial({ color: 0x9298a2, metalness: 0.9, roughness: 0.75, normalMap: HAMMERED.normal, roughnessMap: HAMMERED.rough });
-/** Machine body, matte: plinths, stands, the shell. Above #2a2c32 so passthrough never shows a hole. */
-export const BODY = 0x3a3d44;
-export const GRAPHITE = new MeshStandardMaterial({ color: BODY, metalness: 0.3, roughness: 0.95, normalMap: HAMMERED.normal, normalScale: new Vector2(0.5, 0.5), roughnessMap: HAMMERED.rough });
+/** Machine body, painted matte slate: plinths, stands, the shell (well above #2a2c32, so passthrough never shows a hole). */
+export const BODY = 0x6c717b;
+export const GRAPHITE = new MeshStandardMaterial({ color: BODY, metalness: 0.1, roughness: 0.8, normalMap: HAMMERED.normal, normalScale: new Vector2(0.2, 0.2), roughnessMap: HAMMERED.rough });
 /** The same graphite with darkening baked into vertex colors where parts meet (lathe profiles). */
 export const GRAPHITE_AO = GRAPHITE.clone();
 GRAPHITE_AO.vertexColors = true;
 /** Machine body, machined: ratchets, coins, the shell's clamps. */
-export const GUNMETAL = new MeshStandardMaterial({ color: BODY, metalness: 0.85, roughness: 0.42 });
+export const GUNMETAL = new MeshStandardMaterial({ color: 0x3a3d44, metalness: 0.85, roughness: 0.42 });
 /** Trim. */
 export const BRASS = new MeshStandardMaterial({ color: 0xc99a50, metalness: 1, roughness: 0.4 });
 

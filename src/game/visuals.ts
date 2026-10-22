@@ -1259,13 +1259,13 @@ const VOID_METAL = doubleSided(metal(0x8a7ab0));
 
 const PALETTES: Record<Theme, Palette> = {
   // Three layers at the rim: a dark body, a metal lip (walls and rails), one accent light.
-  // The floor is spun steel, clearly lighter than the graphite shell around it.
-  forge: { floor: 0x4b5058, pit: 0x171313, wall: STEEL_WALL, rail: 0x9aa1ad, railHot: 0xff8a2a, accent: 0xff6a1a, pedestal: BODY },
-  stone: { floor: 0x606369, pit: 0x26262b, wall: STONE, rail: 0x9aa1ad, railHot: 0xffe2b8, accent: 0xf2e6d2, pedestal: 0x3d3f45 },
-  clockwork: { floor: 0x675d4d, pit: 0x2e2618, wall: BRASS_WALL, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0x463b2c },
-  ice: { floor: 0x6a7f8f, pit: 0x22303e, wall: FROST, rail: 0xb8c6d2, railHot: 0xffffff, accent: 0xe8f4ff, pedestal: 0x3e4a56 },
-  lava: { floor: 0x4a3a36, pit: 0x3a0c04, wall: BASALT, rail: 0x8a7a72, railHot: 0xff5a10, accent: 0xff3a0a, pedestal: 0x2a201e },
-  void: { floor: 0x3c3a4e, pit: 0x120c22, wall: VOID_METAL, rail: 0x9a8ab8, railHot: 0xe0b8ff, accent: 0xb86cff, pedestal: 0x252238 },
+  // The floor is satin plastic, clearly lighter than the painted shell around it.
+  forge: { floor: 0x9ea2a8, pit: 0x171313, wall: STEEL_WALL, rail: 0x9aa1ad, railHot: 0xff8a2a, accent: 0xff6a1a, pedestal: BODY },
+  stone: { floor: 0xa9abae, pit: 0x26262b, wall: STONE, rail: 0x9aa1ad, railHot: 0xffe2b8, accent: 0xf2e6d2, pedestal: 0x3d3f45 },
+  clockwork: { floor: 0xb3a68c, pit: 0x2e2618, wall: BRASS_WALL, rail: 0xb09a6a, railHot: 0xffd27a, accent: 0xffb43a, pedestal: 0x463b2c },
+  ice: { floor: 0xaec4d2, pit: 0x22303e, wall: FROST, rail: 0xb8c6d2, railHot: 0xffffff, accent: 0xe8f4ff, pedestal: 0x3e4a56 },
+  lava: { floor: 0x86706a, pit: 0x3a0c04, wall: BASALT, rail: 0x8a7a72, railHot: 0xff5a10, accent: 0xff3a0a, pedestal: 0x2a201e },
+  void: { floor: 0x7a7596, pit: 0x120c22, wall: VOID_METAL, rail: 0x9a8ab8, railHot: 0xe0b8ff, accent: 0xb86cff, pedestal: 0x252238 },
 };
 
 const plinths = new Map<number, MeshStandardMaterial>();
@@ -1338,16 +1338,16 @@ function floorTexture(): CanvasTexture {
   g.fillStyle = base;
   g.fillRect(0, 0, S, S);
   // Fine spun brushing.
-  for (let i = 0; i < 1400; i++) {
+  for (let i = 0; i < 120; i++) {
     const v = 170 + Math.floor(rnd() * 85);
-    g.strokeStyle = `rgba(${v},${v},${v},${0.05 + rnd() * 0.1})`;
+    g.strokeStyle = `rgba(${v},${v},${v},${0.03 + rnd() * 0.05})`;
     g.lineWidth = 0.6 + rnd();
     g.beginPath();
     g.arc(C, C, rnd() * C, 0, Math.PI * 2);
     g.stroke();
   }
   // Wear where the tops run: soft scuffs and short arcs in the outer band.
-  for (let i = 0; i < 260; i++) {
+  for (let i = 0; i < 50; i++) {
     const a = rnd() * Math.PI * 2;
     const r = C * (0.5 + rnd() * 0.42);
     g.strokeStyle = `rgba(60,60,60,${0.04 + rnd() * 0.08})`;
@@ -1398,8 +1398,8 @@ function floorTexture(): CanvasTexture {
   // Contact shading: the floor darkens into the foot of the wall.
   const foot = g.createRadialGradient(C, C, C * 0.88, C, C, C);
   foot.addColorStop(0, 'rgba(0,0,0,0)');
-  foot.addColorStop(0.7, 'rgba(0,0,0,0.25)');
-  foot.addColorStop(1, 'rgba(0,0,0,0.6)');
+  foot.addColorStop(0.7, 'rgba(0,0,0,0.12)');
+  foot.addColorStop(1, 'rgba(0,0,0,0.32)');
   g.fillStyle = foot;
   g.fillRect(0, 0, S, S);
   const t = new CanvasTexture(c);
@@ -1566,14 +1566,14 @@ export class ArenaView {
     this.geo.setAttribute('color', new BufferAttribute(this.colors, 3));
     this.geo.setAttribute('uv', new BufferAttribute(uv, 2));
     this.geo.setIndex(idx);
-    // Blackened spun steel: the turning marks glint in rings, while the forge theme alone gives
-    // the engraved rings and centre spark a restrained ember response.
+    // Satin moulded plastic, like a real top stadium: a clean mid-light floor the dark-rimmed,
+    // colored tops read against. The forge theme alone gives the engraved rings and centre spark a
+    // restrained ember response.
     this.floorMaterial = new MeshStandardMaterial({
       map: FLOOR_TEXTURE,
       vertexColors: true,
-      metalness: 0.82,
-      roughness: 0.56,
-      normalMap: LATHE_NORMAL,
+      metalness: 0.05,
+      roughness: 0.62,
       emissive: 0xff4a12,
       emissiveMap: FLOOR_EMBER_TEXTURE,
       emissiveIntensity: 0,
@@ -1721,12 +1721,12 @@ export class ArenaView {
     const rimY = new Arena(layout).floorHeight(0.97) + 0.0008;
     add(tube(rimPath(layout, 0, Math.PI * 2, -0.005, rimY), 0.0011, accent));
     // A soft dark ring on the table where the pedestal stands, so the arena sits on it.
-    const ao = add(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), own(new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false }))));
-    ao.scale.set(0.15 * 3.1 * (layout.radius / 0.15) * (layout.shape === 'square' ? 1.12 : 1), 1, 0.15 * 3.1 * (layout.radius / 0.15) * (layout.shape === 'oval' ? 0.78 : 1));
+    const ao = add(new Mesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), own(new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0x000000, transparent: true, opacity: 0.7, depthWrite: false }))));
+    ao.scale.set(0.15 * 4.2 * (layout.radius / 0.15) * (layout.shape === 'square' ? 1.12 : 1), 1, 0.15 * 4.2 * (layout.radius / 0.15) * (layout.shape === 'oval' ? 0.78 : 1));
     ao.position.y = -this.pedestalHeight + 0.0006;
     // A tight, darker contact ring hugging the foot: the wide one alone leaves the base floating.
     const contact = add(new Mesh(ao.geometry, own(new MeshBasicMaterial({ map: SOFT_SHADOW, color: 0x000000, transparent: true, opacity: 0.85, depthWrite: false }))));
-    contact.scale.copy(ao.scale).multiplyScalar(2.15 / 3.1);
+    contact.scale.copy(ao.scale).multiplyScalar(2.6 / 4.2);
     contact.position.y = ao.position.y + 0.0003;
 
     // Pedestal: the forge shell for forge arenas, a plain themed plinth for the others.
@@ -3037,9 +3037,9 @@ export function forgeEnvironment(renderer: WebGLRenderer): Texture {
   const scene = new Scene();
   scene.background = new Color(0x08090b);
   const dome = new SphereGeometry(8, 32, 16);
-  const top = new Color(0x6c6f76);
-  const horizon = new Color(0x2c2e33);
-  const floor = new Color(0x060607);
+  const top = new Color(0x9a9da4);
+  const horizon = new Color(0x6a6d74);
+  const floor = new Color(0x2a2b2e);
   const col = new Float32Array(dome.getAttribute('position').count * 3);
   const c = new Color();
   for (let i = 0; i < col.length / 3; i++) {
