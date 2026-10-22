@@ -46,6 +46,7 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 7 (04:45–05:25) | FoV / solid | 6 / 5 → pending | FoV check now covers MENU, REMATCH, PLAY and FORGE names (head-frame angles); buttons and stations pulled in. Double-charge hunt with a charge-spend spy in IWER: a Spin Rub's circling left a Finger Groove that committed on lift (fixed); hands releasing the Arena Forge grips posted a Crossguard rail (fixed: they must leave the rim first); a hand reaching for the grips posted a rail (fixed: the pinch point reserves the grip); one Spin Rub stroke pays one window, Crossguard refunds once (agent). Arena Forge squeeze still double-charges in some long sequences (passes alone and after the tutorial probe) — open | f25b6f1, a936611, + fixes |
 | 7 | Flick on a 75%-fitted arena | — | Whenever the match arena is fitted at 75% (scale 1.8: the `?demo` save, or after the room-matrix probe) the flick probe's swing never flicks (3/3 runs); at scale 2.04–2.4 it passes. Same at older commits, so not a tonight regression; on small real tables Flick may be harder to land — worth a sim/probe check of the flick contact band against root scale | open |
 | final judge (05:35) | Fresh full judge, same method as 01:30 | Overall 6.1 → 6.6 (Innovation 7.6→7.8, Experience 5.9→6.9, Technical 5.3→5.6, Polish 5.5→6.2), Stage One assumed closed; as is it still fails Stage One (no URL, no public video) | Before/after table written to judge-report.md. Fixed after it: flick shot re-recorded without the match-4 card, SUBMISSION video table matches the 53.9 s cut, asset list points at stills-room/ | docs |
+| 8 (05:25–05:50) | Solid / bug-free | 5 → pending | With the spend spy: hands passing over the rim to the forge grips posted a Crossguard rail (fixed: a rail post needs a nearly still palm, < 0.12 arena units/s); the Forge Gust probe's sweep flicked a top in its path (probe holds tops off the line; the gust/flick overlap for a flat palm sweeping through a top is a design question); Outer Ring test throw too hard for a narrow desk (dev only, fixed). Gust and cup now read real speed from the live arena scale (they overstated it on fitted arenas). Sequential `check:hands`: 5 clean runs in a row after the fixes; desk-ko, desk-guard, combat-readability pass; desk-ko-first passes after a reload (no edge sector when a previous probe left the arena far from the desk edge) | 6 commits |
 
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
@@ -79,8 +80,8 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [x] One-Euro again, only on aim/hover paths; rip and flick keep raw joints (hand tracking 5)
 - [x] README condensed for a 5-minute judge (text 5)
 - [x] First-five "seal stamp did not spend": both — the seal pinch raised a ramp (game, fixed) and the driver aimed at a settling seal (fixed)
-- [ ] Flick + groove double charge in long check:hands sequences (1 in ~6)
+- [x] Flick + groove double charge in long check:hands sequences
 - [x] Hub/home label diet (UI/UX 7)
 - [x] Stills from the current build, IWER-labelled: `~/Desktop/spinsmith-videos/night-2026-10-22/stills/` and `stills-room/` (the older store folder is untouched)
-- [ ] check:hands: rub / crossguard double charge in sequence (~1 in 2 runs), forge-wheel cold start under HANDS_ISOLATE=1
+- [x] check:hands double charges in sequence (rub groove-on-lift, forge-release rail, grip-approach rail, moving-palm rail) — 5 clean sequential runs; forge-wheel cold start under HANDS_ISOLATE=1 still open
 - [ ] Flick never lands in the probe when the match arena is fitted at 75% (scale 1.8) — check the contact band against root scale
