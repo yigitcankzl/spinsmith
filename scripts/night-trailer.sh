@@ -62,8 +62,10 @@ clip 04-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK IT" "Your fingertip is part of the
 clip 06-strike "$NEW/seal-stamp.mp4" 1.4 4.6 "STAMP AN ULTIMATE" "Pinch the seal  press it into the bowl"
 # Optional: a 3-4 top brawl shot, when the new-shots folder has one.
 if [ -s "$NEW/brawl.mp4" ]; then clip 07-brawl "$NEW/brawl.mp4" 11.6 5.0 "BRAWL" "Three or four tops  last one spinning"; fi
-clip 08-forge "$MAIN/06-forge.mp4" 1.2 3.8 "FORGE IT BY HAND" "226 builds  each changes the physics"
-clip 09-workshop "$SHOW/05-arena-workshop.mp4" 16.5 3.0 "BUILD THE BATTLEGROUND" "Twenty arenas and a workshop"
+if [ -s "$NEW/forge.mp4" ]; then clip 08-forge "$NEW/forge.mp4" 2.6 5.0 "FORGE IT BY HAND" "226 builds  each changes the physics"
+else clip 08-forge "$MAIN/06-forge.mp4" 1.2 3.8 "FORGE IT BY HAND" "226 builds  each changes the physics"; fi
+if [ -s "$NEW/workshop.mp4" ]; then clip 09-workshop "$NEW/workshop.mp4" 3.0 5.0 "BUILD THE BATTLEGROUND" "Twenty arenas and a workshop"
+else clip 09-workshop "$SHOW/05-arena-workshop.mp4" 16.5 3.0 "BUILD THE BATTLEGROUND" "Twenty arenas and a workshop"; fi
 clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.4 "TWENTY ARENAS" "Fifteen bouts  nine rivals"
 clip 11-return "$NEW/match-won-cards.mp4" 5.0 7.5 "ONE NEW MOVE A MATCH" "A streak and tomorrow on every result"
 card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.8
