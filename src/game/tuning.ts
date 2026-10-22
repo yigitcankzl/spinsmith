@@ -6,6 +6,7 @@
 import { REACH } from './placement.ts';
 import { ARENA_SCALE } from './reach.ts';
 import { PRESS } from './table-touch.ts';
+import { HAND_EURO } from './one-euro.ts';
 
 const query = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
 
@@ -23,6 +24,10 @@ export const TUNE = {
   /** Thumb-to-index distance that starts and ends a pinch (m). */
   pinchOn: knob('pinchOn', 0.02),
   pinchOff: knob('pinchOff', 0.035),
+  /** One-Euro smoothing of the aim points (hands.ts pinchSmooth/indexSmooth): rest cutoff (Hz), cutoff per m/s, speed cutoff (Hz). */
+  euroCutoff: knob('euroCutoff', HAND_EURO.minCutoff),
+  euroBeta: knob('euroBeta', HAND_EURO.beta),
+  euroDCutoff: knob('euroDCutoff', HAND_EURO.dCutoff),
   /** Cord pull that counts as full power (m) and the full-power pull speed (m/s). */
   fullPull: knob('fullPull', 0.22),
   fullSpeed: knob('fullSpeed', 1.0),

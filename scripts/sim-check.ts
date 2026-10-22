@@ -34,6 +34,7 @@ import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/
 import { FpsBook, fpsPhase, QUALITY_MAX, QualityGuard, qualityThresholds } from '../src/game/quality.ts';
 import { commitBlocker, FLICK_AFTER_RELEASE, FREE_HAND, gestureOwner, heldElsewhere, listenBlocker, mayCommit, mayListen, RELEASE_LOCK, RUB_TIP_GUST, RUB_TOUCH_SLACK, SHAPING_RELEASE_LOCK } from '../src/game/gesture-owner.ts';
 import type { GestureOwner, HandFacts, HandVerb } from '../src/game/gesture-owner.ts';
+import { HAND_EURO, OneEuro3 } from '../src/game/one-euro.ts';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_INTENT_LENGTH, GROOVE_MAX_LENGTH, palmCatchDistance, palmCenterX, palmCenterZ } from '../src/game/hand-tools.ts';
 
 const FORGE = ARENAS[0];
@@ -2160,6 +2161,42 @@ if (DESK_DROP_ON) {
   }
   assert.ok(heldElsewhere(hand({ held: 'ember' })) && !heldElsewhere(hand({ held: 'ramp' })), 'held rivet skips shaping, a held ramp does not');
   assert.equal(commitBlocker(hand({ slapPose: true, followLock: 0.2 }), 'cup'), 'follow', 'the first claim in the table names the blocker');
+}
+
+// Hand smoothing (hands.ts pinchSmooth/indexSmooth): the One-Euro filter steadies a still hand,
+// keeps up with a sweep, and forgets a lost hand. Speed verbs never read it (they use the raw joints).
+{
+  let seed = 7;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd());
+  for (const hz of [72, 90]) {
+    const dt = 1 / hz;
+    // A hand held still with 1.5 mm of tracking noise per axis.
+    const still = new OneEuro3(HAND_EURO);
+    let rawSq = 0;
+    let outSq = 0;
+    for (let i = 0; i < hz * 4; i++) {
+      const x = gauss() * 0.0015, y = 1 + gauss() * 0.0015, z = gauss() * 0.0015;
+      const v = still.update(x, y, z, dt);
+      if (i < hz) continue;
+      rawSq += x * x + (y - 1) ** 2 + z * z;
+      outSq += v.x * v.x + (v.y - 1) ** 2 + v.z * v.z;
+    }
+    const drop = 1 - Math.sqrt(outSq / rawSq);
+    assert.ok(drop >= 0.6, `${hz} Hz: a still hand's jitter drops ${(drop * 100).toFixed(0)}% (needs >= 60%)`);
+    // A steady 1.5 m/s sweep, measured once the filter has settled on it (0.4 s, 60 cm).
+    const sweep = new OneEuro3(HAND_EURO);
+    let lag = 0;
+    for (let i = 0; i <= hz * 0.4; i++) lag = 1.5 * i * dt - sweep.update(1.5 * i * dt, 1, 0, dt).x;
+    assert.ok(lag < 0.015, `${hz} Hz: a 1.5 m/s sweep lags ${(lag * 1000).toFixed(1)} mm (needs < 15 mm)`);
+    // Tracking lost and found 40 cm away: the first sample is the hand, not a glide from the old spot.
+    sweep.reset();
+    const back = sweep.update(-0.4, 1.2, 0.1, dt);
+    assert.ok(back.x === -0.4 && back.y === 1.2 && back.z === 0.1, 'a reset filter passes the first sample through');
+    const next = sweep.update(-0.4, 1.2, 0.1, dt);
+    assert.ok(Math.abs(next.x + 0.4) < 1e-9, 'and does not drift back toward the lost position');
+    if (hz === 72) console.log(`hand smoothing: still jitter -${(drop * 100).toFixed(0)}%, 1.5 m/s lag ${(lag * 1000).toFixed(1)} mm`);
+  }
 }
 
 console.log('sim-check: all passed');

@@ -534,7 +534,9 @@ export class MatchSystem extends createSystem({
     justReleased: false,
     gap: Infinity,
     pinch: new Vector3(),
+    pinchSmooth: new Vector3(),
     index: new Vector3(),
+    indexSmooth: new Vector3(),
     low: 0,
     wrist: new Vector3(),
     rayOrigin: new Vector3(),
@@ -861,6 +863,9 @@ export class MatchSystem extends createSystem({
   private handTipAt = new Vector3();
   /** handFacts() scratch: never shared with a caller's vectors. */
   private factTip = new Vector3();
+  private factTipSmooth = new Vector3();
+  /** The One-Euro pinch in arena space, where a shaping pinch lands and aims (toLocal reuses its vector). */
+  private pinchAim = new Vector3();
   private factWrist = new Vector3();
   private factPalm = new Vector3();
   /** The pinch ring between each thumb and index: it closes as the fingers do, and lights when they meet. */
@@ -1779,7 +1784,7 @@ export class MatchSystem extends createSystem({
     const dt = Math.min(delta, 0.05);
     this.frameDt = dt;
     this.time += dt;
-    this.hands.update(frame, ref, session, this.player);
+    this.hands.update(frame, ref, session, this.player, delta);
     this.handOccluder.update(frame, ref, session, this.player);
     this.updateGazePointer(frame, ref, session);
     if (import.meta.env.DEV) {
@@ -2325,7 +2330,7 @@ export class MatchSystem extends createSystem({
       for (const b of buttons) {
         if (!b.mesh.visible) continue;
         b.mesh.getWorldPosition(this.p);
-        const near = h.pinch.distanceTo(this.p) < 0.05;
+        const near = h.pinchSmooth.distanceTo(this.p) < 0.05;
         const t = this.local.copy(this.p).sub(h.rayOrigin).dot(h.rayDir);
         const far = h.hasRay && t > 0 && this.local.copy(h.rayDir).multiplyScalar(t).add(h.rayOrigin).distanceTo(this.p) < Math.max(BUTTON_REACH, b.height * 0.8);
         if (!near && !far) continue;
@@ -2352,7 +2357,7 @@ export class MatchSystem extends createSystem({
         // Only a pinch made away from the bowl presses it: a pinch over the arena (a ramp, a grip,
         // skipping a replay) belongs to the fight, not to the button you happen to be looking at.
         const by = (['left', 'right'] as const).find((side) => this.hands[side].justPinched);
-        const local = by && this.root.worldToLocal(this.handAt.copy(this.hands[by].pinch));
+        const local = by && this.root.worldToLocal(this.handAt.copy(this.hands[by].pinchSmooth));
         const clear = !!local && normRadius(this.arena.layout, local.x, local.z) > 1.35;
         if (g.justPinched && clear && !pressed) pressed = b.id;
         break;
@@ -2991,7 +2996,7 @@ export class MatchSystem extends createSystem({
       // floating reticle until the player is actually aiming at or manipulating the arena.
       m.visible = h.tracked && engaged && h.gap < 0.065 && this.phase !== 'placing';
       if (!m.visible) return;
-      m.position.copy(h.pinch);
+      m.position.copy(h.pinchSmooth);
       m.lookAt(this.head);
       const r = h.pinching ? 0.006 : 0.006 + 0.16 * Math.max(0, h.gap - TUNE.pinchOn);
       m.scale.setScalar(r);
@@ -3019,8 +3024,9 @@ export class MatchSystem extends createSystem({
       if (!play || !h.tracked) return;
       // Preview the same pinch point that updateShaping consumes. The fingertip is kept separately
       // because a press beside a top claims Catch without changing the pinch target underneath it.
-      const l = this.handAt.copy(this.toLocal(h.pinch));
-      const tip = this.root.worldToLocal(this.handTipAt.copy(h.index));
+      // Both smoothed (hands.ts One-Euro), so the rings and the claim do not shimmer at rest.
+      const l = this.handAt.copy(this.toLocal(h.pinchSmooth));
+      const tip = this.root.worldToLocal(this.handTipAt.copy(h.indexSmooth));
       const rimGrip = this.rimPulls[side];
       // Once a rim grip is claimed, its authored surface point remains the contact. The hand may
       // deliberately rise or move outside the bowl while squeezing/tilting; hiding feedback then
@@ -3117,7 +3123,7 @@ export class MatchSystem extends createSystem({
     for (const side of ['left', 'right'] as const) {
       const hand = this.hands[side];
       if (!hand.tracked || !hand.justPinched) continue;
-      const at = this.root.worldToLocal(this.handAt.copy(hand.pinch));
+      const at = this.root.worldToLocal(this.handAt.copy(hand.pinchSmooth));
       if (at.distanceTo(this.secretRelic.position) > 0.05) continue;
       if (!this.progress.collectSecret(bout.id)) return;
       this.secretRelic.visible = false;
@@ -3155,7 +3161,7 @@ export class MatchSystem extends createSystem({
     this.stage.localToWorld(this.handAt.copy(at));
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      if (!h.justPinched || h.pinch.distanceTo(this.handAt) > 0.07) continue;
+      if (!h.justPinched || h.pinchSmooth.distanceTo(this.handAt) > 0.07) continue;
       this.myView.picked = true;
       playPick();
       this.stamp.show('BACK IN HAND', '', 'mine', 0.4);
@@ -3401,6 +3407,7 @@ export class MatchSystem extends createSystem({
     // Off while the hand driver (src/dev-drive.ts) steers the hands: it pinches where it means to.
     g.tracked = !this.gazeOff && (!!pose || import.meta.env.DEV);
     g.pinch.set(0, -100, 0);
+    g.pinchSmooth.set(0, -100, 0);
     const was = g.pinching;
     g.pinching = this.hands.left.pinching || this.hands.right.pinching;
     g.justPinched = g.pinching && !was;
@@ -3487,7 +3494,7 @@ export class MatchSystem extends createSystem({
   private arenaPoint(h: HandState): { x: number; z: number } | null {
     // A shrunk arena: what the hand touches, in the arena's true units.
     const k = this.viewK;
-    const l = this.toLocal(h.pinch).divideScalar(k);
+    const l = this.toLocal(h.pinchSmooth).divideScalar(k);
     const L = this.arena.layout;
     if (normRadius(L, l.x, l.z) < 1.3 && Math.abs(l.y - this.arena.floorHeight(Math.min(1, normRadius(L, l.x, l.z)))) < 0.04) return { x: l.x, z: l.z };
     if (!h.hasRay) return null;
@@ -3740,7 +3747,7 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV && Math.floor(this.settle) !== Math.floor(this.settle - dt)) console.log(`[PRESS] band ${lo.toFixed(3)}..${hi.toFixed(3)} print ${at.x.toFixed(2)},${y.toFixed(3)},${at.z.toFixed(2)} low ${this.hands.right.low.toFixed(3)} at ${this.hands.right.index.x.toFixed(2)},${this.hands.right.index.z.toFixed(2)}`);
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      if (h.justPinched && (raycastTable || Math.hypot(h.pinch.x - at.x, h.pinch.z - at.z) < 0.1)) {
+      if (h.justPinched && (raycastTable || Math.hypot(h.pinchSmooth.x - at.x, h.pinchSmooth.z - at.z) < 0.1)) {
         console.log(`[MATCH] placed by ${raycastTable ? 'gaze + pinch' : 'a pinch on the print'}`);
         this.placeRoot(at);
         this.toHub();
@@ -3751,8 +3758,8 @@ export class MatchSystem extends createSystem({
       this.placeRoot(raycastTable ? at : undefined);
       // Toward the hand a little, standing on the height the palm found.
       const p = this.root.position;
-      const dx = h.index.x - p.x;
-      const dz = h.index.z - p.z;
+      const dx = h.indexSmooth.x - p.x;
+      const dz = h.indexSmooth.z - p.z;
       const k = Math.min(1, PRESS_PULL / (Math.hypot(dx, dz) || 1));
       p.set(p.x + dx * k, hit + PEDESTAL, p.z + dz * k);
       const table2 = this.tableShape();
@@ -4250,7 +4257,7 @@ export class MatchSystem extends createSystem({
       for (const h of [this.hands.right, this.hands.left]) {
         if (!h.tracked || !h.justPinched) continue;
         this.handle.getWorldPosition(this.p);
-        if (h.pinch.distanceTo(this.p) > HANDLE_GRAB) continue;
+        if (h.pinchSmooth.distanceTo(this.p) > HANDLE_GRAB) continue;
         this.dragging = { hand: h, from: h.pinch.clone(), start: this.root.position.clone() };
         playPick();
         return true;
@@ -4528,7 +4535,7 @@ export class MatchSystem extends createSystem({
         this.palmLauncherSide = null;
         this.launcherBrace.visible = false;
       }
-      const d = h.pinch.distanceTo(this.root.position);
+      const d = h.pinchSmooth.distanceTo(this.root.position);
       if (d < best && d < LAUNCH_REACH) {
         best = d;
         pick = side;
@@ -4590,7 +4597,7 @@ export class MatchSystem extends createSystem({
       return;
     }
     // Lock the point shown before the pinch; if this hand never previewed one, try its index now.
-    if (!this.palmLauncherSide && this.launchPreviewSide !== pick && !this.previewLaunch(h.index)) {
+    if (!this.palmLauncherSide && this.launchPreviewSide !== pick && !this.previewLaunch(h.indexSmooth)) {
       this.launchFrom = null;
       this.mine.x = 0;
       this.mine.z = this.SPAWN;
@@ -5408,6 +5415,8 @@ export class MatchSystem extends createSystem({
       }
       this.shapeLost[side] = 0;
       const l = this.toLocal(h.pinch);
+      // Where a pinch lands and where a ramp aims are precision, not speed: the One-Euro point.
+      const ls = this.root.worldToLocal(this.pinchAim.copy(h.pinchSmooth));
       if (h.justReleased) {
         this.palmGustBlockedUntil[side] = this.elapsed + RELEASE_LOCK;
         this.palmGustSampled[side] = false;
@@ -5439,7 +5448,7 @@ export class MatchSystem extends createSystem({
           let railGap = 0.048;
           for (const shape of this.arena.shapes) {
             if (shape.kind !== 'ramp' || shape.owner !== side) continue;
-            const gap = Math.hypot(shape.x - l.x, shape.z - l.z);
+            const gap = Math.hypot(shape.x - ls.x, shape.z - ls.z);
             if (gap < railGap) {
               railGap = gap;
               rail = shape;
@@ -5462,10 +5471,10 @@ export class MatchSystem extends createSystem({
         let rim = this.rimPulls[side];
         // A rim grip is half of the two-hand forge (from its lesson on); alone it is a rim spring (later).
         if (!rim && h.justPinched && open && this.taught('forge')) {
-          const n = normRadius(this.arena.layout, l.x, l.z);
-          const grip = n >= RIM_GRAB_MIN || forgeGripIntent(n, Math.atan2(l.z, l.x));
-          if (grip && n <= 1.12 && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB * 1.5) {
-            rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z, started: this.elapsed };
+          const n = normRadius(this.arena.layout, ls.x, ls.z);
+          const grip = n >= RIM_GRAB_MIN || forgeGripIntent(n, Math.atan2(ls.z, ls.x));
+          if (grip && n <= 1.12 && Math.abs(ls.y - this.arena.height(ls.x, ls.z)) < SHAPE_GRAB * 1.5) {
+            rim = this.rimPulls[side] = { x: l.x, z: l.z, sx: ls.x, sz: ls.z, started: this.elapsed };
             playTick();
           }
         }
@@ -5482,10 +5491,10 @@ export class MatchSystem extends createSystem({
         }
         if (!d && h.justPinched && open) {
           // Pointing out from the middle until the hand drags it round.
-          if (this.arena.inside(l.x, l.z) && Math.abs(l.y - this.arena.height(l.x, l.z)) < SHAPE_GRAB) {
-            d = this.shaping[side] = { x: l.x, z: l.z, sx: l.x, sz: l.z, t: 0, far: false, amp: SHAPE_SIZE.ramp, dx: l.x, dz: l.z, shape: null };
+          if (this.arena.inside(ls.x, ls.z) && Math.abs(ls.y - this.arena.height(ls.x, ls.z)) < SHAPE_GRAB) {
+            d = this.shaping[side] = { x: ls.x, z: ls.z, sx: ls.x, sz: ls.z, t: 0, far: false, amp: SHAPE_SIZE.ramp, dx: ls.x, dz: ls.z, shape: null };
           } else if (this.rayFloor(h)) {
-            d = this.shaping[side] = { x: this.rayHit.x, z: this.rayHit.z, sx: l.x, sz: l.z, t: 0, far: true, amp: SHAPE_SIZE.ramp, dx: this.rayHit.x, dz: this.rayHit.z, shape: null };
+            d = this.shaping[side] = { x: this.rayHit.x, z: this.rayHit.z, sx: ls.x, sz: ls.z, t: 0, far: true, amp: SHAPE_SIZE.ramp, dx: this.rayHit.x, dz: this.rayHit.z, shape: null };
           }
         }
         if (d) {
@@ -5493,8 +5502,8 @@ export class MatchSystem extends createSystem({
           // Aim: the drag since the pinch began (the far hand's own motion counts double), once it is
           // past a small dead zone, so tracking jitter never swings it.
           const k = d.far ? 2 : 1;
-          const px = (l.x - d.sx) * k;
-          const pz = (l.z - d.sz) * k;
+          const px = (ls.x - d.sx) * k;
+          const pz = (ls.z - d.sz) * k;
           if (Math.hypot(px, pz) >= RAMP_AIM_DEADZONE) {
             d.dx = px;
             d.dz = pz;
@@ -5676,7 +5685,8 @@ export class MatchSystem extends createSystem({
     if (!this.oneHand) return null;
     const real = this.oneHand.side === 'left' ? left : right;
     const l = this.root.worldToLocal(this.handAt.copy(real.pinch));
-    const ghost: HandState = { ...real, pinch: this.root.localToWorld(this.oneHandPinch.set(-l.x, this.oneHand.y, -l.z)), justPinched: false, justReleased: false };
+    const mirrored = this.root.localToWorld(this.oneHandPinch.set(-l.x, this.oneHand.y, -l.z));
+    const ghost: HandState = { ...real, pinch: mirrored, pinchSmooth: mirrored, justPinched: false, justReleased: false };
     return this.oneHand.side === 'left' ? [real, ghost] : [ghost, real];
   }
 
@@ -5749,7 +5759,7 @@ export class MatchSystem extends createSystem({
     const mine = this.mine;
     // The Crossguard palm (wrist→fingertip 0.45) decides a reserved Forge grip, as the rail does.
     // Hand marks classify the pinch target while the rail uses the palm: either saying FORGE counts.
-    const grip = this.factPalm.copy(wrist).lerp(tip, 0.45);
+    const grip = this.factPalm.copy(wrist).lerp(this.root.worldToLocal(this.factTipSmooth.copy(h.indexSmooth)), 0.45);
     const gripN = normRadius(this.arena.layout, grip.x, grip.z);
     const onForgeGrip = this.handHoverClaim[side] === 'FORGE' || (this.taught('forge') && forgeGripIntent(gripN, Math.atan2(grip.z, grip.x)));
     // A palm (wrist→fingertip 0.5) down at the table outside the rim, with the strike ready, is a slap.
@@ -5891,11 +5901,11 @@ export class MatchSystem extends createSystem({
       this.emberPickup.getWorldPosition(this.emberWorld);
       for (const side of ['left', 'right'] as const) {
         const hand = this.hands[side];
-        if (hand.tracked && hand.pinching) this.emberGrabGap = hand.pinch.distanceTo(this.emberWorld);
+        if (hand.tracked && hand.pinching) this.emberGrabGap = hand.pinchSmooth.distanceTo(this.emberWorld);
         // The waiting rivet is outside the bowl, so this Quest/IWER-tolerant catch volume cannot
         // steal a ramp or cup pinch. Contact while already pinching also works, so one low-fps
         // justPinched frame can never make the small airborne pickup feel intangible.
-        if (!hand.tracked || !hand.pinching || hand.pinch.distanceTo(this.emberWorld) > 0.1) continue;
+        if (!hand.tracked || !hand.pinching || hand.pinchSmooth.distanceTo(this.emberWorld) > 0.1) continue;
         this.emberHeld = side;
         this.emberLost = 0;
         this.setEmberState(2);
@@ -6051,11 +6061,11 @@ export class MatchSystem extends createSystem({
     this.forgeWheelHandle.getWorldPosition(this.forgeWheelHandleWorld);
     for (const side of ['left', 'right'] as const) {
       const hand = this.hands[side];
-      if (hand.tracked && hand.justPinched) this.forgeWheelGrabGap = hand.pinch.distanceTo(this.forgeWheelHandleWorld);
+      if (hand.tracked && hand.justPinched) this.forgeWheelGrabGap = hand.pinchSmooth.distanceTo(this.forgeWheelHandleWorld);
       // The handle is deliberately outside the bowl, so a generous 10 cm pinch volume cannot
       // steal floor shaping. IWER measures 8.5 cm of closed-finger drift around this small grip;
       // the turn angle itself remains strict, so proximity alone never fires the current.
-      if (!hand.tracked || !hand.justPinched || hand.pinch.distanceTo(this.forgeWheelHandleWorld) > 0.1) continue;
+      if (!hand.tracked || !hand.justPinched || hand.pinchSmooth.distanceTo(this.forgeWheelHandleWorld) > 0.1) continue;
       this.forgeWheelHeld = side;
       this.forgeWheelHandLocal.copy(hand.pinch);
       this.stage.worldToLocal(this.forgeWheelHandLocal);
@@ -6627,7 +6637,7 @@ export class MatchSystem extends createSystem({
     this.overforgeSeal.getWorldPosition(this.p);
     for (const side of ['left', 'right'] as const) {
       const h = this.hands[side];
-      if (!h.tracked || !h.justPinched || h.pinch.distanceTo(this.p) > SEAL_GRAB) continue;
+      if (!h.tracked || !h.justPinched || h.pinchSmooth.distanceTo(this.p) > SEAL_GRAB) continue;
       this.overforgeHeld = side;
       this.overforgeMode = 'held';
       playPick();

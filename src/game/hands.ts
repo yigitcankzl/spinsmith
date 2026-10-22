@@ -1,4 +1,5 @@
 import { Matrix4, Object3D, Quaternion, Vector3 } from '@iwsdk/core';
+import { OneEuro3, OneEuroParams } from './one-euro.js';
 import { TUNE } from './tuning.js';
 
 /** Thumb-to-index distance hysteresis (m): close below ON, open above OFF (tunable on a headset). */
@@ -18,6 +19,12 @@ export interface HandState {
   justReleased: boolean;
   /** Midpoint between thumb and index tips, world space. */
   pinch: Vector3;
+  /**
+   * pinch and index One-Euro filtered (one-euro.ts): steady points for aim, hover and hit tests.
+   * Anything that measures a speed or a swing (rip, flick, rub, gust, slap) reads the raw ones.
+   */
+  pinchSmooth: Vector3;
+  indexSmooth: Vector3;
   /** Thumb-to-index distance (m), for the pinch ring (Infinity for controllers). */
   gap: number;
   /** Index fingertip, world space (grip position for controllers). */
@@ -40,6 +47,8 @@ const newHand = (): HandState => ({
   justPinched: false,
   justReleased: false,
   pinch: new Vector3(),
+  pinchSmooth: new Vector3(),
+  indexSmooth: new Vector3(),
   gap: Infinity,
   index: new Vector3(),
   low: 0,
@@ -61,8 +70,22 @@ export class HandInput {
   private mat = new Matrix4();
   private quat = new Quaternion();
   private v = new Vector3();
+  private euroParams: OneEuroParams = { minCutoff: TUNE.euroCutoff, beta: TUNE.euroBeta, dCutoff: TUNE.euroDCutoff };
+  private euro = {
+    left: { pinch: new OneEuro3(this.euroParams), index: new OneEuro3(this.euroParams) },
+    right: { pinch: new OneEuro3(this.euroParams), index: new OneEuro3(this.euroParams) },
+  };
+  private lastFrameTime = -1;
 
-  update(frame: XRFrame, ref: XRReferenceSpace, session: XRSession, player: Object3D) {
+  /** fallbackDt (s) is used only when the XR frame carries no predicted display time. */
+  update(frame: XRFrame, ref: XRReferenceSpace, session: XRSession, player: Object3D, fallbackDt = 1 / 72) {
+    // The filter's dt comes from the XR frame clock, so a dropped frame reads as a longer step.
+    const t = (frame as XRFrame & { predictedDisplayTime?: number }).predictedDisplayTime;
+    let dt = fallbackDt;
+    if (typeof t === 'number' && Number.isFinite(t)) {
+      if (this.lastFrameTime >= 0 && t > this.lastFrameTime) dt = Math.min(0.1, (t - this.lastFrameTime) / 1000);
+      this.lastFrameTime = t;
+    }
     this.seen.left = false;
     this.seen.right = false;
     for (const source of session.inputSources) {
@@ -78,6 +101,11 @@ export class HandInput {
       h.pinching = pinching;
       h.justPinched = pinching && !was;
       h.justReleased = !pinching && was;
+      const f = this.euro[side];
+      const p = f.pinch.update(h.pinch.x, h.pinch.y, h.pinch.z, dt);
+      h.pinchSmooth.set(p.x, p.y, p.z);
+      const i = f.index.update(h.index.x, h.index.y, h.index.z, dt);
+      h.indexSmooth.set(i.x, i.y, i.z);
     }
     for (const side of ['left', 'right'] as const) {
       if (this.seen[side]) continue;
@@ -86,6 +114,9 @@ export class HandInput {
       h.justPinched = false;
       h.pinching = false;
       h.tracked = false;
+      // Re-acquired tracking starts fresh: no glide from where the hand was lost.
+      this.euro[side].pinch.reset();
+      this.euro[side].index.reset();
       // No stale ray (or reticle) from where the hand was last seen.
       h.hasRay = false;
     }
