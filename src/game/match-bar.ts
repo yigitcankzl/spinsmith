@@ -337,6 +337,8 @@ const GAUGE_SPAN = 0.9;
 const GAUGE_SEGS = 40;
 const PIP_STEP = 0.075;
 const PIP_MAX = 16;
+/** A gauge label's width (arena units). */
+const LABEL_W = 0.1;
 
 /**
  * A duel's spin on the arena itself, the way a stadium paints its score: two bands along the far
@@ -359,6 +361,9 @@ export class RimGauge {
   private readonly v = new Vector3();
   private readonly dark = new Color(0x3a3d44);
   private readonly team = [new Color(ORANGE), new Color(CYAN)];
+  /** What the gauge is: each band's owner and SPIN at its middle, FIRST TO n over the pips. */
+  private labels: Mesh[] = [];
+  private labelKey = '';
 
   constructor() {
     this.root.name = 'rim-gauge';
@@ -376,6 +381,52 @@ export class RimGauge {
     this.pips.renderOrder = 3;
     this.pips.frustumCulled = false;
     this.root.add(this.pips);
+    for (let i = 0; i < 3; i++) {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 128;
+      const label = new Mesh(new PlaneGeometry(LABEL_W, LABEL_W / 4), new MeshBasicMaterial({ map: signTexture(c), transparent: true, depthWrite: false, toneMapped: false }));
+      label.renderOrder = 3;
+      label.userData.canvas = c;
+      this.labels.push(label);
+      this.root.add(label);
+    }
+  }
+
+  /** Names the bands (YOU and the rival) and says how many points win. */
+  setLabels(rival: string, toWin: number) {
+    const key = `${rival}|${toWin}`;
+    if (key === this.labelKey) return;
+    this.labelKey = key;
+    const k = pxPerM(512, LABEL_W * ARENA_SCALE);
+    const texts: [string, string, string][] = [['YOU', 'SPIN', ORANGE], [rival.toUpperCase(), 'SPIN', CYAN], [`FIRST TO ${toWin}`, '', TEXT]];
+    texts.forEach(([word, unit, color], i) => {
+      const mesh = this.labels[i];
+      const c = mesh.userData.canvas as HTMLCanvasElement;
+      const g = c.getContext('2d')!;
+      g.clearRect(0, 0, 512, 128);
+      g.textBaseline = 'middle';
+      g.lineJoin = 'round';
+      setType(g, 'title', k, DIST);
+      const w = g.measureText(word).width;
+      setType(g, 'caption', k, DIST);
+      const u = unit ? g.measureText(` ${unit}`).width : 0;
+      let x = Math.max(8, 256 - (w + u) / 2);
+      setType(g, 'title', k, DIST);
+      g.lineWidth = 10;
+      g.strokeStyle = 'rgba(10, 12, 16, 0.85)';
+      g.strokeText(word, x, 64, 496);
+      g.fillStyle = color;
+      g.fillText(word, x, 64, 496);
+      x += Math.min(w, 496);
+      if (unit) {
+        setType(g, 'caption', k, DIST);
+        g.strokeText(` ${unit}`, x, 68);
+        g.fillStyle = TEXT_DIM;
+        g.fillText(` ${unit}`, x, 68);
+      }
+      (mesh.material as MeshBasicMaterial).map!.needsUpdate = true;
+    });
   }
 
   /**
@@ -405,6 +456,13 @@ export class RimGauge {
     this.pipR = r * 1.045;
     this.pipY = h * 0.75;
     this.pipSize = h * 0.95;
+    // The labels stand just over the bands, turned to face the arena's centre (the player's side).
+    const angles = [Math.PI + gap + GAUGE_SPAN / 2, Math.PI - gap - GAUGE_SPAN / 2, Math.PI];
+    angles.forEach((a, i) => {
+      const lr = r * 1.05;
+      this.labels[i].position.set(lr * Math.sin(a), h * 1.6 + LABEL_W / 8 + (i === 2 ? 0.004 : 0), lr * Math.cos(a));
+      this.labels[i].rotation.set(0, a + Math.PI, 0);
+    });
   }
 
   /** Each frame: spin 0..1 per side, the bar's fill colours, and the points toward the match. */

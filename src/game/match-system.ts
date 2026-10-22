@@ -69,7 +69,7 @@ import type { RubStroke } from './gesture-owner.js';
 import type { HandFacts, HeldTool } from './gesture-owner.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 import { HandVerbs } from './hand-verbs.js';
-import { ARENA_SCALE, HAND_LOSS_GRACE, DESK_KO_BONUS, RESULT_TIME, CAUSE_WINDOW, FINISH_WORD, RUB_WINDOW, RUB_REOPEN, MAX_AIM, LAUNCH_MAX_N, LAUNCH_GAP, ARENA_FORGE_TITLE, SLING_SNAP } from './match-constants.js';
+import { ARENA_SCALE, HAND_LOSS_GRACE, DESK_KO_BONUS, RESULT_TIME, CAUSE_WINDOW, FINISH_WORD, FINISH_SUB, RUB_WINDOW, RUB_REOPEN, MAX_AIM, LAUNCH_MAX_N, LAUNCH_GAP, ARENA_FORGE_TITLE, SLING_SNAP } from './match-constants.js';
 import { DeskPlay } from './desk-play.js';
 import { ResultRewards } from './result-rewards.js';
 import { OnlineDuel } from './online-duel.js';
@@ -1782,6 +1782,8 @@ export class MatchSystem extends createSystem({
         if (this.phase === 'result') {
           // Asked to leave? The result holds while the second pinch comes.
           if (this.time - this.menuArmed >= 3) this.resultTimer -= dt;
+          // Between rounds a pinch skips the rest of the card, once the finish has been seen.
+          if (!this.matchOver && !this.replay && !this.demo && RESULT_TIME - this.resultTimer > 1 && (this.hands.left.justPinched || this.hands.right.justPinched)) this.resultTimer = Math.min(this.resultTimer, 0.2);
           if (this.resultTimer <= 0) {
             if (this.demo) {
               this.endDemo();
@@ -1900,6 +1902,7 @@ export class MatchSystem extends createSystem({
         const r = rimRadius(L, -Math.PI / 2);
         this.rimGauge.fit(r, this.arena.height(0, -r * 0.97) + WALL_HEIGHT[L.wall] + 0.002, this.stage.rotation.y, MATCH_HEAT);
         this.rimGauge.update(this.mine.spin, this.theirs.spin, [this.bar.fillColor(0), this.bar.fillColor(1)], this.barPoints[0], this.barPoints[1], MATCH_HEAT, dt);
+        this.rimGauge.setLabels(this.rival.name, MATCH_HEAT);
         this.rimGauge.root.visible = true;
       }
     }
@@ -7563,7 +7566,10 @@ export class MatchSystem extends createSystem({
         }
       } else {
         // A spin finish says why (the most common finish otherwise reads as luck).
-        const why = loser.finish === 'spin' ? this.outlastReason(v === 1) : '';
+        // A lost knockout gets the same advice a lost match does.
+        const why = loser.finish === 'spin'
+          ? this.outlastReason(v === 1)
+          : v === -1 ? `Try: ${rematchAdvice({ openingOutcome: this.openingOutcome, zone: this.lastOpeningTrace?.zone ?? this.launchZoneKind, rip: this.lastRip, finish: loser.finish, ownBackfire: null, rivalMove: null, shaped: !!this.lastShape })}` : '';
         text = `${name(loser)}! ${v === 1 ? 'You' : 'They'} +${points} heat\n${why ? `${why} · ` : ''}${score}`;
       }
       // A finish within 1.5 s of the player's shape names it as the cause.
@@ -7590,7 +7596,7 @@ export class MatchSystem extends createSystem({
       }
       const finishSub = deskKo
         ? `${cause ? `${cause} → ` : ''}EDGE +${DESK_KO_BONUS}${decided ? ' · WIN' : ''}`
-        : decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause;
+        : decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause || FINISH_SUB[loser.finish ?? 'spin'];
       // Match 1's DESK KO! stamp (updateDeskVerdict) already says this round; it is not said twice.
       if (!(deskKo && this.quietFirst && !decided)) this.stamp.show(`${finishWord}!`, finishSub, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
       if (recent && v === 1) {
@@ -7691,7 +7697,9 @@ export class MatchSystem extends createSystem({
     // rule and how the rival plays), and later rounds say to rip again; it is never blank while waiting.
     if (!ready && this.phase === 'ready' && !this.demo && this.time - this.readySince > INTRO_TIME && !this.label.current) {
       const first = this.myPoints === 0 && this.theirPoints === 0;
-      this.label.set(first ? `${this.arena.layout.name}: ${this.arena.layout.rule ?? ''}\n${this.rival.name}: ${this.rival.style}` : 'RIP AGAIN');
+      // Match 2 is the first scored the full way: a knockout is now worth two.
+      const head = this.progress.matches === 1 ? 'KNOCKOUTS NOW +2 HEAT' : `${this.arena.layout.name}: ${this.arena.layout.rule ?? ''}`;
+      this.label.set(first ? `${head}\n${this.rival.name}: ${this.rival.style}` : 'RIP AGAIN');
     }
     // As soon as ramps work (the opening grace), so even a short round shows it.
     const bump = g === 'bump' && this.phase === 'fight' && !this.demo && this.elapsed > TUNING.grace && this.theirs.alive;

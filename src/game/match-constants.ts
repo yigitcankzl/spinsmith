@@ -13,6 +13,8 @@ export const RESULT_TIME = 4;
 /** A finish this soon (s) after the player's shape is credited to it. */
 export const CAUSE_WINDOW = 1.5;
 export const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', burst: 'SHATTER', spin: 'OUTLAST' };
+/** What each finish word means, under the stamp when no move of yours or theirs caused it. */
+export const FINISH_SUB: Record<string, string> = { pocket: 'INTO THE SLAG PIT', over: 'OVER THE WALL', burst: 'BROKEN APART', spin: 'OUT OF SPIN' };
 /** Seconds one shaping charge keeps a Spin Rub open, and the pause before rubbing can spend another. */
 export const RUB_WINDOW = 1.2;
 export const RUB_REOPEN = 0.4;
