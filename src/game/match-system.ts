@@ -5236,7 +5236,7 @@ export class MatchSystem extends createSystem({
       }
       const depth = this.arena.inside(tip.x, tip.z) ? this.arena.height(tip.x, tip.z) - tip.y : -1;
       // Downward speed (m/s), smoothed over about 80 ms so tracking jitter is not a press.
-      const raw = ((this.tipY[side] - tip.y) * ARENA_SCALE) / Math.max(1e-3, this.frameDt);
+      const raw = ((this.tipY[side] - tip.y) * this.root.scale.x) / Math.max(1e-3, this.frameDt);
       this.tipY[side] = tip.y;
       const down = (this.tipDown[side] += (raw - this.tipDown[side]) * (1 - Math.exp(-this.frameDt / 0.08)));
       // Direct touch has a second, deliberately different verb: slide the open index finger along

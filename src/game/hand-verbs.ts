@@ -7,7 +7,7 @@ import type { CrossguardRail } from './sim.js';
 import { CALL } from './calls.js';
 import { FirstFiveState } from '../components.js';
 import { mayCommit, mayListen } from './gesture-owner.js';
-import { ARENA_SCALE, HAND_LOSS_GRACE } from './match-constants.js';
+import { HAND_LOSS_GRACE } from './match-constants.js';
 import type { MatchSystem } from './match-system.js';
 
 /** An open palm must sweep this fast above the bowl before it becomes a deliberate forge gust. */
@@ -425,7 +425,8 @@ export class HandVerbs {
       const last = this.palmGustLast[side];
       const dx = palm.x - last.x;
       const dz = palm.z - last.z;
-      const speed = (Math.hypot(dx, dz) * ARENA_SCALE) / Math.max(1e-3, dt);
+      // Real m/s: the live root scale (smaller on a fitted, shrunk arena), not the nominal ARENA_SCALE.
+      const speed = (Math.hypot(dx, dz) * this.m.root.scale.x) / Math.max(1e-3, dt);
       last.copy(palm);
       const origin = this.palmGustOrigin[side];
       const wasArming = this.palmGustAge[side] < 0;
@@ -447,7 +448,7 @@ export class HandVerbs {
         this.palmGustAge[side] = 0;
         continue;
       }
-      if (this.palmGustCooldown > 0 || speed < PALM_GUST_SPEED || path * ARENA_SCALE < 0.105) continue;
+      if (this.palmGustCooldown > 0 || speed < PALM_GUST_SPEED || path * this.m.root.scale.x < 0.105) continue;
       // A fingertip arriving on your own top is a Spin Rub reaching in, not a sweep (a sweep that
       // crosses your top still fires once it is past it).
       if (!mayCommit(facts, 'gust')) continue;
