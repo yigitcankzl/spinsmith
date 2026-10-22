@@ -1512,6 +1512,8 @@ export class MatchSystem extends createSystem({
               const d = rayExit(this.desk.deskEdgePoly, Math.cos(c), Math.sin(c));
               if (d > room) [room, a] = [d, c];
             }
+            // The outline is in the root frame; the sim (stage) frame is turned by the stage's yaw.
+            a += this.stage.rotation.y;
           }
           t.vx = Math.cos(a) * speed;
           t.vz = Math.sin(a) * speed;
