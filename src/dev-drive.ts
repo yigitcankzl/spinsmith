@@ -1141,8 +1141,10 @@ export function installDriver() {
       const start = () => local(top.x - dx * back, top.z - dz * back, 0.008);
       const before = g.flickCount ?? 0;
       await setPinch(side, false);
-      // From above, like a hand: a straight reach from the parked hand skims the floor (a groove).
-      await glide(side, 'index', above(local(0, g.arena.radius * 1.2), 0.14), 0.3, 0, 'natural', 'reach');
+      // From above, like a hand: first straight up from the lap, outside the rim, then over the bowl;
+      // a straight line from the parked hand would cross the bowl floor (a groove).
+      await glide(side, 'index', above(local((side === 'left' ? -1 : 1) * g.arena.radius * 1.3, g.arena.radius * 1.7), 0.16), 0.2, 0, 'natural', 'reach');
+      await glide(side, 'index', above(local(0, g.arena.radius * 1.2), 0.14), 0.25, 0, 'natural', 'reach');
       await glide(side, 'index', () => above(start(), 0.06), 0.3, 0, 'natural', 'reach');
       await glide(side, 'index', start, 0.16, 0, 'natural', 'grip');
       Object.assign(top, { vx: 0, vz: 0 });
@@ -1183,7 +1185,8 @@ export function installDriver() {
         await setPinch(side, false);
         // Come in from above like a hand does: the parked hand rests below the table edge, and a
         // straight reach from there skims the floor and draws a Finger Groove on the way.
-        await glide(side, 'index', above(local(0, g.arena.radius * 1.2), 0.14), 0.3, 0, 'natural', 'reach');
+        await glide(side, 'index', above(local((side === 'left' ? -1 : 1) * g.arena.radius * 1.3, g.arena.radius * 1.7), 0.16), 0.2, 0, 'natural', 'reach');
+      await glide(side, 'index', above(local(0, g.arena.radius * 1.2), 0.14), 0.25, 0, 'natural', 'reach');
         await glide(side, 'index', above(at(), 0.06), 0.25, 0, 'natural', 'reach');
         await glide(side, 'index', at, 0.18, 0, 'natural', 'grip');
         const steps = Math.round(seconds / 0.04);
