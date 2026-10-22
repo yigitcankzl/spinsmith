@@ -91,6 +91,7 @@ export class ResultRewards {
 
   xpGained = 0;
   levelUpText = '';
+  private levelStamped = false;
   /** Unlocks waiting to be shown over the arena, and the one showing. */
   reveals: string[] = [];
   reveal: { obj: Object3D; t: number } | null = null;
@@ -122,7 +123,10 @@ export class ResultRewards {
       for (let i = 0; i < 3; i++) this.m.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
       if (COMFORT.flashes) this.m.pillar.play(this.m.arena.layout, maxRim(this.m.arena.layout) + 0.01, this.m.arena.floorHeight(1), 0xffd34a);
       this.levelUpText = `LEVEL ${this.m.progress.level}!\n${this.m.progress.rank}${this.m.progress.level > before + 1 ? ` (+${this.m.progress.level - before})` : ''}`;
-      if (!this.m.quietFirst || matchOver) this.m.stamp.later(`LEVEL ${this.m.progress.level}!`, this.m.progress.rank.toUpperCase(), 'mine', 1.2, 1.5);
+      if (!this.m.quietFirst || matchOver) {
+        this.m.stamp.later(`LEVEL ${this.m.progress.level}!`, this.m.progress.rank.toUpperCase(), 'mine', 1.2, 1.5);
+        this.levelStamped = true;
+      }
     }
     // Match 1 reveals only its NEW MOVE: the Spur tip is the home note's next step, the rest wait on the board.
     this.reveals.push(...(this.m.quietFirst ? [] : award.unlocked));
@@ -227,7 +231,7 @@ export class ResultRewards {
     // The finale's own stamps replace the bout's (the stamp queue holds three).
     if (fresh && !finale) {
       const word = fresh & 1 ? (bout.boss ? 'BOSS DOWN!' : 'BOUT WON!') : 'MEDAL!';
-      this.m.stamp.later(word, `${bout.id} · ${have}/3 MEDALS${got.length ? ` · ${got.join(' · ')}` : ''}`, 'mine', 1.6, fresh & 1 && bout.boss ? 1.5 : 1.2);
+      this.m.stamp.later(word, `BOUT ${bout.id} · MEDAL ${have} OF 3${got.length ? ` · ${got.join(' · ')}` : ''}`, 'mine', 1.6, fresh & 1 && bout.boss ? 1.5 : 1.2);
       playStamp();
     }
     // The campaign's end: the last boss beaten for the first time is the game's finale.
@@ -253,8 +257,10 @@ export class ResultRewards {
   /** Shows a level-up, then each new unlock spinning over the arena before it flies off. */
   updateRewards(dt: number) {
     if (this.levelUpText && this.m.phase === 'result' && this.m.resultTimer < RESULT_TIME - 1.4 && (this.m.matchOver || !this.m.quietFirst)) {
-      this.m.label.set(this.levelUpText);
+      // A level the stamp already says keeps its beat, but the card does not say it twice.
+      if (!this.levelStamped) this.m.label.set(this.levelUpText);
       this.levelUpText = '';
+      this.levelStamped = false;
       // The level-up reads before the first unlock replaces it.
       this.rewardHold = 1.4;
       this.m.resultTimer = Math.max(this.m.resultTimer, 1.4 + 2.8);

@@ -1256,11 +1256,11 @@ export class ForgeLoop {
     lp.type = 'lowpass';
     lp.frequency.value = 400;
     const breath = a.createGain();
-    breath.gain.value = 0.03;
+    breath.gain.value = 0.07;
     const bellows = a.createOscillator();
     bellows.frequency.value = 0.12;
     const depth = a.createGain();
-    depth.gain.value = 0.015;
+    depth.gain.value = 0.035;
     bellows.connect(depth).connect(breath.gain);
     this.bed = a.createGain();
     this.bed.gain.value = 0;

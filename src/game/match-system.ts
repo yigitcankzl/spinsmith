@@ -1694,7 +1694,8 @@ export class MatchSystem extends createSystem({
     // The music follows the game; tension when a bar is full, a top is nearly out of spin, or a rival winds up.
     const ph = this.phase;
     const tense = ph === 'fight' && (this.forgeBar.full || this.tellAt >= 0 || (this.mine.alive && this.mine.spin < 0.3) || (this.theirs.alive && this.theirs.spin < 0.3));
-    this.loop.update(ph === 'hub' || ph === 'forge' || ph === 'build' ? 'home' : ph === 'ready' || ph === 'pulling' ? 'ready' : ph === 'fight' ? 'fight' : 'quiet', tense ? 1 : 0);
+    // A decided match's result is a decision screen: the forge's room tone comes back under it.
+    this.loop.update(ph === 'hub' || ph === 'forge' || ph === 'build' || (ph === 'result' && this.matchOver) ? 'home' : ph === 'ready' || ph === 'pulling' ? 'ready' : ph === 'fight' ? 'fight' : 'quiet', tense ? 1 : 0);
     this.handle.visible = this.phase === 'hub';
     {
       // Home is bright, a fight dark around the lit arena, the forge and workshop warm.
