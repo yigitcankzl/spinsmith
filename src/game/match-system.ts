@@ -1520,7 +1520,7 @@ export class MatchSystem extends createSystem({
             // The outline is in the root frame; the sim (stage) frame is turned by the stage's yaw.
             a += this.stage.rotation.y;
             // A narrow desk gets a softer throw, so the top still lands on the wood.
-            speed = Math.min(speed, 0.6 * room * this.rootK);
+            speed = Math.min(speed, 0.4 * room * this.rootK);
           }
           t.vx = Math.cos(a) * speed;
           t.vz = Math.sin(a) * speed;
