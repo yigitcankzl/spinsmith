@@ -486,7 +486,7 @@ export class Hub {
 
   /** Near pinch distance, or ray distance (+ a small bias), or Infinity when out of reach. */
   private distance(h: HandState, point: Vector3) {
-    const d = h.pinch.distanceTo(point);
+    const d = h.pinchSmooth.distanceTo(point);
     if (d < GRAB_NEAR) return d;
     if (!h.hasRay) return Infinity;
     const t = this.q.copy(point).sub(h.rayOrigin).dot(h.rayDir);
