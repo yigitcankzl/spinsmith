@@ -55,7 +55,8 @@ clip() {
 
 # Story: the hook is the room-dependent beat, then how you get there, then the depth behind it.
 clip 00-hook "$NEW/desk-ko-first-side.mp4" 0.3 6.0 "THE ARENA IS THE WEAPON" "Squeeze the bowl  throw the rival off your real desk"
-clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 2.6 "YOUR TABLE IS THE ARENA" "Seated mixed reality  hands only"
+if [ -s "$NEW/hub.mp4" ]; then clip 01-rise "$NEW/hub.mp4" 0.4 2.8 "YOUR TABLE IS THE ARENA" "Seated mixed reality  hands only"
+else clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 2.6 "YOUR TABLE IS THE ARENA" "Seated mixed reality  hands only"; fi
 clip 02-rip "$NEW/first-rip-ghost.mp4" 2.6 6.6 "PINCH  PULL  RIP" "A ghost hand shows each move once"
 clip 03-desk "$NEW/desk-ko-first-close.mp4" 1.2 4.4 "DESK KO IN YOUR FIRST MATCH" "The real edge glows  the squeeze throws"
 clip 04-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK IT" "Your fingertip is part of the physics"
