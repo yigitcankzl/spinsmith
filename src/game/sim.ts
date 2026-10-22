@@ -1156,6 +1156,34 @@ export function crossguard(top: Top, ax: number, az: number, bx: number, bz: num
   return true;
 }
 
+/** What one paid Crossguard rail has done: slung the rival across it, refunded its charge for your top's save. */
+export interface CrossguardRail {
+  slung: boolean;
+  refunded: boolean;
+}
+
+/**
+ * A top crossing a paid rail (its first contact, or later in its CROSSGUARD_LIVE window). The rail
+ * spent one charge and pays back at most that one:
+ * - your top is reflected every time; its first save refunds the charge ('refund'), later saves only reflect ('save');
+ * - the rival's first escape (moving out) is slung toward a pocket ('sling'): the sling is the payoff, so no refund,
+ *   but a save of your top later in the same live window still refunds;
+ * - anything else passes (null): a rival heading inward, or a second rival escape.
+ */
+export function crossguardLive(arena: Arena, rail: CrossguardRail, top: Top, mine: boolean, ax: number, az: number, bx: number, bz: number, strength = 1): 'refund' | 'save' | 'sling' | null {
+  if (!crossguardCrosses(top, ax, az, bx, bz)) return null;
+  if (mine) {
+    crossguard(top, ax, az, bx, bz, strength);
+    if (rail.refunded) return 'save';
+    rail.refunded = true;
+    return 'refund';
+  }
+  if (rail.slung || !movingOut(top)) return null;
+  rail.slung = true;
+  crossguardSling(arena, top);
+  return 'sling';
+}
+
 /** A planted ember rivet stays a live post this long (s), kicking every top that hits it. */
 export const EMBER_POST_TIME = 3;
 /** Extra outward (away from the bowl centre) push the post gives the rival's top (m/s). */

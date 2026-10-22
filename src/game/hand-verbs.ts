@@ -3,6 +3,7 @@ import { playLand, playPick, playThock, playDash, playTick } from './audio.js';
 import { Side } from './hands.js';
 import { maxRim, normRadius, rimRadius } from './layout.js';
 import { EMBER_POST_TIME, palmGust, palmGustCrosses, TUNING } from './sim.js';
+import type { CrossguardRail } from './sim.js';
 import { CALL } from './calls.js';
 import { FirstFiveState } from '../components.js';
 import { mayCommit, mayListen } from './gesture-owner.js';
@@ -41,9 +42,9 @@ export class HandVerbs {
   /** Two flat palms on the rim join into one finite, one-hit rail across the bowl. */
   crossguardActive = false;
   crossguardConsumed = false;
-  /** A paid rail stays live until then (arena time); the rival can be slung across it once. */
+  /** A paid rail stays live until then (arena time): the rival can be slung across it once, and it refunds its charge once (sim.ts crossguardLive). */
   crossguardLiveUntil = -9;
-  crossguardSlung = false;
+  crossguardRail: CrossguardRail = { slung: false, refunded: false };
   crossguardHits = 0;
   crossguardBreak = 0;
   crossguardA = new Vector3();
@@ -133,7 +134,7 @@ export class HandVerbs {
     this.crossguardActive = false;
     this.crossguardConsumed = false;
     this.crossguardLiveUntil = -9;
-    this.crossguardSlung = false;
+    this.crossguardRail = { slung: false, refunded: false };
     this.crossguardBreak = 0;
     this.crossguardBeam.visible = this.crossguardGlow.visible = false;
     for (const post of this.crossguardPosts) post.visible = false;

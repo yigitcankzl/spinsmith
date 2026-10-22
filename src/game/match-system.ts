@@ -10,11 +10,11 @@ import { FpsBook, fpsPhase, QUALITY_LEVELS, QualityGuard } from './quality.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
-import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow } from './reach.js';
+import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow, RESULT_BUTTONS } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
-import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
+import { CROSSGUARD_LIVE, crossguardLive, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguardCrosses, emberBumper, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, loadBuild, saveBuild, sealModel } from './forge.js';
 import { FEATS, MARK, Progress, VERB_RELEASE } from './progress.js';
@@ -64,7 +64,8 @@ import { brawlModeName, targetWinner } from './brawl.js';
 import { clearSnapshot, loadSnapshot, RESUME_VERSION, saveSnapshot } from './match-resume.js';
 import type { MatchSnapshot } from './match-resume.js';
 import type { BrawlMode } from './brawl.js';
-import { commitBlocker, FLICK_AFTER_RELEASE, FLICK_FOLLOW_THROUGH, GROOVE_COMMIT_DELAY, heldElsewhere, mayCommit, mayListen, RELEASE_LOCK, SHAPING_RELEASE_LOCK } from './gesture-owner.js';
+import { commitBlocker, FLICK_AFTER_RELEASE, FLICK_FOLLOW_THROUGH, GROOVE_COMMIT_DELAY, heldElsewhere, mayCommit, mayListen, RELEASE_LOCK, RUB_STROKE_GAP, rubStrokeStep, SHAPING_RELEASE_LOCK } from './gesture-owner.js';
+import type { RubStroke } from './gesture-owner.js';
 import type { HandFacts, HeldTool } from './gesture-owner.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 import { HandVerbs } from './hand-verbs.js';
@@ -127,7 +128,7 @@ const HOME_NOTE_Y = HUD.homeNoteY;
 const BAR_Y = HUD.barY;
 const BAR_BACK = HUD.barBack;
 /** The MENU plate's height over the arena floor (arena-local), at the rim's height like the tabs. */
-const MENU_Y = 0.012;
+const MENU_Y = RESULT_BUTTONS.y;
 /** The workshop shows the arena a little smaller, so its near rim stays behind the piece rail. */
 const WORKSHOP_RIM = 0.13;
 /** A match arena's near rim stays this far out (arena-local, as the 0.17 arenas): a bigger one slides back. */
@@ -372,6 +373,8 @@ export class MatchSystem extends createSystem({
   /** Spin Rub: the paid window's end and when the next charge may open one (this.time). */
   private rubUntil = -9;
   private rubReadyAt = -9;
+  /** Each hand's Spin Rub stroke (gesture-owner.ts rubStrokeStep): one stroke pays for one window. */
+  private rubStrokes: Record<Side, RubStroke> = { left: { lastAt: -9, paid: false }, right: { lastAt: -9, paid: false } };
   /** Spin this window has rubbed in (negative when braking) and the charge's force. */
   private rubGain = 0;
   private rubPower = 0;
@@ -1266,7 +1269,7 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
     this.duel.openOnline();
     // A plate laid on the left of the near rim at the touch band's one pitch, like every sign you pinch.
-    this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14);
+    this.menuButton.mesh.position.set(-RESULT_BUTTONS.x, MENU_Y, RESULT_BUTTONS.z);
     this.menuButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.menuButton.set('MENU');
     this.menuButton.mesh.visible = false;
@@ -1283,7 +1286,7 @@ export class MatchSystem extends createSystem({
       this.root.add(mesh);
       this.drawFpsOverlay();
     }
-    this.rematchButton.mesh.position.set(0.2, MENU_Y, 0.14);
+    this.rematchButton.mesh.position.set(RESULT_BUTTONS.x, MENU_Y, RESULT_BUTTONS.z);
     this.rematchButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.rematchButton.set('REMATCH', true, true);
     this.passButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
@@ -3657,9 +3660,9 @@ export class MatchSystem extends createSystem({
       button.mesh.position.set((i - 1) * 0.105 * readScale, MENU_Y, 0.225 + this.pushed / (ARENA_SCALE * this.rootK));
     }
     this.passButton.mesh.position.set(0, MENU_Y, 0.15 + this.pushed / (ARENA_SCALE * this.rootK));
-    const resultButtonX = 0.15 * readScale;
-    this.menuButton.mesh.position.set(-resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
-    this.rematchButton.mesh.position.set(resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
+    const resultButtonX = RESULT_BUTTONS.x * readScale;
+    this.menuButton.mesh.position.set(-resultButtonX, MENU_Y, RESULT_BUTTONS.z + this.pushed / (ARENA_SCALE * this.rootK));
+    this.rematchButton.mesh.position.set(resultButtonX, MENU_Y, RESULT_BUTTONS.z + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
   }
 
@@ -5453,6 +5456,7 @@ export class MatchSystem extends createSystem({
       pressing: this.pressing[side],
       gustSweep: this.verbs.palmGustTime > 0 && this.verbs.palmGustSide === side,
       rubWindow: this.time < this.rubUntil,
+      rubStroke: this.time - this.rubStrokes[side].lastAt <= RUB_STROKE_GAP,
       tipToOwnTop: mine.alive ? Math.hypot(tip.x - mine.x, tip.z - mine.z) : Infinity,
       ownTopRing: mine.spec.radius + FINGER_RADIUS + RUB_SLACK,
       onForgeGrip,
@@ -5701,7 +5705,7 @@ export class MatchSystem extends createSystem({
       // A full hand of charges: the fingertip sheds embers, ready to strike.
       if (armed && this.charges.charges >= 3 && Math.random() < dt * 5) this.sparks.embers(tip.x, tip.y - 0.006, tip.z, 1, 0.05, 0.03, 1);
       // A slow fingertip running along your own top's rim is a Spin Rub, never a flick or a nudge.
-      if (this.updateRub(tip, vel, along, dt)) continue;
+      if (this.updateRub(side, tip, vel, along, dt)) continue;
       for (const top of this.tops) {
         const approach = fingerTouches(top, tip.x, tip.z, vel.x, vel.z);
         if (!approach) continue;
@@ -5770,10 +5774,10 @@ export class MatchSystem extends createSystem({
   /**
    * Spin Rub: an open fingertip run along your own top's rim, mostly tangential and slower than a
    * flick, rubs spin back into it the way it turns (against it brakes a little). One shaping charge
-   * opens a RUB_WINDOW; a window adds at most RUB_WINDOW_MAX spin. True when the finger is rubbing
-   * (so the flick stands down this frame).
+   * opens a RUB_WINDOW; a window adds at most RUB_WINDOW_MAX spin; one stroke pays for one window
+   * (it must lift to pay again). True when the finger is rubbing (so the flick stands down this frame).
    */
-  private updateRub(tip: Vector3, vel: Vector3, along: number, dt: number) {
+  private updateRub(side: Side, tip: Vector3, vel: Vector3, along: number, dt: number) {
     const top = this.mine;
     if (!this.taught('rub') || !top.alive || along >= FLICK_HARD) return false;
     const rx = tip.x - top.x;
@@ -5785,13 +5789,16 @@ export class MatchSystem extends createSystem({
     const tangential = Math.abs(rvx * rz - rvz * rx) / d;
     const radial = Math.abs(rvx * rx + rvz * rz) / d;
     if (tangential <= radial || tangential < RUB_MIN) return false;
-    if (this.time >= this.rubUntil) {
-      if (this.time < this.rubReadyAt) return true;
+    const stroke = this.rubStrokes[side];
+    const step = rubStrokeStep(stroke, this.time, this.rubUntil, this.rubReadyAt);
+    if (step === 'hold') return true;
+    if (step === 'pay') {
       const force = this.charges.spend(this.elapsed, TUNING.grace);
       if (!force) {
         this.locked('SPIN RUB NEEDS A CHARGE');
         return true;
       }
+      stroke.paid = true;
       this.rubUntil = this.time + RUB_WINDOW;
       this.rubReadyAt = this.rubUntil + RUB_REOPEN;
       this.rubGain = 0;
@@ -7185,17 +7192,14 @@ export class MatchSystem extends createSystem({
       const openingDx = this.theirs.x - this.mine.x;
       const openingDz = this.theirs.z - this.mine.z;
       if (this.elapsed < this.verbs.crossguardLiveUntil) {
-        // A paid rail stays live a moment: every save of your top refunds its charge, and the
-        // rival's first escape across it is sent on toward a pocket.
+        // A paid rail stays live a moment: it keeps reflecting your top (refunding its one charge
+        // on the first save, if the first contact was not one), and sends the rival's first escape
+        // across it on toward a pocket.
         for (const top of this.tops) {
-          if (!crossguardCrosses(top, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z)) continue;
-          if (top === this.mine) {
-            if (crossguard(top, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z)) this.charges.reward();
-          } else if (top === this.theirs && !this.verbs.crossguardSlung && movingOut(top)) {
-            this.verbs.crossguardSlung = true;
-            crossguardSling(this.arena, top);
-            this.impacts.dash(top.x, this.arena.height(top.x, top.z), top.z, top.vx, top.vz);
-          }
+          if (top !== this.mine && top !== this.theirs) continue;
+          const outcome = crossguardLive(this.arena, this.verbs.crossguardRail, top, top === this.mine, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z);
+          if (outcome === 'refund') this.charges.reward();
+          else if (outcome === 'sling') this.impacts.dash(top.x, this.arena.height(top.x, top.z), top.z, top.vx, top.vz);
         }
       } else if (this.verbs.crossguardActive && !this.verbs.crossguardConsumed) {
         for (const top of this.tops) {
@@ -7212,9 +7216,9 @@ export class MatchSystem extends createSystem({
             break;
           }
           this.verbs.crossguardLiveUntil = this.elapsed + CROSSGUARD_LIVE;
-          this.verbs.crossguardSlung = rivalEscape;
-          if (rivalEscape) crossguardSling(this.arena, top);
-          else if (crossguard(top, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z, force)) this.charges.reward();
+          this.verbs.crossguardRail = { slung: false, refunded: false };
+          // The contact that paid: your top's save refunds the charge, the rival's escape is slung (no refund).
+          if (crossguardLive(this.arena, this.verbs.crossguardRail, top, top === this.mine, this.verbs.crossguardA.x, this.verbs.crossguardA.z, this.verbs.crossguardB.x, this.verbs.crossguardB.z, force) === 'refund') this.charges.reward();
           this.verbs.crossguardHits++;
           this.rootEntity?.setValue(FirstFiveState, 'crossguardActive', false);
           this.rootEntity?.setValue(FirstFiveState, 'crossguardHits', this.verbs.crossguardHits);

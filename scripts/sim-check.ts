@@ -23,7 +23,7 @@ import { PEDESTAL, pickTable, pickTablePlane, placeArena, polyArea, polyMinWidth
 import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, hudAnchors, hudAnchorsOffMatch, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, SEAL_NAMES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
-import { crossguard, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict, DESK_DROP_ON } from '../src/game/sim.ts';
+import { crossguard, crossguardLive, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict, DESK_DROP_ON } from '../src/game/sim.ts';
 import { rematchAdvice } from '../src/game/mastery.ts';
 import { CALL, CALL_REPEAT, callAllowed } from '../src/game/calls.ts';
 import { BOUTS, boutOpen, boutSkill, CHAPTERS, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from '../src/game/campaign.ts';
@@ -33,7 +33,7 @@ import { boardHead, gateShort, HUB_NOTE, HUB_WORDS, ledgerLine, mapHead, ORDER_D
 import { CARD_HOW_WORDS, CLAIM, LESSON, lessonText, PROMPT_WORDS, promptWords } from '../src/game/lessons.ts';
 import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/game/desk-edge.ts';
 import { FpsBook, fpsPhase, QUALITY_MAX, QualityGuard, qualityThresholds } from '../src/game/quality.ts';
-import { commitBlocker, FLICK_AFTER_RELEASE, FREE_HAND, gestureOwner, heldElsewhere, listenBlocker, mayCommit, mayListen, RELEASE_LOCK, RUB_TIP_GUST, RUB_TOUCH_SLACK, SHAPING_RELEASE_LOCK } from '../src/game/gesture-owner.ts';
+import { commitBlocker, FLICK_AFTER_RELEASE, FREE_HAND, gestureOwner, heldElsewhere, listenBlocker, mayCommit, mayListen, RELEASE_LOCK, RUB_STROKE_GAP, RUB_TIP_GUST, RUB_TOUCH_SLACK, rubStrokeStep, SHAPING_RELEASE_LOCK } from '../src/game/gesture-owner.ts';
 import type { GestureOwner, HandFacts, HandVerb } from '../src/game/gesture-owner.ts';
 import { BONES, boneMatrix, handOcclusionOn, JOINTS, PALM, palmMatrix } from '../src/game/hand-proxy.ts';
 import { HAND_EURO, OneEuro3 } from '../src/game/one-euro.ts';
@@ -367,6 +367,26 @@ TUNING.grace = 0;
   crossguardSling(slingArena, escaping);
   const heading = pocketHeading(slingArena, escaping.x, escaping.z);
   assert.ok(Math.abs(Math.hypot(escaping.vx, escaping.vz) - CROSSGUARD_SLING) < 1e-9 && escaping.vx * heading.x + escaping.vz * heading.z > CROSSGUARD_SLING * 0.999, 'the sling heads for the pocket mouth at least CROSSGUARD_SLING fast');
+
+  // A paid rail pays back at most the one charge it spent: your top's first save refunds it (also
+  // after the rival's escape was the paying contact), later saves only reflect; the rival is slung once.
+  {
+    const rail = { slung: false, refunded: false };
+    const cross = (x: number, z: number, vz: number) => {
+      const t = new Top(ATTACK);
+      t.launch(x, z, 0, vz, 0.8, 1);
+      return t;
+    };
+    const live = (top: Top, mine: boolean) => crossguardLive(slingArena, rail, top, mine, -0.1, 0.1, 0.1, 0.1);
+    assert.equal(live(cross(0, 0.096, -0.35), false), null, 'a rival heading inward passes a live rail');
+    assert.equal(live(cross(0, 0.104, 0.35), false), 'sling', "the rival's escape is slung, not refunded");
+    const saved = cross(0, 0.096, 0.35);
+    assert.equal(live(saved, true), 'refund', 'your top saved later in the same live window still refunds');
+    assert.ok(saved.vz < 0, 'the save reflects your top back in');
+    assert.equal(live(cross(0, 0.096, 0.35), true), 'save', 'a second save reflects but never refunds again');
+    assert.equal(live(cross(0, 0.104, 0.35), false), null, 'the rival is slung only once');
+    assert.equal(live(cross(0.13, 0.096, 0.35), true), null, 'beyond the posts nothing happens');
+  }
 
   const emberHit = new Top(ATTACK);
   emberHit.launch(0, 0.02, 0, -0.3, 0.8, 1);
@@ -1150,8 +1170,9 @@ TUNING.grace = 0;
 }
 
 // 16b2. Field of view: every essential read surface (the round card and its prompts, the match bar,
-// the count/KO/verdict stamp, the forge card, the home note) sits within +-35 degrees vertically and
-// +-40 degrees horizontally of a seated head looking at the arena centre, for trays 0.30-0.45 m below
+// the count/KO/verdict stamp, the MENU and REMATCH buttons, the forge card, the home note, home's
+// PLAY and FORGE station names) sits within +-35 degrees vertically and
+// +-40 degrees horizontally of a seated head looking at the arena centre (in the head's frame), for trays 0.30-0.45 m below
 // the eyes, on every arena (slid back as a match slides it), with a standard or a high wall.
 {
   const near = (l: ArenaLayout) => Math.max(0, rimRadius(l, Math.PI / 2) - 0.17) * 2.4;
@@ -2160,6 +2181,9 @@ if (DESK_DROP_ON) {
     { name: 'gust sweep crossing own top, past it', f: hand({ tipToOwnTop: RUB_TIP_GUST + 0.005 }), owner: 'rub', fire: ['gust'], deaf: ['groove'] },
     { name: 'gust sweep clear of own top', f: hand({ tipToOwnTop: ring + RUB_TOUCH_SLACK + 0.01 }), owner: null, fire: ['gust', 'groove'] },
     { name: 'rub vs crossguard', f: hand({ rubWindow: true, onForgeGrip: false }), owner: 'rub', deaf: ['crossguard'] },
+    // A rubbing fingertip owns its hand for the whole stroke, past its window too: a slow frame that reads as a hard swing, or the press of the stroke, is not a flick or a cup.
+    { name: 'rub stroke vs flick and cup', f: hand({ rubStroke: true, tipToOwnTop: ring }), owner: 'rub', listen: ['flick', 'rub', 'cup'], hold: ['flick', 'cup'], deaf: ['gust', 'groove', 'crossguard'] },
+    { name: 'rub stroke past its window vs gust and groove', f: hand({ rubStroke: true }), owner: 'rub', deaf: ['gust', 'groove', 'crossguard'], hold: ['flick'] },
     // Arena Forge release: both hands get the open-palm lock and the release pull-back.
     { name: 'forge release vs cup', f: hand({ releaseLock: RELEASE_LOCK, followLock: FLICK_AFTER_RELEASE }), owner: 'release', hold: ['cup'], listen: ['groove'] },
     { name: 'forge release vs crossguard', f: hand({ releaseLock: RELEASE_LOCK, followLock: FLICK_AFTER_RELEASE }), owner: 'release', deaf: ['crossguard', 'gust', 'flick', 'rub'] },
@@ -2187,6 +2211,47 @@ if (DESK_DROP_ON) {
     for (const v of c.hold ?? []) assert.ok(mayListen(c.f, v) && !mayCommit(c.f, v), `${c.name}: ${v} listens but must not fire`);
   }
   assert.ok(heldElsewhere(hand({ held: 'ember' })) && !heldElsewhere(hand({ held: 'ramp' })), 'held rivet skips shaping, a held ramp does not');
+  // One Spin Rub stroke pays for one window (match-system RUB_WINDOW 1.2 s, RUB_REOPEN 0.4 s): a stroke
+  // that keeps rubbing past its window, at a fast or a slow (0.05 s) frame clock, never pays again
+  // until the fingertip lifts for RUB_STROKE_GAP.
+  {
+    const W = 1.2;
+    const R = 0.4;
+    for (const frame of [1 / 72, 0.05]) {
+      const stroke = { lastAt: -9, paid: false };
+      let until = -9;
+      let ready = -9;
+      let pays = 0;
+      const rub = (t: number) => {
+        const step = rubStrokeStep(stroke, t, until, ready);
+        if (step === 'pay') {
+          pays++;
+          stroke.paid = true;
+          until = t + W;
+          ready = until + R;
+        }
+        return step;
+      };
+      let t = 0;
+      for (; t < 3; t += frame) rub(t);
+      assert.equal(pays, 1, `a 3 s continuous stroke at ${frame.toFixed(3)} s frames pays once`);
+      // A hitch frame (the finger read off the rim) inside the gap is still the same stroke.
+      t += RUB_STROKE_GAP * 0.8;
+      assert.equal(rub(t), 'hold', 'a short gap keeps the stroke');
+      t += RUB_STROKE_GAP + 0.05;
+      assert.equal(rub(t), 'pay', 'lifted and rubbed again, a new stroke opens a new window');
+      assert.equal(pays, 2);
+    }
+    // Lifting inside the window and rubbing again in the reopen pause waits for the pause.
+    const s1 = { lastAt: -9, paid: false };
+    assert.equal(rubStrokeStep(s1, 0, -9, -9), 'pay');
+    s1.paid = true;
+    assert.equal(rubStrokeStep(s1, 1.0, W, W + R), 'rub');
+    assert.equal(rubStrokeStep(s1, 1.3, W, W + R), 'hold', 'a new stroke in the reopen pause waits');
+    let opened = -1;
+    for (let t = 1.3 + 1 / 72; t < 1.8 && opened < 0; t += 1 / 72) if (rubStrokeStep(s1, t, W, W + R) === 'pay') opened = t;
+    assert.ok(opened >= W + R && opened < W + R + 0.02, 'a new stroke (it lifted first) pays once the pause ends');
+  }
   assert.equal(commitBlocker(hand({ slapPose: true, followLock: 0.2 }), 'cup'), 'follow', 'the first claim in the table names the blocker');
 }
 

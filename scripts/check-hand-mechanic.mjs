@@ -111,7 +111,7 @@ export default async function run({ page, frame }) {
     } else if (check === 'rub') {
       if (before.phase !== 'fight') throw new Error('rub check requires a fight');
       action = (async () => {
-        // Shorter than one 1.2 s window even on a slow emulator frame clock: a longer rub rightly pays again.
+        // One continuous stroke pays for one window however long it runs (gesture-owner.ts rubStrokeStep).
         const proof = await drive.rub({ seconds: 0.7, side: 'right' });
         const after = drive.state();
         if (after.charges !== before.charges - 1) throw new Error(`a Spin Rub window must spend exactly one charge (${before.charges} -> ${after.charges})`);
