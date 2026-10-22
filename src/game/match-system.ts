@@ -2216,7 +2216,8 @@ export class MatchSystem extends createSystem({
           const local = this.root.worldToLocal(this.handAt.copy(this.hands[side].pinchSmooth));
           return normRadius(this.arena.layout, local.x, local.z) > 1.1 || local.y - this.arena.height(local.x, local.z) > 0.06;
         });
-        if (g.justPinched && clear && !pressed) pressed = b.id;
+        // Not while a replay or a knockout freeze runs: a pinch then skips it, it does not leave.
+        if (g.justPinched && clear && !this.replay && this.koFreeze <= 0 && !pressed) pressed = b.id;
         break;
       }
     }
@@ -5813,6 +5814,8 @@ export class MatchSystem extends createSystem({
     if (step === 'pay') {
       const force = this.charges.spend(this.elapsed, TUNING.grace);
       if (!force) {
+        // Once per stroke: lift and rub again when a charge has come back.
+        stroke.paid = true;
         this.locked('SPIN RUB NEEDS A CHARGE');
         return true;
       }

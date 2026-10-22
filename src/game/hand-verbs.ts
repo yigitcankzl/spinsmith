@@ -292,8 +292,8 @@ export class HandVerbs {
       // this ownership window, releasing two-hand Arena Forge can accidentally build Crossguard
       // and spend a second charge on the same physical gesture.
       // A Spin Rub is one open hand low over the bowl too; while its window is open no rail is built.
-      // The two glowing Forge grips are reserved for that verb (gesture-owner.ts 'grip'), so
-      // approaching them cannot spend a charge as Crossguard first.
+      // A palm on a glowing Forge grip is reserved for that verb (gesture-owner.ts 'grip'); a hand
+      // passing over the rim to the grips is not still long enough to post (RAIL_STILL, RAIL_DWELL).
       if (mayListen(this.m.handFacts(side), 'crossguard')) {
         const wrist = this.m.handAt.copy(this.m.toLocal(h.wrist));
         const index = this.m.root.worldToLocal(this.m.local.copy(h.index));
