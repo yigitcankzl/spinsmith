@@ -73,6 +73,9 @@ export default async function run({ page, frame }) {
       };
       pin();
       const pinned = setInterval(pin, 16);
+      // Hover cards are teaching copy: they show only while the guide is running (not for a smith
+      // who finished it), so the probe takes the learner's state instead of inheriting the save's.
+      game.progress.guide = 'match';
       action = (async () => {
         const ramp = await drive.hoverArena({ n: 0.7, angle: 0, side: 'right' });
         const forge = await drive.hoverArena({ n: 0.86, angle: (65 * Math.PI) / 180, side: 'right' });
