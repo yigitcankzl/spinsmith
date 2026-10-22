@@ -40,7 +40,7 @@ import type { XZ } from './room.js';
 import { allBuilds, buildName, edgeOf, NAMED_BUILDS, circuitOf, CIRCUITS, statsOf, PRESETS, RINGS, RIVALS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, FingerStreak, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, FingerStreak, TEAM_RIVAL, TopView, VERB_TINT, WALL_HEIGHT } from './visuals.js';
 import { BRASS } from './materials.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, SHAPING, ShapingCharges, StrikeBar } from './shaping.js';
@@ -2914,10 +2914,13 @@ export class MatchSystem extends createSystem({
         contact.visible = committed || hovering;
         contact.position.set(l.x, floor + 0.003, l.z);
         const pulse = 1 + 0.08 * Math.sin(this.time * 9 + i * Math.PI);
-        contact.scale.setScalar((forging ? 0.054 : committed ? 0.04 : 0.032) * pulse);
+        contact.scale.setScalar((forging ? 0.036 : committed ? 0.04 : 0.032) * pulse);
         const contactMat = contact.material as MeshBasicMaterial;
         contactMat.color.setHex(forging ? 0xffe0a3 : color);
-        contactMat.opacity = forging ? 0.92 : committed ? 0.72 : 0.32;
+        // Once both hands hold, the bending bowl is the feedback: the grip marks step back to a faint
+        // outline, and the glow under the hands goes, so they never cover the move.
+        contactMat.opacity = forging ? 0.4 : committed ? 0.72 : 0.32;
+        if (forging && !hot) m.visible = false;
       } else {
         this.handHoverClaim[side] = '';
         mat.color.setHex(0x000000);
@@ -4988,7 +4991,7 @@ export class MatchSystem extends createSystem({
       this.label.set(LESSON.forgeDone);
       this.labelTimer = 1.65;
       this.sparks.burst(0, this.arena.height(0, 0), 0, 0.9);
-      this.impacts.shock(0, this.arena.height(0, 0), 0, 0.75);
+      this.impacts.shock(0, this.arena.height(0, 0), 0, 0.75, VERB_TINT.forge);
       this.hitStop = Math.max(this.hitStop, 0.12);
       this.roomLight.hit();
       playThock();
@@ -5034,7 +5037,9 @@ export class MatchSystem extends createSystem({
 
     const g0 = this.rimSpringGuides[0];
     const g1 = this.rimSpringGuides[1];
-    g0.visible = g1.visible = !this.photo;
+    // While the bowl bends under both hands its shape is the feedback: the bright grip bars stay off
+    // (they read as a blob over the hands); the faint contact rings keep the grip points.
+    g0.visible = g1.visible = false;
     g0.position.set(this.arenaMorphA.x, this.arena.height(this.arenaMorphA.x, this.arenaMorphA.z) + 0.006, this.arenaMorphA.z);
     g1.position.set(this.arenaMorphB.x, this.arena.height(this.arenaMorphB.x, this.arenaMorphB.z) + 0.006, this.arenaMorphB.z);
     g0.rotation.y = g1.rotation.y = Math.PI / 2 - this.arenaMorphStart.angle;
@@ -5396,7 +5401,7 @@ export class MatchSystem extends createSystem({
     }
     const hits = springRim(this.arena, this.mine, [this.theirs], sx, sz, x, z, f);
     this.arenaView.flashRail(sx, sz);
-    this.impacts.shock(sx, this.arena.height(sx, sz), sz, hits ? 0.75 : 0.35);
+    this.impacts.shock(sx, this.arena.height(sx, sz), sz, hits ? 0.75 : 0.35, VERB_TINT.spring);
     this.sparks.burst(sx, this.arena.height(sx, sz), sz, hits ? 0.9 : 0.35);
     this.lastShape = hits ? { t: this.elapsed, kind: 'parry' } : this.lastShape;
     this.progress.advance('match');
@@ -5810,7 +5815,8 @@ export class MatchSystem extends createSystem({
         view?.flash();
         view?.hit(strength, dx, dz, 0.05);
         this.impacts.hit(top.x, y, top.z, strength);
-        this.impacts.shock(top.x, y, top.z, 0.55 + strength * 0.35, top === this.theirs ? 0xffb04a : 0xffe2a8);
+        this.impacts.shock(top.x, y, top.z, 0.55 + strength * 0.35, VERB_TINT.flick);
+        this.impacts.splash(top.x, y, top.z, strength, VERB_TINT.flick);
         this.sparks.burst(top.x, y, top.z, 0.5 + strength * 0.4);
         this.hitStop = Math.max(this.hitStop, 0.05 + strength * 0.03);
         // The blow itself: a streak of light along the flick, a scorch where it landed and, on a
@@ -5914,6 +5920,7 @@ export class MatchSystem extends createSystem({
     if (!this.rubStamped && this.rubGain >= 0.02) {
       this.rubStamped = true;
       this.stamp.show('SPIN RUB!', 'YOUR TOP SPINS UP', 'mine', 0.5, 0.9);
+      this.impacts.shock(cx, y, cz, 0.5, VERB_TINT.rub);
     }
     return true;
   }
@@ -7297,7 +7304,8 @@ export class MatchSystem extends createSystem({
           this.lastShape = { t: this.elapsed, kind: 'parry' };
           this.recordIntervention();
           const y = this.arena.height(top.x, top.z);
-          this.impacts.shock(top.x, y, top.z, 0.95, 0xffa12d);
+          this.impacts.shock(top.x, y, top.z, 0.95, VERB_TINT.crossguard);
+          this.impacts.splash(top.x, y, top.z, 0.9, VERB_TINT.crossguard);
           this.sparks.burst(top.x, y, top.z, 1);
           this.stamp.show('CROSSGUARD!', rivalEscape ? 'THEIR ESCAPE → YOUR POCKET' : 'SAVED · CHARGE BACK', 'mine', 0.72, 1.05);
           this.label.set('RAIL SPENT — OPEN BOTH HANDS TO REARM');
@@ -7338,7 +7346,7 @@ export class MatchSystem extends createSystem({
           if (!emberBumper(top, this.verbs.emberBumperAt.x, this.verbs.emberBumperAt.z, 0.014, rivalTop ? EMBER_RIVAL_KICK : 0)) continue;
           const y = this.arena.height(top.x, top.z);
           this.impacts.hit(top.x, y, top.z, 0.9);
-          this.impacts.shock(top.x, y, top.z, 0.78, 0xff7a1a);
+          this.impacts.shock(top.x, y, top.z, 0.78, VERB_TINT.rivet);
           this.sparks.embers(top.x, y, top.z, 12, 0.16, 0.12, 1);
           if (rivalTop) this.stamp.show('RIVET KICK!', 'YOUR PLANTED METAL FIRED', 'mine', 0.62, 0.9);
           this.roomLight.hit();
@@ -7726,8 +7734,12 @@ export class MatchSystem extends createSystem({
       const pulse = 1.15 + 0.15 * Math.sin(this.time * 6);
       for (let i = 0; i < this.rimSpringGuides.length; i++) {
         const side = (i === 0 ? 'left' : 'right') as Side;
-        if (this.rimPulls[side]) continue;
         const guide = this.rimSpringGuides[i];
+        // A held grip needs no target: the guide goes, so it never covers the hands' move.
+        if (this.rimPulls[side]) {
+          guide.visible = false;
+          continue;
+        }
         const { x, z } = grips[i];
         guide.visible = !this.photo;
         guide.position.set(x, this.arena.height(x, z) + 0.005, z);
@@ -7736,13 +7748,15 @@ export class MatchSystem extends createSystem({
       }
       // Two mirrored hands make the new verb legible without a paragraph: grab opposite sides,
       // move together, let go. Later matches leave the other three actions to discovery cards.
+      // Once the real hands hold both grips the ghosts step aside: they must never cover the move.
+      const holding = !!this.rimPulls.left && !!this.rimPulls.right;
       const [gl, gr] = grips;
       const y = Math.max(this.arena.height(gl.x, gl.z), this.arena.height(gr.x, gr.z));
       // Squeeze: the hands move toward each other, along the line between the grips.
       const inward = Math.min(0.045, gr.x * 0.3);
       this.ghost.play([[0, gl.x, y + 0.055, gl.z, 0], [0.45, gl.x, y + 0.01, gl.z, 0], [0.7, gl.x, y + 0.01, gl.z, 1], [1.35, gl.x + inward, y + 0.01, gl.z, 1], [1.55, gl.x + inward, y + 0.035, gl.z, 0], [2.35, gl.x, y + 0.055, gl.z, 0]], this.frameDt);
       this.forgeGhost.play([[0, gr.x, y + 0.055, gr.z, 0], [0.45, gr.x, y + 0.01, gr.z, 0], [0.7, gr.x, y + 0.01, gr.z, 1], [1.35, gr.x - inward, y + 0.01, gr.z, 1], [1.55, gr.x - inward, y + 0.035, gr.z, 0], [2.35, gr.x, y + 0.055, gr.z, 0]], this.frameDt);
-      ghost = forgeGhost = true;
+      ghost = forgeGhost = !holding;
     } else if (this.phase === 'fight' && !this.demo && !this.online && !this.cuppedOnce && (this.progress.matches === VERB_RELEASE.spring || this.progress.matches === VERB_RELEASE.cup) && this.elapsed > 4 && this.labelTimer <= 0 && !this.label.current) {
       // The match right after a pinch verb's card repeats it once, in the fight.
       this.label.set(this.progress.matches === VERB_RELEASE.spring && this.rimExperiment

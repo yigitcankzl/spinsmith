@@ -2991,6 +2991,33 @@ export function miniArena(layout: ArenaLayout, current: boolean): Group {
  * molten for you and steel-teal for the rival. It punches in with a little overshoot, holds, then
  * sinks and fades. One at a time; a new one replaces the last.
  */
+/**
+ * Each hand move has its own colour, so a montage of moves does not read as one move: its stamp,
+ * its shockwave and its splash all wear it. Team orange stays the rip's and the finishes'.
+ */
+export const VERB_TINT = {
+  forge: 0xf2f6ff,
+  flick: 0xffe24a,
+  crossguard: 0xc49bff,
+  rub: 0x7dffa6,
+  rivet: 0xff7ac8,
+  spring: 0xffd27a,
+  gust: 0xd7ff6b,
+} as const;
+const STAMP_TINT: Record<string, number> = {
+  'SQUEEZE!': VERB_TINT.forge,
+  'STRETCH!': VERB_TINT.forge,
+  'TWIST!': VERB_TINT.forge,
+  'TILT!': VERB_TINT.forge,
+  'FLICK!': VERB_TINT.flick,
+  'CROSSGUARD!': VERB_TINT.crossguard,
+  'SPIN RUB!': VERB_TINT.rub,
+  'RIVET PLANTED!': VERB_TINT.rivet,
+  'RIVET KICK!': VERB_TINT.rivet,
+  'RIM SPRING!': VERB_TINT.spring,
+  'FORGE GUST!': VERB_TINT.gust,
+};
+
 export class Stamp {
   readonly mesh: Mesh;
   private canvas = document.createElement('canvas');
@@ -3057,9 +3084,10 @@ export class Stamp {
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(1, '#c9d3e0');
     } else {
-      // White-hot to orange: gold is kept for teaching.
+      // White-hot to orange (gold is kept for teaching); a hand move's own colour instead.
+      const tint = STAMP_TINT[word];
       grad.addColorStop(0, '#fff1d6');
-      grad.addColorStop(1, ORANGE);
+      grad.addColorStop(1, tint ? `#${tint.toString(16).padStart(6, '0')}` : ORANGE);
     }
     g.lineJoin = 'round';
     g.lineWidth = 22;

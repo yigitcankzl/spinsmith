@@ -8,6 +8,7 @@ import { CALL } from './calls.js';
 import { FirstFiveState } from '../components.js';
 import { mayCommit, mayListen } from './gesture-owner.js';
 import { HAND_LOSS_GRACE } from './match-constants.js';
+import { VERB_TINT } from './visuals.js';
 import type { MatchSystem } from './match-system.js';
 
 /** An open palm must sweep this fast above the bowl before it becomes a deliberate forge gust. */
@@ -539,7 +540,7 @@ export class HandVerbs {
     }
     this.m.lastShape = { t: this.m.elapsed, kind: 'parry' };
     this.m.recordIntervention();
-    if (struck.length) this.m.impacts.shock(struck[0].x, this.m.arena.height(struck[0].x, struck[0].z), struck[0].z, 0.5, 0xffb04a);
+    if (struck.length) this.m.impacts.shock(struck[0].x, this.m.arena.height(struck[0].x, struck[0].z), struck[0].z, 0.5, VERB_TINT.gust);
     this.m.stamp.show(struck.length ? 'FORGE GUST!' : 'GUST MISSED', struck.length ? `${struck.length} TOP${struck.length === 1 ? '' : 'S'} IN THE CORRIDOR` : 'SWEEP THROUGH A TOP', struck.length ? 'mine' : 'neutral', 0.6, 0.9);
     this.m.label.set(struck.length ? 'YOUR HAND MOVED THE FIGHT' : 'THE CORRIDOR MISSED');
     this.m.labelTimer = 1.1;
