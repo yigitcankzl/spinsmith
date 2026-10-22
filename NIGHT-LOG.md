@@ -28,6 +28,11 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 3 | Accessibility (combinable comfort) | 8 → pending | Dial selects, plate toggles; any combination; v1 → v2 migration | 74bb5c1 |
 | 3 | 60 fps (overlay + guard) | 4 → pending | `?fps` world-locked readout; QualityGuard steps full → lite → lite+foveation after 3 slow seconds, back after 10 good; per-phase fps in the Quest test report | b37a58a |
 | 3 | Untested rooms | 6 → pending | Room matrix 10 cases incl. tilted 30° surface (tray), two desks (near wins), 0.38 m coffee table (tray), table 1.7 m away (tray), rebuilt-plane control | e1de6cd |
+| 4 (03:05–03:22) | Video | 3 → pending | New 41.6 s reel (`scripts/night-trailer.sh`, `~/Desktop/spinsmith-videos/night-2026-10-22/spinsmith-reel-1080p60.mp4`): opens on a side view of the staged DESK KO (rival skids off the desk edge), then rip + ramp with the lesson ghost, DESK KO close, Flick, strike, tilt, forge, workshop, hub; every shot labelled IWER. New `stageFirstWrench` drive step; SUBMISSION video section rewritten | night-trailer.sh |
+| 4 | Hand tracking | 5 → pending | One-Euro on aim/hover/hit paths only (`pinchSmooth`, `indexSmooth`; minCutoff 2.5 Hz, beta 10): still-hand jitter −67%, 1.5 m/s sweep lag 13.8 mm; rip, flick, rub, gust, slap stay raw. dual-rip passes | 011a669 |
+| 4 | Passthrough polish (hand occlusion) | — | Existing joint-proxy occluder gated (AR only, `?nohandocclude`), palm slab, never pickable, flick glow / wrist bar drawn over it; kept on under depth sensing because tops are not depth-occluded | abaa5e7 |
+| 4 | Submission text | 5 → pending | README 469 → 179 lines (judge path, real-room list, hands table, honest limits); design notes moved to DESIGN.md | bc80a55 |
+| 4 | Solid / bug-free | — | Probes found: sim-check block left unclosed by a merge (caught: a piped `tail` had hidden the exit code; now checks keep exit codes); groove committing before a flick on a curved swing (fixed: a groove commits once the fingertip leaves the floor). `check:hands` 1 of 2 sequences clean (flick double-charge 1 in ~6 runs, open); desk-ko-first, desk-ko, desk-guard, combat-readability, room-matrix pass | 832a4d4 |
 
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
@@ -51,13 +56,16 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [x] README top 15 lines matching the code (README:85, echo.ts:30, index.html:88 fixed in 152a1f1)
 - [x] Rewrite docs/SUBMISSION.md from the current game (Submission text 6)
 - [ ] Refresh IWER-labelled stills (Images 5)
-- [ ] Last: IWER-labelled trailer recut opening on the DESK KO (Video 4)
+- [x] IWER-labelled trailer recut opening on the DESK KO (Video 4)
 - [x] FPS overlay + automatic quality fallback (60 fps 3)
 - [x] One gesture arbitration table for the open fingertip / palm verbs, tested (Solid 5)
 - [x] Comfort modes as combinable toggles (Accessibility 6)
 - [x] Fewer stamps in match 1 (55 prompts / 258 words) (First Five Minutes)
 - [x] Room matrix: tilted plane, two desks, coffee table, table at the edge of reach (Untested rooms 5)
-- [ ] Real hands occlude the arena (joint capsules writing depth) (passthrough / polish)
-- [ ] One-Euro again, only on aim/hover paths; rip and flick keep raw joints (hand tracking 5)
-- [ ] README condensed for a 5-minute judge (text 5)
+- [x] Real hands occlude the arena (joint capsules writing depth) (passthrough / polish)
+- [x] One-Euro again, only on aim/hover paths; rip and flick keep raw joints (hand tracking 5)
+- [x] README condensed for a 5-minute judge (text 5)
 - [ ] First-five driver: "seal stamp did not spend the armed ultimate" twice — driver or game?
+- [ ] Flick + groove double charge in long check:hands sequences (1 in ~6)
+- [ ] Hub/home label diet (UI/UX 7)
+- [ ] Store stills from the current build, IWER-labelled (Images 4)
