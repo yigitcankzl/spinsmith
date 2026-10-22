@@ -1949,7 +1949,7 @@ assert.equal(edgeOf('defense', 'defense'), 0);
 
 // 36. Crowded bouts can be won too: against the bout's rival and its crowd together, some build is
 // the last top spinning above a fair share (1 in 3 or 1 in 4) by a quarter, without hands, with
-// either spin direction (the spin token).
+// either spin direction (the spin token), yet none is last spinning more than 65% (no walkover build).
 {
   const candidates = [...PRESETS.map((p) => p.build), ...NAMED_BUILDS.map((n) => n.build), ...RIVALS.map((r) => r.build)];
   const all = [...RIVALS, ...NAMED_BUILDS];
@@ -1987,6 +1987,8 @@ assert.equal(edgeOf('defense', 'defense'), 0);
     }
     // Without hands: the player's ramps, forges and strike, and the assist after two losses, add the rest.
     assert.ok(best >= 1.25 / n, `crowded bout ${bout.id}: some build is last spinning ${(best * 100).toFixed(0)}% of rounds (fair share ${(100 / n).toFixed(0)}%)`);
+    // ...but no single build walks through the crowd: the crowd tops still have to be played.
+    assert.ok(best <= 0.65, `crowded bout ${bout.id}: no build is last spinning more than 65% of rounds (best ${(best * 100).toFixed(0)}%)`);
     console.log(`crowded bout ${bout.id}: best build last spinning ${(best * 100).toFixed(0)}% (fair share ${(100 / n).toFixed(0)}%)`);
   }
 }
