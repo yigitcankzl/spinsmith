@@ -54,17 +54,17 @@ clip() {
 }
 
 # Story: the hook is the room-dependent beat, then how you get there, then the depth behind it.
-clip 00-hook "$NEW/desk-ko-first-side.mp4" 0.3 6.0 "THE ARENA IS THE WEAPON" "Squeeze the bowl  throw the rival off your real desk"
+clip 00-hook "$NEW/desk-ko-first-side.mp4" 0.3 6.0 "THE ARENA IS THE WEAPON" "Squeeze the bowl  throw the rival off your desk"
 if [ -s "$NEW/hub.mp4" ]; then clip 01-rise "$NEW/hub.mp4" 0.4 2.8 "YOUR TABLE IS THE ARENA" "Seated mixed reality  hands only"
 else clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 2.6 "YOUR TABLE IS THE ARENA" "Seated mixed reality  hands only"; fi
 clip 02-rip "$NEW/first-rip-ghost.mp4" 2.6 6.6 "PINCH  PULL  RIP" "A ghost hand shows each move once"
 clip 03-desk "$NEW/desk-ko-first-close.mp4" 1.2 4.4 "DESK KO IN YOUR FIRST MATCH" "The real edge glows  the squeeze throws"
 clip 04-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK IT" "Your fingertip is part of the physics"
-clip 06-strike "$NEW/seal-stamp.mp4" 0.3 4.2 "STAMP AN ULTIMATE" "Pinch the seal  press it into the bowl"
+clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal  press it into the bowl"
 # Optional hand close-ups, when the new-shots folder has them.
-if [ -s "$NEW/close-squeeze.mp4" ]; then clip 05a-squeeze "$NEW/close-squeeze.mp4" 0.6 3.0 "TWO HANDS ON THE RIM" "Squeeze  stretch  tilt  twist the live bowl"; fi
-if [ -s "$NEW/close-crossguard.mp4" ]; then clip 05b-guard "$NEW/close-crossguard.mp4" 0.3 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"; fi
-if [ -s "$NEW/close-rub.mp4" ]; then clip 05c-rub "$NEW/close-rub.mp4" 0.9 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"; fi
+if [ -s "$NEW/close-squeeze.mp4" ]; then clip 05a-squeeze "$NEW/close-squeeze.mp4" 0.3 3.0 "TWO HANDS ON THE RIM" "Squeeze  stretch  tilt  twist the live bowl"; fi
+if [ -s "$NEW/close-crossguard.mp4" ]; then clip 05b-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"; fi
+if [ -s "$NEW/close-rub.mp4" ]; then clip 05c-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"; fi
 # Optional: a 3-4 top brawl shot, when the new-shots folder has one.
 if [ -s "$NEW/brawl.mp4" ]; then clip 07-brawl "$NEW/brawl.mp4" 11.6 5.0 "BRAWL" "Three or four tops  last one spinning"; fi
 if [ -s "$NEW/forge.mp4" ]; then clip 08-forge "$NEW/forge.mp4" 2.6 5.0 "FORGE IT BY HAND" "226 builds  each changes the physics"
@@ -74,8 +74,10 @@ else clip 09-workshop "$SHOW/05-arena-workshop.mp4" 16.5 3.0 "BUILD THE BATTLEGR
 clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.4 "TWENTY ARENAS" "Fifteen bouts  nine rivals"
 clip 11-return "$NEW/match-won-cards.mp4" 5.0 7.5 "ONE NEW MOVE A MATCH" "A streak and tomorrow on every result"
 card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.8
+# A full-width disclosure first: what the footage is, before anything else.
+card 00-disclose "EMULATOR FOOTAGE" "${DISCLOSE:-IWSDK emulator (IWER)  -  not headset footage}" 1.6
 
-segments=(00-hook 01-rise 02-rip 03-desk 04-flick)
+segments=(00-disclose 00-hook 01-rise 02-rip 03-desk 04-flick)
 for c in 05a-squeeze 05b-guard 05c-rub; do [ -s "$TMP/$c.mp4" ] && segments+=("$c"); done
 segments+=(06-strike)
 [ -s "$NEW/brawl.mp4" ] && segments+=(07-brawl)
