@@ -4859,6 +4859,7 @@ export class MatchSystem extends createSystem({
         this.palmGustBlockedUntil[side] = this.elapsed + RELEASE_LOCK;
         this.verbs.palmGustSampled[side] = false;
         this.verbs.palmGustAge[side] = 0;
+        this.verbs.railNeedsClear[side] = true;
       }
       this.verbs.clearCrossguard();
       this.rimSpringGuides[0].visible = false;

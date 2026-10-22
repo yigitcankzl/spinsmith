@@ -39,6 +39,8 @@ export class HandVerbs {
   /** Where each low, flat open hand rests on the rim (radians); two of them make a Crossguard. */
   palmRailAngles: Record<Side, number | null> = { left: null, right: null };
   private palmRailGrace: Record<Side, number> = { left: 0, right: 0 };
+  /** After an Arena Forge release, a hand must leave the rim once before it counts as a rail post. */
+  railNeedsClear: Record<Side, boolean> = { left: false, right: false };
   /** Two flat palms on the rim join into one finite, one-hit rail across the bowl. */
   crossguardActive = false;
   crossguardConsumed = false;
@@ -290,7 +292,11 @@ export class HandVerbs {
         const n = normRadius(this.m.arena.layout, palm.x, palm.z);
         const floor = this.m.arena.height(palm.x, palm.z);
         // A rail post needs a low, flat open hand; a relaxed upright hand near the rim does not count.
-        accepted = n >= 0.78 && n <= 1.22 && palm.y >= floor - 0.025 && palm.y <= floor + 0.065 && Math.abs(wrist.y - index.y) <= 0.07;
+        const onRim = n >= 0.78 && n <= 1.22 && palm.y >= floor - 0.025 && palm.y <= floor + 0.065 && Math.abs(wrist.y - index.y) <= 0.07;
+        // Hands that just let go of the Arena Forge grips are open palms on the rim already: they
+        // must leave the rim once before they can post a rail.
+        if (!onRim) this.railNeedsClear[side] = false;
+        accepted = onRim && !this.railNeedsClear[side];
         if (accepted) {
           this.palmRailAngles[side] = Math.atan2(palm.z, palm.x);
           this.palmRailGrace[side] = 0.22;
