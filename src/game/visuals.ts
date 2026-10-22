@@ -143,7 +143,7 @@ BRUSHED.colorSpace = SRGBColorSpace;
 const BLADE_NORMAL = LATHE_NORMAL.clone();
 BLADE_NORMAL.repeat.copy(BRUSHED.repeat);
 BLADE_NORMAL.offset.copy(BRUSHED.offset);
-const BLADE_METAL = new MeshStandardMaterial({ color: 0xc4cad5, metalness: 1, roughness: 0.34, map: BRUSHED, roughnessMap: BRUSHED_ROUGHNESS, normalMap: BLADE_NORMAL });
+const BLADE_METAL = new MeshStandardMaterial({ color: 0xdde2ea, metalness: 1, roughness: 0.2, map: BRUSHED, roughnessMap: BRUSHED_ROUGHNESS, normalMap: BLADE_NORMAL });
 
 /**
  * Spun metal: fine concentric brushing with a few scratches, centered on the top's axis. The

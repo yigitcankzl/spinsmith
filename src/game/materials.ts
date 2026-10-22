@@ -165,6 +165,8 @@ export const GRAPHITE = new MeshStandardMaterial({ color: BODY, metalness: 0.1, 
 /** The same graphite with darkening baked into vertex colors where parts meet (lathe profiles). */
 export const GRAPHITE_AO = GRAPHITE.clone();
 GRAPHITE_AO.vertexColors = true;
+/** The forge shell's painted body: warm sand enamel, so the arena is a toy on the desk, not a machine. */
+export const SHELL_PAINT = new MeshStandardMaterial({ color: 0xc2b59c, metalness: 0, roughness: 0.6, vertexColors: true });
 /** Machine body, machined: ratchets, coins, the shell's clamps. */
 export const GUNMETAL = new MeshStandardMaterial({ color: 0x3a3d44, metalness: 0.85, roughness: 0.42 });
 /** Trim. */
@@ -187,9 +189,12 @@ export function plastic(hex: number): MeshStandardMaterial {
   return m;
 }
 
-/** A top's colored plastic layer: glossy moulded plastic under a clear coat (one per top, freed with it). */
+/**
+ * A top's colored plastic layer: glossy moulded plastic under a clear coat, lifted by a little of its
+ * own colour so the team reads saturated even in a dimmed room (one per top, freed with it).
+ */
 export function topPlastic(hex: number): MeshPhysicalMaterial {
-  return new MeshPhysicalMaterial({ color: hex, metalness: 0, roughness: 0.5, clearcoat: 0.6, clearcoatRoughness: 0.15 });
+  return new MeshPhysicalMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.18, metalness: 0, roughness: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.12 });
 }
 
 

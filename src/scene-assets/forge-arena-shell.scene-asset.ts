@@ -10,7 +10,7 @@ import {
   TorusGeometry,
   Vector2,
 } from '@iwsdk/core';
-import { bevelBox, BRASS, GRAPHITE, GRAPHITE_AO, GUNMETAL } from '../game/materials.js';
+import { bevelBox, BRASS, GRAPHITE, GUNMETAL, SHELL_PAINT } from '../game/materials.js';
 /** The shell is modelled around a 15 cm arena and scaled to the arena in play. */
 const ARENA_RADIUS = 0.15;
 
@@ -48,7 +48,7 @@ const bodyGeo = new LatheGeometry(profile, 64);
   for (let i = 0; i < n; i++) color.fill(occlusion[i % profile.length], i * 3, i * 3 + 3);
   bodyGeo.setAttribute('color', new BufferAttribute(color, 3));
 }
-const body = new Mesh(bodyGeo, GRAPHITE_AO);
+const body = new Mesh(bodyGeo, SHELL_PAINT);
 body.name = 'ForgedPlinth';
 root.add(body);
 
