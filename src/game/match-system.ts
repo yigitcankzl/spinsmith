@@ -7388,6 +7388,9 @@ export class MatchSystem extends createSystem({
           // A hard hit: more sparks, a ring of light, both tops flash, and a brief hit stop.
           this.sparks.burst(clash.x, y, clash.z, 1);
           this.impacts.hit(clash.x, y, clash.z, clash.strength);
+          // The splash takes the colour of whichever top came in faster: the hitter.
+          const mineFaster = Math.hypot(this.mine.vx, this.mine.vz) >= Math.hypot(this.theirs.vx, this.theirs.vz);
+          this.impacts.splash(clash.x, y, clash.z, clash.strength, mineFaster ? TEAM_MINE : TEAM_RIVAL);
           this.myView.flash();
           this.theirView.flash();
           // Harder hits freeze longer (70-110 ms) and shake both tops (never the view).

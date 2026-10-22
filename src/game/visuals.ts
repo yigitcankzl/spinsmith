@@ -2361,8 +2361,43 @@ const SHOCK_RING = (() => {
  * Impact effects in the arena: an expanding ring of light where a hard hit lands, and a fading
  * streak behind a top that dashes along a rail. Small pools, additive, no depth writes.
  */
+/** An ink splash: a jagged star with a few flung drops, white (tinted per hit), soft-edged. */
+function splashTexture(): CanvasTexture {
+  const S = 128;
+  const C = S / 2;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d')!;
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = '#ffffff';
+  g.beginPath();
+  const n = 14;
+  for (let i = 0; i <= n * 2; i++) {
+    const a = (i / (n * 2)) * Math.PI * 2;
+    const r = i % 2 === 0 ? C * (0.62 + 0.3 * rnd()) : C * (0.3 + 0.08 * rnd());
+    g.lineTo(C + Math.cos(a) * r, C + Math.sin(a) * r);
+  }
+  g.closePath();
+  g.fill();
+  for (let i = 0; i < 7; i++) {
+    const a = rnd() * Math.PI * 2;
+    const r = C * (0.7 + 0.22 * rnd());
+    g.beginPath();
+    g.arc(C + Math.cos(a) * r, C + Math.sin(a) * r, 2 + rnd() * 4, 0, Math.PI * 2);
+    g.fill();
+  }
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+}
+const SPLASH = splashTexture();
+
 export class Impacts {
   readonly root = new Group();
+  /** Hard clashes: a flat ink splash in the hitter's team colour, facing the eye (top-game style). */
+  private splashes: { sprite: Sprite; t: number; size: number }[] = [];
+  private nextSplash = 0;
   private rings: { mesh: Mesh; t: number; size: number }[] = [];
   private streaks: { mesh: Mesh; t: number }[] = [];
   private nextRing = 0;
@@ -2389,6 +2424,13 @@ export class Impacts {
   constructor() {
     this.flare.visible = false;
     this.root.add(this.flare);
+    for (let i = 0; i < 2; i++) {
+      const sprite = new Sprite(new SpriteMaterial({ map: SPLASH, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+      sprite.visible = false;
+      sprite.renderOrder = 4;
+      this.splashes.push({ sprite, t: 1, size: 0 });
+      this.root.add(sprite);
+    }
     for (let i = 0; i < 3; i++) {
       const o = new Vector3();
       const mat = new MeshBasicMaterial({ map: SHOCK_RING, color: 0xffc890, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, toneMapped: false });
@@ -2453,6 +2495,18 @@ export class Impacts {
     }
   }
 
+  /** A hard clash (strength 0..1): an ink splash in the hitter's colour, 0.22 s, at blade height. */
+  splash(x: number, y: number, z: number, strength: number, color: number) {
+    const s = this.splashes[this.nextSplash];
+    this.nextSplash = (this.nextSplash + 1) % this.splashes.length;
+    s.t = 0;
+    s.size = 0.04 + 0.04 * strength;
+    s.sprite.position.set(x, y + 0.014, z);
+    s.sprite.material.color.set(color);
+    s.sprite.material.rotation = Math.random() * Math.PI * 2;
+    s.sprite.visible = true;
+  }
+
   /**
    * A hard hit on the floor (strength 0..1): a thick shockwave rolls out over 0.3 s, and a scorch
    * glows hot where it landed and cools to a dark mark that fades in about 2 s. Floor effects only,
@@ -2505,6 +2559,15 @@ export class Impacts {
       if (k >= 1) this.flare.visible = false;
     }
     const lum = COMFORT.flashes ? 1 : 0.6;
+    for (const s of this.splashes) {
+      if (!s.sprite.visible) continue;
+      s.t += dt / 0.22;
+      const k = Math.min(1, s.t);
+      // Pops out fast, holds its shape, then thins away.
+      s.sprite.scale.setScalar(s.size * (0.55 + 0.45 * Math.sqrt(k)));
+      s.sprite.material.opacity = lum * 0.95 * (k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5);
+      if (k >= 1) s.sprite.visible = false;
+    }
     for (const s of this.shocks) {
       if (!s.mesh.visible) continue;
       s.t += dt / 0.3;
