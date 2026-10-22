@@ -1293,6 +1293,8 @@ export function installDriver() {
       api.rest();
       g.progress.matches = 0;
       g.progress.guide = 'match';
+      // A new smith's lessons: an earlier forge in this page must not count as the lesson done.
+      g.morphedOnce = false;
       if (g.arena.layout.name !== 'Forge Bowl') g.setArena(g.arenas.find((a: { name: string }) => a.name === 'Forge Bowl'));
       g.startMatch();
       for (let i = 0; i < 200 && g.phase !== 'ready'; i++) await wait(0.025);
