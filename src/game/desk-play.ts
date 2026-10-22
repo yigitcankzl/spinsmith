@@ -41,7 +41,7 @@ export class DeskPlay {
    * DESK KO can be aimed. Sectors are in the arena root's local frame (see updateDeskEdge).
    */
   deskArcs = [0, 1].map(() => {
-    const m = new Mesh(new RingGeometry(0.1, 0.11, 8), new MeshBasicMaterial({ color: 0xff5a1e, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false, side: DoubleSide }));
+    const m = new Mesh(new RingGeometry(0.1, 0.11, 8), new MeshBasicMaterial({ color: 0xff5a1e, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide, toneMapped: false }));
     m.name = 'desk-edge-arc';
     m.visible = false;
     m.renderOrder = 3;
@@ -265,9 +265,11 @@ export class DeskPlay {
       }
       const now = (rivalNear && inSector(sec, rivalAngle)) || (i === 0 && this.deskWrenchAt() !== null);
       const m = arc.material;
-      m.opacity = now ? 0.55 + 0.2 * Math.sin(this.m.time * 9) : 0.3 + 0.08 * Math.sin(this.m.time * 1.8 + i);
-      // Red, not the bowl's orange: the warning must not melt into the rim it sits on.
-      m.color.setHex(now ? 0xfff0c8 : warnColor(0xff2a3a, SAFE_COLORS.edge));
+      // Painted, not glowing (it sits on the light enamel): solid enough to read, throbbing when it is the move.
+      m.opacity = now ? 0.8 + 0.2 * Math.sin(this.m.time * 9) : 0.55 + 0.1 * Math.sin(this.m.time * 1.8 + i);
+      // Red, not the bowl's orange: the warning must not melt into the rim it sits on. When it is the
+      // move, it is not paler (cream vanished on the sand enamel) but solid and throbbing.
+      m.color.setHex(warnColor(now ? 0xff1424 : 0xff2a3a, SAFE_COLORS.edge));
     }
     if (sectors.length && this.m.progress.matches > 0 && this.deskEdgeHintMatch !== this.m.progress.matches && this.m.labelTimer <= 0) {
       this.deskEdgeHintMatch = this.m.progress.matches;

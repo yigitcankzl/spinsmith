@@ -2838,7 +2838,8 @@ export class ShapeMarks {
 
   /** `sides`: the rings' outline (the rival's marks are hexagons, yours round: not colour alone). */
   constructor(color: number, count = 4, sides = 48) {
-    const ring = new RingGeometry(0.94, 1, sides).rotateX(-Math.PI / 2);
+    // Bold bands, not hairlines: they read on the light floor at arm's length.
+    const ring = new RingGeometry(0.86, 1, sides).rotateX(-Math.PI / 2);
     const chevron = new ConeGeometry(0.008, 0.016, 3).rotateX(Math.PI / 2);
     for (let i = 0; i < count; i++) {
       const group = new Group();
