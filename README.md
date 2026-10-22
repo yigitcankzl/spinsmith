@@ -49,6 +49,17 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 
 Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD` in `src/game/progress.ts`). Online duels, brawls and the `?demo` save (level 8) have every verb. Every one-hand gesture (rip, ramp, cup, strike) works with either hand. Per-verb tuning and measured win-point gains are in [DESIGN.md](DESIGN.md).
 
+## Measured performance (IWER on a desktop GPU, not a Quest)
+
+`npm run report:runtime-performance` on 2026-10-23 (RTX 4060 laptop, ANGLE/Vulkan; both eyes counted by the renderer):
+
+| Phase | Draw calls per eye | Triangles | Game update per frame (p50 / p95 / max) |
+|---|---|---|---|
+| Ready (first match) | 112 | 137 k | 0.6 / 0.8 / 1.7 ms |
+| Fight (first match) | 95 | 137 k | 0.7 / 1.0 / 1.9 ms |
+
+The budget is 150 draws per eye, no bloom, no shadow maps. Quest frame rate is unmeasured until it runs on a headset; `?fps` shows it there, and the game drops to a lite quality level by itself when frames run long.
+
 ## Known limits
 
 - Nothing has been run or measured on a headset yet, including frame rate (`?fps` and `?diagnostics` are there for it).
