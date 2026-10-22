@@ -91,5 +91,5 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [x] Flick + groove double charge in long check:hands sequences
 - [x] Hub/home label diet (UI/UX 7)
 - [x] Stills from the current build, IWER-labelled: `~/Desktop/spinsmith-videos/night-2026-10-22/stills/` and `stills-room/` (the older store folder is untouched)
-- [x] check:hands double charges in sequence (rub groove-on-lift, forge-release rail, grip-approach rail, moving-palm rail) — 5 clean sequential runs; forge-wheel cold start under HANDS_ISOLATE=1 still open
+- [x] check:hands double charges in sequence (rub groove-on-lift, forge-release rail, grip-approach rail, moving-palm rail) — 5 clean sequential runs; forge-wheel cold start under HANDS_ISOLATE=1 still open (07:15: on a cold page the handle grab is never claimed — claimed=false — while the warm sequence passes; the driver now watches for the current from the release on)
 - [x] Flick probe on the `?demo` save: passes 3/3 at 05:55 (scale 1.68) after the night's collision fixes; earlier misses were not reproduced. Notes kept:  a headless kinematic replay (all 20 arenas, scales 1.8/2.04/2.4, 24–72 fps) lands every time, so the gesture math is scale-correct; likely cause is the match state (level-8 rivals shaping the floor under the swing, or the rival moving) — needs one IWER run with the owner blockers logged
