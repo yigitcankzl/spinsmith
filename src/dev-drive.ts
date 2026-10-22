@@ -1265,11 +1265,17 @@ export function installDriver() {
     async demo() {
       const m = await import('./game/demo-save.js');
       m.demoSave(localStorage);
+      // The match in progress would be saved for resume as the page unloads; this is a reset.
+      const { RESUME_KEY } = await import('./game/match-resume.js');
+      addEventListener('pagehide', () => localStorage.removeItem(RESUME_KEY));
       setTimeout(() => location.reload(), 50);
     },
     async fresh() {
       const m = await import('./game/demo-save.js');
       m.freshSave(localStorage);
+      // The match in progress would be saved for resume as the page unloads; this is a reset.
+      const { RESUME_KEY } = await import('./game/match-resume.js');
+      addEventListener('pagehide', () => localStorage.removeItem(RESUME_KEY));
       setTimeout(() => location.reload(), 50);
     },
     /** Gives a hand back to the emulator's own controls. */
