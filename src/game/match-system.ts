@@ -5414,7 +5414,6 @@ export class MatchSystem extends createSystem({
 
   /** The tool a hand holds this frame, for gesture ownership (Arena Forge holds both hands). */
   private sealWorld = new Vector3();
-  private factPinch = new Vector3();
   private heldTool(side: Side): HeldTool | null {
     if (this.overforgeHeld === side || this.overforgeControl?.side === side) return 'overforge';
     // A pinch on the ready seal (it docks over the bowl floor) is the seal's, not a ramp.
@@ -5442,10 +5441,7 @@ export class MatchSystem extends createSystem({
     // Hand marks classify the pinch target while the rail uses the palm: either saying FORGE counts.
     const grip = this.factPalm.copy(wrist).lerp(this.root.worldToLocal(this.factTipSmooth.copy(h.indexSmooth)), 0.45);
     const gripN = normRadius(this.arena.layout, grip.x, grip.z);
-    // The pinch point at a grip counts too: a hand reaching for the grips has its palm over the rim.
-    const pinchAt = this.root.worldToLocal(this.factPinch.copy(h.pinchSmooth));
-    const onForgeGrip = this.handHoverClaim[side] === 'FORGE' || (this.taught('forge') && (forgeGripIntent(gripN, Math.atan2(grip.z, grip.x))
-      || forgeGripIntent(normRadius(this.arena.layout, pinchAt.x, pinchAt.z), Math.atan2(pinchAt.z, pinchAt.x))));
+    const onForgeGrip = this.handHoverClaim[side] === 'FORGE' || (this.taught('forge') && forgeGripIntent(gripN, Math.atan2(grip.z, grip.x)));
     // A palm (wrist→fingertip 0.5) down at the table outside the rim, with the strike ready, is a slap.
     const slap = this.factPalm.copy(wrist).lerp(tip, 0.5);
     const atTable = h.low < this.root.position.y - PEDESTAL * this.rootK + 0.05;
@@ -5802,7 +5798,14 @@ export class MatchSystem extends createSystem({
     // now or when the finger lifts (the same quiet a flick gets).
     this.grooving[side] = this.pendingGroove[side] = null;
     this.flickAt[side] = this.time;
-    if (step === 'hold') return true;
+    if (step === 'hold') {
+      // A stroke that ran past its window pays no more until the finger lifts: say so, not silence.
+      if (this.time >= this.rubReadyAt && this.labelTimer <= 0) {
+        this.label.set('LIFT TO RUB AGAIN');
+        this.labelTimer = 1.2;
+      }
+      return true;
+    }
     if (step === 'pay') {
       const force = this.charges.spend(this.elapsed, TUNING.grace);
       if (!force) {
