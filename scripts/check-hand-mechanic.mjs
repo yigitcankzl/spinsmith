@@ -47,6 +47,8 @@ export default async function run({ page, frame }) {
       for (let i = 0; i < 400 && drive.state().phase !== 'ready'; i++) await sleep(25);
       if (drive.state().phase === 'ready') drive.key('KeyL');
       for (let i = 0; i < 400 && drive.state().phase !== 'fight'; i++) await sleep(25);
+      // Aim only once the arena has finished sliding to its match size (a cold page is slow).
+      for (let i = 0; i < 400 && !window.__game.sizeSettled; i++) await sleep(25);
       if (drive.state().phase === 'fight') drive.key('KeyU');
     }
     // Headless IWER can run below 10 fps. The interaction itself is what this probe covers, so do

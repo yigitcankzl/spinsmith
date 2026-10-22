@@ -1215,6 +1215,8 @@ export function installDriver() {
       g.labelTimer = 0;
       await setPinch(side, false);
       await glide(side, 'pinch', target, 0.28, 0);
+      // Hold still a moment: hover claims read the smoothed pinch point, which settles ~0.1 s later.
+      await wait(0.15);
       // Re-arm only the transient preview after the reach. A clash/rivet message may legitimately
       // use the shared card during the approach; the next real update now proves the hover copy.
       g.handHoverClaim[side] = '';
