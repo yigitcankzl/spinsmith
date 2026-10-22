@@ -60,13 +60,17 @@ clip 02-rip "$NEW/first-rip-ghost.mp4" 2.6 6.6 "PINCH  PULL  RIP" "A ghost hand 
 clip 03-desk "$NEW/desk-ko-first-close.mp4" 1.2 4.4 "DESK KO IN YOUR FIRST MATCH" "The real edge glows  the squeeze throws"
 clip 04-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK IT" "Your fingertip is part of the physics"
 clip 06-strike "$NEW/seal-stamp.mp4" 1.4 4.6 "STAMP AN ULTIMATE" "Pinch the seal  press it into the bowl"
+# Optional: a 3-4 top brawl shot, when the new-shots folder has one.
+if [ -s "$NEW/brawl.mp4" ]; then clip 07-brawl "$NEW/brawl.mp4" 11.6 5.0 "BRAWL" "Three or four tops  last one spinning"; fi
 clip 08-forge "$MAIN/06-forge.mp4" 1.2 3.8 "FORGE IT BY HAND" "226 builds  each changes the physics"
 clip 09-workshop "$SHOW/05-arena-workshop.mp4" 16.5 3.0 "BUILD THE BATTLEGROUND" "Twenty arenas and a workshop"
 clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.4 "TWENTY ARENAS" "Fifteen bouts  nine rivals"
 clip 11-return "$NEW/match-won-cards.mp4" 5.0 7.5 "ONE NEW MOVE A MATCH" "A streak and tomorrow on every result"
 card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.8
 
-segments=(00-hook 01-rise 02-rip 03-desk 04-flick 06-strike 08-forge 09-workshop 10-arenas 11-return 13-end)
+segments=(00-hook 01-rise 02-rip 03-desk 04-flick 06-strike)
+[ -s "$NEW/brawl.mp4" ] && segments+=(07-brawl)
+segments+=(08-forge 09-workshop 10-arenas 11-return 13-end)
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
 mkdir -p "$(dirname "$FINAL")"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" \
