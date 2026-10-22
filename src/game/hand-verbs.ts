@@ -21,6 +21,9 @@ const PALM_GUST_COOLDOWN = 1.8;
 const PALM_GUST_FX_TIME = 0.65;
 
 /** Crossguard (two flat palms on the rim), Forge Gust (an open-palm sweep) and Ember (the hot rivet caught and planted as a bumper): the match's free-hand verbs, their state and their meshes. */
+/** Fastest a palm may move (arena units/s, about 30 cm/s real) and still post a Crossguard rail. */
+const RAIL_STILL = 0.12;
+
 export class HandVerbs {
   constructor(private readonly m: MatchSystem) {}
 
@@ -41,6 +44,8 @@ export class HandVerbs {
   private palmRailGrace: Record<Side, number> = { left: 0, right: 0 };
   /** After an Arena Forge release, a hand must leave the rim once before it counts as a rail post. */
   railNeedsClear: Record<Side, boolean> = { left: false, right: false };
+  /** Last frame's palm position per hand (w = 0 until seen), for the rail's stillness test. */
+  private railPrev: Record<Side, { x: number; z: number; w: number }> = { left: { x: 0, z: 0, w: 0 }, right: { x: 0, z: 0, w: 0 } };
   /** Two flat palms on the rim join into one finite, one-hit rail across the bowl. */
   crossguardActive = false;
   crossguardConsumed = false;
@@ -296,7 +301,12 @@ export class HandVerbs {
         // Hands that just let go of the Arena Forge grips are open palms on the rim already: they
         // must leave the rim once before they can post a rail.
         if (!onRim) this.railNeedsClear[side] = false;
-        accepted = onRim && !this.railNeedsClear[side];
+        // A rail post is a palm set down and held, not a hand passing over the rim on its way to a
+        // grip or a top: it must be nearly still.
+        const prev = this.railPrev[side];
+        const speed = prev.w > 0 && this.m.frameDt > 0 ? Math.hypot(palm.x - prev.x, palm.z - prev.z) / this.m.frameDt : Infinity;
+        this.railPrev[side] = { x: palm.x, z: palm.z, w: 1 };
+        accepted = onRim && !this.railNeedsClear[side] && speed < RAIL_STILL;
         if (accepted) {
           this.palmRailAngles[side] = Math.atan2(palm.z, palm.x);
           this.palmRailGrace[side] = 0.22;
