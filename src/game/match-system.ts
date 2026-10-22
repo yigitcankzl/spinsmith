@@ -1904,7 +1904,7 @@ export class MatchSystem extends createSystem({
         const L = this.arena.layout;
         const r = rimRadius(L, -Math.PI / 2);
         this.rimGauge.fit(r, this.arena.height(0, -r * 0.97) + WALL_HEIGHT[L.wall] + 0.002, this.stage.rotation.y, MATCH_HEAT);
-        this.rimGauge.update(this.mine.spin, this.theirs.spin, [this.bar.fillColor(0), this.bar.fillColor(1)], this.barPoints[0], this.barPoints[1], MATCH_HEAT, dt);
+        this.rimGauge.update(this.mine.spin, this.theirs.spin, [this.bar.fillColor(0), this.bar.fillColor(1)], this.barPoints[0], this.barPoints[1], MATCH_HEAT, dt, COMFORT.bigText ? BIG_TEXT : 1);
         this.rimGauge.setLabels(this.rival.name, MATCH_HEAT);
         this.rimGauge.root.visible = true;
       }

@@ -465,9 +465,10 @@ export class RimGauge {
     });
   }
 
-  /** Each frame: spin 0..1 per side, the bar's fill colours, and the points toward the match. */
-  update(mine: number, theirs: number, colors: [Color, Color], myPoints: number, theirPoints: number, toWin: number, dt: number) {
+  /** Each frame: spin 0..1 per side, the bar's fill colours, the points toward the match, and the labels' text scale (Large text). */
+  update(mine: number, theirs: number, colors: [Color, Color], myPoints: number, theirPoints: number, toWin: number, dt: number, textScale = 1) {
     this.t += dt;
+    for (const label of this.labels) label.scale.setScalar(textScale);
     const v = [mine, theirs];
     for (const i of [0, 1] as const) {
       const k = Math.max(0, Math.min(1, v[i]));
