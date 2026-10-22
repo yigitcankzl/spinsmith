@@ -3689,7 +3689,8 @@ export class MatchSystem extends createSystem({
     // A wall higher than the standard one lifts them clear of it.
     const lift = Math.max(0, WALL_HEIGHT[L.wall] - WALL_HEIGHT.standard);
     this.bar.mesh.position.y = (BAR_Y + lift) * grow;
-    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift) * grow;
+    // On a result the bar shows its full plate (XP row): the card rides a little higher to clear it.
+    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift + (this.phase === 'result' ? HUD.resultLift : 0)) * grow;
     // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
     this.stamp.mesh.rotation.set(0, 0, 0);
     if (this.stamp.pin) {
