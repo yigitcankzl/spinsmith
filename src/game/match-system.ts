@@ -5757,8 +5757,12 @@ export class MatchSystem extends createSystem({
   }
 
   /** The tool a hand holds this frame, for gesture ownership (Arena Forge holds both hands). */
+  private sealWorld = new Vector3();
   private heldTool(side: Side): HeldTool | null {
     if (this.overforgeHeld === side || this.overforgeControl?.side === side) return 'overforge';
+    // A pinch on the ready seal (it docks over the bowl floor) is the seal's, not a ramp.
+    if (this.overforgeMode === 'ready' && this.overforgeSeal.visible
+      && this.hands[side].pinchSmooth.distanceTo(this.overforgeSeal.getWorldPosition(this.sealWorld)) <= SEAL_GRAB) return 'overforge';
     if (this.emberHeld === side) return 'ember';
     if (this.forgeWheelHeld === side) return 'wheel';
     if (this.arenaMorphing) return 'forge';

@@ -946,11 +946,14 @@ export function installDriver() {
       if (g.phase !== 'fight' || g.forgeBar.value < 0.999) throw new Error('ultimate is not ready');
       for (let i = 0; i < 80 && !g.overforgeSeal.visible; i++) await wait(0.025);
       if (!g.overforgeSeal.visible) throw new Error('forge seal did not rise');
-      const from = g.overforgeSeal.getWorldPosition(new Vector3());
+      // The seal is still settling into its dock (and bobbing): follow it rather than a frozen point,
+      // and hold still a beat so the smoothed pinch point arrives too.
+      const seal = () => g.overforgeSeal.getWorldPosition(new Vector3());
       const top = at === 'rival' ? g.theirs : at === 'mine' ? g.mine : null;
       const target = top ? { x: top.x, z: top.z } : { ...(at as { x: number; z: number }) };
-      await glide(side, 'pinch', above(from, 0.06), 0.25, 0);
-      await glide(side, 'pinch', from, 0.14, 0);
+      await glide(side, 'pinch', () => above(seal(), 0.06), 0.25, 0);
+      await glide(side, 'pinch', seal, 0.14, 0);
+      await glide(side, 'pinch', seal, 0.12, 0);
       await setPinch(side, true);
       await glide(side, 'pinch', above(local(target.x, target.z, 0), 0.07), 0.35);
       await glide(side, 'pinch', local(target.x, target.z, -0.008), 0.16, pinchNow[side], 'linear');
