@@ -41,6 +41,8 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 | 5 | Art / video | 6 / 5 → pending | Second cut over the CC0 360° café backdrop (wooden table, skinned hands; labelled as a backdrop): DESK KO front and side, first-match rip, flick, seal stamp, first-match win cards; `spinsmith-reel-room-1080p60.mp4` 45.5 s | night-trailer.sh |
 | 6 (03:45–04:17) | Solid / code structure | 6 → pending | match-system.ts 9,672 → 7,997 lines: hand-verbs.ts (Crossguard, Gust, Ember), desk-play.ts (edge arcs, drop sides, staged DESK KO, verdict, Outer Ring), result-rewards.ts, online-duel.ts; byte-identical bodies via a compiler-driven rewrite; desk-ko-first, desk-ko, desk-guard, combat-readability, room-matrix pass on the split | 97c74bc…6b9eba6 |
 | 6 | Solid (probe hygiene) | — | Found: hover cards are teaching copy (shown only while the guide runs), so intent-preview depended on the save; drive resets resurrected a match via the resume snapshot; flick/rub drivers reached through the bowl floor (a groove). All fixed in the probes/driver. `HANDS_ISOLATE=1` (fresh page per mode) exposed a cold-start forge-wheel failure (turn ≥0.35 reached, charge not spent) — open. Sequential `check:hands` still fails ~1 in 2 runs on a varying mode (rub / crossguard double charge) — open | several |
+| 6 re-score (04:25) | Fresh full judge | Mean 6.5 (baseline 5.75), assuming Stage One gaps closed: Innovation 7.6, Experience 6.6, Technical 5.5, Polish 6.2; submission text 7, video 5, images 4 (it looked at the 10-15 store folder) | Split judged clean (every moved line re-appears with `this.m.`); open: check:hands double charge, forge-wheel cold start. Fixed now: README layout lists the new modules, gaze called a head-ray assist, label statement per cut | docs |
+| 7 (04:25–04:45) | Video / images | 5 / 4 → pending | Room cut 53.9 s: DESK KO, hub, first-match rip, DESK KO side, flick, seal stamp, four-top brawl, forge, workshop (all over the backdrop), arenas (grey), first-match win cards; 11 stills in `stills-room/` | night-trailer.sh |
 
 ## Backlog
 - [x] Staged match-1 DESK KO in the deciding round (edge pulse, prompt, slow-mo), `matches=0` probe, tray fallback (Passthrough 5, take-it-away 4, wow)
@@ -76,5 +78,5 @@ Baseline: judge-report.md (2026-10-22, HEAD 2108a38, mean 5.75).
 - [x] First-five "seal stamp did not spend": both — the seal pinch raised a ramp (game, fixed) and the driver aimed at a settling seal (fixed)
 - [ ] Flick + groove double charge in long check:hands sequences (1 in ~6)
 - [x] Hub/home label diet (UI/UX 7)
-- [x] Store stills from the current build, IWER-labelled (Images 4)
+- [x] Stills from the current build, IWER-labelled: `~/Desktop/spinsmith-videos/night-2026-10-22/stills/` and `stills-room/` (the older store folder is untouched)
 - [ ] check:hands: rub / crossguard double charge in sequence (~1 in 2 runs), forge-wheel cold start under HANDS_ISOLATE=1
