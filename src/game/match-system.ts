@@ -1,6 +1,6 @@
 import { AdditiveBlending, NormalBlending, BufferGeometry, CircleGeometry, DepthOccludable, DoubleSide, EnvironmentRaycastTarget, Shape, ShapeGeometry, Vector2, Float32BufferAttribute, createSystem, CylinderGeometry, Group, Matrix4, ConeGeometry, Mesh, MeshBasicMaterial, Object3D, OcclusionShadersMode, OctahedronGeometry, PlaneGeometry, Quaternion, RaycastSpace, RingGeometry, TorusGeometry, Vector3, VisibilityState, XRAnchor, XRPlane } from '@iwsdk/core';
 import type { Entity } from '@iwsdk/core';
-import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playXp, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish, playRub } from './audio.js';
+import { CordTone, duck, setAudioFrame, ForgeLoop, playGong, playHover, playLand, playQuench, playTell, playBarFull, playCupCatch, playLocked, playMachine, playStrike, playPick, playPlace, playShapeHit, playSling, playThock, playUltimateSignature, setAudioPaused, applySound, playLevelUp, playUnlock, playBurst, playClash, playDash, playLaunch, playOver, playPocket, playResult, playStamp, playTick, playTopple, SpinHum, playTouchdown, playScrape, playMatch, playSwish, playRub } from './audio.js';
 import { COMFORT, comfortSummary, nextComfort, SAFE_COLORS, toggleComfort, warnColor } from './comfort.js';
 import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
@@ -16,14 +16,14 @@ import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
 import { CROSSGUARD_LIVE, crossguardSling, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguard, crossguardCrosses, emberBumper, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, palmGust, palmGustCrosses, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
-import { Forge, FORGE_SINK, itemKey, itemModel, loadBuild, ROWS, saveBuild, sealModel } from './forge.js';
-import { FEATS, MARK, Progress, VERB_CARD, VERB_RELEASE, verbReleasedAt } from './progress.js';
+import { Forge, FORGE_SINK, loadBuild, saveBuild, sealModel } from './forge.js';
+import { FEATS, MARK, Progress, VERB_RELEASE } from './progress.js';
 import { CLAIM, LESSON, lessonText } from './lessons.js';
 import { HUB_NOTE } from './hub-copy.js';
 import type { OpeningZone, ReleasedVerb } from './progress.js';
 import { rematchAdvice } from './mastery.js';
-import { dailyOrder, localDate, orderMet } from './orders.js';
-import { addDays, comeBackCard } from './come-back.js';
+import { dailyOrder, localDate } from './orders.js';
+import { addDays } from './come-back.js';
 import { nextArena } from './rotation.js';
 import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
@@ -37,10 +37,10 @@ import { edgeDistance, fitToTable, insidePoly, RIM_MARGIN } from './room.js';
 import { rayExit } from './desk-edge.js';
 import { TableTouch } from './table-touch.js';
 import type { XZ } from './room.js';
-import { allBuilds, buildName, edgeOf, NAMED_BUILDS, circuitOf, CIRCUITS, CORES, statsOf, EMBLEM_COLORS, EMBLEM_NAMES, PRESETS, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
+import { allBuilds, buildName, edgeOf, NAMED_BUILDS, circuitOf, CIRCUITS, statsOf, PRESETS, RINGS, RIVALS, SEAL_NAMES, ringOf, roleOf, specFromBuild, TIPS } from './parts.js';
 import type { Rival } from './parts.js';
 import type { TopBuild } from './parts.js';
-import { ArenaView, ChargePips, Cord, Impacts, Label, miniArena, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, FingerStreak, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
+import { ArenaView, ChargePips, Cord, Impacts, Label, OPPONENT_COLOR, ROOM, PALM, GhostHand, ShapeMarks, SOFT_SHADOW, Sparks, Pillar, Stamp, TEAM_MINE, Trails, FingerStreak, TEAM_RIVAL, TopView, WALL_HEIGHT } from './visuals.js';
 import { BRASS } from './materials.js';
 import type { ShapeMarkSpec } from './visuals.js';
 import { behindOn, SHAPE_SIZE, SHAPING, ShapingCharges, StrikeBar } from './shaping.js';
@@ -57,7 +57,7 @@ import type { ArenaForgeAction, ArenaForgeGesture } from './arena-forge.js';
 import { clampGuestSpot, guestPointsBefore, linkFromAddress, sanitizeGuestEvent } from './online.js';
 import type { OnlineLink } from './online.js';
 import type { GuestEvent, PackedShape, Vec3 } from './net.js';
-import { BOUTS, boutSkill, CHAPTERS, MEDAL_TEXT, medalCount, medalOrder, medalsFrom, nextBout, nextGate, nightBout } from './campaign.js';
+import { BOUTS, boutSkill, CHAPTERS, medalOrder, nextBout, nightBout } from './campaign.js';
 import type { Bout } from './campaign.js';
 import { PERFECT_INTERRUPT_WINDOW, SUDDEN_DEATH_AT } from './gameplay-rules.js';
 import { clampedGrooveX, clampedGrooveZ, grooveLength, hasGrooveIntent, GROOVE_MIN_LENGTH } from './hand-tools.js';
@@ -69,8 +69,9 @@ import { commitBlocker, FLICK_AFTER_RELEASE, FLICK_FOLLOW_THROUGH, GROOVE_COMMIT
 import type { HandFacts, HeldTool } from './gesture-owner.js';
 import forgeWheelModel from '../scene-assets/forge-wheel.scene-asset.js';
 import { HandVerbs } from './hand-verbs.js';
-import { ARENA_SCALE, HAND_LOSS_GRACE, DESK_KO_BONUS } from './match-constants.js';
+import { ARENA_SCALE, HAND_LOSS_GRACE, DESK_KO_BONUS, RESULT_TIME, CAUSE_WINDOW, FINISH_WORD } from './match-constants.js';
 import { DeskPlay } from './desk-play.js';
+import { ResultRewards } from './result-rewards.js';
 /** Seconds one shaping charge keeps a Spin Rub open, and the pause before rubbing can spend another. */
 const RUB_WINDOW = 1.2;
 const RUB_REOPEN = 0.4;
@@ -113,18 +114,13 @@ const STEEP_SPIN = 0.12;
 const SHAPE_GRAB = 0.05;
 /** Keep near-rim floor pinches available for ramps; only the physical outer lip claims a rim grip. */
 const RIM_GRAB_MIN = 0.9;
-
-const RESULT_TIME = 4;
 /** A knockout replay: this many sim steps (2 s) recorded, played back at this speed. */
 const REPLAY_STEPS = 240;
 const REPLAY_SPEED = 0.4;
 /** A replay step: per top x, z, angle, wobble, damage, spin, vx, vz, kick, kickX, kickZ; then the step's clash (strength, x, z). */
 const REC_TOP = 11;
 const REC = 2 * REC_TOP + 3;
-/** A finish this soon (s) after the player's shape is credited to it. */
-const CAUSE_WINDOW = 1.5;
 const RIVAL_TELL_CODE: Record<RivalMove, number> = { charge: 1, quake: 2, pull: 3 };
-const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', burst: 'SHATTER', spin: 'OUTLAST' };
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
 /** A one-hand rim pull waits this long for the other hand before it can become a spring. */
@@ -242,6 +238,19 @@ type RawPlane = { orientation?: string; semanticLabel?: string; polygon?: DOMPoi
 export class MatchSystem extends createSystem({
   planes: { required: [XRPlane] },
 }) {
+  /** Result rewards: XP, level-ups, marks, medals, orders, unlock reveals and the come-back card (result-rewards.ts). */
+  readonly rewards = new ResultRewards(this);
+  // Probe-visible names (scripts and dev-drive read these on the system).
+  get levelUpText() { return this.rewards.levelUpText; }
+  set levelUpText(v) { this.rewards.levelUpText = v; }
+  get reveals() { return this.rewards.reveals; }
+  set reveals(v) { this.rewards.reveals = v; }
+  get reveal() { return this.rewards.reveal; }
+  set reveal(v) { this.rewards.reveal = v; }
+  get rewardHold() { return this.rewards.rewardHold; }
+  set rewardHold(v) { this.rewards.rewardHold = v; }
+  get comeBackPending() { return this.rewards.comeBackPending; }
+  set comeBackPending(v) { this.rewards.comeBackPending = v; }
   /** Real-room desk play: edge arcs, DESK KO staging and verdict, Outer Ring rescue (desk-play.ts). */
   readonly desk = new DeskPlay(this);
   // Probe-visible names (scripts and dev-drive read these on the system).
@@ -415,7 +424,7 @@ export class MatchSystem extends createSystem({
   /** Ultimates leave a compact, persistent history on the player's real table. */
   roomImprints = new RoomImprints((-PEDESTAL + 0.003) / ARENA_SCALE);
   /** Arenas in rotation (built-ins plus the player's own) and the one in play. */
-  private arenas: ArenaLayout[] = [...ARENAS, ...loadArenas()];
+  arenas: ArenaLayout[] = [...ARENAS, ...loadArenas()];
   private arenaIndex = 0;
   /** The arena builder and the button that opens it. */
   private builder = new Builder({
@@ -475,14 +484,12 @@ export class MatchSystem extends createSystem({
   private quietMatch = false;
   /** The signature two-hand arena move has happened at least once this session. */
   private morphedOnce = false;
-  private xpGained = 0;
-  private lastPerfect = false;
+  lastPerfect = false;
   /** Today's Smith Order, whether this match plays it, and what the order needs to know. */
-  private order: Order | null = null;
-  private orderMatch = false;
-  private cupCaughtInRound = false;
-  private perfectInMatch = false;
-  private levelUpText = '';
+  order: Order | null = null;
+  orderMatch = false;
+  cupCaughtInRound = false;
+  perfectInMatch = false;
   private perfTimer = 0;
   private paused = false;
   /** Seconds the pulling hand has been untracked. */
@@ -501,21 +508,13 @@ export class MatchSystem extends createSystem({
   private fingerStreak = new FingerStreak();
   /** Per hand: the swing is above flick speed (for one whoosh per swing). */
   private swinging: Record<Side, boolean> = { left: false, right: false };
-  private pillar = new Pillar();
+  pillar = new Pillar();
   private trailT = 0;
   private showcase = new Group();
   /** First-session hints: arrows teaching the rip, and a marker where a bump would pay off. */
   private ripArrows = new Group();
   private bumpMark = new Mesh(new RingGeometry(0.012, 0.016, 32).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: GUIDE, transparent: true, depthWrite: false }));
   private bumpHintShown = false;
-  /** Unlocks waiting to be shown over the arena, and the one showing. */
-  private reveals: string[] = [];
-  private reveal: { obj: Object3D; t: number } | null = null;
-  /** One unlock shown per result card (the first session's part first); the rest wait for the next ones. */
-  private revealedHere = false;
-  /** The come-back card (streak, tomorrow) still to show on this match's result. */
-  private comeBackPending = false;
-  private rewardHold = 0;
   /** Home screen buttons, in front of the arena; and the small MENU plate during a match. */
   /** Home: the smithy stations around the arena (top stand, arena rack, anvil). */
   private hub = new Hub();
@@ -562,9 +561,9 @@ export class MatchSystem extends createSystem({
   /** Builds for the coming round are chosen once per round, not on every reset. */
   private typesPicked = false;
   /** A match just ended: the next ready screen moves on to the next arena. */
-  private matchOver = false;
+  matchOver = false;
   /** Your build (from the forge) and the opponent's; each side's view is rebuilt when its build changes. */
-  private myBuild: TopBuild = loadBuild();
+  myBuild: TopBuild = loadBuild();
   private theirBuild: TopBuild = { ...PRESETS[1].build, spin: -1 };
   myView!: TopView;
   theirView!: TopView;
@@ -735,7 +734,7 @@ export class MatchSystem extends createSystem({
   causeCue = { t: 0, stage: 0 as 0 | 1 | 2 | 3, kind: '', sx: 0, sz: 0, tx: 0, tz: 0 };
   private firstHeroRamp = false;
   /** Seconds left of a won match's celebration (sparks round the rim). */
-  private celebrate = 0;
+  celebrate = 0;
   /** This match you were match point down at some time (a win is a comeback). */
   private wasDown = false;
   /** Shape marks, pooled for updateShapes, and the floor height lookup they use. */
@@ -847,7 +846,7 @@ export class MatchSystem extends createSystem({
   private replayAt = 0;
   private replayCount = 0;
   /** A knockout replay playing (in recorded steps, at REPLAY_SPEED), with stand-in tops to draw. */
-  private replay: { t: number; frames: Float32Array; n: number; out: [Top, Top]; at: number } | null = null;
+  replay: { t: number; frames: Float32Array; n: number; out: [Top, Top]; at: number } | null = null;
   /** A knockout's still frame (s left), and the last light hit's punch on the tops (sim s). */
   koFreeze = 0;
   private lastPop = -1;
@@ -857,7 +856,7 @@ export class MatchSystem extends createSystem({
   /** The turntable's turn during a replay (radians). */
   private turn = 0;
   /** This match so far, for the report at home: each round's finish (- = the rival's), best rip, XP. */
-  private matchLog = { rounds: [] as string[], rip: 0, xp: 0, won: false, score: '' };
+  matchLog = { rounds: [] as string[], rip: 0, xp: 0, won: false, score: '' };
   /** Where this match's current round started (match-resume.ts): written on pause, session end and page hide. */
   private resumeSnap: MatchSnapshot | null = null;
   private title = titleMesh('SPINSMITH', 0.26, 0.06);
@@ -871,12 +870,12 @@ export class MatchSystem extends createSystem({
   private round = 0;
   /** Match score in heat: first to MATCH_HEAT wins the match. */
   private myPoints = 0;
-  private theirPoints = 0;
+  theirPoints = 0;
   elapsed = 0;
   private pressureShown = false;
   private strikeWindowShown = false;
   accumulator = 0;
-  private resultTimer = 0;
+  resultTimer = 0;
   time = 0;
   frameDt = 0;
   /** Which hand holds the cord, and pull bookkeeping. */
@@ -1123,8 +1122,7 @@ export class MatchSystem extends createSystem({
   private afterHome: (() => void) | null = null;
   /** The address's online room was opened (it waits for the first session to end). */
   private onlineTried = false;
-  private bout: Bout | null = null;
-  private boutEarned = 0;
+  bout: Bout | null = null;
   /** This match as an echo for a friend's game: each rip and each two-hand forge (echo.ts). */
   private echoRec: Echo = { rips: [], forges: [] };
   /** A friend's recorded match the Challenger replays (rips and forges), or null. */
@@ -1892,7 +1890,7 @@ export class MatchSystem extends createSystem({
         level: p.level,
         rank: p.rank,
         fraction: p.fraction,
-        gained: this.phase === 'result' ? this.xpGained : 0,
+        gained: this.phase === 'result' ? this.rewards.xpGained : 0,
         show: this.phase === 'result',
       }, this.extras.length ? this.brawlBarField() : null);
       this.bar.animate(this.mine.spin, this.theirs.spin, dt);
@@ -1935,7 +1933,7 @@ export class MatchSystem extends createSystem({
     this.updateGuide();
     this.updateRivalGhost(dt);
     for (const c of this.showcase.children) c.rotation.y += dt * 0.4;
-    this.updateRewards(dt);
+    this.rewards.updateRewards(dt);
     this.updateShapes();
     this.updateCauseCue(dt);
     this.syncUiHierarchy();
@@ -2303,7 +2301,7 @@ export class MatchSystem extends createSystem({
   }
 
   /** What a Smith Order can ask of this player now (orders.ts OrderContext). */
-  private orderContext() {
+  orderContext() {
     return {
       rivals: RIVALS.filter((r) => r.level <= this.progress.level).map((r) => r.name),
       arenas: ARENAS.filter((a) => this.progress.isUnlocked(`arena:${a.name}`)),
@@ -2312,13 +2310,6 @@ export class MatchSystem extends createSystem({
       table: !!ROOM.poly,
       medal: medalOrder(this.progress.bouts, !!ROOM.poly) ?? undefined,
     };
-  }
-
-  /** The match result's last card: the day streak, tomorrow's Smith Order and the next bout. */
-  private comeBackText() {
-    const today = localDate(new Date());
-    const p = this.progress;
-    return comeBackCard(p.streak(today), dailyOrder(addDays(today, 1), this.orderContext()), nextBout(p.bouts, p.matches % 2 === 0, p.matches));
   }
 
   /** The first session's note at home: where to reach next ('' once the guide is done). */
@@ -2396,7 +2387,7 @@ export class MatchSystem extends createSystem({
       const bout = o.bout ? BOUTS.find((b) => b.id === o.bout) : null;
       if (bout && !this.online && bout.arena === this.arena.layout.name && bout.rival === this.rival.name) {
         this.bout = bout;
-        this.boutEarned = 0;
+        this.rewards.boutEarned = 0;
         // The bout as it is: a crowded one brings its crowd (and a pegs' brawl gives way to it).
         this.clearBrawl();
         if (bout.crowd?.length) this.setupBrawl(bout.crowd.length, bout.crowd);
@@ -3390,7 +3381,7 @@ export class MatchSystem extends createSystem({
     // The first session's guided rematch is still the first bout.
     const planned = last ?? this.nextBoutPick ?? (this.progress.guide !== 'done' || (again && this.progress.matches <= 1) ? BOUTS[0] : null);
     this.bout = !friend && (again || !rival) && planned && planned.rival === this.rival.name && planned.arena === this.arena.layout.name ? planned : null;
-    this.boutEarned = 0;
+    this.rewards.boutEarned = 0;
     this.nextRival = null;
     this.nextBoutPick = null;
     // A brawl is free play: no bout, no order; a friend's challenge and the first session stay duels.
@@ -7436,12 +7427,12 @@ export class MatchSystem extends createSystem({
       this.online.result(v, heat);
     }
     this.phase = 'result';
-    this.comeBackPending = false;
+    this.rewards.comeBackPending = false;
     this.desk.deskKoScored = deskKo;
     if (deskKo) this.desk.setDeskKoStage(3);
     this.resultTimer = RESULT_TIME;
     // One unlock per result card; the rest wait for the next ones.
-    this.revealedHere = false;
+    this.rewards.revealedHere = false;
     if (this.demo) {
       // Workshop demo: say how it ended, no points.
       const loser = v === 1 ? this.theirs : this.mine;
@@ -7477,14 +7468,14 @@ export class MatchSystem extends createSystem({
       const score = `Heat ${this.myPoints} - ${this.theirPoints}`;
       const decided = this.myPoints >= MATCH_HEAT || this.theirPoints >= MATCH_HEAT;
       if (!decided && loser.finish === 'spin') this.resultTimer = 1.15;
-      this.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
+      this.rewards.earn(v === 1, loser, decided, decided && this.myPoints > this.theirPoints);
       if (deskKo) this.matchLog.rounds[this.matchLog.rounds.length - 1] = 'DESK KO';
       if (decided) {
         const youWon = this.myPoints > this.theirPoints;
         playMatch(youWon);
         this.matchLog.won = youWon;
         this.matchLog.score = `${this.myPoints} - ${this.theirPoints}`;
-        this.comeBackPending = !this.online;
+        this.rewards.comeBackPending = !this.online;
         if (youWon && this.theirPoints === 0) this.featDone('flawless');
         if (youWon && this.wasDown) this.featDone('comeback');
         if (youWon && !this.demo && this.progress.wonMatchIn(this.arena.layout.name)) this.featDone('everyArena');
@@ -7735,100 +7726,6 @@ export class MatchSystem extends createSystem({
     }
     if (!ghost) this.ghost.hide();
     if (!forgeGhost) this.forgeGhost.hide();
-  }
-
-  /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */
-  private earn(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
-    const before = this.progress.level;
-    const award = this.progress.award({ won, finish: loser.finish, pocketPoints: loser.pocketPoints, perfect: this.lastPerfect && won, matchOver, matchWon, rival: loser === this.theirs || !won ? this.rival.name : undefined });
-    this.xpGained = award.gained;
-    this.matchLog.xp += award.gained;
-    this.matchLog.rounds.push(`${won ? '' : '-'}${FINISH_WORD[loser.finish ?? 'spin']}`);
-    playXp();
-    console.log(`[XP] +${award.gained} -> Lv ${this.progress.level} (${(this.progress.fraction * 100).toFixed(0)}%)${award.unlocked.length ? ` unlocked ${award.unlocked.join(', ')}` : ''}`);
-    if (award.levels.length) {
-      playLevelUp();
-      for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
-      if (COMFORT.flashes) this.pillar.play(this.arena.layout, maxRim(this.arena.layout) + 0.01, this.arena.floorHeight(1), 0xffd34a);
-      this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
-      if (!this.quietFirst || matchOver) this.stamp.later(`LEVEL ${this.progress.level}!`, this.progress.rank.toUpperCase(), 'mine', 1.2, 1.5);
-    }
-    // Match 1 reveals only its NEW MOVE: the Spur tip is the home note's next step, the rest wait on the board.
-    this.reveals.push(...(this.quietFirst ? [] : award.unlocked));
-    // The first session's own part goes first: the forge calls for it next.
-    this.reveals.sort((a, b) => Number(b === 'tip:spur') - Number(a === 'tip:spur'));
-    // One new hand verb per completed match: its card leads the reveals (after the first part).
-    const verb = matchOver && !this.demo ? verbReleasedAt(this.progress.matches) : undefined;
-    if (verb) this.reveals.splice(this.reveals[0] === 'tip:spur' ? 1 : 0, 0, `move:${verb}`);
-    // Online matches give XP for your own result, but no marks, bouts, orders or champions.
-    if (!this.demo && !this.online) this.trackComeBack(won, loser, matchOver, matchWon);
-    // The forge is earned only after the player has actually raised a ramp. Finishing a match
-    // without the hero verb repeats that one lesson instead of silently graduating it.
-    if (matchOver && this.progress.guide === 'match') this.progress.advance('forge');
-  }
-
-  /**
-   * What outlives the match: marks against this rival, a champion for a won match, and today's
-   * order when this match plays it and the round or match fulfils it.
-   */
-  private trackComeBack(won: boolean, loser: Top, matchOver: boolean, matchWon: boolean) {
-    const cause = this.lastShape && this.elapsed - this.lastShape.t < CAUSE_WINDOW ? this.lastShape.kind : null;
-    let scarChanged = false;
-    if (won && cause) {
-      this.progress.recordScar(this.myBuild, 'shapes');
-      scarChanged = true;
-    }
-    if (matchWon) {
-      this.progress.recordScar(this.myBuild, 'wins');
-      scarChanged = true;
-    }
-    if (scarChanged) this.myView.scars(this.progress.scarsFor(this.myBuild));
-    const ko = loser.finish === 'pocket' || loser.finish === 'over' || loser.finish === 'burst';
-    // In a brawl a bot's knockout is no mark against the rival (nor its circuit's clearing).
-    const rivalOut = loser === this.theirs || !this.extras.length;
-    const fresh = won && rivalOut ? this.progress.mark(this.rival.name, (matchWon ? MARK.beaten : 0) | (ko ? MARK.knockout : 0) | (cause ? MARK.shape : 0)) : 0;
-    // Beating a circuit's champion for the first time clears the circuit: a moment of its own.
-    const c = circuitOf(this.rival.name);
-    if (fresh & MARK.beaten && c?.champion) {
-      // In a campaign bout the map says it (BOSS DOWN, a chapter opening, the finale); free play keeps this stamp.
-      if (!this.bout) {
-        this.stamp.later(`${c.circuit.toUpperCase()} CLEARED!`, `${this.rival.name.toUpperCase()} IS BEATEN`, 'mine', 2.2, 1.5);
-        playLevelUp();
-      }
-      const feat = c.circuit.startsWith('Cinder') ? 'cinder' : c.circuit.startsWith('Iron') ? 'iron' : 'crown';
-      // In the campaign the chapter's boss bout earns it (trackBout); a rival met earlier in a bout does not.
-      if (!this.bout) this.featDone(feat);
-    }
-    if (matchWon) this.progress.recordChampion(this.myBuild);
-    const event = {
-      rival: this.rival.name,
-      arena: this.arena.layout.name,
-      wonRound: won,
-      finish: loser.finish,
-      cause,
-      cupCaughtInRound: this.cupCaughtInRound,
-      matchWon,
-      shutout: matchWon && this.theirPoints === 0,
-      role: roleOf(specFromBuild(this.myBuild)),
-      perfectInMatch: this.perfectInMatch,
-      deskKo: this.desk.deskKoScored,
-    };
-    if (this.bout && !this.demo) this.trackBout(this.bout, event, matchOver, matchWon);
-    const o = this.order;
-    if (!this.orderMatch || !o || this.progress.hasOrder(o.date)) return;
-    const met = orderMet(o, event);
-    if (!met) return;
-    const before = this.progress.level;
-    const a = this.progress.completeOrder(o.date);
-    this.progress.recordScar(this.myBuild, 'orders');
-    this.myView.scars(this.progress.scarsFor(this.myBuild));
-    console.log(`[ORDER] done: ${o.text} -> ${this.progress.stamps} stamps${a.unlocked.length ? `, unlocked ${a.unlocked.join(', ')}` : ''}`);
-    this.reveals.unshift(`stamp:${this.progress.stamps}`);
-    this.reveals.push(...a.unlocked);
-    if (a.levels.length && !this.levelUpText) {
-      playLevelUp();
-      this.levelUpText = `LEVEL ${this.progress.level}!\n${this.progress.rank}${this.progress.level > before + 1 ? ` (+${this.progress.level - before})` : ''}`;
-    }
   }
 
   /** Opens the online duel the address asks for (after the first session), and wires its messages. */
@@ -8398,107 +8295,6 @@ export class MatchSystem extends createSystem({
     return 1;
   }
 
-  /**
-   * Medals earned in a bout this round build up through the match and are kept when it ends (won
-   * or lost: a medal earned is earned). Each new one stamps in turn, then the map says what opened.
-   */
-  private trackBout(bout: Bout, event: Parameters<typeof medalsFrom>[1], matchOver: boolean, matchWon: boolean) {
-    const earned = medalsFrom(bout, event, !!ROOM.poly);
-    // A medal earned mid-match is said at once (feedback while the move is fresh); the match end sums up.
-    const now = earned & ~1 & ~this.boutEarned & ~(this.progress.bouts[bout.id] ?? 0);
-    this.boutEarned |= earned;
-    if (!matchOver) {
-      bout.medals.forEach((m, i) => {
-        if (now & (2 << i) && !this.quietFirst) this.stamp.later('MEDAL!', MEDAL_TEXT[m].toUpperCase(), 'mine', 1.1, 1.1);
-      });
-      return;
-    }
-    const before = nextBout(this.progress.bouts);
-    const { fresh, unlocked } = this.progress.recordBout(bout.id, this.boutEarned, matchWon);
-    // One stamp for the bout (the queue keeps three; feats and levels share it), one for a new chapter.
-    const got = bout.medals.filter((_, i) => fresh & (2 << i)).map((m) => MEDAL_TEXT[m].toUpperCase());
-    const have = [1, 2, 4].filter((m) => (this.progress.bouts[bout.id] ?? 0) & m).length;
-    const finale = !!(fresh & 1) && bout === BOUTS[BOUTS.length - 1];
-    if (fresh & 1 && bout.boss) this.progress.feat((['cinder', 'iron', 'crown'] as const)[bout.chapter - 1]);
-    // The finale's own stamps replace the bout's (the stamp queue holds three).
-    if (fresh && !finale) {
-      const word = fresh & 1 ? (bout.boss ? 'BOSS DOWN!' : 'BOUT WON!') : 'MEDAL!';
-      this.stamp.later(word, `${bout.id} · ${have}/3 MEDALS${got.length ? ` · ${got.join(' · ')}` : ''}`, 'mine', 1.6, fresh & 1 && bout.boss ? 1.5 : 1.2);
-      playStamp();
-    }
-    // The campaign's end: the last boss beaten for the first time is the game's finale.
-    if (finale) {
-      const medals = medalCount(this.progress.bouts);
-      this.stamp.later('THE CROWN IS YOURS', 'EVERY CIRCUIT CLEARED', 'mine', 2.4, 1.6);
-      this.stamp.later('SPINSMITH', `${medals} OF ${BOUTS.length * 3} MEDALS`, 'mine', 2, 1.4);
-      this.levelUpText = `You took the Crown.\nThanks for playing. Medals, orders and brawls await`;
-      this.celebrate = Math.max(this.celebrate, 4);
-      playLevelUp();
-    }
-    const after = nextBout(this.progress.bouts);
-    // A boss beaten without the medals to open the next chapter: say what is missing, right here.
-    if (fresh & 1 && bout.boss && !finale && (!after || after.chapter <= bout.chapter) && nextGate(this.progress.bouts)) this.stamp.later('NOT YET', nextGate(this.progress.bouts).toUpperCase(), 'neutral', 1.8, 1.1);
-    if (after && before && after.chapter > before.chapter) {
-      this.stamp.later(`${CHAPTERS[after.chapter - 1].name.toUpperCase()} OPEN!`, `NEXT: ${after.rival.toUpperCase()} IN ${after.arena.toUpperCase()}`, 'mine', 1.8, 1.5);
-      playLevelUp();
-    }
-    if (!this.quietFirst) this.reveals.push(...unlocked);
-    if (import.meta.env.DEV) console.log(`[BOUT] ${bout.id} ${matchWon ? 'won' : 'lost'} bits ${this.progress.bouts[bout.id] ?? 0} (+${fresh}) next ${after?.id ?? '-'}${nextGate(this.progress.bouts) ? ` · ${nextGate(this.progress.bouts)}` : ''}`);
-  }
-
-  /** Shows a level-up, then each new unlock spinning over the arena before it flies off. */
-  private updateRewards(dt: number) {
-    if (this.levelUpText && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4 && (this.matchOver || !this.quietFirst)) {
-      this.label.set(this.levelUpText);
-      this.levelUpText = '';
-      // The level-up reads before the first unlock replaces it.
-      this.rewardHold = 1.4;
-      this.resultTimer = Math.max(this.resultTimer, 1.4 + 2.8);
-    }
-    if (this.rewardHold > 0) this.rewardHold -= dt;
-    // Unlocks wait for the match's end (never between rounds), then show one after another.
-    else if (!this.reveal && !this.replay && this.matchOver && this.reveals.length && this.phase === 'result' && this.resultTimer < RESULT_TIME - 1.4) {
-      this.revealedHere = true;
-      const key = this.reveals.shift()!;
-      const obj = unlockModel(key, this.arenas);
-      this.stage.add(obj);
-      this.reveal = { obj, t: 0 };
-      if (key.startsWith('stamp:')) playStamp();
-      else playUnlock();
-      this.label.set(revealText(key));
-      // Keep the result up while it shows.
-      this.resultTimer = Math.max(this.resultTimer, 2.8);
-    } else if (this.comeBackPending && !this.reveal && !this.replay && this.matchOver && !this.reveals.length && this.phase === 'result' && this.resultTimer < 1.2) {
-      // Once the result and every unlock have been read: why to come back tomorrow.
-      this.comeBackPending = false;
-      this.label.set(this.comeBackText());
-    }
-    const r = this.reveal;
-    if (!r) return;
-    r.t += dt;
-    // A pinch moves on to the next one.
-    if ((this.hands.left.justPinched || this.hands.right.justPinched) && r.t > 0.4 && r.t < 2) r.t = 2;
-    const grow = Math.min(1, r.t / 0.3);
-    const leave = Math.max(0, (r.t - 2) / 0.6);
-    // Low over the arena's middle, clear of the card and the match bar behind it.
-    r.obj.position.set(0, 0.055 + 0.008 * Math.sin(r.t * 3) + leave * 0.3, 0.03);
-    r.obj.rotation.y += dt * 2.5;
-    r.obj.scale.setScalar(1.6 * grow * (1 - leave));
-    if (leave >= 1) {
-      r.obj.removeFromParent();
-      // Its own geometry. ponytail: materials stay (most are shared from materials.ts, and disposing
-      // one forces a recompile stall); a few per-reveal ones leak, fine at one reveal per unlock.
-      r.obj.traverse((o) => {
-        const m = o as Mesh;
-        if (m.isMesh) m.geometry.dispose();
-      });
-      this.reveal = null;
-      // Its card stays readable a moment after the model flies off (a stamp may have covered its start).
-      this.rewardHold = 1.5;
-      this.resultTimer = Math.max(this.resultTimer, 1.5 + 1.3);
-    }
-  }
-
   /** A small dot where the pointing hand's ray (or, in dev, the gaze) meets the floor. */
   private updateReticle() {
     const h = this.hands.right.hasRay ? this.hands.right : this.hands.left;
@@ -8570,63 +8366,6 @@ export class MatchSystem extends createSystem({
     }
     return false;
   }
-}
-
-/** A readable name for an unlock key. */
-/** The card shown while an unlock (or an order stamp) spins over the arena. */
-function revealText(key: string): string {
-  const [kind, id] = key.split(':');
-  if (kind === 'rival') return `NEW RIVAL!\n${id} · ${RIVALS.find((r) => r.name === id)?.style ?? ''}`;
-  if (kind === 'stamp') return `ORDER DONE!\nStamp ${id} in your ledger`;
-  if (kind === 'move') return `NEW MOVE: ${VERB_CARD[id as ReleasedVerb][0]}\n${VERB_CARD[id as ReleasedVerb][1]}`;
-  return `NEW: ${unlockName(key)}\n${unlockBlurb(key)}`;
-}
-
-/** What a new thing does, in one line (so the card says why it matters and where to try it). */
-function unlockBlurb(key: string): string {
-  const [kind, id] = key.split(':');
-  if (kind === 'ring') return RINGS.find((r) => r.id === id)?.blurb ?? '';
-  if (kind === 'core') return CORES.find((c) => c.id === id)?.blurb ?? '';
-  if (kind === 'tip') return TIPS.find((t) => t.id === id)?.blurb ?? '';
-  if (kind === 'seal') return `${SEAL_BLURBS[id as Seal]} · set it in the forge's Combat drawer`;
-  if (kind === 'arena') return ARENAS.find((a) => a.name === id)?.rule ?? 'A new arena in the rotation';
-  if (kind === 'paint') return 'Try it in the forge';
-  if (kind === 'emblem') return 'Pick it in the forge, Look drawer';
-  return '';
-}
-
-function unlockName(key: string): string {
-  const [kind, id] = key.split(':');
-  if (kind === 'paint') return 'New paint';
-  if (kind === 'emblem') return `${EMBLEM_NAMES[Number(id)]} emblem glow`;
-  if (kind === 'ledger') return 'Gilded ledger';
-  if (kind === 'rival') return `${id} rival`;
-  if (kind === 'arena') return `${id} arena`;
-  if (kind === 'seal') return `${SEAL_NAMES[id as Seal]} strike`;
-  const name = kind === 'ring' ? RINGS.find((r) => r.id === id)?.name : kind === 'tip' ? TIPS.find((t) => t.id === id)?.name : kind === 'core' ? CORES.find((c) => c.id === id)?.name : id;
-  return `${name} ${kind}`;
-}
-
-/** The model shown when something is unlocked: the part, a paint pot, or the arena's miniature. */
-function unlockModel(key: string, arenas: ArenaLayout[]): Object3D {
-  const [kind, id] = key.split(':');
-  if (kind === 'arena') return miniArena(arenas.find((a) => a.name === id) ?? arenas[0], true);
-  if (kind === 'seal') return sealModel(id as Seal);
-  if (kind === 'rival') {
-    const r = RIVALS.find((x) => x.name === id);
-    if (r) return new TopView(r.build, OPPONENT_COLOR).root;
-  }
-  if (kind === 'emblem' || kind === 'stamp' || kind === 'ledger' || kind === 'move') {
-    // A struck medallion: the glow's color, the stamp's (or a new move's) orange, or the ledger's gold.
-    const color = kind === 'emblem' ? EMBLEM_COLORS[Number(id)] : kind === 'stamp' || kind === 'move' ? 0xff8a2a : 0xffd34a;
-    const g = new Group();
-    const coin = new Mesh(new CylinderGeometry(0.02, 0.02, 0.004, 32), new MeshBasicMaterial({ color }));
-    coin.rotation.x = Math.PI / 2;
-    g.add(coin);
-    return g;
-  }
-  for (const [, items] of ROWS) for (const item of items) if (itemKey(item) === key) return itemModel(item);
-  return new Group();
 }
 
 /** One-hand forge: how long a lone rim grip is held before the far rim mirrors it (s). */

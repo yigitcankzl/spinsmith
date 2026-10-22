@@ -7,3 +7,7 @@ export const ARENA_SCALE = TUNE.scale;
 export const HAND_LOSS_GRACE = 0.28;
 /** A rival crossing the detected real table edge adds this much heat after a normal ring-out. */
 export const DESK_KO_BONUS = 1;
+export const RESULT_TIME = 4;
+/** A finish this soon (s) after the player's shape is credited to it. */
+export const CAUSE_WINDOW = 1.5;
+export const FINISH_WORD: Record<string, string> = { pocket: 'SLAG', over: 'THROWN', burst: 'SHATTER', spin: 'OUTLAST' };
