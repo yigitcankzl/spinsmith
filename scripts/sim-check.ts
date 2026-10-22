@@ -2197,6 +2197,8 @@ if (DESK_DROP_ON) {
   assert.ok(handOcclusionOn({ ...gate, depthOcclusion: true }), 'still on under real depth occlusion (tops are not depth-occluded)');
   assert.ok(!handOcclusionOn({ ...gate, optOut: true }), 'off with ?nohandocclude');
   assert.ok(!handOcclusionOn({ ...gate, knob: 0 }), 'off with ?occluder=0');
+}
+
 // Hand smoothing (hands.ts pinchSmooth/indexSmooth): the One-Euro filter steadies a still hand,
 // keeps up with a sweep, and forgets a lost hand. Speed verbs never read it (they use the raw joints).
 {
