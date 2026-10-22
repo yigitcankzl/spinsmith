@@ -1553,6 +1553,8 @@ export class ArenaView {
   private readonly warm = new Color(0x8f4728);
   private readonly cold = new Color(0x2c3442);
   private readonly pit = new Color();
+  /** The floor's raised relief: its own colour, lifted toward white. */
+  private readonly relief = new Color();
   private readonly ember = new Color(0xff4a12);
   private readonly tmp = new Color();
   private readonly floorMaterial: MeshStandardMaterial;
@@ -1640,6 +1642,7 @@ export class ArenaView {
     this.disposables = [];
     this.features.clear();
     this.base.set(P.floor);
+    this.relief.set(P.floor).lerp(this.tmp.set(0xffffff), 0.5);
     this.floorMaterial.emissiveIntensity = layout.theme === 'forge' ? 0.32 : 0;
     this.pit.set(P.pit);
     this.railIdle.set(P.rail);
@@ -1937,6 +1940,13 @@ export class ArenaView {
           arena.slope(x, z, SLOPE_TMP);
           const lit = (1 - 0.3 * SLOPE_TMP.x - 0.8 * SLOPE_TMP.z) / Math.sqrt((1 + SLOPE_TMP.x * SLOPE_TMP.x + SLOPE_TMP.z * SLOPE_TMP.z) * 1.73);
           this.tmp.multiplyScalar(Math.max(0.35, Math.min(1.5, 0.25 + lit * 1.1)));
+        }
+        // The floor's own relief is painted in: what stands above a plain bowl is lighter, what sinks
+        // below it darker, so a hill, a terrace, a crater's lip or a ripple reads in a still frame.
+        if (L.floor !== 'bowl' && L.floor !== 'flat' && L.depth > 0) {
+          const rel = (arena.height(x, z) - shape - arena.pocketDip(x, z) - L.depth * Math.min(n, 1.05) ** 2) / L.depth;
+          if (rel > 0) this.tmp.lerp(this.relief, Math.min(0.65, rel * 2.4));
+          else this.tmp.multiplyScalar(1 - Math.min(0.45, -rel * 1.6));
         }
         if (dip > 0) this.tmp.lerp(this.pit, Math.min(1, dip) * 0.8);
         // Embers: outside the shrinking safe zone the floor glows, pulsing.
