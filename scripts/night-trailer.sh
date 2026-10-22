@@ -42,32 +42,29 @@ clip() {
 # The disclosure, big, over the opening shot (not a silent black card).
 EXTRA="drawtext=fontfile=$FONT:text='EMULATOR FOOTAGE':fontcolor=0xff8a2a:fontsize=84:x=(w-text_w)/2:y=h-250:box=1:boxcolor=0x111419@0.8:boxborderw=18:enable='lt(t,2.4)',drawtext=fontfile=$FONT:text='${DISCLOSE:-IWSDK emulator (IWER)  -  not headset footage}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-140:box=1:boxcolor=0x111419@0.7:boxborderw=10:enable='lt(t,2.4)'" \
   clip 00-hook "$NEW/desk-ko-first-side.mp4" 0.4 6.5 "THE ARENA IS THE WEAPON" "Squeeze the bowl / throw the rival off your desk"
-clip 01-match "$NEW/first-match.mp4" 1.0 13.3 "ONE ROUND, UNCUT" "Rip  /  the rival runs to your edge  /  squeeze"
+clip 01-match "$NEW/first-match.mp4" 1.0 12.3 "ONE ROUND, UNCUT" "Rip  /  the rival runs to your edge  /  squeeze"
 clip 02-squeeze "$NEW/close-squeeze.mp4" 0.3 3.2 "TWO HANDS ON THE RIM" "Squeeze / stretch / tilt / twist the live bowl"
 clip 03-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK" "Your fingertip is part of the physics"
 clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"
 clip 05-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal / press it into the bowl"
-# Six arenas, one beat each (IWER stills of the current build, scripts in .tmp/arenas.sh style).
-ARENAS=${ARENAS:-$PWD/artifacts/look/arenas5}
-if [ -d "$ARENAS" ]; then
-  parts=()
-  for i in 03 05 06 10 12 15; do
-    ffmpeg -y -loglevel error -loop 1 -t 0.6 -i "$ARENAS/$i.png" -f lavfi -t 0.6 -i anullsrc=r=48000:cl=stereo \
-      -vf "crop=iw*0.56:ih*0.56:iw*0.22:ih*0.2,scale=${WIDTH}:${HEIGHT}:flags=lanczos,fps=${FPS},drawtext=fontfile=$FONT:text='EVERY ARENA PLAYS ITS OWN WAY':fontcolor=0xffa24a:fontsize=58:x=46:y=38:box=1:boxcolor=0x111419@0.74:boxborderw=15,drawtext=fontfile=$FONT:text='Hills  /  terraces  /  craters  /  ice  /  pits':fontcolor=white:fontsize=31:x=49:y=119:box=1:boxcolor=0x111419@0.62:boxborderw=9,drawtext=fontfile=$FONT:text='$LABEL':fontcolor=white@0.55:fontsize=22:x=w-text_w-28:y=h-42" \
-      -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/arena-$i.mp4"
-    parts+=("arena-$i")
-  done
-fi
+# Four arenas in live play, one beat each (IWER, recorded by .tmp/rec-arenas.sh style drives).
+parts=()
+for f in "$NEW"/arenas/*.mp4; do
+  [ -s "$f" ] || continue
+  n=$(basename "$f" .mp4)
+  clip "arena-$n" "$f" 0.6 1.5 "EVERY ARENA PLAYS ITS OWN WAY" "Hills  /  terraces  /  craters  /  ice  /  pits"
+  parts+=("arena-$n")
+done
 clip 07-forge "$NEW/forge.mp4" 2.8 3.2 "FORGE IT BY HAND" "Drag a part onto your top / it fights differently"
-clip 08-workshop "$NEW/workshop.mp4" 7.6 5.0 "BUILD THE BATTLEGROUND" "Shape the floor / place pits and bumpers"
+clip 08-workshop "$NEW/workshop.mp4" 7.6 3.8 "BUILD THE BATTLEGROUND" "Shape the floor / place pits and bumpers"
 # Filmed wide from a fixed pose: cropped in to the card and the arena.
 PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" clip 085-return "$NEW/match-won-cards.mp4" $(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$NEW/match-won-cards.mp4") - 3.6))") 3.4 "COME BACK TOMORROW" "A day streak and a new order for tomorrow"
 # The end card rings the game's motif (D A F high-D), so the reel never ends in silence.
 ffmpeg -y -loglevel error \
-  -f lavfi -i "color=c=0x111419:s=${WIDTH}x${HEIGHT}:d=2.6:r=${FPS}" \
+  -ss 3.2 -t 2.6 -i "$NEW/desk-ko-first-side.mp4" \
   -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=2.6" \
-  -vf "drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=104:x=(w-text_w)/2:y=(h-text_h)/2-55,drawtext=fontfile=$FONT:text='Your real desk is the ring-out':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=(h/2)+50,drawtext=fontfile=$FONT:text='Hands only  /  Seated  /  Meta Quest Browser':fontcolor=0xe7edf4@0.7:fontsize=32:x=(w-text_w)/2:y=(h/2)+125" \
+  -map 0:v -map 1:a -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}:${HEIGHT},fps=${FPS},gblur=sigma=16,eq=brightness=-0.42:saturation=0.7,drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=104:x=(w-text_w)/2:y=(h-text_h)/2-55,drawtext=fontfile=$FONT:text='Your real desk is the ring-out':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=(h/2)+50,drawtext=fontfile=$FONT:text='Hands only  /  Seated  /  Meta Quest Browser':fontcolor=0xe7edf4@0.7:fontsize=32:x=(w-text_w)/2:y=(h/2)+125,drawtext=fontfile=$FONT:text='$LABEL':fontcolor=white@0.55:fontsize=22:x=w-text_w-28:y=h-42" \
   -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p \
   -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/09-end.mp4"
 
