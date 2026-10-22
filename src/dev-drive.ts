@@ -1009,14 +1009,21 @@ export function installDriver() {
       const dx = bx - ax;
       const dz = bz - az;
       const length = Math.hypot(dx, dz) || 1;
-      const nx = -dz / length;
-      const nz = dx / length;
-      Object.assign(g.theirs, {
-        x: (ax + bx) * 0.5 + nx * 0.035,
-        z: (az + bz) * 0.5 + nz * 0.035,
-        vx: -nx * 0.32,
-        vz: -nz * 0.32,
-        spin: Math.max(0.65, g.theirs.spin),
+      const mx = (ax + bx) * 0.5;
+      const mz = (az + bz) * 0.5;
+      // The rail's normal, pointing out toward the rim it guards.
+      const out = -dz * mx + dx * mz >= 0 ? 1 : -1;
+      const nx = (-dz / length) * out;
+      const nz = (dx / length) * out;
+      // A save: your own top runs out across the rail. (Driving the rival inward across it is not a
+      // counted contact; the hit then came from whichever top the collision sent out first, and a
+      // rival escape is slung, not refunded, so the probe flaked between a refund and none.)
+      Object.assign(g.mine, {
+        x: mx - nx * 0.035,
+        z: mz - nz * 0.035,
+        vx: nx * 0.32,
+        vz: nz * 0.32,
+        spin: Math.max(0.65, g.mine.spin),
         state: 'spinning',
         sinceWall: 1,
       });

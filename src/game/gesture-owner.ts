@@ -28,12 +28,18 @@
  * |  6 | press      | a fingertip press (cup) is down                | cup       | flick, rub                          |               |
  * |  7 | gust       | this hand's Forge Gust is still sweeping       | gust      | flick, rub                          |               |
  * |  8 | rubWindow  | a paid Spin Rub window is open                 | rub       | gust, crossguard, groove            |               |
+ * |  8b| rubStroke  | this hand's fingertip rubbed your top within   | rub       | gust, crossguard, groove            | flick, cup    |
+ * |    |            | RUB_STROKE_GAP (the stroke outlives its window)|           |                                     |               |
  * |  9 | rubTouch   | fingertip within RUB_TOUCH_SLACK of own top's  | rub       | groove                              | gust (only    |
  * |    |            | rub ring                                       |           |                                     | within RUB_TIP_GUST) |
  * | 10 | grip       | open hand over a glowing Forge grip            | grip      | crossguard                          |               |
  * | 11 | slap       | strike ready, palm down at the table outside   | slap      |                                     | cup           |
  * |    |            | the rim                                        |           |                                     |               |
  * |  - | closed     | the hand is pinching                           | (none)    | every open-hand verb                |               |
+ *
+ * One stroke, one charge (rubStrokeStep): a fingertip that keeps rubbing past its window, or whose
+ * reading jumps for a frame (a slow frame reads as a fast swing), stays the same Spin Rub. It cannot
+ * open a second window until it lifts for RUB_STROKE_GAP, and cannot flick or cup with that hand.
  *
  * Within a frame the detectors run shaping (cup, groove) → crossguard → gust → flick (rub rides on
  * the flick's fingertip listener); a commit sets the claim that stops the rest from the next check.
@@ -47,7 +53,7 @@ export type HandVerb =
 export type HeldTool = 'overforge' | 'ember' | 'wheel' | 'forge' | 'grip' | 'sling' | 'ramp';
 /** The verb holding the hand; 'release' is a finished gesture's lockout; null is a free hand. */
 export type GestureOwner = HandVerb | 'release' | null;
-export type Claim = 'untracked' | 'held' | 'release' | 'shaping' | 'follow' | 'rail' | 'press' | 'gust' | 'rubWindow' | 'rubTouch' | 'grip' | 'slap' | 'closed';
+export type Claim = 'untracked' | 'held' | 'release' | 'shaping' | 'follow' | 'rail' | 'press' | 'gust' | 'rubWindow' | 'rubStroke' | 'rubTouch' | 'grip' | 'slap' | 'closed';
 
 /** The shared open-palm lock after any pinch lets go, and after Arena Forge's release (s). */
 export const RELEASE_LOCK = 0.35;
@@ -65,6 +71,32 @@ export const RUB_TOUCH_SLACK = 0.012;
  * sweep that crosses the top still fires once past it (arena m). */
 // A fingertip on any top's rim (top radius up to 0.03 + FINGER_RADIUS 0.009) is a rub, not a sweep.
 export const RUB_TIP_GUST = 0.045;
+/** A rubbing fingertip that leaves its top's rim for less than this is still the same stroke (s). */
+export const RUB_STROKE_GAP = 0.25;
+
+/** One hand's Spin Rub stroke: when it last rubbed, and whether it has paid for a window. */
+export interface RubStroke {
+  lastAt: number;
+  paid: boolean;
+}
+
+/**
+ * One rubbing frame of one hand: 'rub' inside an open window; 'pay' opens a window (the caller
+ * spends a charge and marks the stroke paid if it got one); 'hold' owns the fingertip and does
+ * nothing (the RUB_REOPEN pause, or a stroke that rubbed in a window that ran out before it lifted).
+ * A gap over RUB_STROKE_GAP since the hand last rubbed starts a new stroke.
+ */
+export function rubStrokeStep(s: RubStroke, time: number, rubUntil: number, rubReadyAt: number): 'rub' | 'pay' | 'hold' {
+  if (time - s.lastAt > RUB_STROKE_GAP) s.paid = false;
+  s.lastAt = time;
+  if (time < rubUntil) {
+    // Rubbing inside a window (whichever hand paid for it) makes this stroke a paid one.
+    s.paid = true;
+    return 'rub';
+  }
+  if (time < rubReadyAt || s.paid) return 'hold';
+  return 'pay';
+}
 
 /** Per-hand facts for one frame. Times are seconds left on each window (<= 0 when closed). */
 export interface HandFacts {
@@ -86,6 +118,8 @@ export interface HandFacts {
   gustSweep: boolean;
   /** A paid Spin Rub window is open (it belongs to your top, so to either hand). */
   rubWindow: boolean;
+  /** This hand's fingertip rubbed your top within RUB_STROKE_GAP. */
+  rubStroke: boolean;
   /** Fingertip to your own top's centre (Infinity when it is down), and that top's rub ring
    * (its radius + the finger + rub slack). */
   tipToOwnTop: number;
@@ -99,7 +133,7 @@ export interface HandFacts {
 /** A free, tracked, open hand far from everything (the base for tests and defaults). */
 export const FREE_HAND: Readonly<HandFacts> = {
   tracked: true, pinching: false, held: null, releaseLock: 0, shapingLock: 0, needsClearance: false, followLock: 0,
-  railPost: false, crossguardUp: false, pressing: false, gustSweep: false, rubWindow: false,
+  railPost: false, crossguardUp: false, pressing: false, gustSweep: false, rubWindow: false, rubStroke: false,
   tipToOwnTop: Infinity, ownTopRing: 0, onForgeGrip: false, slapPose: false,
 };
 
@@ -128,6 +162,7 @@ const RULES: readonly Rule[] = [
   { claim: 'press', owner: () => 'cup', active: (f) => f.pressing, listen: among('flick', 'rub') },
   { claim: 'gust', owner: () => 'gust', active: (f) => f.gustSweep, listen: among('flick', 'rub') },
   { claim: 'rubWindow', owner: () => 'rub', active: (f) => f.rubWindow, listen: among('gust', 'crossguard', 'groove') },
+  { claim: 'rubStroke', owner: () => 'rub', active: (f) => f.rubStroke, listen: among('gust', 'crossguard', 'groove'), commit: among('flick', 'cup') },
   {
     claim: 'rubTouch', owner: () => 'rub', active: (f) => f.tipToOwnTop <= f.ownTopRing + RUB_TOUCH_SLACK,
     listen: among('groove'), commit: (v, f) => v === 'gust' && f.tipToOwnTop < RUB_TIP_GUST,
