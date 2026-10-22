@@ -37,6 +37,13 @@ export default async function run({ page, frame }) {
     const pct = (q) => Math.round((sortedMs[Math.min(sortedMs.length - 1, Math.floor(sortedMs.length * q))] ?? 0) * 100) / 100;
 
     const diagnostics = window.spinsmithDiagnostics?.();
+    // Without multiview each eye is its own camera pass, so the renderer's count covers both eyes.
+    const xr = renderer.xr;
+    const views = xr?.isPresenting ? (xr.getCamera?.()?.cameras?.length ?? 1) : 1;
+    const multiview = !!xr?.isMultiview;
+    const perEye = multiview ? renderer.info.render.calls : Math.round(renderer.info.render.calls / views);
+    const BUDGET = 150;
+    if (perEye > BUDGET) throw new Error(`draw calls per eye ${perEye} over the ${BUDGET} budget (phase ${game.phase})`);
     return {
       environment: 'desktop IWER emulator',
       renderer: info
@@ -51,6 +58,10 @@ export default async function run({ page, frame }) {
       updateFrames: updateMs.length,
       updateMs: { p50: pct(0.5), p95: pct(0.95), max: pct(1) },
       drawCalls: renderer.info.render.calls,
+      views,
+      multiview,
+      drawCallsPerEye: perEye,
+      budgetPerEye: BUDGET,
       triangles: renderer.info.render.triangles,
       recorderCodecs: {
         h264: MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E'),

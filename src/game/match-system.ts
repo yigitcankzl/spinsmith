@@ -4937,6 +4937,7 @@ export class MatchSystem extends createSystem({
       const force = this.charges.spend(this.elapsed, TUNING.grace);
       if (!force) {
         playLocked();
+        this.pips.refuse();
         this.cancelArenaForge('FORGE NOT READY\nWAIT FOR A CHARGE');
         return true;
       }
@@ -5384,8 +5385,8 @@ export class MatchSystem extends createSystem({
     const pull = (x - sx) * ix + (z - sz) * iz;
     const minimum = 0.012 * (this.arena.radius / 0.17);
     if (pull < minimum) {
-      playLocked();
-      if (!this.stamp.busy) this.stamp.show('NO SPRING', 'PULL THE RIM INWARD', 'neutral', 0.4);
+      // Through locked(): with a stamp already up the refusal goes on the card, never sound alone.
+      this.locked('NO SPRING · PULL THE RIM INWARD');
       if (import.meta.env.DEV) console.log(`[RIM] ignored: inward pull ${pull.toFixed(3)}`);
       return;
     }

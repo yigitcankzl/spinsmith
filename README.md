@@ -51,14 +51,15 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 
 ## Measured performance (IWER on a desktop GPU, not a Quest)
 
-`npm run report:runtime-performance` on 2026-10-23 (RTX 4060 laptop, ANGLE/Vulkan). IWER renders the two eyes as two cameras without multiview, so `renderer.info.render.calls` counts both; the per-eye column is that raw count halved (raw: ready 224, fight 190). Lowest fps over five seconds: 87 ready, 86 fight (desktop, not Quest).
+`npm run report:runtime-performance` (RTX 4060 laptop, ANGLE/Vulkan) fails when a phase goes over 150 draw calls per eye. IWER renders each eye as its own camera without multiview, so the script divides the renderer's count by the number of views. Saved runs from 2026-10-23 are in `artifacts/perf/`.
 
-| Phase | Draw calls per eye | Triangles | Game update per frame (p50 / p95 / max) |
+| Phase | Draw calls per eye | Lowest fps over 5 s | Game update per frame (p50 / p95 / max) |
 |---|---|---|---|
-| Ready (first match) | 112 | 137 k | 0.6 / 0.8 / 1.7 ms |
-| Fight (first match) | 95 | 137 k | 0.7 / 1.0 / 1.9 ms |
+| Hub | 47 | 97 | see the JSON |
+| Ready, first match | 75 (112 with the capture room and the desk-edge arcs up) | 88 | 0.6 / 0.8 / 1.7 ms |
+| Fight, first match | 51 (95 with the capture room up) | 86–88 | 0.7 / 1.0 / 1.9 ms |
 
-The budget is 150 draws per eye, no bloom, no shadow maps. Quest frame rate is unmeasured until it runs on a headset; `?fps` shows it there, and the game drops to a lite quality level by itself when frames run long.
+The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rate on Quest has not been measured, because the game has not run on a headset yet. There, `?fps` shows the frame rate and lowest frame rate. When frames run long, a quality guard first turns off room dimming, then sets full fixed foveation (src/game/quality.ts).
 
 ## Known limits
 
