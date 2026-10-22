@@ -10,7 +10,7 @@ import { FpsBook, fpsPhase, QUALITY_LEVELS, QualityGuard } from './quality.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
-import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow } from './reach.js';
+import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow, RESULT_BUTTONS } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
@@ -127,7 +127,7 @@ const HOME_NOTE_Y = HUD.homeNoteY;
 const BAR_Y = HUD.barY;
 const BAR_BACK = HUD.barBack;
 /** The MENU plate's height over the arena floor (arena-local), at the rim's height like the tabs. */
-const MENU_Y = 0.012;
+const MENU_Y = RESULT_BUTTONS.y;
 /** The workshop shows the arena a little smaller, so its near rim stays behind the piece rail. */
 const WORKSHOP_RIM = 0.13;
 /** A match arena's near rim stays this far out (arena-local, as the 0.17 arenas): a bigger one slides back. */
@@ -1266,7 +1266,7 @@ export class MatchSystem extends createSystem({
     if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = this;
     this.duel.openOnline();
     // A plate laid on the left of the near rim at the touch band's one pitch, like every sign you pinch.
-    this.menuButton.mesh.position.set(-0.2, MENU_Y, 0.14);
+    this.menuButton.mesh.position.set(-RESULT_BUTTONS.x, MENU_Y, RESULT_BUTTONS.z);
     this.menuButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.menuButton.set('MENU');
     this.menuButton.mesh.visible = false;
@@ -1283,7 +1283,7 @@ export class MatchSystem extends createSystem({
       this.root.add(mesh);
       this.drawFpsOverlay();
     }
-    this.rematchButton.mesh.position.set(0.2, MENU_Y, 0.14);
+    this.rematchButton.mesh.position.set(RESULT_BUTTONS.x, MENU_Y, RESULT_BUTTONS.z);
     this.rematchButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
     this.rematchButton.set('REMATCH', true, true);
     this.passButton.mesh.rotation.set(-SIGN_TILT, 0, 0);
@@ -3657,9 +3657,9 @@ export class MatchSystem extends createSystem({
       button.mesh.position.set((i - 1) * 0.105 * readScale, MENU_Y, 0.225 + this.pushed / (ARENA_SCALE * this.rootK));
     }
     this.passButton.mesh.position.set(0, MENU_Y, 0.15 + this.pushed / (ARENA_SCALE * this.rootK));
-    const resultButtonX = 0.15 * readScale;
-    this.menuButton.mesh.position.set(-resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
-    this.rematchButton.mesh.position.set(resultButtonX, MENU_Y, 0.14 + this.pushed / (ARENA_SCALE * this.rootK));
+    const resultButtonX = RESULT_BUTTONS.x * readScale;
+    this.menuButton.mesh.position.set(-resultButtonX, MENU_Y, RESULT_BUTTONS.z + this.pushed / (ARENA_SCALE * this.rootK));
+    this.rematchButton.mesh.position.set(resultButtonX, MENU_Y, RESULT_BUTTONS.z + this.pushed / (ARENA_SCALE * this.rootK));
     this.roomLight.setPool(rim * this.viewK * this.rootK * ARENA_SCALE);
   }
 

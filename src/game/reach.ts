@@ -34,6 +34,24 @@ export const BLUEPRINT_AT: Spot = { x: 0.08, y: 0, z: 0.185 };
 export const COMFORT_AT: Spot = { x: -0.075, y: 0, z: 0.2 };
 /** The brawl pegs: how many tops share the next match (two to four). */
 export const BRAWL_AT: Spot = { x: -0.052, y: 0, z: 0.19 };
+/**
+ * Home pulls the dock and the anvil this much toward the middle of the near rim (the blueprint a
+ * little less far out still), so they sit in the seated view; the forge and the workshop keep the wide layout.
+ */
+export const STATION_PULL = 0.84;
+export const BLUEPRINT_PULL = 0.86;
+/**
+ * The station names lie on the table this far in front of their station (arena-local), SIGN.y up.
+ * PLAY and FORGE sit just clear of the dock's foot and the anvil's plinth, which keeps them inside
+ * the seated view (16b2); the workshop's sits clear of the blueprint's cradle.
+ */
+export const SIGN = { y: 0.012, play: 0.02, forge: 0.028, workshop: 0.04 };
+/**
+ * The bout's MENU (left) and REMATCH (right) buttons on the near rim, arena-local before the match's
+ * slide back (the match adds pushed / ARENA_SCALE to z so they stay where the hand finds them).
+ * x = 0.15 put them about 40 degrees out at the frame edge; 0.13 keeps them inside the seated view.
+ */
+export const RESULT_BUTTONS = { x: 0.13, y: 0.012, z: 0.14 };
 /** The forge: where your top stands on the anvil, and the part tray: an arc of this radius around it, spanning this angle toward the player. */
 export const WORK: Spot = { x: 0, y: 0.07, z: 0.06 };
 export const TRAY = { r: 0.11, y: 0.035, gap: 0.047 };
@@ -118,6 +136,8 @@ export function touchTargets(layouts: ArenaLayout[] = []): [string, Spot][] {
     ['comfort dial', { ...COMFORT_AT, y: TABLE_Y + 0.012 }],
     ['comfort plate', { x: COMFORT_AT.x - 0.012, y: TABLE_Y + 0.02, z: COMFORT_AT.z + 0.026 }],
     ['brawl pegs', { ...BRAWL_AT, y: TABLE_Y + 0.012 }],
+    ['MENU button', { x: -RESULT_BUTTONS.x, y: RESULT_BUTTONS.y, z: RESULT_BUTTONS.z }],
+    ['REMATCH button', { x: RESULT_BUTTONS.x, y: RESULT_BUTTONS.y, z: RESULT_BUTTONS.z }],
     ...layouts.flatMap((l) => forgeGrips(l).map((g, i): [string, Spot] => [`${l.name} forge grip ${i ? 'right' : 'left'}`, g])),
   ];
 }
@@ -163,6 +183,8 @@ export function hudAnchors(layout: ArenaLayout, lift = 0, pushed = 0): [string, 
     ['round card', { x: HUD.card.x, y: cardY, z }],
     ['match bar', { x: 0, y: (HUD.barY + lift) * grow, z: z + HUD.barBack * grow }],
     ['stamp (count, KO, verdict)', { x: HUD.card.x, y: cardY + HUD.stampLift, z: z + 0.01 }],
+    // The buttons do not slide with the arena: arena-local they come forward by the slide.
+    ...(['MENU button', 'REMATCH button'] as const).map((n, i): [string, Spot] => [n, { x: (i ? 1 : -1) * RESULT_BUTTONS.x, y: RESULT_BUTTONS.y, z: RESULT_BUTTONS.z + pushed / ARENA_SCALE }]),
   ];
 }
 
@@ -172,14 +194,36 @@ export function hudAnchorsOffMatch(layout: ArenaLayout): [string, Spot][] {
   return [
     ['forge card', { x: HUD.card.x, y: HUD.card.y + HUD.forgeLift, z: hudCardZ(far, true) }],
     ['home note', { x: HUD.card.x, y: HUD.homeNoteY, z: hudCardZ(far) }],
+    ...hubSigns(),
   ];
 }
 
-/** Degrees above (+) and beside a seated head looking at the arena centre, of an arena-local spot, for a tray `drop` below the eyes. */
+/**
+ * Home's station names that always show (right-handed; left-handed mirrors x): PLAY in front of the
+ * dock, FORGE in front of the anvil. The WORKSHOP name in front of the blueprint is not held to the
+ * band: it sits about 39-44 degrees below the gaze (only the cradle's depth in front of the blueprint
+ * would clear it), and it is the secondary station.
+ */
+export function hubSigns(): [string, Spot][] {
+  return [
+    ['PLAY station name', { x: DOCK_AT.x * STATION_PULL, y: TABLE_Y + SIGN.y, z: DOCK_AT.z + SIGN.play }],
+    ['FORGE station name', { x: FORGE_AT.x * STATION_PULL, y: TABLE_Y + SIGN.y, z: FORGE_AT.z + SIGN.forge }],
+  ];
+}
+
+/**
+ * Degrees above (+) and beside a seated head looking at the arena centre, of an arena-local spot, for
+ * a tray `drop` below the eyes: in the head's own frame (pitched down at the centre), as a display's
+ * frame sees it (tan = offset / depth along the gaze). For spots straight ahead (x = 0) this is the
+ * plain elevation difference; for near, low spots off to the side it is what the frame actually shows.
+ */
 export function gazeAngles(p: Spot, drop: number, reach = REACH): { up: number; side: number } {
   const deg = 180 / Math.PI;
   const x = p.x * ARENA_SCALE;
   const ahead = reach - p.z * ARENA_SCALE;
   const y = -drop + p.y * ARENA_SCALE;
-  return { up: (Math.atan2(y, Math.hypot(x, ahead)) + Math.atan2(drop, reach)) * deg, side: Math.atan2(x, ahead) * deg };
+  const pitch = Math.atan2(drop, reach);
+  const depth = ahead * Math.cos(pitch) - y * Math.sin(pitch);
+  const up = y * Math.cos(pitch) + ahead * Math.sin(pitch);
+  return { up: Math.atan2(up, depth) * deg, side: Math.atan2(x, depth) * deg };
 }

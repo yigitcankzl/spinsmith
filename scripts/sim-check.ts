@@ -1150,8 +1150,9 @@ TUNING.grace = 0;
 }
 
 // 16b2. Field of view: every essential read surface (the round card and its prompts, the match bar,
-// the count/KO/verdict stamp, the forge card, the home note) sits within +-35 degrees vertically and
-// +-40 degrees horizontally of a seated head looking at the arena centre, for trays 0.30-0.45 m below
+// the count/KO/verdict stamp, the MENU and REMATCH buttons, the forge card, the home note, home's
+// PLAY and FORGE station names) sits within +-35 degrees vertically and
+// +-40 degrees horizontally of a seated head looking at the arena centre (in the head's frame), for trays 0.30-0.45 m below
 // the eyes, on every arena (slid back as a match slides it), with a standard or a high wall.
 {
   const near = (l: ArenaLayout) => Math.max(0, rimRadius(l, Math.PI / 2) - 0.17) * 2.4;

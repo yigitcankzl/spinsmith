@@ -53,7 +53,7 @@ import { SmithBoard } from './board.js';
 import { encodeBuild } from './challenge.js';
 import { ECHO_KEY } from './echo.js';
 import { popIn } from './rim.js';
-import { ARENA_SCALE, BRAWL_AT, COMFORT_AT, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
+import { ARENA_SCALE, BLUEPRINT_PULL, BRAWL_AT, COMFORT_AT, SIGN, STATION_PULL, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
 import { localDate } from './orders.js';
 import { FEATS, MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
@@ -104,9 +104,9 @@ const HAND_LOSS_GRACE = 0.28;
  * unchanged. Read when a Hub is built (the match rebuilds it when the plate toggles it).
  */
 let SIDE = 1;
-export const FORGE_AT = new Vector3(REACH_FORGE.x * 0.88, REACH_FORGE.y, REACH_FORGE.z);
-const DOCK_AT = new Vector3(REACH_DOCK.x * 0.88, REACH_DOCK.y, REACH_DOCK.z);
-const BLUEPRINT_AT = new Vector3(REACH_BLUEPRINT.x * 0.86, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
+export const FORGE_AT = new Vector3(REACH_FORGE.x * STATION_PULL, REACH_FORGE.y, REACH_FORGE.z);
+const DOCK_AT = new Vector3(REACH_DOCK.x * STATION_PULL, REACH_DOCK.y, REACH_DOCK.z);
+const BLUEPRINT_AT = new Vector3(REACH_BLUEPRINT.x * BLUEPRINT_PULL, REACH_BLUEPRINT.y, REACH_BLUEPRINT.z);
 const DIAL_AT = new Vector3(COMFORT_AT.x, COMFORT_AT.y, COMFORT_AT.z);
 const PEGS_AT = new Vector3(BRAWL_AT.x, BRAWL_AT.y, BRAWL_AT.z);
 /**
@@ -116,9 +116,8 @@ const PEGS_AT = new Vector3(BRAWL_AT.x, BRAWL_AT.y, BRAWL_AT.z);
 const BOARD_AT = new Vector3(0, 0.085, -0.215);
 /** How long the board shows its back (the rivals) after a pinch on the level plate (s). */
 const BOARD_BACK_TIME = 12;
-/** Station names lie on the table this far in front of their station (arena-local), at one pitch. */
-const SIGN_AHEAD = 0.05;
-const SIGN_Y = 0.012;
+/** Station names lie on the table just in front of their station (arena-local, reach.ts SIGN), at one pitch. */
+const SIGN_Y = SIGN.y;
 /** The level plate's canvas (px) and size (arena-local; shown at 0.8). */
 const RANK_W = 1024;
 const RANK_H = 280;
@@ -128,9 +127,9 @@ const CHAMPION_AT = [new Vector3(-0.2, 0, 0.065), new Vector3(-0.21, 0, -0.01), 
 /** Puts the stations on the right (1) or, left-handed, the left (-1) side. */
 function setSide(side: number) {
   SIDE = side;
-  FORGE_AT.x = side * REACH_FORGE.x * 0.88;
-  DOCK_AT.x = side * REACH_DOCK.x * 0.88;
-  BLUEPRINT_AT.x = side * REACH_BLUEPRINT.x * 0.86;
+  FORGE_AT.x = side * REACH_FORGE.x * STATION_PULL;
+  DOCK_AT.x = side * REACH_DOCK.x * STATION_PULL;
+  BLUEPRINT_AT.x = side * REACH_BLUEPRINT.x * BLUEPRINT_PULL;
   DIAL_AT.x = side * COMFORT_AT.x;
   PEGS_AT.x = side * BRAWL_AT.x;
   CHAMPION_AT[0].x = -0.2 * side;
@@ -561,7 +560,7 @@ export class Hub {
     this.blueprint.add(cradle, holder);
     this.root.add(this.blueprint);
     // On the table in front of the roll, between the level plate and the anvil's name.
-    const build = this.label('WORKSHOP', this.blueprint, BLUEPRINT_AT.x - 0.008 * SIDE, BLUEPRINT_AT.z + SIGN_AHEAD - 0.01);
+    const build = this.label('WORKSHOP', this.blueprint, BLUEPRINT_AT.x - 0.008 * SIDE, BLUEPRINT_AT.z + SIGN.workshop);
     build.position.y += TABLE_Y;
     this.items.push({ action: { kind: 'workshop' }, carry: false, model: holder, home, name: build });
   }
@@ -641,7 +640,7 @@ export class Hub {
     model.rotation.y = -0.6 * SIDE;
     body.add(model);
     this.anvil.add(body);
-    const name = this.label('FORGE', this.anvil, 0, SIGN_AHEAD);
+    const name = this.label('FORGE', this.anvil, 0, SIGN.forge);
     this.items.push({ action: { kind: 'forge' }, carry: false, model: body, home: new Vector3(), name });
   }
 
@@ -712,7 +711,7 @@ export class Hub {
     const dock = standModel();
     dock.scale.setScalar(RIM_SCALE);
     this.stand.add(dock);
-    const name = this.label('PLAY', this.stand, 0, SIGN_AHEAD, this.playSign);
+    const name = this.label('PLAY', this.stand, 0, SIGN.play, this.playSign);
     // The top's view is rebuilt in show(), so the holder is what gets carried.
     this.stand.add(this.standHolder);
     this.items.push({ action: { kind: 'play' }, carry: true, model: this.standHolder, home: new Vector3(), name });
