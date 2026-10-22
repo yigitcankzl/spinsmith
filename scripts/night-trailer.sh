@@ -62,9 +62,9 @@ clip 03-desk "$NEW/desk-ko-first-close.mp4" 1.2 4.4 "DESK KO IN YOUR FIRST MATCH
 clip 04-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK IT" "Your fingertip is part of the physics"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.3 4.2 "STAMP AN ULTIMATE" "Pinch the seal  press it into the bowl"
 # Optional hand close-ups, when the new-shots folder has them.
-if [ -s "$NEW/close-squeeze.mp4" ]; then clip 05a-squeeze "$NEW/close-squeeze.mp4" 1.4 3.2 "TWO HANDS ON THE RIM" "Squeeze  stretch  tilt  twist the live bowl"; fi
-if [ -s "$NEW/close-crossguard.mp4" ]; then clip 05b-guard "$NEW/close-crossguard.mp4" 0.6 2.8 "CROSSGUARD" "Two still palms make a rail that saves you"; fi
-if [ -s "$NEW/close-rub.mp4" ]; then clip 05c-rub "$NEW/close-rub.mp4" 1.4 2.6 "SPIN RUB" "A fingertip along your rim spins it back up"; fi
+if [ -s "$NEW/close-squeeze.mp4" ]; then clip 05a-squeeze "$NEW/close-squeeze.mp4" 0.6 3.0 "TWO HANDS ON THE RIM" "Squeeze  stretch  tilt  twist the live bowl"; fi
+if [ -s "$NEW/close-crossguard.mp4" ]; then clip 05b-guard "$NEW/close-crossguard.mp4" 0.3 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"; fi
+if [ -s "$NEW/close-rub.mp4" ]; then clip 05c-rub "$NEW/close-rub.mp4" 0.9 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"; fi
 # Optional: a 3-4 top brawl shot, when the new-shots folder has one.
 if [ -s "$NEW/brawl.mp4" ]; then clip 07-brawl "$NEW/brawl.mp4" 11.6 5.0 "BRAWL" "Three or four tops  last one spinning"; fi
 if [ -s "$NEW/forge.mp4" ]; then clip 08-forge "$NEW/forge.mp4" 2.6 5.0 "FORGE IT BY HAND" "226 builds  each changes the physics"
