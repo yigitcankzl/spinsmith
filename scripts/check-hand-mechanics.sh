@@ -23,9 +23,27 @@ if ! grep -Eq '"sessionActive"[[:space:]]*:[[:space:]]*true' <<<"$xr_status"; th
 fi
 "${CLI[@]}" xr set-input-mode --input-json '{"mode":"hand"}' >/dev/null
 
+# HANDS_ISOLATE=1 starts each mode from a freshly loaded page (default: one page, faster): one
+# probe's leftover tops, locks, cards or save state must not decide the next probe's result.
+isolate() {
+  [ "${HANDS_ISOLATE:-0}" = 1 ] || return 0
+  "${CLI[@]}" browser reload >/dev/null 2>&1 || true
+  "${CLI[@]}" runtime wait --timeout 60000 >/dev/null 2>&1 || true
+  for _ in 1 2 3; do
+    "${CLI[@]}" xr status --input-json '{}' 2>/dev/null | grep -Eq '"sessionActive"[[:space:]]*:[[:space:]]*true' && break
+    "${CLI[@]}" xr enter --input-json '{}' >/dev/null 2>&1 || true
+    sleep 2
+  done
+  "${CLI[@]}" xr set-input-mode --input-json '{"mode":"hand"}' >/dev/null 2>&1 || true
+  bash scripts/emu.sh front >/dev/null 2>&1 || true
+  # Let the first frames' shader compiles pass: a turn sampled at a few fps reads short.
+  sleep 4
+}
+
 run_check() {
   local mode="$1"
   local output
+  isolate
   echo "[hands] $mode"
   if ! output="$(HAND_CHECK="$mode" "${CLI[@]}" browser run scripts/check-hand-mechanic.mjs --timeout 100000 2>&1)"; then
     printf '%s\n' "$output" >&2
