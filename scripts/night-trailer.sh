@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Cuts the competition reel around the first match's staged DESK KO (IWER emulator footage,
+# labelled on every shot). New shots come from the drive steps recorded on 2026-10-22
+# (stageFirstWrench, rip + ramp with the lesson ghost, flick); the rest reuse the 10-16 sources.
+#
+#   scripts/night-trailer.sh [new-shots-dir] [old-sources-dir] [out-file]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+NEW=${1:-$HOME/Desktop/spinsmith-videos/night-2026-10-22/shots}
+OLD=${2:-$HOME/Desktop/spinsmith-videos/competition-final}
+FINAL=${3:-$HOME/Desktop/spinsmith-videos/night-2026-10-22/spinsmith-reel-1080p60.mp4}
+MAIN=$OLD/main/shots
+SHOW=$OLD/showcase/shots
+ULT=$OLD/ultimates/shots
+WIDTH=1920
+HEIGHT=1080
+FPS=60
+FONT=$(realpath public/fonts/Rajdhani-Bold.woff2)
+
+for file in "$NEW/desk-ko-first-side.mp4" "$NEW/desk-ko-first-close.mp4" "$NEW/first-rip-ghost.mp4" "$NEW/flick.mp4" \
+  "$MAIN/01-rise-title.mp4" "$MAIN/04-strike.mp4" "$MAIN/06-forge.mp4" \
+  "$SHOW/01-hub-progression.mp4" "$SHOW/05-arena-workshop.mp4" "$SHOW/07-all-arenas-labelled.mp4" "$ULT/4-tilt.mp4"; do
+  [ -s "$file" ] || { echo "Missing source: $file" >&2; exit 1; }
+done
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+card() {
+  local file=$1 title=$2 sub=$3 duration=$4
+  ffmpeg -y -loglevel error \
+    -f lavfi -i "color=c=0x111419:s=${WIDTH}x${HEIGHT}:d=${duration}:r=${FPS}" \
+    -f lavfi -i anullsrc=r=48000:cl=stereo -t "$duration" \
+    -vf "drawtext=fontfile=$FONT:text='$title':fontcolor=0xff8a2a:fontsize=104:x=(w-text_w)/2:y=(h-text_h)/2-55,drawtext=fontfile=$FONT:text='$sub':fontcolor=0xe7edf4:fontsize=42:x=(w-text_w)/2:y=(h/2)+65" \
+    -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p \
+    -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/$file.mp4"
+}
+
+# Every shot: scaled to 1080p, a short title, and a permanent IWER disclosure.
+clip() {
+  local file=$1 source=$2 start=$3 duration=$4 title=$5 sub=$6
+  local audio=(-c:a aac -b:a 256k -ar 48000 -ac 2)
+  local inputs=(-ss "$start" -i "$source")
+  if ! ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$source" | grep -q .; then
+    inputs+=(-f lavfi -i anullsrc=r=48000:cl=stereo)
+    audio+=(-shortest)
+  fi
+  ffmpeg -y -loglevel error "${inputs[@]}" -t "$duration" \
+    -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${WIDTH}:${HEIGHT},fps=${FPS},eq=contrast=1.06:saturation=1.13:brightness=-0.015,drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=58:x=46:y=38:box=1:boxcolor=0x111419@0.74:boxborderw=15:enable='lt(t,2.2)',drawtext=fontfile=$FONT:text='$sub':fontcolor=white:fontsize=31:x=49:y=119:box=1:boxcolor=0x111419@0.62:boxborderw=9:enable='lt(t,2.2)',drawtext=fontfile=$FONT:text='IWER EMULATOR CAPTURE  -  NOT HEADSET FOOTAGE':fontcolor=white@0.55:fontsize=22:x=w-text_w-28:y=h-42" \
+    -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p "${audio[@]}" "$TMP/$file.mp4"
+}
+
+# Story: the hook is the room-dependent beat, then how you get there, then the depth behind it.
+clip 00-hook "$NEW/desk-ko-first-side.mp4" 0.3 6.0 "THE ARENA IS THE WEAPON" "Squeeze the bowl  throw the rival off your real desk"
+clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 2.6 "YOUR TABLE IS THE ARENA" "Seated mixed reality  hands only"
+clip 02-rip "$NEW/first-rip-ghost.mp4" 2.6 6.6 "PINCH  PULL  RIP" "A ghost hand shows each move once"
+clip 03-desk "$NEW/desk-ko-first-close.mp4" 1.2 4.4 "DESK KO IN YOUR FIRST MATCH" "The real edge glows  the squeeze throws"
+clip 04-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK IT" "Your fingertip is part of the physics"
+clip 06-strike "$MAIN/04-strike.mp4" 3.0 3.2 "STRIKE THE TABLE" "Stamp an ultimate into the fight"
+clip 07-tilt "$ULT/4-tilt.mp4" 8.5 2.2 "ARENA TILTED" "Every strike leaves a rule behind"
+clip 08-forge "$MAIN/06-forge.mp4" 1.2 3.8 "FORGE IT BY HAND" "226 builds  each changes the physics"
+clip 09-workshop "$SHOW/05-arena-workshop.mp4" 16.5 3.0 "BUILD THE BATTLEGROUND" "Twenty arenas and a workshop"
+clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.4 "ONE NEW MOVE A MATCH" "Fifteen bouts  nine rivals"
+clip 11-return "$SHOW/01-hub-progression.mp4" 1.8 2.8 "COME BACK TOMORROW" "Daily orders  streaks  medals"
+card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.8
+
+segments=(00-hook 01-rise 02-rip 03-desk 04-flick 06-strike 07-tilt 08-forge 09-workshop 10-arenas 11-return 13-end)
+printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
+mkdir -p "$(dirname "$FINAL")"
+ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" \
+  -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p \
+  -c:a aac -b:a 256k -movflags +faststart "$FINAL"
+echo "$FINAL ($(ffprobe -v error -show_entries format=duration -of csv=p=0 "$FINAL") s)"
