@@ -18,9 +18,9 @@ HEIGHT=1080
 FPS=60
 FONT=$(realpath public/fonts/Rajdhani-Bold.woff2)
 
-for file in "$NEW/desk-ko-first-side.mp4" "$NEW/desk-ko-first-close.mp4" "$NEW/first-rip-ghost.mp4" "$NEW/flick.mp4" \
-  "$MAIN/01-rise-title.mp4" "$MAIN/04-strike.mp4" "$MAIN/06-forge.mp4" \
-  "$SHOW/01-hub-progression.mp4" "$SHOW/05-arena-workshop.mp4" "$SHOW/07-all-arenas-labelled.mp4" "$ULT/4-tilt.mp4"; do
+for file in "$NEW/desk-ko-first-side.mp4" "$NEW/desk-ko-first-close.mp4" "$NEW/first-rip-ghost.mp4" "$NEW/flick.mp4" "$NEW/seal-stamp.mp4" "$NEW/match-won-cards.mp4" \
+  "$MAIN/01-rise-title.mp4" "$MAIN/06-forge.mp4" \
+  "$SHOW/05-arena-workshop.mp4" "$SHOW/07-all-arenas-labelled.mp4"; do
   [ -s "$file" ] || { echo "Missing source: $file" >&2; exit 1; }
 done
 
@@ -57,15 +57,14 @@ clip 01-rise "$MAIN/01-rise-title.mp4" 6.2 2.6 "YOUR TABLE IS THE ARENA" "Seated
 clip 02-rip "$NEW/first-rip-ghost.mp4" 2.6 6.6 "PINCH  PULL  RIP" "A ghost hand shows each move once"
 clip 03-desk "$NEW/desk-ko-first-close.mp4" 1.2 4.4 "DESK KO IN YOUR FIRST MATCH" "The real edge glows  the squeeze throws"
 clip 04-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK IT" "Your fingertip is part of the physics"
-clip 06-strike "$MAIN/04-strike.mp4" 3.0 3.2 "STRIKE THE TABLE" "Stamp an ultimate into the fight"
-clip 07-tilt "$ULT/4-tilt.mp4" 8.5 2.2 "ARENA TILTED" "Every strike leaves a rule behind"
+clip 06-strike "$NEW/seal-stamp.mp4" 1.4 4.6 "STAMP AN ULTIMATE" "Pinch the seal  press it into the bowl"
 clip 08-forge "$MAIN/06-forge.mp4" 1.2 3.8 "FORGE IT BY HAND" "226 builds  each changes the physics"
 clip 09-workshop "$SHOW/05-arena-workshop.mp4" 16.5 3.0 "BUILD THE BATTLEGROUND" "Twenty arenas and a workshop"
-clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.4 "ONE NEW MOVE A MATCH" "Fifteen bouts  nine rivals"
-clip 11-return "$SHOW/01-hub-progression.mp4" 1.8 2.8 "COME BACK TOMORROW" "Daily orders  streaks  medals"
+clip 10-arenas "$SHOW/07-all-arenas-labelled.mp4" 9.5 2.4 "TWENTY ARENAS" "Fifteen bouts  nine rivals"
+clip 11-return "$NEW/match-won-cards.mp4" 5.0 7.5 "ONE NEW MOVE A MATCH" "A streak and tomorrow on every result"
 card 13-end "SPINSMITH" "Hands only  Seated  Meta Quest Browser" 1.8
 
-segments=(00-hook 01-rise 02-rip 03-desk 04-flick 06-strike 07-tilt 08-forge 09-workshop 10-arenas 11-return 13-end)
+segments=(00-hook 01-rise 02-rip 03-desk 04-flick 06-strike 08-forge 09-workshop 10-arenas 11-return 13-end)
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
 mkdir -p "$(dirname "$FINAL")"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" \
