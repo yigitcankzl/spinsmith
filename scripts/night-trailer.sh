@@ -41,7 +41,7 @@ clip() {
 
 # The disclosure, big, over the opening shot (not a silent black card).
 EXTRA="drawtext=fontfile=$FONT:text='EMULATOR FOOTAGE':fontcolor=0xff8a2a:fontsize=84:x=(w-text_w)/2:y=h-250:box=1:boxcolor=0x111419@0.8:boxborderw=18:enable='lt(t,1.5)',drawtext=fontfile=$FONT:text='${DISCLOSE:-IWSDK emulator (IWER)  -  not headset footage}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-140:box=1:boxcolor=0x111419@0.7:boxborderw=10:enable='lt(t,1.5)'" \
-  clip 00-hook "$NEW/desk-ko-first-side.mp4" 0.4 6.5 "THE ARENA IS THE WEAPON" "Squeeze the bowl / throw the rival off your desk"
+  clip 00-hook "$NEW/desk-ko-first-side.mp4" 1.3 5.6 "THE ARENA IS THE WEAPON" "Squeeze the bowl / throw the rival off your desk"
 # A running game clock on the new player's segment: the pace is the point.
 FIRST30=; if [ -s "$NEW/first-30.mp4" ]; then FIRST30=1; EXTRA="drawtext=fontfile=$FONT:text='FROM HOME  %{eif\\:t\\:d\\:2}.%{eif\\:mod(t*10\\,10)\\:d} s':fontcolor=0xffa24a:fontsize=64:x=w-text_w-46:y=40:box=1:boxcolor=0x111419@0.74:boxborderw=14" clip 005-first "$NEW/first-30.mp4" 0.2 17.8 "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"; fi
 clip 01-match "$NEW/first-match.mp4" 1.0 12.3 "ONE ROUND, UNCUT" "Rip  /  the rival runs to your edge  /  squeeze"
