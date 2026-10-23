@@ -7598,7 +7598,15 @@ export class MatchSystem extends createSystem({
         clearSnapshot(localStorage);
         this.markFirstFive(5);
         // A finished match keeps the day streak; its last card says what waits tomorrow.
-        if (!this.demo && !this.online) this.progress.playedOn(localDate(new Date()));
+        if (!this.demo && !this.online) {
+          const today = localDate(new Date());
+          const bonus = this.progress.playedOn(today);
+          if (bonus) {
+            this.stamp.later(`${this.progress.streak(today)}-DAY STREAK!`, `+${bonus.gained} XP FOR COMING BACK`, 'mine', 1.4, 1.2);
+            // A level the streak XP crosses still shows what it opened.
+            this.rewards.reveals.push(...bonus.unlocked);
+          }
+        }
         // The match becomes your echo: the board's challenge code carries it to a friend.
         if (!this.demo && !this.extras.length && !this.online && this.echoRec.rips.length) {
           try {

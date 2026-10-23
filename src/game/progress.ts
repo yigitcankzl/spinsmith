@@ -149,6 +149,9 @@ export function verbReleasedAt(matches: number): ReleasedVerb | undefined {
 
 /** XP for finishing a Smith Order. */
 export const ORDER_XP = 120;
+/** XP per streak day for the first finished match of a new day, from day 2, up to STREAK_XP_DAYS days. */
+export const STREAK_XP = 25;
+export const STREAK_XP_DAYS = 7;
 
 /** Marks against a rival: beaten in a match, beaten in a round by knockout, by your own shape. */
 export const MARK = { beaten: 1, knockout: 2, shape: 4 } as const;
@@ -463,11 +466,15 @@ export class Progress {
   }
 
   /** A match was finished on this local date (YYYY-MM-DD): it counts toward the day streak. */
-  playedOn(date: string) {
-    if (this.days.has(date)) return;
+  playedOn(date: string): Award | null {
+    if (this.days.has(date)) return null;
     this.days.add(date);
     this.days = new Set([...this.days].sort().slice(-DAYS_KEPT));
     this.save();
+    // Coming back pays: the first match of a new day in a streak earns XP for every day of it.
+    const n = this.streak(date);
+    if (n < 2) return null;
+    return this.award({ won: false, finish: null, perfect: false, matchOver: false, matchWon: false }, STREAK_XP * Math.min(n, STREAK_XP_DAYS));
   }
 
   hasPlayed(date: string) {
