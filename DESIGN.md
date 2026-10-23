@@ -237,7 +237,7 @@ an arena. First to 4 heat wins a match.
   direction and swing speed and the host applies it. The first match teaches it too: once its
   forge lesson is done (or in its third round), a tired rival near the rim calls for a flick.
 - **One new move per match:** after the first match's lessons (ramp, Arena Forge, strike, Flick)
-  each completed match releases exactly one more hand verb, most useful first, and ends with its
+  each completed match releases exactly one more hand verb, the measured ones most useful first, and ends with its
   card (NEW MOVE: name, one line on the gesture): Rim Spring for match 2, Forge Gust 3, cup and
   sling 4 (campaign bout 1-4 teaches it), Ember Rivet 5, Spin Rub 6, Crossguard 7, Finger Groove 8, Forge Wheel 9
   (`VERB_RELEASE` in `src/game/progress.ts`, checked by `npm run check:sim`). Online, brawls and
