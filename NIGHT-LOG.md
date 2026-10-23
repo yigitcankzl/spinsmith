@@ -164,6 +164,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | final judge 2 (06:24–06:26) | Full re-score after cycles 48-50 | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 8, RtCB 6, Accessibility 8, Boldest 6, IWSDK 7) | the table in judge-report-2026-10-22.md shows both end judges; check:hands clean on master (06:28) | — |
 | 53 (06:26–06:31) | Polish: video (caption clutter) | blind A/B reels: 7 → 6 | Tried: corner captions up for 1.6 s instead of 2.2 s; too short to read a title and its subtitle | dropped |
 | 54 (06:29–06:33) | Polish: video (caption position) | blind A/B reels: 7 → 6 | Tried: captions bottom-left; they land on the table, rim and hands. Top-left stays | dropped |
+| 55 (06:31–06:36) | Technical (GPU / CPU split) | blind A/B snapshots: 5 → 6 | report:runtime-performance times the GPU (EXT_disjoint_timer_query_webgl2 around each render). Capture-room ready, 95 draws/eye: GPU 0.86 ms p50 unthrottled, 2.44 ms at 4x (an upper bound, it includes waiting on submission); the 4x frame (~37 ms, 27 fps) is CPU-side submission and the emulator. Saved runs and README | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -218,7 +219,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] The last card pushes tomorrow over an immediate rematch hook (judge A/B c37)
 - [ ] Room backgrounds still murky in the splits (judge A/B c39)
 - [ ] Outer Ring in the capture room: the test throw leaves the desk there (offDesk true); film it with a table placement that keeps the top on the wood (judge c40)
-- [x] README worst-case draws (cycle 42); a GPU/CPU frame split is still not measured
+- [x] README worst-case draws (cycle 42); GPU/CPU split measured (cycle 55)
 - [ ] Comfort shot still holds ~1.5 s on the static ON plate (judge A/B c43)
 - [ ] Large text split crops the FLICK! title; only the ON side shows the event banner (judge A/B c46)
 
