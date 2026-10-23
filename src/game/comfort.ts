@@ -78,16 +78,17 @@ export interface DialStop {
 
 /** The dial's stops, in order. Presets are combinations of the toggles; Standard keeps the hand. */
 export const COMFORT_DIAL: DialStop[] = [
+  // The settings most players reach for first sit nearest: a turn or two, not ten.
   { name: 'Calm', detail: 'no flashes, press to strike', preset: { flashes: false, gentle: true } },
+  { name: 'Large text', detail: 'cards and calls 1.3x', toggle: ['bigText', true] },
+  { name: 'One hand', detail: 'hold the rim to forge', toggle: ['oneHand', true] },
+  { name: 'Assist', detail: 'fights at 80% speed', toggle: ['assist', true] },
   { name: 'Quiet', detail: 'sound off', toggle: ['sound', false] },
   { name: 'No flashes', detail: 'no white flashes', toggle: ['flashes', false] },
   { name: 'Press to strike', detail: 'press and hold, no slap', toggle: ['gentle', true] },
-  { name: 'Assist', detail: 'fights at 80% speed', toggle: ['assist', true] },
-  { name: 'One hand', detail: 'hold the rim to forge', toggle: ['oneHand', true] },
   { name: 'High contrast', detail: 'bold team rings', toggle: ['contrast', true] },
   { name: 'Left-handed', detail: 'home stations swap sides', toggle: ['lefty', true] },
   { name: 'Colour-safe', detail: 'blue and orange warnings', toggle: ['colorSafe', true] },
-  { name: 'Large text', detail: 'cards and calls 1.3x', toggle: ['bigText', true] },
   { name: 'Standard', detail: 'every setting off but the hand', preset: { sound: true, flashes: true, gentle: false, assist: false, oneHand: false, contrast: false, colorSafe: false, bigText: false } },
 ];
 
