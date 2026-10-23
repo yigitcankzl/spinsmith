@@ -72,6 +72,19 @@ The quality guard is off under the emulator by design (a desktop frame rate says
 
 The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rate on Quest has not been measured, because the game has not run on a headset yet. There, `?fps` shows the frame rate and lowest frame rate. When frames run long, a quality guard first turns off room dimming, then sets full fixed foveation (src/game/quality.ts).
 
+## IWSDK features used (and where)
+
+| Feature | Where | Run on |
+|---|---|---|
+| ECS world and systems (`World.create`, `createSystem`) | src/index.ts:37, src/game/match-system.ts:231 | IWER |
+| Scene planes with semantic labels (`XRPlane`, table/desk choice) | src/game/match-system.ts:232, src/game/placement.ts | IWER (synthesised rooms, `check:room-matrix`) |
+| Environment hit-test for unlabelled surfaces (`EnvironmentRaycastTarget`) | src/game/match-system.ts:1385 | IWER |
+| Persistent anchor for the smithy pose (`XRAnchor`) | src/game/match-system.ts:1333, 3253 | IWER |
+| Depth occlusion (`DepthOccludable`) | src/game/match-system.ts:1374-1382 | not yet (IWER has no camera depth) |
+| Hand joints (`XRHand`), joint proxies that hide the game behind real hands | src/game/hands.ts, src/game/hand-occluder.ts | IWER |
+| Fixed foveation from the quality guard (`setFoveation`) | src/game/match-system.ts, src/game/quality.ts | IWER (`PERF_GUARD=1`) |
+| HRTF spatial audio (`PannerNode`) | src/game/audio.ts | desktop browser |
+
 ## Known limits
 
 - Nothing has been run or measured on a headset yet, including frame rate (`?fps` and `?diagnostics` are there for it).
