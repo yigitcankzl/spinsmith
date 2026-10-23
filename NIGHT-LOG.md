@@ -113,18 +113,19 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 4 (02:00–02:25) | First Five Minutes; Polish: audio | 7 → 7 → 7; 6 → 6 → 6 (three re-scores) | Tried: no VS stamp over the first match's rival card, no WATCH THE TOPS REACT under the DESK KO stamp (first-five 3 runs: 16/18/17 prompts, 64/73/64 words, was 22 / 70-92); forge and builder SFX ~2x (forge/workshop shot peaks -28 → -7 dB); the result keeps the room tone; LEVEL card not repeated under its stamp; medal stamp in plain words; come-back card waits 2 s after the last stamp (then the first-five probe missed the card). Judges: still one prompt every 3.5 s and a stacked post-match; reel 35-45 s 18 dB under the fight | dropped (no score rise); the reel on disk was cut from it: re-record forge, workshop and match-won-cards on master before the final cut |
 | 5 (02:25–02:35) | Accessibility | 7 → 7 → 7 (three re-scores) | Tried: Large text comfort toggle (card, stamps, bar 1.3x, gauge labels; probed scale 1.25 → 1.625 on the card), sim-check covers the stop and Standard reset, textScale() unit-checked; a new smith's home shows the comfort plate unasked (probed visible). Judges: colour-safe misses the forge stat needle (rim.ts:317) and a bar red (match-bar.ts:301); no audio subtitles | dropped (no score rise) |
 | 6 (02:35–02:57) | Polish: video; visual; readability | 6 → 6 → 6 → blind A/B: video 5 → 6, visual 4 → 7, readability 5 → 6 | Fresh single-reel judges kept landing on the same integer whatever changed, each citing new nits, so the re-score became a blind A/B: one fresh judge scores the master-script reel and the branch reel side by side (labels X/Y, same shots). Changes: four arenas in live play (Sumo Square, Titan Crater, Glacier Steps, Crucible Gate; .tmp/rec-arenas.sh drives), the DESK KO stamp leaves its edge pin when the result comes (the plate covered it), dead frames trimmed, disclosure overlay 1.5 s, 2 s end card over the dimmed DESK KO, captions name only what is shown. desk-ko-first, desk-ko, combat-readability pass | merged |
+| 7 (03:00–03:10) | First Five Minutes; Polish: audio; video | blind A/B: FFM clarity 5 → 7, clutter 4 → 6; audio 5 → 6; video 6 → 6 | Cycle 4's dropped commits re-tried under the blind A/B: no VS stamp over the first rival card, no WATCH THE TOPS REACT under the DESK KO stamp, the LEVEL card not repeated under its stamp, medal stamp without the bout number, forge/builder SFX ~2x, room tone under a decided result. first-five: 18/19 prompts, 68/73 words (was 22 / 92), come-back card seen; desk-ko-first, desk-ko, desk-guard, combat-readability, check:hands pass on a fresh page | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
 - [x] First accidental flick named: already true (every flick stamps FLICK!, match-system.ts:5838)
-- [ ] Cut first-five text where a ghost hand teaches (70–90 words)
+- [x] Cut first-five text (cycle 7: 18-19 prompts, 68-73 words)
 - [ ] Dead time between rounds (INTRO only delays the card; RESULT 4 s, pinch skip exists)
 - [ ] Pip-fill beat on a scored point (the rim gauge is hidden on results: the plate's pips would carry it)
 - [x] Refused move points at the charge sparks (cycle 3)
 - [x] Desk-edge red arcs vs team orange: hazard tape (cycle 3)
 - [ ] Waves floor relief faint
 - [ ] The table remembers: DESK KO notch and beaten top readable after reload, on camera (judge: show a day-2/day-5 return)
-- [ ] Forge / workshop near-silent
+- [x] Forge / workshop near-silent (cycle 7, SFX ~2x)
 - [ ] Captions or visual twin for every audio cue (audit)
 - [ ] IWER checks 3x on a fresh page; check:hands Outer Ring "ended idle"
 - [ ] Readability: one text layer per beat in the reel (caption vs in-game banner); small labels at reel size
@@ -137,3 +138,6 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Colour-safe: rim.ts:317 stat needle green/red and match-bar.ts:301 red bypass warnColor (judge c5)
 - [ ] DESK KO stamp pulled toward the arena lands over the gauge's FIRST TO 4 in the front shot (judge A/B)
 - [ ] SPIN RUB chapter shows an ULTIMATE READY banner (reel shot choice)
+- [ ] The desk-KO card burst (WRENCH, PINCH BOTH GLOWS, SQUEEZE! RELEASE within 3 s) into one card (judge A/B c7)
+- [ ] SLAG stamp and the result card in the same frame (judge A/B c7)
+- [ ] Re-try cycle 5 (Large text, comfort plate on first visit) under the blind A/B
