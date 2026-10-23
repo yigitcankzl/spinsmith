@@ -58,7 +58,7 @@ clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms 
 clip 05-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal / press it into the bowl"
 # Comfort: the dial's stops on its plate (filmed from the seat, cropped in).
-COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 4.6 4.2 "COMFORT, ONE PINCH AWAY" "Pinch the comfort plate  /  Large text: ON"; fi
+COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 5.6 3.0 "COMFORT, ONE PINCH AWAY" "Pinch the comfort plate  /  Large text: ON"; fi
 # Large text, off and on side by side (the same close fight shot, IWER).
 if [ -n "$COMFORTSEG" ] && [ -s "$NEW/bigtext-fight.mp4" ]; then
   ffmpeg -y -loglevel error -ss 0.6 -t 2.6 -i "$NEW/flick.mp4" -ss 0.6 -t 2.6 -i "$NEW/bigtext-fight.mp4" -filter_complex \
