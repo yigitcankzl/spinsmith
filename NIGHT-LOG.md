@@ -125,6 +125,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 16 (04:10–04:25) | Reason to Come Back | blind A/B cards: 4 → 7 (next-match move), then 5 → 6 (tomorrow says vs) | The come-back card names what the very next match unlocks (Next match: new move Forge Gust, from VERB_RELEASE) ahead of tomorrow's order; tomorrow's line says "vs" so the name reads as a rival (arena kept when it fits six words). sim-check covers both lines and every move name; first-five shows the card; desk-ko-first, combat-readability pass | merged |
 | 17 (04:25–04:45) | Technical (perf evidence) | blind A/B snapshots: 4 → 5 | `PERF_THROTTLE=n` on report:runtime-performance (DevTools CPU emulation); saved ready-phase runs at 1x / 4x / 6x: game update p95 0.6 / 2.5 / 4.6 ms, lowest fps 117 / 35 / 21, 117 draws per eye; README states the heavier scene and does not pin the fps drop on the emulator alone | merged |
 | 18 (04:20–04:40) | Accessibility (as shown); video | blind A/B reels: 5 → 4 (dial turns Large text ON, effect not shown), then 4 → 6 and video 6 → 7 | The comfort shot turns the dial to Large text and pinches it ON on camera (plate goes orange), then a split-screen LARGE TEXT OFF / ON in the same close fight shot (gauge labels and card 1.3x); the capture browser's Large text set back off after | merged |
+| 19 (04:25–04:35) | Polish: visual (Ripple Pool) | blind A/B stills: 5 → 6 | The Waves floor's relief paint is boosted 2.4x (its rings are shallow by design), so light and dark bands read between the rings. check:sim passes. Also check:hands clean again on a fresh page (third clean run tonight after the one "ended idle" miss) | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -134,7 +135,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Pip-fill beat on a scored point (the rim gauge is hidden on results: the plate's pips would carry it)
 - [x] Refused move points at the charge sparks (cycle 3)
 - [x] Desk-edge red arcs vs team orange: hazard tape (cycle 3)
-- [ ] Waves floor relief faint
+- [x] Waves floor relief (cycle 19)
 - [ ] The table remembers: DESK KO notch and beaten top readable after reload, on camera (judge: show a day-2/day-5 return)
 - [x] Forge / workshop near-silent (cycle 7, SFX ~2x)
 - [ ] Captions or visual twin for every audio cue (audit)
@@ -162,3 +163,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] IWSDK: a shot where the desk-edge arcs line up with the visible table edge (judge c15)
 - [ ] Come-back card: a move name (Forge Gust) says nothing about what it does; DAY 1 STREAK means little on day one (judge A/B c16)
 - [ ] Large text split: the two halves are framed at different zoom (judge A/B c18)
+- [ ] Ripple rings read as painted lines, not steps: a lit and a shadowed edge per ring (judge A/B c19)
