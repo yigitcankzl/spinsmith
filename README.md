@@ -74,7 +74,7 @@ The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rat
 
 ## Accessibility (seated, hands only)
 
-One brass dial on the home table (shown unasked through a new player's first session); each pinch turns it, a pinch on its plate toggles the stop. Stops in order (src/game/comfort.ts):
+One brass dial on the home table (its plate shows unasked through a new player's first session, src/game/hub.ts:412); each pinch turns it, a pinch on its plate toggles the stop. Stops in order (src/game/comfort.ts):
 
 1. **Calm**: no flashes and press-to-strike together
 2. **Large text**: cards, stamps, match bar and gauge labels 1.3x
@@ -85,7 +85,7 @@ One brass dial on the home table (shown unasked through a new player's first ses
 7. **Press to strike**: press and hold instead of a slap
 8. **High contrast**: wide, solid team rings
 9. **Left-handed**: home stations swap sides
-10. **Colour-safe**: Okabe-Ito blue / orange / yellow warnings; your rings are round and the rival's hexagons, and the real-edge band is striped, so nothing relies on hue alone
+10. **Colour-safe**: Okabe-Ito blue / orange / yellow warnings; your rings are round and the rival's hexagons (src/game/visuals.ts:915), and the real-edge band is striped (src/game/desk-play.ts:57), so nothing relies on hue alone
 11. **Standard**: everything off but the hand
 
 The toggles combine and are saved. `npm run check:sim` covers the dial, Large text's scale and the colour-safe swaps.
