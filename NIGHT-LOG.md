@@ -123,6 +123,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 14 (04:00–04:10) | Exp: comfort / FoV (off-centre seat) | blind A/B frames: 3 → 5 | The round card and the stamp in its slot yaw toward the head in ready / fight / result (the pinned DESK KO stamp already faced the eyes). Side-seat shot: the card is less skewed and fully in frame; the rest is perspective near the frame edge. desk-ko-first, combat-readability, desk-guard, sim-check (FoV anchors) pass | merged |
 | 15 (04:00–04:30) | Full judge re-score, then Polish: video / FFM / Accessibility as shown | full: mean 6.75 (Innovation 8, Experience 7, Technical 6, Polish 6; FFM 7, RtCB 7, Accessibility 8, Boldest 7, IWSDK 6). Blind A/B reels: FFM 4 → 7, Accessibility 1 → 4, video 7 → 7, RtCB 6 → 6 | Reel now 75 s: a new player's first 18 s uncut (PUT YOUR TOP IN, carry the top in, the rival's portal, ghost-hand rip, first ramp, SLAG), and the comfort dial's plate cycling stops (caption names only what is shown). room-matrix passes | merged |
 | 16 (04:10–04:25) | Reason to Come Back | blind A/B cards: 4 → 7 (next-match move), then 5 → 6 (tomorrow says vs) | The come-back card names what the very next match unlocks (Next match: new move Forge Gust, from VERB_RELEASE) ahead of tomorrow's order; tomorrow's line says "vs" so the name reads as a rival (arena kept when it fits six words). sim-check covers both lines and every move name; first-five shows the card; desk-ko-first, combat-readability pass | merged |
+| 17 (04:25–04:45) | Technical (perf evidence) | blind A/B snapshots: 4 → 5 | `PERF_THROTTLE=n` on report:runtime-performance (DevTools CPU emulation); saved ready-phase runs at 1x / 4x / 6x: game update p95 0.6 / 2.5 / 4.6 ms, lowest fps 117 / 35 / 21, 117 draws per eye; README states the heavier scene and does not pin the fps drop on the emulator alone | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -156,6 +157,6 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Post-win: MATCH WON, You win the match!, BOUT WON! are three win messages; LEVEL / NEW MOVE / STREAK ~1 s apart (judge A/B c11)
 - [ ] NO TABLE · MOVE BY HANDLE right before PUT YOUR TOP IN (judge A/B c11)
 - [ ] Comfort shot: toggle one stop ON on camera (the plate read OFF throughout) (judge A/B c15)
-- [ ] Technical: a CPU-throttled perf run saved next to the others (judge c15)
+- [x] Technical: CPU-throttled perf runs (cycle 17)
 - [ ] IWSDK: a shot where the desk-edge arcs line up with the visible table edge (judge c15)
 - [ ] Come-back card: a move name (Forge Gust) says nothing about what it does; DAY 1 STREAK means little on day one (judge A/B c16)
