@@ -153,6 +153,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 44 (05:44–05:48) | Polish: video (disclosure) | blind A/B frames at 640 px: 5 → 7 | The IWER / not-headset disclosure is larger (30 px), brighter and on a dark backing, readable at gallery-thumbnail size without covering the arena | merged |
 | 45 (05:47–05:55) | Polish: video (comfort hold) | blind A/B: 7 → 6 | Tried: comfort shot 2.2 s; the clean ON plate then showed for ~0.25 s. desk-ko-first, combat-readability, desk-ko pass 2/2 more on fresh pages | dropped |
 | 46 (05:48–05:55) | Accessibility as shown; video (Large text split) | blind A/B frames: 3 → 6; 4 → 5 | The OFF / ON split is cropped in on the gauge with both halves at matching arena scale (the old split's OFF side sat further back, so the smaller text came from distance, an unfair comparison) | merged |
+| closing pass (05:53–06:00) | Master green | — | typecheck, check:sim, check:sim-n, check:net, build; on fresh pages desk-ko-first, desk-ko, desk-guard, combat-readability, first-five (14 prompts, 54 words, first KO 18.4 s, DESK KO 40.9 s), room-matrix (failed after other probes, passed alone on a fresh page, as the README says), check:hands. Stills refreshed from the final reel (night-2026-10-23/stills/) | — |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
