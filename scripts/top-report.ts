@@ -7,7 +7,7 @@ import { Worker } from 'node:worker_threads';
 import { allBuilds, buildName } from '../src/game/parts.ts';
 import { summarize, topWarnings } from '../src/game/top-report.ts';
 
-// 48 opponents per build: fewer and the luckiest of 136 builds looks dominant by chance.
+// 48 opponents per build: fewer and the luckiest of 226 builds looks dominant by chance.
 const OPPONENTS = 48;
 const t0 = Date.now();
 const n = allBuilds().length;
