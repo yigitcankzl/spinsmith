@@ -138,6 +138,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 29 (04:51–04:54) | Reason to Come Back (card bug) | blind A/B frames: 5 → 7 | Re-recording the result card showed cycle 27's title wrapping onto two lines and the card joining its two body lines ("…Forge Gust Tomorrow: vs Iron Keep"); day one's title is now COME BACK TOMORROW (one line) and the lines stay apart | merged |
 | 30 (04:55–05:00) | Full judge re-score | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 7, RtCB 7, Accessibility 7, Boldest 6, IWSDK 7) | lowest: Technical, Boldest, Experience | judge only |
 | 32 (05:00–05:05) | Accessibility (dial reach) | blind A/B: 5 → 7 | Comfort dial order: Calm, Large text, One hand, Assist first (Large text 1 pinch away, was 9; One hand 2, was 5). The stop is not saved, so no migration; sim-check passes | merged |
+| 31 (04:57–05:08) | Boldest; Polish: video | blind A/B reels: Boldest 6 → 8 (with 1.35x captions video fell 7 → 5, reverted), then Boldest 6 → 8, video 6 → 6 | The table-off / table-detected split comes right after the opening DESK KO, titled YOUR DESK IS THE RING-OUT; comfort caption says what the shot shows | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -185,3 +186,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [x] Room-decides split prompts readable (cycle 26)
 - [ ] Disk is nearly full (2.5 GB free): keep judge frames as small JPGs
 - [ ] Come-back card: why tomorrow's rival matters / what beating it gives (judge A/B c27)
+- [ ] A faint DESK KO! shows behind the end card (judges c23, c31)
