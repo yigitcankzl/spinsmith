@@ -182,6 +182,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | closing pass 3 (07:22–07:31) | Master green on the last commit | — | typecheck, check:sim, check:sim-n, check:net, build; fresh pages: desk-ko-first, combat-readability, desk-ko, desk-guard, first-five, room-matrix, check:hands. Night 2 total: 48 cycles merged or kept, 15 dropped, 5 judge-only | — |
 | 69 (07:32–07:35) | Full judge re-score | mean 6.5 (Innovation 8, Experience 6, Technical 6, Polish 6; FFM 7, RtCB 6, Accessibility 7, Boldest 6, IWSDK 7) | check:hands clean again on master (07:34) | judge only |
 | 70 (07:33–07:35) | Experience Design (first minute at a glance) | blind A/B README: 4 → 6 | README "The first minute, measured": a timed strip from the three saved first-five runs (put top in ~2 s, rip ~12 s, ramp ~14 s, first KO ~18 s in 2 of 3 runs, DESK KO 29-45 s, match won 49-94 s); the judge's one error (run 2) was already corrected | merged |
+| 71 (07:35–07:38) | Polish: video (split prompt) | blind A/B frames: 5 → 7 | The opening split's right half is framed so its card (SQUEEZE! RELEASE) reads in full; the right arena's left edge is cut instead | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
