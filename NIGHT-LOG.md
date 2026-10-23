@@ -119,6 +119,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 10 (03:20–03:40) | First Five Minutes (post-win) | blind A/B: 6.5 → 5.5 (one run each), 6 → 5 (two runs each) | Tried: unlocks wait for the stamp queue (pushed LEVEL onto the win card: 0.6 s after it), the finish sub-line keeps its meaning with a cause, no flick lesson on the round that can decide the first match | dropped |
 | 11 (03:40–03:55) | First Five Minutes (wording) | blind A/B two runs each: 6 → 6.5 (clarity 6 → 7) | From cycle 10 only the two parts the judge credited: YOUR RAMP → INTO THE SLAG PIT, and no flick lesson on the deciding round of match 1. first-five 2 runs pass; desk-ko-first, combat-readability, desk-ko pass | merged |
 | 12 (03:40–04:00) | First Five Minutes (post-win) | blind A/B two runs each: 6 → 6 (bout beat as MEDAL n OF 3), then 7 → 5.5 (plus a win card without "You win the match!" and a plain no-table card) | Judges read the score on the card as noise and the post-win spacing swings with bot timing more than with these lines; three post-win attempts (cycles 10, 12) moved nothing, so this line of work stops here | dropped |
+| 13 (03:50–04:05) | Exp: readability (DESK KO moment) | blind A/B frames: 3 → 8 | The pinned DESK KO stamp comes back toward the fight stamp's slot over the far rim instead of the arena centre, so DESK KO!, its sub-line and the gauge's FIRST TO 4 / YOU / rival sit in three bands (before: the sub-line garbled DRIFTER, FIRST TO 4 hidden). desk-ko-first, desk-ko, combat-readability pass | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -141,7 +142,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [x] Text-size comfort option (cycle 8)
 - [ ] An unlock payoff on camera (judge c2)
 - [x] Colour-safe: forge needle and low-spin bar (cycle 8)
-- [ ] DESK KO stamp pulled toward the arena lands over the gauge's FIRST TO 4 in the front shot (judge A/B)
+- [x] DESK KO stamp over the gauge (cycle 13)
 - [ ] SPIN RUB chapter shows an ULTIMATE READY banner (reel shot choice)
 - [x] The desk-KO card burst (cycle 9: WRENCH then SQUEEZE! RELEASE)
 - [x] Result card 0.9 s after the finish stamp (cycle 9)
