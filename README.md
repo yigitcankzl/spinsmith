@@ -59,8 +59,10 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 | Hub | 47 | 97 | 0.9 / 1.2 / 2 ms |
 | Ready, first match | 75 | 88 | 1.4 / 1.7 / 2.5 ms |
 | Fight, first match | 51 | 88 | 1.2 / 1.8 / 3.1 ms |
+| Fight, first match, capture room (planes and edge arcs up) | 83 | 96 | 0.5 / 0.8 / 1.5 ms |
+| Fight, 4-top brawl, capture room | 97 | 89 | 0.8 / 1.3 / 6.7 ms |
 
-The worst case saved is 117 draws per eye (ready phase with the capture room's planes and the desk-edge arcs up, `ready-cpu1x-2026-10-23.json`); the gate fails the script above 150 in any state.
+A 4-top brawl at 4x CPU throttle (next round's ready phase) reads 86 draws per eye, lowest 24 fps, update p95 3.7 ms (`brawl4-ready-room-cpu4x-2026-10-23.json`). The worst case saved is 117 draws per eye (ready phase with the capture room's planes and the desk-edge arcs up, `ready-cpu1x-2026-10-23.json`); the gate fails the script above 150 in any state.
 
 CPU-throttled proxy (`PERF_THROTTLE=4` / `6`, DevTools CPU emulation, ready phase, `artifacts/perf/ready-cpu*x-2026-10-23.json`): the game's own update per frame goes from 0.4 / 0.6 ms (p50 / p95) unthrottled to 1.9 / 2.5 ms at 4x and 3.0 / 4.6 ms at 6x, inside a 72 Hz frame (13.9 ms). These throttled runs caught a heavier scene than the table above (117 draws per eye, 168 k triangles, the capture room's planes and edge arcs up). The page's lowest fps falls to 35 at 4x and 21 at 6x. With the game's update that small (2.5 ms p95 at 4x), the rest of the frame is three.js submitting two eye passes without multiview plus the emulator itself (IWER runs in the same JavaScript thread and draws the 360 backdrop); the script does not split GPU from CPU time, so how much carries over to a Quest is not known, and this is not a Quest prediction.
 
