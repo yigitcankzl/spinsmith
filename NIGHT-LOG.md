@@ -115,6 +115,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 6 (02:35–02:57) | Polish: video; visual; readability | 6 → 6 → 6 → blind A/B: video 5 → 6, visual 4 → 7, readability 5 → 6 | Fresh single-reel judges kept landing on the same integer whatever changed, each citing new nits, so the re-score became a blind A/B: one fresh judge scores the master-script reel and the branch reel side by side (labels X/Y, same shots). Changes: four arenas in live play (Sumo Square, Titan Crater, Glacier Steps, Crucible Gate; .tmp/rec-arenas.sh drives), the DESK KO stamp leaves its edge pin when the result comes (the plate covered it), dead frames trimmed, disclosure overlay 1.5 s, 2 s end card over the dimmed DESK KO, captions name only what is shown. desk-ko-first, desk-ko, combat-readability pass | merged |
 | 7 (03:00–03:10) | First Five Minutes; Polish: audio; video | blind A/B: FFM clarity 5 → 7, clutter 4 → 6; audio 5 → 6; video 6 → 6 | Cycle 4's dropped commits re-tried under the blind A/B: no VS stamp over the first rival card, no WATCH THE TOPS REACT under the DESK KO stamp, the LEVEL card not repeated under its stamp, medal stamp without the bout number, forge/builder SFX ~2x, room tone under a decided result. first-five: 18/19 prompts, 68/73 words (was 22 / 92), come-back card seen; desk-ko-first, desk-ko, desk-guard, combat-readability, check:hands pass on a fresh page | merged |
 | 8 (03:10–03:25) | Accessibility | blind A/B (source snapshots): 6.5 → 8 | Cycle 5's dropped commits re-tried: Large text (card, stamps, bar, gauge labels 1.3x; textScale() tested), the comfort plate shows through a new smith's first session, plus colour-safe now reaches the forge preview needle (worse also dashed) and the low-spin bar fill. desk-ko-first, combat-readability, desk-guard, build pass | merged |
+| 9 (03:11–03:35) | First Five Minutes (clutter) | blind A/B prompt lists: 5.5 → 6.5 (clutter 5 → 7, clarity 6 → 6) | The result card follows the finish stamp by 0.9 s (was the same frame); the staged DESK KO lesson no longer adds PINCH BOTH GLOWS over its own card and ghosts. first-five 2 runs: 14/15 prompts, 52/52 words (was 18-19 / 68-73), come-back card seen. desk-ko-first, desk-ko, desk-guard, combat-readability, check:hands pass on a fresh page | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -139,7 +140,9 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [x] Colour-safe: forge needle and low-spin bar (cycle 8)
 - [ ] DESK KO stamp pulled toward the arena lands over the gauge's FIRST TO 4 in the front shot (judge A/B)
 - [ ] SPIN RUB chapter shows an ULTIMATE READY banner (reel shot choice)
-- [ ] The desk-KO card burst (WRENCH, PINCH BOTH GLOWS, SQUEEZE! RELEASE within 3 s) into one card (judge A/B c7)
-- [ ] SLAG stamp and the result card in the same frame (judge A/B c7)
+- [x] The desk-KO card burst (cycle 9: WRENCH then SQUEEZE! RELEASE)
+- [x] Result card 0.9 s after the finish stamp (cycle 9)
 - [x] Re-try cycle 5 under the blind A/B (cycle 8)
 - [ ] Colour-safe low-spin colour: orange on the canvas bar, yellow on the 3D gauge (judge c8)
+- [ ] End-of-match pile-up: LEVEL, BOUT WON, NEW MOVE, STREAK in ~7 s (judge A/B c9)
+- [ ] Jargon at payoffs: SLAG! with a cause sub-line hides INTO THE SLAG PIT; MEDAL 2 OF 3 · RAMP IT OUT (judge A/B c9)
