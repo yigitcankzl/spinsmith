@@ -159,6 +159,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 48 (06:07–06:12) | Technical (worst-case perf coverage) | blind A/B snapshots: 4 → 6 | Saved runs for a capture-room duel fight (83 draws/eye, 96 fps) and a 4-top brawl fight (97/eye, 89 fps, update p95 1.3 ms), plus a throttled brawl (4x, ready: 86/eye, 24 fps); README table rows and the 6x guard run's 15.3 ms update spike stated | merged |
 | 49 (06:10–06:16) | Reason to Come Back (streak pays) | blind A/B code: 6 → 7 | From day 2 of a streak the day's first finished match earns 25 XP per streak day (cap 7 → 175 XP), stamped N-DAY STREAK! with any unlocks it opens shown; the demo save stays level 8; sim-check asserts day 1 / same day earn nothing and day 2 earns 2x25. desk-ko-first, combat-readability, first-five, build pass | merged |
 | 50 (06:16–06:22) | Reason to Come Back (tomorrow's line) | blind A/B cards: 5 → 7 (clarity 6 → 7) | Tomorrow's line says what the order pays when it fits six words (Tomorrow: beat Iron Keep · +120 XP), else rival and arena; result card re-recorded, renders on one line | merged |
+| 51 (06:20–06:23) | Polish: visual (Sumo outline) | blind A/B stills: 6 → 5 | Tried: drop the floor accent band on wall-less arenas (the berm line doubles it). The berm line alone is broken at the front and back, so the edge read worse | dropped |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -200,7 +201,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Guard test checks the label only, not that the steps help (judge A/B c22)
 - [x] Room-decides split (cycle 25)
 - [ ] Polish: comfort shot at sofa height, knob over the plate; one tagline everywhere (judge c20)
-- [x] Hazard-tape bands follow the rim (cycle 24); doubled white rim outline still open
+- [x] Hazard-tape bands follow the rim (cycle 24); doubled white rim outline still open (cycle 51: the berm line alone is broken, keep the band)
 - [ ] Comfort caption says Turn the dial but no dial turns on screen; a ghosted DESK KO! shows through the end card (judge A/B c23)
 - [ ] Sumo Square: the band sits a little out on the base ring, below the wall top (judge A/B c24)
 - [x] Room-decides split prompts readable (cycle 26)
