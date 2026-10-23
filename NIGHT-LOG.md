@@ -170,6 +170,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | closing pass 2 (06:40–06:45) | Master green after every merge | — | typecheck, check:sim, check:sim-n, check:net, build; fresh pages: desk-ko-first, desk-ko, desk-guard, combat-readability, first-five (14 prompts, 50 words, first KO 17.8 s, DESK KO 30.6 s), room-matrix, check:hands. Stills refreshed from the final reel. Night 2 total: 39 cycles merged, 14 dropped, 4 judge-only | — |
 | 58 (06:45–06:47) | Full judge re-score | mean 6.75 (Innovation 8, Experience 7, Technical 6, Polish 6; FFM 7, RtCB 6, Accessibility 7, Boldest 7, IWSDK 6) | lowest: Technical, Polish, RtCB | judge only |
 | 59 (06:45–06:47) | Technical (perf read in 5 s) | blind A/B README: 5 → 6 | "In short" line at the top of Measured performance: draws 47-117/eye, update 0.4-1.4 ms, GPU 0.86 ms on the timed scene, the throttled frame is CPU-side; numbers re-checked against every saved run | merged |
+| 60 (06:47–06:51) | Accessibility as shown | blind A/B reels: Accessibility 5 → 6, Polish 7.5 → 7 | Tried: a 2.2 s colour-safe fight (yellow hazard tape, shape-coded owners) after the Large text split; wide and its caption hit a game card, so Polish regressed | dropped |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
