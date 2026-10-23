@@ -183,6 +183,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 69 (07:32–07:35) | Full judge re-score | mean 6.5 (Innovation 8, Experience 6, Technical 6, Polish 6; FFM 7, RtCB 6, Accessibility 7, Boldest 6, IWSDK 7) | check:hands clean again on master (07:34) | judge only |
 | 70 (07:33–07:35) | Experience Design (first minute at a glance) | blind A/B README: 4 → 6 | README "The first minute, measured": a timed strip from the three saved first-five runs (put top in ~2 s, rip ~12 s, ramp ~14 s, first KO ~18 s in 2 of 3 runs, DESK KO 29-45 s, match won 49-94 s); the judge's one error (run 2) was already corrected | merged |
 | 71 (07:35–07:38) | Polish: video (split prompt) | blind A/B frames: 5 → 7 | The opening split's right half is framed so its card (SQUEEZE! RELEASE) reads in full; the right arena's left edge is cut instead | merged |
+| 72 (07:38–07:40) | Boldest (one line) | blind A/B reels: 5 → 6, video 6 → 6 | The end card says "Your desk is the ring-out", word for word the split's title at 0:06, so the line comes back as an echo; README.txt and SUBMISSION.md updated | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
