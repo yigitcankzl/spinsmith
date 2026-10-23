@@ -50,7 +50,13 @@ clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms 
 clip 05-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal / press it into the bowl"
 # Comfort: the dial's stops on its plate (filmed from the seat, cropped in).
-COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 4.6 5.6 "COMFORT, ONE PINCH AWAY" "Turn the dial, pinch the plate  /  Large text: ON"; fi
+COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 4.6 4.2 "COMFORT, ONE PINCH AWAY" "Turn the dial, pinch the plate  /  Large text: ON"; fi
+# Large text, off and on side by side (the same close fight shot, IWER).
+if [ -n "$COMFORTSEG" ] && [ -s "$NEW/bigtext-fight.mp4" ]; then
+  ffmpeg -y -loglevel error -ss 0.6 -t 2.6 -i "$NEW/flick.mp4" -ss 0.6 -t 2.6 -i "$NEW/bigtext-fight.mp4" -filter_complex \
+    "[0:v]scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}/2:${HEIGHT},fps=${FPS}[a];[1:v]scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}/2:${HEIGHT},fps=${FPS}[b];[a][b]hstack,drawbox=x=iw/2-2:y=0:w=4:h=ih:color=0x111419:t=fill,drawtext=fontfile=$FONT:text='LARGE TEXT OFF':fontcolor=white:fontsize=40:x=w/4-text_w/2:y=h-120:box=1:boxcolor=0x111419@0.75:boxborderw=12,drawtext=fontfile=$FONT:text='LARGE TEXT ON':fontcolor=0xffa24a:fontsize=40:x=3*w/4-text_w/2:y=h-120:box=1:boxcolor=0x111419@0.75:boxborderw=12,drawtext=fontfile=$FONT:text='$LABEL':fontcolor=white@0.55:fontsize=22:x=w-text_w-28:y=h-42[v]" \
+    -map "[v]" -map 0:a? -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/066-bigtext.mp4"
+fi
 # Four arenas in live play, one beat each (IWER, recorded by .tmp/rec-arenas.sh style drives).
 parts=()
 for f in "$NEW"/arenas/*.mp4; do
@@ -71,7 +77,7 @@ ffmpeg -y -loglevel error \
   -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p \
   -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/09-end.mp4"
 
-segments=(00-hook ${FIRST30:+005-first} 01-match 02-squeeze 03-flick 04-guard 05-rub 06-strike ${COMFORTSEG:+065-comfort} ${parts[@]+"${parts[@]}"} 07-forge 08-workshop 085-return 09-end)
+segments=(00-hook ${FIRST30:+005-first} 01-match 02-squeeze 03-flick 04-guard 05-rub 06-strike ${COMFORTSEG:+065-comfort} ${COMFORTSEG:+066-bigtext} ${parts[@]+"${parts[@]}"} 07-forge 08-workshop 085-return 09-end)
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
 mkdir -p "$(dirname "$FINAL")"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" \
