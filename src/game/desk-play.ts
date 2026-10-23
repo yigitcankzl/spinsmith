@@ -26,6 +26,33 @@ const OUTER_RAIL_WIDTH = 0.0045;
 /** Maximum real seconds to wait for a thrown rival to settle on, or leave, the detected table. */
 const DESK_VERDICT_TIME = 3.5;
 
+/** A flat band just outside a rim from angle a0 to a1 (root frame), its radius read per angle; planar UVs over `span`. */
+function rimBand(a0: number, a1: number, radiusAt: (a: number) => number, span: number): BufferGeometry {
+  const segs = 24;
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const index: number[] = [];
+  for (let k = 0; k <= segs; k++) {
+    const a = a0 + ((a1 - a0) * k) / segs;
+    const rr = radiusAt(a);
+    for (const f of [1.02, 1.1]) {
+      const x = Math.cos(a) * rr * f;
+      const z = Math.sin(a) * rr * f;
+      pos.push(x, 0, z);
+      uv.push((x / span + 1) / 2, (z / span + 1) / 2);
+    }
+    if (k < segs) {
+      const i = k * 2;
+      index.push(i, i + 1, i + 2, i + 1, i + 3, i + 2);
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  g.setIndex(index);
+  return g;
+}
+
 /** Diagonal hazard stripes (white and dark; the arc's colour tints the white), tiled across the planar ring UVs. */
 const HAZARD = (() => {
   const c = document.createElement('canvas');
@@ -66,7 +93,7 @@ export class DeskPlay {
   deskArcs = [0, 1].map(() => {
     // Hazard tape: diagonal dark stripes over the warning colour, so the real edge differs from the
     // team-orange rim by pattern as well as hue (and still reads in the colour-safe palette).
-    const m = new Mesh(new RingGeometry(0.1, 0.11, 8), new MeshBasicMaterial({ color: 0xff5a1e, map: HAZARD, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide, toneMapped: false }));
+    const m = new Mesh<BufferGeometry, MeshBasicMaterial>(new RingGeometry(0.1, 0.11, 8), new MeshBasicMaterial({ color: 0xff5a1e, map: HAZARD, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide, toneMapped: false }));
     m.name = 'desk-edge-arc';
     m.visible = false;
     m.renderOrder = 3;
@@ -262,7 +289,9 @@ export class DeskPlay {
           const r = rimRadius(L, sa);
           const half = Math.min(sec.halfWidth, DESK_DROP_HALF_MAX);
           arcs[i].geometry.dispose();
-          arcs[i].geometry = new RingGeometry(r * 1.02, r * 1.1, 24, 1, -sec.angle - half, half * 2).rotateX(-Math.PI / 2);
+          // The band follows the rim's own radius at every angle (a square or oval rim is not a
+          // circle), so it never cuts through the wall. UVs stay planar for the hazard stripes.
+          arcs[i].geometry = rimBand(sec.angle - half, sec.angle + half, (a) => rimRadius(L, a + stageYaw), r * 1.1);
           arcs[i].position.y = this.m.arena.height(Math.cos(sa) * r * 0.97, Math.sin(sa) * r * 0.97) + WALL_HEIGHT[L.wall] + 0.002;
         });
         if (import.meta.env.DEV) console.log(`[DESK EDGE] ${this.deskEdgeSectors.map((d) => `${((d.angle * 180) / Math.PI).toFixed(0)}deg +-${((d.halfWidth * 180) / Math.PI).toFixed(0)} at ${(d.distance * s).toFixed(2)} m`).join('; ') || 'none'}`);
