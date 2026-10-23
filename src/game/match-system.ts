@@ -116,6 +116,8 @@ const REC = 2 * REC_TOP + 3;
 const RIVAL_TELL_CODE: Record<RivalMove, number> = { charge: 1, quake: 2, pull: 3 };
 /** Seconds the rival and arena intro shows before the first session's rip hint. */
 const INTRO_TIME = 2.5;
+/** The finish stamp's beat before the result card (s). */
+const RESULT_CARD_DELAY = 0.9;
 /** A one-hand rim pull waits this long for the other hand before it can become a spring. */
 const RIM_SPRING_INTENT = 0.25;
 /** The table slap lives clearly outside every rim-grab zone, so one contact can never mean both. */
@@ -876,6 +878,8 @@ export class MatchSystem extends createSystem({
   private strikeWindowShown = false;
   accumulator = 0;
   resultTimer = 0;
+  /** The round's result card, waiting for the finish stamp to be read. */
+  private resultCard: { text: string; at: number } | null = null;
   time = 0;
   frameDt = 0;
   /** Which hand holds the cord, and pull bookkeeping. */
@@ -1781,6 +1785,10 @@ export class MatchSystem extends createSystem({
       case 'ready':
       case 'result':
         if (this.phase === 'result') {
+          if (this.resultCard && this.time >= this.resultCard.at) {
+            this.label.set(this.resultCard.text);
+            this.resultCard = null;
+          }
           // Asked to leave? The result holds while the second pinch comes.
           if (this.time - this.menuArmed >= 3) this.resultTimer -= dt;
           // Between rounds a pinch skips the rest of the card, once the finish has been seen.
@@ -2902,7 +2910,9 @@ export class MatchSystem extends createSystem({
       }
       if (claim !== this.handHoverClaim[side]) {
         this.handHoverClaim[side] = claim;
-        if (claim && this.labelTimer <= 0 && this.progress.guide !== 'done' && (claim !== 'RIM' || this.taught('spring'))) {
+        // In the staged DESK KO lesson the card and the ghost hands already say where to grip.
+        const lessonSays = claim === 'FORGE' && this.progress.matches === 0 && this.desk.deskWrenchAt() !== null;
+        if (claim && !lessonSays && this.labelTimer <= 0 && this.progress.guide !== 'done' && (claim !== 'RIM' || this.taught('spring'))) {
           this.label.set(CLAIM[claim]);
           this.labelTimer = 0.65;
         }
@@ -4042,6 +4052,7 @@ export class MatchSystem extends createSystem({
   }
 
   private toReady() {
+    this.resultCard = null;
     this.cancelActiveGestures();
     this.verbs.resetEmber();
     for (const t of this.extras) {
@@ -7651,7 +7662,10 @@ export class MatchSystem extends createSystem({
       }
     }
     // Match 1's rounds leave the finish to the stamp and the score to the bar; its verdict is carded.
-    this.label.set(this.quietFirst && v !== 2 && !this.matchOver ? '' : text);
+    // The finish stamp reads first; the result card follows a beat later, not in the same frame.
+    const card = this.quietFirst && v !== 2 && !this.matchOver ? '' : text;
+    this.label.set('');
+    this.resultCard = card ? { text: card, at: this.time + RESULT_CARD_DELAY } : null;
     // The card and stamp already name the finish. The bar uses its scarce centre slot for score.
     this.barMessage = v === 2 ? 'DRAW' : `${this.barPoints[0]} — ${this.barPoints[1]}`;
     console.log(`[MATCH] ${this.lastCause ? `${this.lastCause} - ` : ''}${text.replace('\n', ' - ')} after ${this.elapsed.toFixed(1)} s, ${this.clashes} clash steps`);
