@@ -1096,12 +1096,13 @@ TUNING.grace = 0;
   // Tomorrow's order is a real order for tomorrow's date: deterministic, and what the card says.
   const ctx = { rivals: RIVALS.map((r) => r.name), arenas: ARENAS, built: [], table: true };
   const tomorrow = dailyOrder(addDays('2026-10-22', 1), ctx);
+  const fitsSix = (l: string) => wordsIn(l) <= COME_BACK_WORDS;
   assert.equal(tomorrow.date, '2026-10-23');
   assert.deepEqual(dailyOrder('2026-10-23', ctx), tomorrow, 'the teaser is the order tomorrow brings');
-  assert.equal(tomorrowLine(tomorrow), `Tomorrow: ${tomorrow.rival} in ${tomorrow.arena}`);
+  assert.equal(tomorrowLine(tomorrow), fitsSix(`Tomorrow: vs ${tomorrow.rival} in ${tomorrow.arena}`) ? `Tomorrow: vs ${tomorrow.rival} in ${tomorrow.arena}` : `Tomorrow: vs ${tomorrow.rival}`);
   const card = comeBackCard(1, tomorrow, nextBout({}, true, 0));
-  assert.deepEqual(card.split('\n'), ['DAY 1 STREAK', 'Next bout 1-1: Drifter', `Tomorrow: ${tomorrow.rival} in ${tomorrow.arena}`], 'no move to unlock: streak, next bout, tomorrow');
-  assert.deepEqual(comeBackCard(1, tomorrow, nextBout({}, true, 0), 'Forge Gust').split('\n'), ['DAY 1 STREAK', 'Next match: new move Forge Gust', `Tomorrow: ${tomorrow.rival} in ${tomorrow.arena}`], 'a move to unlock comes before the bout');
+  assert.deepEqual(card.split('\n'), ['DAY 1 STREAK', 'Next bout 1-1: Drifter', tomorrowLine(tomorrow)], 'no move to unlock: streak, next bout, tomorrow');
+  assert.deepEqual(comeBackCard(1, tomorrow, nextBout({}, true, 0), 'Forge Gust').split('\n'), ['DAY 1 STREAK', 'Next match: new move Forge Gust', tomorrowLine(tomorrow)], 'a move to unlock comes before the bout');
   for (const [name] of Object.values(VERB_CARD)) assert.ok(promptWords(nextMoveLine(name)) <= 6, `${name} fits the card`);
   assert.equal(comeBackCard(4, null, null), 'DAY 4 STREAK\nTomorrow: a new Smith Order', 'no order known, no bout left: still a pull');
   // Every rival, arena and bout (and a long workshop arena name) stays within six words a line.

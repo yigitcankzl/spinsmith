@@ -47,7 +47,8 @@ export function streakTitle(streak: number, playedToday: boolean): string {
 /** What tomorrow brings: its Smith Order's rival and arena when known. */
 export function tomorrowLine(order: Order | null): string {
   if (!order) return 'Tomorrow: a new Smith Order';
-  return fit(`Tomorrow: ${order.rival} in ${order.arena}`, `Tomorrow: an order vs ${order.rival}`, 'Tomorrow: a new Smith Order');
+  // "vs" says the name is the rival; the arena follows when it fits.
+  return fit(`Tomorrow: vs ${order.rival} in ${order.arena}`, `Tomorrow: vs ${order.rival}`, 'Tomorrow: a new Smith Order');
 }
 
 /** The next Circuit Map bout, or '' when every bout is won. */
