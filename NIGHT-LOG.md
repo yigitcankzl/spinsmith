@@ -136,6 +136,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 27 (04:46–04:49) | Reason to Come Back (clarity) | blind A/B cards: clarity 6 → 8, replay 6 → 6 | Day one's streak line says DAY 1 · COME BACK TOMORROW (a one-day streak is nothing to keep yet); sim-check updated | merged |
 | 28 (04:49–04:51) | Technical / IWSDK (judge self-test) | blind A/B README: 5 → 6 | README judge step 7: `?fps` readout beside MENU and `?diagnostics` copyable report after leaving XR | merged |
 | 29 (04:51–04:54) | Reason to Come Back (card bug) | blind A/B frames: 5 → 7 | Re-recording the result card showed cycle 27's title wrapping onto two lines and the card joining its two body lines ("…Forge Gust Tomorrow: vs Iron Keep"); day one's title is now COME BACK TOMORROW (one line) and the lines stay apart | merged |
+| 30 (04:55–05:00) | Full judge re-score | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 7, RtCB 7, Accessibility 7, Boldest 6, IWSDK 7) | lowest: Technical, Boldest, Experience | judge only |
+| 32 (05:00–05:05) | Accessibility (dial reach) | blind A/B: 5 → 7 | Comfort dial order: Calm, Large text, One hand, Assist first (Large text 1 pinch away, was 9; One hand 2, was 5). The stop is not saved, so no migration; sim-check passes | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
