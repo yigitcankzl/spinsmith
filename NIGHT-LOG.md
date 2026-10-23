@@ -139,8 +139,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 30 (04:55–05:00) | Full judge re-score | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 7, RtCB 7, Accessibility 7, Boldest 6, IWSDK 7) | lowest: Technical, Boldest, Experience | judge only |
 | 32 (05:00–05:05) | Accessibility (dial reach) | blind A/B: 5 → 7 | Comfort dial order: Calm, Large text, One hand, Assist first (Large text 1 pinch away, was 9; One hand 2, was 5). The stop is not saved, so no migration; sim-check passes | merged |
 | 31 (04:57–05:08) | Boldest; Polish: video | blind A/B reels: Boldest 6 → 8 (with 1.35x captions video fell 7 → 5, reverted), then Boldest 6 → 8, video 6 → 6 | The table-off / table-detected split comes right after the opening DESK KO, titled YOUR DESK IS THE RING-OUT; comfort caption says what the shot shows | merged |
-| 33 (05:08–05:12) | Polish: video (end card) | blind A/B frames: 4 → 7 | The end card's dimmed background now comes from before the DESK KO stamp, so no ghosted DESK KO! sits behind the title | merged |
-| 34 (05:12–05:20) | First Five Minutes (as shown) | blind A/B reels: 7 → 8, video 7 → 7 | A running clock FROM HOME on the uncut new-player segment: carry, ghost-hand rip, ramp and the first KO inside 18 s. Also checked: the heavier saved scene is ~76 visible game meshes plus emulator room objects, no cheap draw cut | merged |
+| 33 (05:05–05:07) | Polish: video (end card) | blind A/B frames: 4 → 7 | The end card's dimmed background now comes from before the DESK KO stamp, so no ghosted DESK KO! sits behind the title | merged |
+| 34 (05:07–05:11) | First Five Minutes (as shown) | blind A/B reels: 7 → 8, video 7 → 7 | A running clock FROM HOME on the uncut new-player segment: carry, ghost-hand rip, ramp and the first KO inside 18 s. Also checked: the heavier saved scene is ~76 visible game meshes plus emulator room objects, no cheap draw cut | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
