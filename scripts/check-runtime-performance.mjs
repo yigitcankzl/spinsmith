@@ -45,7 +45,34 @@ export default async function run({ page, frame }) {
       updateMs.push(performance.now() - t0);
       return r;
     };
+    // GPU time per rendered frame (EXT_disjoint_timer_query_webgl2 around renderer.render), so the
+    // frame can be split into GPU work and everything else (game, three.js submission, emulator).
+    const tq = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    const gpuMs = [];
+    const pending = [];
+    const render = renderer.render;
+    if (tq) {
+      renderer.render = function (...args) {
+        const q = gl.createQuery();
+        gl.beginQuery(tq.TIME_ELAPSED_EXT, q);
+        const r = render.apply(this, args);
+        gl.endQuery(tq.TIME_ELAPSED_EXT);
+        pending.push(q);
+        for (let i = pending.length - 1; i >= 0; i--) {
+          const p = pending[i];
+          if (gl.getQueryParameter(p, gl.QUERY_RESULT_AVAILABLE) && !gl.getParameter(tq.GPU_DISJOINT_EXT)) {
+            gpuMs.push(gl.getQueryParameter(p, gl.QUERY_RESULT) / 1e6);
+            gl.deleteQuery(p);
+            pending.splice(i, 1);
+          }
+        }
+        return r;
+      };
+    }
     await new Promise((resolve) => setTimeout(resolve, guard ? 9200 : 5200));
+    renderer.render = render;
+    const gpuSorted = gpuMs.slice().sort((a, b) => a - b);
+    const gpct = (q) => Math.round((gpuSorted[Math.min(gpuSorted.length - 1, Math.floor(gpuSorted.length * q))] ?? 0) * 100) / 100;
     if (guard) history.replaceState(null, '', `${location.pathname}${search}`);
     game.update = original;
     const sortedMs = updateMs.slice().sort((a, b) => a - b);
@@ -75,6 +102,7 @@ export default async function run({ page, frame }) {
       liteMode: diagnostics?.liteMode ?? null,
       updateFrames: updateMs.length,
       updateMs: { p50: pct(0.5), p95: pct(0.95), max: pct(1) },
+      gpuMs: tq ? { frames: gpuMs.length, p50: gpct(0.5), p95: gpct(0.95), max: gpct(1) } : 'no timer query',
       drawCalls: renderer.info.render.calls,
       views,
       multiview,
