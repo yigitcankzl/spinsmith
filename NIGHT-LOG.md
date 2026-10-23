@@ -165,6 +165,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 53 (06:26–06:31) | Polish: video (caption clutter) | blind A/B reels: 7 → 6 | Tried: corner captions up for 1.6 s instead of 2.2 s; too short to read a title and its subtitle | dropped |
 | 54 (06:29–06:33) | Polish: video (caption position) | blind A/B reels: 7 → 6 | Tried: captions bottom-left; they land on the table, rim and hands. Top-left stays | dropped |
 | 55 (06:31–06:36) | Technical (GPU / CPU split) | blind A/B snapshots: 5 → 6 | report:runtime-performance times the GPU (EXT_disjoint_timer_query_webgl2 around each render). Capture-room ready, 95 draws/eye: GPU 0.86 ms p50 unthrottled, 2.44 ms at 4x (an upper bound, it includes waiting on submission); the 4x frame (~37 ms, 27 fps) is CPU-side submission and the emulator. Saved runs and README | merged |
+| 56 (06:35–06:38) | Boldest (opening) | blind A/B reels: 6 → 7, video 6 → 6 | The reel opens 0.9 s later into the side DESK KO take, with the hands already on the rim; the KO lands at ~2.75 s instead of ~3.75 s | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
