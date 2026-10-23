@@ -128,6 +128,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 19 (04:25–04:35) | Polish: visual (Ripple Pool) | blind A/B stills: 5 → 6 | The Waves floor's relief paint is boosted 2.4x (its rings are shallow by design), so light and dark bands read between the rings. check:sim passes. Also check:hands clean again on a fresh page (third clean run tonight after the one "ended idle" miss) | merged |
 | 20 (04:30–04:45) | Full judge re-score | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 8, RtCB 6, Accessibility 8, Boldest 7, IWSDK 7) | README top lines matched to the code (flick hint timing, the come-back card's next move) | judge only |
 | 22 (04:45–05:00) | Technical (safeguards) | blind A/B snapshots: 5 → 6 | `PERF_GUARD=1` runs the in-game quality guard under the emulator (it is off there by design) and the report fails if it never steps down below 60 fps; saved run at 6x throttle: full → lite → lite+foveation at 24 fps, 3 s apart | merged |
+| 21 (04:35–05:05) | Polish: visual (floor form) | blind A/B stills: 6 → 5 | Tried: each floor rise lit and shaded from its own slope beyond a plain bowl. It brightened Sumo Square's terrace step and took away the dark band that made it read as a drop; ripples unchanged | dropped |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -169,3 +170,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Guard test checks the label only, not that the steps help (judge A/B c22)
 - [ ] Innovation: a tray vs detected-table beat showing the room changes the outcome (judge c20)
 - [ ] Polish: comfort shot at sofa height, knob over the plate; one tagline everywhere (judge c20)
+- [ ] Hazard-tape arcs clip through the rim on Sumo Square / Ripple Pool, and a doubled white rim outline (judge A/B c21)
