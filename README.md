@@ -72,6 +72,24 @@ The quality guard is off under the emulator by design (a desktop frame rate says
 
 The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rate on Quest has not been measured, because the game has not run on a headset yet. There, `?fps` shows the frame rate and lowest frame rate. When frames run long, a quality guard first turns off room dimming, then sets full fixed foveation (src/game/quality.ts).
 
+## Accessibility (seated, hands only)
+
+One brass dial on the home table (shown unasked through a new player's first session); each pinch turns it, a pinch on its plate toggles the stop. Stops in order (src/game/comfort.ts):
+
+1. **Calm**: no flashes and press-to-strike together
+2. **Large text**: cards, stamps, match bar and gauge labels 1.3x
+3. **One hand**: hold one rim grip to forge; the far rim mirrors it
+4. **Assist**: fights run at 80% speed
+5. **Quiet**: sound off (every gameplay sound has a visual twin: a stamp or the card)
+6. **No flashes**
+7. **Press to strike**: press and hold instead of a slap
+8. **High contrast**: wide, solid team rings
+9. **Left-handed**: home stations swap sides
+10. **Colour-safe**: Okabe-Ito blue / orange / yellow warnings; your rings are round and the rival's hexagons, and the real-edge band is striped, so nothing relies on hue alone
+11. **Standard**: everything off but the hand
+
+The toggles combine and are saved. `npm run check:sim` covers the dial, Large text's scale and the colour-safe swaps.
+
 ## IWSDK features used (and where)
 
 | Feature | Where | Run on |
