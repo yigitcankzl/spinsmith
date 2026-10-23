@@ -162,6 +162,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 51 (06:20–06:23) | Polish: visual (Sumo outline) | blind A/B stills: 6 → 5 | Tried: drop the floor accent band on wall-less arenas (the berm line doubles it). The berm line alone is broken at the front and back, so the edge read worse | dropped |
 | 52 (06:22–06:24) | Polish: video (brawl on screen) | — | Tried twice to film a 4-top brawl from the demo save (seats set by probe); the player's top was out within ~1-2 s both times (SHATTER / SLAG), nothing to show. No code change; shot discarded | dropped |
 | final judge 2 (06:24–06:26) | Full re-score after cycles 48-50 | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 8, RtCB 6, Accessibility 8, Boldest 6, IWSDK 7) | the table in judge-report-2026-10-22.md shows both end judges; check:hands clean on master (06:28) | — |
+| 53 (06:26–06:31) | Polish: video (caption clutter) | blind A/B reels: 7 → 6 | Tried: corner captions up for 1.6 s instead of 2.2 s; too short to read a title and its subtitle | dropped |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -222,3 +223,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 
 The before/after table is in judge-report-2026-10-22.md (git-ignored like every judge-report*.md; kept on disk).
 - [ ] A brawl shot for the reel needs a drive that keeps the player's top in for a few seconds
+- [ ] Corner captions sit over game banners (TWO-HAND FORGE, ULTIMATE READY): move them, do not shorten (judge A/B c53)
