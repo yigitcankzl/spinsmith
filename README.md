@@ -6,6 +6,14 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 
 **Status:** tested only in IWSDK's Quest emulator (IWER), headless simulations and browser windows; not yet run on a headset. **Hosted URL:** _PLACEHOLDER: hosted URL goes here_
 
+## The first minute, measured
+
+From today's scripted first sessions in the emulator (`artifacts/first-five/`, a bot that reads each card for 0.8 s; game time):
+
+| ~2 s | ~12 s | ~14 s | ~18 s | 29–45 s | 49–94 s |
+|---|---|---|---|---|---|
+| PUT YOUR TOP IN | RIP! (ghost hand shows it) | PINCH + DRAG: RAMP | first knockout (the ramp throws the rival into the pit) | WRENCH IT OFF YOUR DESK → DESK KO | match won |
+
 ## Try it (judges): five minutes, seated, hands only
 1. Sit at a table with a Meta Quest 3 or 3S, no controllers, and open the hosted URL in the Quest Browser.
 2. Press **ENTER** and allow spatial data. The arena rises on your real table (a labelled table or desk, or any flat unlabelled surface at desk height); with none it stands on a floating tray and says so.
