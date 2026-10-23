@@ -172,6 +172,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 59 (06:45–06:47) | Technical (perf read in 5 s) | blind A/B README: 5 → 6 | "In short" line at the top of Measured performance: draws 47-117/eye, update 0.4-1.4 ms, GPU 0.86 ms on the timed scene, the throttled frame is CPU-side; numbers re-checked against every saved run | merged |
 | 60 (06:47–06:51) | Accessibility as shown | blind A/B reels: Accessibility 5 → 6, Polish 7.5 → 7 | Tried: a 2.2 s colour-safe fight (yellow hazard tape, shape-coded owners) after the Large text split; wide and its caption hit a game card, so Polish regressed | dropped |
 | 61 (06:50–06:53) | IWSDK / Technical (verifiable) | blind A/B README: 5 → 8 | README table: each IWSDK feature used, its file:line, and what it has run on (depth occlusion: not yet); the judge checked every cited line | merged |
+| 62 (06:53–06:56) | Accessibility (findable, verifiable) | blind A/B README: 4 → 7 | README Accessibility section: the dial's 11 stops in order (from COMFORT_DIAL), what each does, file references for the first-session plate, ring shapes and striped band, and what check:sim covers | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -235,3 +236,4 @@ The before/after table is in judge-report-2026-10-22.md (git-ignored like every 
 - [ ] Corner captions sit over game banners (TWO-HAND FORGE, ULTIMATE READY): move them, do not shorten (judge A/B c53)
 - [ ] The opening side shot faces another part of the 360 room; a judge read it as a different room (judge c58)
 - [ ] Reel: the uncut new-player clock stops at the ramp KO, not the DESK KO it promises (judge c58)
+- [ ] "Every gameplay sound has a visual twin" (README) has no test behind it (judge A/B c62)
