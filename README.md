@@ -12,7 +12,7 @@ From today's scripted first sessions in the emulator (`artifacts/first-five/`, a
 
 | ~2 s | ~12 s | ~14 s | ~18 s | 29–45 s | 49–94 s |
 |---|---|---|---|---|---|
-| PUT YOUR TOP IN | RIP! (ghost hand shows it) | PINCH + DRAG: RAMP | first knockout (the ramp throws the rival into the pit) | WRENCH IT OFF YOUR DESK → DESK KO | match won |
+| PUT YOUR TOP IN | RIP! (ghost hand shows it) | PINCH + DRAG: RAMP | first knockout, the ramp throws the rival into the pit (2 of 3 runs; in the third the ramp missed) | WRENCH IT OFF YOUR DESK → DESK KO | match won |
 
 ## Try it (judges): five minutes, seated, hands only
 1. Sit at a table with a Meta Quest 3 or 3S, no controllers, and open the hosted URL in the Quest Browser.
