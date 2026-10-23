@@ -19,7 +19,12 @@ export default async function run({ page, frame }) {
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
   }
   try {
-  const result = await target.evaluate(async () => {
+  // PERF_GUARD=1 lets the in-game quality guard run under the emulator (?fpsguard, set without a
+  // reload) and measures long enough for it to step, then reports the level it reached.
+  const guard = process.env.PERF_GUARD === '1';
+  const result = await target.evaluate(async (guard) => {
+    const search = location.search;
+    if (guard) history.replaceState(null, '', `${location.pathname}?fpsguard`);
     const game = window.__game;
     const renderer = game.world?.renderer ?? game.renderer;
     const gl = renderer?.getContext?.();
@@ -40,7 +45,8 @@ export default async function run({ page, frame }) {
       updateMs.push(performance.now() - t0);
       return r;
     };
-    await new Promise((resolve) => setTimeout(resolve, 5200));
+    await new Promise((resolve) => setTimeout(resolve, guard ? 9200 : 5200));
+    if (guard) history.replaceState(null, '', `${location.pathname}${search}`);
     game.update = original;
     const sortedMs = updateMs.slice().sort((a, b) => a - b);
     const pct = (q) => Math.round((sortedMs[Math.min(sortedMs.length - 1, Math.floor(sortedMs.length * q))] ?? 0) * 100) / 100;
@@ -63,6 +69,9 @@ export default async function run({ page, frame }) {
         : gl.getParameter(gl.VENDOR),
       phase: game.phase,
       lowestFpsOverFiveSeconds: diagnostics?.lowestFps ?? null,
+      qualityLevel: diagnostics?.qualityLevel ?? null,
+      qualitySteps: diagnostics?.qualitySteps ?? null,
+      guardRan: guard,
       liteMode: diagnostics?.liteMode ?? null,
       updateFrames: updateMs.length,
       updateMs: { p50: pct(0.5), p95: pct(0.95), max: pct(1) },
@@ -78,7 +87,11 @@ export default async function run({ page, frame }) {
         vp9: MediaRecorder.isTypeSupported('video/webm;codecs=vp9'),
       },
     };
-  });
+  }, guard);
+  // With the guard on and frames well under the slow line, it must have stepped down.
+  if (guard && result.lowestFpsOverFiveSeconds !== null && result.lowestFpsOverFiveSeconds < 60 && result.qualityLevel === 'full') {
+    throw new Error(`quality guard never stepped down at ${result.lowestFpsOverFiveSeconds} fps`);
+  }
   return { ...result, cpuThrottle: throttle };
   } finally {
     if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });

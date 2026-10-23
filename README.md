@@ -63,6 +63,8 @@ With the capture room's planes and the desk-edge arcs up, earlier unsaved runs r
 
 CPU-throttled proxy (`PERF_THROTTLE=4` / `6`, DevTools CPU emulation, ready phase, `artifacts/perf/ready-cpu*x-2026-10-23.json`): the game's own update per frame goes from 0.4 / 0.6 ms (p50 / p95) unthrottled to 1.9 / 2.5 ms at 4x and 3.0 / 4.6 ms at 6x, inside a 72 Hz frame (13.9 ms). These throttled runs caught a heavier scene than the table above (117 draws per eye, 168 k triangles, the capture room's planes and edge arcs up). The page's lowest fps falls to 35 at 4x and 21 at 6x. With the game's update that small, the rest is rendering and the emulator (IWER is JavaScript and draws both eyes and the 360 backdrop); how much would carry over to a Quest is not known, so this is not a Quest prediction.
 
+The quality guard is off under the emulator by design (a desktop frame rate says nothing about a headset); `PERF_GUARD=1 PERF_THROTTLE=6` turns it on for the run and fails if it does not step down. Saved run (`artifacts/perf/guard-cpu6x-2026-10-23.json`): at 24 fps it went full → lite after 3 s, then lite → lite+foveation after 3 more.
+
 The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rate on Quest has not been measured, because the game has not run on a headset yet. There, `?fps` shows the frame rate and lowest frame rate. When frames run long, a quality guard first turns off room dimming, then sets full fixed foveation (src/game/quality.ts).
 
 ## Known limits
