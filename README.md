@@ -52,6 +52,8 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 
 ## Measured performance (IWER on a desktop GPU, not a Quest)
 
+**In short:** 47–117 draw calls per eye in every saved state (budget 150), the game's own update 0.4–1.4 ms per frame, GPU time 0.86 ms per frame (p50) on the timed capture-room scene (95 draws per eye). Under a 4x CPU throttle the page drops to 24–35 fps, and the GPU timer shows why: of a ~37 ms frame, game update plus GPU are about 5 ms and the rest is CPU-side draw submission and the emulator. Nothing here is a Quest measurement.
+
 `npm run report:runtime-performance` (RTX 4060 laptop, ANGLE/Vulkan) fails when a phase goes over 150 draw calls per eye. IWER renders each eye as its own camera without multiview, so the script divides the renderer's count by the number of views. Saved runs from 2026-10-23 are in `artifacts/perf/`.
 
 | Phase | Draw calls per eye | Lowest fps over 5 s | Game update per frame (p50 / p95 / max) |
