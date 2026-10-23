@@ -114,6 +114,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 5 (02:25–02:35) | Accessibility | 7 → 7 → 7 (three re-scores) | Tried: Large text comfort toggle (card, stamps, bar 1.3x, gauge labels; probed scale 1.25 → 1.625 on the card), sim-check covers the stop and Standard reset, textScale() unit-checked; a new smith's home shows the comfort plate unasked (probed visible). Judges: colour-safe misses the forge stat needle (rim.ts:317) and a bar red (match-bar.ts:301); no audio subtitles | dropped (no score rise) |
 | 6 (02:35–02:57) | Polish: video; visual; readability | 6 → 6 → 6 → blind A/B: video 5 → 6, visual 4 → 7, readability 5 → 6 | Fresh single-reel judges kept landing on the same integer whatever changed, each citing new nits, so the re-score became a blind A/B: one fresh judge scores the master-script reel and the branch reel side by side (labels X/Y, same shots). Changes: four arenas in live play (Sumo Square, Titan Crater, Glacier Steps, Crucible Gate; .tmp/rec-arenas.sh drives), the DESK KO stamp leaves its edge pin when the result comes (the plate covered it), dead frames trimmed, disclosure overlay 1.5 s, 2 s end card over the dimmed DESK KO, captions name only what is shown. desk-ko-first, desk-ko, combat-readability pass | merged |
 | 7 (03:00–03:10) | First Five Minutes; Polish: audio; video | blind A/B: FFM clarity 5 → 7, clutter 4 → 6; audio 5 → 6; video 6 → 6 | Cycle 4's dropped commits re-tried under the blind A/B: no VS stamp over the first rival card, no WATCH THE TOPS REACT under the DESK KO stamp, the LEVEL card not repeated under its stamp, medal stamp without the bout number, forge/builder SFX ~2x, room tone under a decided result. first-five: 18/19 prompts, 68/73 words (was 22 / 92), come-back card seen; desk-ko-first, desk-ko, desk-guard, combat-readability, check:hands pass on a fresh page | merged |
+| 8 (03:10–03:25) | Accessibility | blind A/B (source snapshots): 6.5 → 8 | Cycle 5's dropped commits re-tried: Large text (card, stamps, bar, gauge labels 1.3x; textScale() tested), the comfort plate shows through a new smith's first session, plus colour-safe now reaches the forge preview needle (worse also dashed) and the low-spin bar fill. desk-ko-first, combat-readability, desk-guard, build pass | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -133,11 +134,12 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Forge/builder sounds are ~1/5 of fight levels (pick 0.06, place 0.12 vs clash 0.55)
 - [ ] First match: VS stamp repeats the rival card; WATCH THE TOPS REACT lands under the DESK KO stamp (22 prompts / 92 words in the last run)
 - [ ] Colour-safe palette does not reach VERB_TINT or the gauge fills (judge c3)
-- [ ] Text-size comfort option (judge c3)
+- [x] Text-size comfort option (cycle 8)
 - [ ] An unlock payoff on camera (judge c2)
-- [ ] Colour-safe: rim.ts:317 stat needle green/red and match-bar.ts:301 red bypass warnColor (judge c5)
+- [x] Colour-safe: forge needle and low-spin bar (cycle 8)
 - [ ] DESK KO stamp pulled toward the arena lands over the gauge's FIRST TO 4 in the front shot (judge A/B)
 - [ ] SPIN RUB chapter shows an ULTIMATE READY banner (reel shot choice)
 - [ ] The desk-KO card burst (WRENCH, PINCH BOTH GLOWS, SQUEEZE! RELEASE within 3 s) into one card (judge A/B c7)
 - [ ] SLAG stamp and the result card in the same frame (judge A/B c7)
-- [ ] Re-try cycle 5 (Large text, comfort plate on first visit) under the blind A/B
+- [x] Re-try cycle 5 under the blind A/B (cycle 8)
+- [ ] Colour-safe low-spin colour: orange on the canvas bar, yellow on the 3D gauge (judge c8)
