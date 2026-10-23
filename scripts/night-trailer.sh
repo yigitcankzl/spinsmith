@@ -42,7 +42,7 @@ clip() {
 # The disclosure, big, over the opening shot (not a silent black card).
 EXTRA="drawtext=fontfile=$FONT:text='EMULATOR FOOTAGE':fontcolor=0xff8a2a:fontsize=84:x=(w-text_w)/2:y=h-250:box=1:boxcolor=0x111419@0.8:boxborderw=18:enable='lt(t,1.5)',drawtext=fontfile=$FONT:text='${DISCLOSE:-IWSDK emulator (IWER)  -  not headset footage}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-140:box=1:boxcolor=0x111419@0.7:boxborderw=10:enable='lt(t,1.5)'" \
   clip 00-hook "$NEW/desk-ko-first-side.mp4" 0.4 6.5 "THE ARENA IS THE WEAPON" "Squeeze the bowl / throw the rival off your desk"
-FIRST30=; if [ -s "$NEW/first-30.mp4" ]; then FIRST30=1; clip 005-first "$NEW/first-30.mp4" 0.2 20 "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"; fi
+FIRST30=; if [ -s "$NEW/first-30.mp4" ]; then FIRST30=1; clip 005-first "$NEW/first-30.mp4" 0.2 17.8 "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"; fi
 clip 01-match "$NEW/first-match.mp4" 1.0 12.3 "ONE ROUND, UNCUT" "Rip  /  the rival runs to your edge  /  squeeze"
 clip 02-squeeze "$NEW/close-squeeze.mp4" 0.3 3.2 "TWO HANDS ON THE RIM" "Squeeze / stretch / tilt / twist the live bowl"
 clip 03-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK" "Your fingertip is part of the physics"
@@ -50,7 +50,7 @@ clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms 
 clip 05-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal / press it into the bowl"
 # Comfort: the dial's stops on its plate (filmed from the seat, cropped in).
-COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 0.6 5.4 "COMFORT, ONE PINCH AWAY" "Calm  /  quiet  /  no flashes  /  one hand  /  colour-safe  /  large text"; fi
+COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 0.6 5.4 "COMFORT, ONE PINCH AWAY" "One dial  /  shown here: calm, quiet, no flashes, press to strike"; fi
 # Four arenas in live play, one beat each (IWER, recorded by .tmp/rec-arenas.sh style drives).
 parts=()
 for f in "$NEW"/arenas/*.mp4; do
