@@ -1,0 +1,106 @@
+{
+ "ok": true,
+ "done": true,
+ "failed": "",
+ "leases": 1,
+ "phase": "result",
+ "gameSeconds": 64.18,
+ "secondsTo": {
+  "firstKo": 18.21,
+  "firstAnyKo": 18.21,
+  "firstDeskKo": 30.47,
+  "matchEnd": 49.37
+ },
+ "prompts": {
+  "distinctToMatchEnd": 14,
+  "wordsToMatchEnd": 52,
+  "cards": 8,
+  "stamps": 6,
+  "all": [
+   "2.31s card: PUT YOUR TOP IN",
+   "7.5s card: DRIFTER \u00b7 THE LONG SPIN",
+   "10s card: PINCH, PULL BACK, RELEASE",
+   "12.03s stamp: RIP!",
+   "14.04s card: PINCH + DRAG: RAMP",
+   "18.21s stamp: SLAG! / INTO THE SLAG PIT",
+   "18.38s stamp: ROUND 2 / 1 - 0",
+   "20.88s card: RIP AGAIN",
+   "24.92s card: WRENCH IT OFF YOUR DESK",
+   "27.29s card: SQUEEZE! RELEASE",
+   "29.06s stamp: DESK KO! / YOUR SQUEEZE \u2192 REAL EDGE +1",
+   "31.76s stamp: REPLAY / PINCH TO SKIP",
+   "48.34s card: ANVIL STRIKE: PINCH + STAMP",
+   "49.37s stamp: SLAG! / MATCH WON",
+   "50.27s card: You win the match! / Drifter: \"You outlasted the drift.\"",
+   "56.09s stamp: LEVEL 2! / APPRENTICE",
+   "57.72s stamp: BOUT WON! / MEDAL 2 OF 3 \u00b7 RAMP IT OUT",
+   "58.67s card: NEW MOVE: Rim Spring / Pinch rim, pull, release",
+   "59.75s stamp: FEAT! / Ramp a rival out",
+   "62.87s card: WON 4-0 \u00b7 COME BACK / Next match: new move Forge Gust / Tomorrow: beat Iron Keep \u00b7 +120 XP"
+  ]
+ },
+ "verbs": {
+  "taught": {
+   "deskKo": 24.92,
+   "strike": 48.34
+  },
+  "performed": {
+   "place": 1,
+   "carry": 1,
+   "rip": 3,
+   "ramp": 3,
+   "arenaForge": 1
+  }
+ },
+ "autoPlaced": false,
+ "rounds": [
+  {
+   "at": 18.21,
+   "winner": "you",
+   "finish": "pocket",
+   "round": 1,
+   "heat": [
+    1,
+    0
+   ]
+  },
+  {
+   "at": 30.47,
+   "winner": "you",
+   "finish": "desk",
+   "round": 2,
+   "heat": [
+    3,
+    0
+   ]
+  },
+  {
+   "at": 49.37,
+   "winner": "you",
+   "finish": "pocket",
+   "round": 3,
+   "heat": [
+    4,
+    0
+   ]
+  }
+ ],
+ "resultCards": [
+  "You win the match! / Drifter: \"You outlasted the drift.\"",
+  "NEW MOVE: Rim Spring / Pinch rim, pull, release",
+  "WON 4-0 \u00b7 COME BACK / Next match: new move Forge Gust / Tomorrow: beat Iron Keep \u00b7 +120 XP"
+ ],
+ "comeBackCard": false,
+ "actions": [
+  "1.33s place",
+  "5.11s carry",
+  "10.42s rip",
+  "14.82s ramp",
+  "17.61s ramp",
+  "21.3s rip",
+  "25.89s arenaForge",
+  "43.72s rip",
+  "48.14s ramp"
+ ],
+ "errors": []
+}

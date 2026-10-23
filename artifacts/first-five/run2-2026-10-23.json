@@ -1,0 +1,127 @@
+{
+ "ok": true,
+ "done": true,
+ "failed": "",
+ "leases": 2,
+ "phase": "result",
+ "gameSeconds": 108.51,
+ "secondsTo": {
+  "firstKo": 46.88,
+  "firstAnyKo": 46.88,
+  "firstDeskKo": 46.88,
+  "matchEnd": 93.63
+ },
+ "prompts": {
+  "distinctToMatchEnd": 16,
+  "wordsToMatchEnd": 60,
+  "cards": 8,
+  "stamps": 8,
+  "all": [
+   "2.32s card: PUT YOUR TOP IN",
+   "7.53s card: DRIFTER \u00b7 THE LONG SPIN",
+   "10.04s card: PINCH, PULL BACK, RELEASE",
+   "12.04s stamp: RIP!",
+   "13.86s card: PINCH + DRAG: RAMP",
+   "33.57s stamp: OUTLAST! / OUT OF SPIN",
+   "34.73s stamp: ROUND 2 / 0 - 1",
+   "37.23s card: RIP AGAIN",
+   "41.33s card: WRENCH IT OFF YOUR DESK",
+   "43.72s card: SQUEEZE! RELEASE",
+   "45.47s stamp: DESK KO! / YOUR SQUEEZE \u2192 REAL EDGE +1",
+   "48.17s stamp: REPLAY / PINCH TO SKIP",
+   "64.27s card: ANVIL STRIKE: PINCH + STAMP",
+   "66.6s stamp: ANVIL STRIKE!",
+   "69.73s stamp: SLAG! / YOUR RAMP \u2192 INTO THE SLAG PIT",
+   "93.63s stamp: SHATTER! / MATCH WON",
+   "94.54s card: You win the match! / Drifter: \"You outlasted the drift.\"",
+   "95.16s stamp: LEVEL 2! / APPRENTICE",
+   "96.64s card: NEW MOVE: Rim Spring / Pinch rim, pull, release",
+   "96.79s stamp: BOUT WON! / MEDAL 2 OF 3 \u00b7 RAMP IT OUT",
+   "100.84s card: WON 4-1 \u00b7 COME BACK / Next match: new move Forge Gust / Tomorrow: beat Iron Keep \u00b7 +120 XP"
+  ]
+ },
+ "verbs": {
+  "taught": {
+   "deskKo": 41.33,
+   "strike": 64.27
+  },
+  "performed": {
+   "place": 1,
+   "carry": 1,
+   "rip": 4,
+   "ramp": 10,
+   "arenaForge": 1,
+   "strike": 1
+  }
+ },
+ "autoPlaced": false,
+ "rounds": [
+  {
+   "at": 33.57,
+   "winner": "rival",
+   "finish": "spin",
+   "round": 1,
+   "heat": [
+    0,
+    1
+   ]
+  },
+  {
+   "at": 46.88,
+   "winner": "you",
+   "finish": "desk",
+   "round": 2,
+   "heat": [
+    2,
+    1
+   ]
+  },
+  {
+   "at": 69.73,
+   "winner": "you",
+   "finish": "pocket",
+   "round": 3,
+   "heat": [
+    3,
+    1
+   ]
+  },
+  {
+   "at": 93.63,
+   "winner": "you",
+   "finish": "burst",
+   "round": 4,
+   "heat": [
+    4,
+    1
+   ]
+  }
+ ],
+ "resultCards": [
+  "You win the match! / Drifter: \"You outlasted the drift.\"",
+  "NEW MOVE: Rim Spring / Pinch rim, pull, release",
+  "WON 4-1 \u00b7 COME BACK / Next match: new move Forge Gust / Tomorrow: beat Iron Keep \u00b7 +120 XP"
+ ],
+ "comeBackCard": false,
+ "actions": [
+  "1.33s place",
+  "5.12s carry",
+  "10.48s rip",
+  "14.56s ramp",
+  "17.02s ramp",
+  "19.61s ramp",
+  "22.09s ramp",
+  "29.8s ramp",
+  "37.69s rip",
+  "42.28s arenaForge",
+  "60.14s rip",
+  "65.12s strike",
+  "68.74s ramp",
+  "76.7s rip",
+  "81.05s ramp",
+  "83.5s ramp",
+  "86.23s ramp",
+  "88.72s ramp"
+ ],
+ "errors": []
+}
