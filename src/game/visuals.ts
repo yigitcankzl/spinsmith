@@ -1944,7 +1944,8 @@ export class ArenaView {
         // The floor's own relief is painted in: what stands above a plain bowl is lighter, what sinks
         // below it darker, so a hill, a terrace, a crater's lip or a ripple reads in a still frame.
         if (L.floor !== 'bowl' && L.floor !== 'flat' && L.depth > 0) {
-          const rel = (arena.height(x, z) - shape - arena.pocketDip(x, z) - L.depth * Math.min(n, 1.05) ** 2) / L.depth;
+          // Ripples are shallow by design (a ramp per ring): their paint is boosted so the rings still read.
+          const rel = (L.floor === 'waves' ? 2.4 : 1) * (arena.height(x, z) - shape - arena.pocketDip(x, z) - L.depth * Math.min(n, 1.05) ** 2) / L.depth;
           if (rel > 0) this.tmp.lerp(this.relief, Math.min(0.65, rel * 2.4));
           else this.tmp.multiplyScalar(1 - Math.min(0.45, -rel * 1.6));
         }
