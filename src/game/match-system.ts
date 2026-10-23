@@ -1899,7 +1899,8 @@ export class MatchSystem extends createSystem({
     this.rimGauge.root.visible = false;
     if (this.phase === 'ready' || this.phase === 'pulling' || this.phase === 'fight' || this.phase === 'result') {
       const p = this.progress;
-      this.bar.bar(this.mine.spin, this.theirs.spin, this.barPoints[0], this.barPoints[1], MATCH_HEAT, ['YOU', this.rival.name.toUpperCase()], this.phase === 'fight' && this.barMessage === 'READY' ? (this.extras.length ? `${this.tops.filter((t) => t.alive).length} LEFT` : 'FIGHT') : this.barMessage, {
+      // A top that is out (thrown, slagged, shattered) shows no spin left, whatever it flew off with.
+      this.bar.bar(this.mine.alive ? this.mine.spin : 0, this.theirs.alive ? this.theirs.spin : 0, this.barPoints[0], this.barPoints[1], MATCH_HEAT, ['YOU', this.rival.name.toUpperCase()], this.phase === 'fight' && this.barMessage === 'READY' ? (this.extras.length ? `${this.tops.filter((t) => t.alive).length} LEFT` : 'FIGHT') : this.barMessage, {
         level: p.level,
         rank: p.rank,
         fraction: p.fraction,
@@ -1911,7 +1912,7 @@ export class MatchSystem extends createSystem({
         const L = this.arena.layout;
         const r = rimRadius(L, -Math.PI / 2);
         this.rimGauge.fit(r, this.arena.height(0, -r * 0.97) + WALL_HEIGHT[L.wall] + 0.002, this.stage.rotation.y, MATCH_HEAT);
-        this.rimGauge.update(this.mine.spin, this.theirs.spin, [this.bar.fillColor(0), this.bar.fillColor(1)], this.barPoints[0], this.barPoints[1], MATCH_HEAT, dt, textScale());
+        this.rimGauge.update(this.mine.alive ? this.mine.spin : 0, this.theirs.alive ? this.theirs.spin : 0, [this.bar.fillColor(0), this.bar.fillColor(1)], this.barPoints[0], this.barPoints[1], MATCH_HEAT, dt, textScale());
         this.rimGauge.setLabels(this.rival.name, MATCH_HEAT);
         this.rimGauge.root.visible = true;
       }
