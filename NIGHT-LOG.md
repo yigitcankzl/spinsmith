@@ -180,6 +180,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 67 (07:12–07:17) | Polish (DESIGN.md claims) | fact-check, no A/B (corrections only) | A read-only fact-check of DESIGN.md found seven stale items, all corrected: comfort dial order and Large text, the score (not the finish) in the bar's middle, streak XP and the come-back card, hazard-striped real-edge bands and their call text, the seal strike (palm press is the fallback), result-card timing | merged |
 | 68 (07:14–07:28) | Accessibility (Quiet loses nothing) | blind review: 6 → 7 (twice) | A read-only audit of ~165 play* calls found two sound-only cases when a stamp was already up: a refused move in locked() and a wrong-way Spin Rub. Both now queue their stamp behind the busy one (wrong-way at most every 2 s); the pips still flash only for a missing charge; the stamp queue never holds the same word and line twice. desk-ko-first, combat-readability, desk-ko, desk-guard, first-five, check:hands pass on fresh pages | merged |
 | closing pass 3 (07:22–07:31) | Master green on the last commit | — | typecheck, check:sim, check:sim-n, check:net, build; fresh pages: desk-ko-first, combat-readability, desk-ko, desk-guard, first-five, room-matrix, check:hands. Night 2 total: 48 cycles merged or kept, 15 dropped, 5 judge-only | — |
+| 69 (07:32–07:35) | Full judge re-score | mean 6.5 (Innovation 8, Experience 6, Technical 6, Polish 6; FFM 7, RtCB 6, Accessibility 7, Boldest 6, IWSDK 7) | check:hands clean again on master (07:34) | judge only |
+| 70 (07:35–07:39) | Experience Design (first minute at a glance) | blind A/B README: 4 → 6 | README "The first minute, measured": a timed strip from the three saved first-five runs (put top in ~2 s, rip ~12 s, ramp ~14 s, first KO ~18 s in 2 of 3 runs, DESK KO 29-45 s, match won 49-94 s); the judge's one error (run 2) was already corrected | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -244,3 +246,4 @@ The before/after table is in judge-report-2026-10-22.md (git-ignored like every 
 - [ ] The opening side shot faces another part of the 360 room; a judge read it as a different room (judge c58)
 - [ ] Reel: the uncut new-player clock stops at the ramp KO, not the DESK KO it promises (judge c58)
 - [x] "Every gameplay sound has a visual twin": audited, two gaps closed (cycle 68); still no automated test
+- [ ] One tagline everywhere (The arena is the weapon / Your desk is the ring-out) (judge c69)
