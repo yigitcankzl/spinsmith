@@ -41,6 +41,8 @@ const fit = (...lines: string[]) => lines.find((l) => wordsIn(l) <= COME_BACK_WO
 /** The streak as a card headline. */
 export function streakTitle(streak: number, playedToday: boolean): string {
   if (streak <= 0) return 'START A STREAK TODAY';
+  // Day one has no streak to keep yet: it says what starts one.
+  if (playedToday && streak === 1) return 'DAY 1 · COME BACK TOMORROW';
   return playedToday ? `DAY ${streak} STREAK` : `${streak}-DAY STREAK · PLAY TODAY`;
 }
 
