@@ -24,12 +24,14 @@ an arena. First to 4 heat wins a match.
 - **Frame rate (`?fps`, `?diagnostics`):** not yet measured on a headset. `?fps` shows a world-locked readout beside MENU (1 s fps, lowest, draw calls, quality level); after 3 s below 66 fps (or 0.9× the session's refresh rate) the game drops room dimming, then sets full foveation, and steps back after 10 s comfortable (rendering only; the 120 Hz sim is untouched); `?diagnostics`' COPY QUEST TEST REPORT includes each step and fps per hub/fight/forge.
 - **Comfort dial** (`src/game/comfort.ts`): the brass dial between the dock and the level plate
   picks a setting; the plate in front of it shows ON/OFF and a pinch on it toggles that setting, so
-  they combine: Quiet (sound off); No flashes; Press to strike (a palm pressed and held instead of
-  slapped, for trays and shared spaces); Assist (fights at 80% speed); One hand: hold the rim with
-  one hand for a moment and a mirrored partner appears on the far rim, so turning, pushing in or
-  out and lifting that one hand twist, squeeze, stretch and tilt the arena; High contrast: each
-  top's team ring wide and solid; Left-handed: the home stations swap sides; Colour-safe. Presets
-  set several at once: Calm (no flashes + press to strike) and Standard.
+  they combine. Stops in order: Calm (preset: no flashes + press to strike); Large text (the card,
+  stamps, match bar and gauge labels 1.3x); One hand: hold the rim with one hand for a moment and a
+  mirrored partner appears on the far rim, so turning, pushing in or out and lifting that one hand
+  twist, squeeze, stretch and tilt the arena; Assist (fights at 80% speed); Quiet (sound off); No
+  flashes; Press to strike (a palm pressed and held instead of slapped, for trays and shared
+  spaces); High contrast: each top's team ring wide and solid; Left-handed: the home stations swap
+  sides; Colour-safe; Standard (preset: every setting off but the hand). A new smith's home shows
+  the dial's plate unasked through the first session.
 
 ## What is in the game
 
@@ -49,7 +51,7 @@ an arena. First to 4 heat wins a match.
   (`src/game/rotation.ts`). Pin an arena, or go back to the rotation, in the workshop's Arenas
   drawer. In a match a fighting-game bar is set into the far rim
   (`src/game/match-bar.ts`: each top's spin draining as a health bar, points as pips, the
-  round's result in the middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
+  score in the middle), so score and fight share one view. A small *Menu* button beside the arena returns home, and
   the match ends back home when a side reaches 4 heat.
 - **Rip-cord launch, from where you choose:** pinch over the arena (inside the dashed ring)
   and your top goes to that spot; pinch anywhere else and it launches from its usual spot near
@@ -119,7 +121,8 @@ an arena. First to 4 heat wins a match.
   lost, earns the Spur tip: the anvil appears and calls for it, the forge highlights only that
   part, and after saving the dock calls you back for the rematch.
 - **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
-  knockout, a white-hot pull, and the match), filling levels 1-20 with ranks
+  knockout, a white-hot pull, and the match; the first match of each streak day pays 25 XP per
+  streak day, up to 7), filling levels 1-20 with ranks
   (Apprentice, Journeyman, Smith, Master Smith, Legend). Levels open options, never power: you
   start with the classic tops' parts, two paints and two arenas, and each level opens a part, a
   paint, an arena, a seal or a rival, with emblem glows near the top, ending in a gilded ledger;
@@ -178,7 +181,9 @@ an arena. First to 4 heat wins a match.
   arena and one way of winning (ramp them out, shatter them, outlast them from your cup, win
   with a given kind of top, with a white-hot pull, without giving up heat, on your own arena). Pinch the
   board to play it; doing it strikes a stamp into the ledger (stamps 5, 10 and 15 earn emblem
-  glows). Missed days cost nothing. The board's back (a pinch on the level plate) shows the
+  glows). Missed days cost only the streak. A match ends on a come-back card: the streak (COME
+  BACK TOMORROW on day one, WON 4-0 · COME BACK after a win), the next match's new move (or the
+  next bout), and tomorrow's order (Tomorrow: beat RIVAL · +120 XP). The board's back (a pinch on the level plate) shows the
   current chapter of the Circuit Map as medallions with three medal notches each, and the medals
   the next bout still asks for. The last three tops
   that won a match stand as champions on the left rim with their record; pinch one to make it
@@ -212,10 +217,10 @@ an arena. First to 4 heat wins a match.
   scores 1. From 15 s the pressure phase opens the pockets (up to 75% wider by 19 s) and heats the
   outer rim, so rounds rarely run long. The
   score shows on the match bar.
-- **Real-edge cue:** in a duel fight on a detected table, up to two faint red-orange arcs glow on
-  the rim in the directions where the real table edge is within about 25 cm of it; an arc brightens
-  while the rival is near the rim inside it; in the first match's forge round the nearest arc pulses for the staged DESK KO. From the second match on, a one-time label (REAL
-  EDGE) explains it. From the second match the rim under each arc is a lower drop side for both tops (a top goes over it at 55% of the usual outward speed; `DESK_DROP_ESCAPE` in `src/game/sim.ts`), so where your real desk edge is changes where throws land; online duels and brawls leave it off. Unverified on a headset.
+- **Real-edge cue:** in a duel fight on a detected table, up to two red hazard-striped bands (yellow
+  in Colour-safe) sit on the rim, following its shape, in the directions where the real table edge is within about 25 cm of it; an arc brightens
+  while the rival is near the rim inside it; in the first match's forge round the nearest arc pulses for the staged DESK KO. From the second match on, a one-time call (REAL
+  EDGE: LOW RIM / THROW THEM OFF YOUR DESK) explains it. From the second match the rim under each arc is a lower drop side for both tops (a top goes over it at 55% of the usual outward speed; `DESK_DROP_ESCAPE` in `src/game/sim.ts`), so where your real desk edge is changes where throws land; online duels and brawls leave it off. Unverified on a headset.
 - **Sound,** all synthesized: a spin hum per top whose pitch drops and wavers as it
   slows, metal clashes, the cord's rising tension tone, launch, rail kick, slag pit,
   burst, topple and result jingles.
@@ -277,8 +282,10 @@ an arena. First to 4 heat wins a match.
   around with the mouse and click-holding.
 - **The duel layer:** a forge bar (the ring on the back of each hand)
   starts each round almost half full (45%; a white hot rip adds a quarter), fills on its own in 24 s and from solid clashes, three times
-  as fast while your top is behind on spin. Full, press
-  your palm on the table beside the arena: your strike. The seal you engrave in the forge's
+  as fast while your top is behind on spin. Full, pinch
+  the seal off your top and stamp it into the arena (hold the pinch to steer Tilt, Magnet or
+  Ward); a palm pressed on the table beside the arena is the fallback (after 4 s, or in Press to
+  strike). The seal you engrave in the forge's
   Combat drawer picks it: the Anvil Strike (a shockwave from the middle that throws tops near the
   rim, hot ones further; your own top is braced), the Tilt (Lv 3: the arena dips toward your
   palm; the rival slides, your top holds), the Rush (Lv 4: your top charges the rival), the Ward
@@ -328,5 +335,6 @@ an arena. First to 4 heat wins a match.
   bpm in D minor on the game's four-note motif (home: drone and anvil; getting ready: bass;
   fight: toms; tension: hats and the motif), ducked under big hits; clashes ring at each ring's
   own pitch (an Anvil clangs lower than a Striker).
-- Result card with the finish and score, then pinch again for the next round.
+- The finish stamps first; a result card follows 0.9 s later (none in the first match's rounds),
+  and the next round starts after 4 s, sooner on a pinch.
 
