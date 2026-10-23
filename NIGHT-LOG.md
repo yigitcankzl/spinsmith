@@ -129,6 +129,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 20 (04:30–04:45) | Full judge re-score | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 8, RtCB 6, Accessibility 8, Boldest 7, IWSDK 7) | README top lines matched to the code (flick hint timing, the come-back card's next move) | judge only |
 | 22 (04:45–05:00) | Technical (safeguards) | blind A/B snapshots: 5 → 6 | `PERF_GUARD=1` runs the in-game quality guard under the emulator (it is off there by design) and the report fails if it never steps down below 60 fps; saved run at 6x throttle: full → lite → lite+foveation at 24 fps, 3 s apart | merged |
 | 21 (04:35–05:05) | Polish: visual (floor form) | blind A/B stills: 6 → 5 | Tried: each floor rise lit and shaded from its own slope beyond a plain bowl. It brightened Sumo Square's terrace step and took away the dark band that made it read as a drop; ripples unchanged | dropped |
+| 23 (04:50–05:10) | Polish: video; Accessibility as shown | blind A/B reels: 7 → 6 and 7 → 5 | Tried: the comfort dial filmed from the seat with the arena in frame, and the end card on the README's line. The wide seat shot made the plate unreadable; the judge also preferred "Your real desk is the ring-out" as the closing line | dropped (close-up comfort shot restored) |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -171,3 +172,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Innovation: a tray vs detected-table beat showing the room changes the outcome (judge c20)
 - [ ] Polish: comfort shot at sofa height, knob over the plate; one tagline everywhere (judge c20)
 - [ ] Hazard-tape arcs clip through the rim on Sumo Square / Ripple Pool, and a doubled white rim outline (judge A/B c21)
+- [ ] Comfort caption says Turn the dial but no dial turns on screen; a ghosted DESK KO! shows through the end card (judge A/B c23)
