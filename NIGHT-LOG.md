@@ -144,6 +144,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 35 (05:11–05:20) | Reason to Come Back (rival preview) | blind A/B frames: clarity 6 → 4, replay 6 → 6 | Tried: tomorrow's rival top spinning over the arena under the come-back card. It read as the beaten rival still standing after a 4-0 win; first-five, desk-ko-first, combat-readability passed | dropped |
 | 36 (05:20–05:30) | Exp: readability (result plate) | blind A/B frames: 3 → 5 | A top that is out shows no spin left on the match plate's fills, its canvas bar and the rim gauge (a shattered rival kept its full cyan bar on a 4-0 win screen). sim-check, combat-readability, desk-ko-first pass | merged |
 | 37 (05:20–05:27) | Reason to Come Back / Exp readability (last card) | blind A/B frames: 4 → 6 | A won match's last card heads with the score on one line (WON 4-0 · COME BACK); a lost one keeps COME BACK TOMORROW. first-five (card seen: WON 4-3 · COME BACK), desk-ko, desk-guard, sim-check pass | merged |
+| 38 (05:27–05:40) | Polish: visual (reel grade) | blind A/B frames: 5 → 7 | Brighter grade in clip(): mean brightness 51-55 → 75-79, crushed blacks 5-12% → 0.1-1.7% (judge's measure). Split-screen segments keep the old grade. check:hands clean again on a fresh page | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
