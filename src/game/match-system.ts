@@ -883,6 +883,8 @@ export class MatchSystem extends createSystem({
   private resultCard: { text: string; at: number } | null = null;
   time = 0;
   frameDt = 0;
+  /** When a wrong-way rub's stamp was last queued behind another (s). */
+  private wrongWayQueuedAt = -9;
   /** Which hand holds the cord, and pull bookkeeping. */
   puller: Side | null = null;
   private maxPull = 0;
@@ -5940,10 +5942,10 @@ export class MatchSystem extends createSystem({
         playTick();
         // The wrong-way tick has a twin: the rub is slowing your own top.
         if (!this.stamp.busy) this.stamp.show('WRONG WAY', 'RUB WITH YOUR SPIN', 'neutral', 0.4);
-        // A stamp already up: the card carries it, so the tick never plays alone.
-        else {
-          this.label.set('WRONG WAY · RUB WITH YOUR SPIN');
-          this.labelTimer = 1;
+        // A stamp already up: it waits its turn (once every 2 s), so the tick never plays alone.
+        else if (this.time - this.wrongWayQueuedAt > 2) {
+          this.wrongWayQueuedAt = this.time;
+          this.stamp.later('WRONG WAY', 'RUB WITH YOUR SPIN', 'neutral', 0.4);
         }
       }
       return true;
@@ -7863,13 +7865,14 @@ export class MatchSystem extends createSystem({
     if (this.time - this.lockedAt < 0.6) return;
     this.lockedAt = this.time;
     playLocked();
-    // The charge pips at the near rim always answer a refusal (a visual twin of the clunk, even when
-    // a stamp and the card are both busy); for want of a charge they are where the eye should go.
-    this.pips.refuse();
+    // Refused for want of a charge: the charge pips at the near rim answer, so the eye finds them.
+    if (this.charges.charges < 1) this.pips.refuse();
     // The card is busy (or just said it): a short stamp carries the same news (never over a stamp
     // already showing), never sound alone.
     if (this.labelTimer > 0 || this.time - this.lockedSaidAt < 2) {
+      // A stamp already up: the refusal waits its turn rather than leaving the clunk alone.
       if (!this.stamp.busy) this.stamp.show(why.split('\n')[0].toUpperCase(), '', 'neutral', 0.35);
+      else this.stamp.later(why.split('\n')[0].toUpperCase(), '', 'neutral', 0.35);
       return;
     }
     this.lockedSaidAt = this.time;
