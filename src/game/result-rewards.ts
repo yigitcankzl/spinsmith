@@ -107,7 +107,10 @@ export class ResultRewards {
     const today = localDate(new Date());
     const p = this.m.progress;
     const next = verbReleasedAt(p.matches + 1);
-    return comeBackCard(p.streak(today), dailyOrder(addDays(today, 1), this.m.orderContext()), nextBout(p.bouts, p.matches % 2 === 0, p.matches), next ? VERB_CARD[next][0] : undefined);
+    const card = comeBackCard(p.streak(today), dailyOrder(addDays(today, 1), this.m.orderContext()), nextBout(p.bouts, p.matches % 2 === 0, p.matches), next ? VERB_CARD[next][0] : undefined);
+    // A won match's last card still says it was won: the score heads it on day one (one short line).
+    const log = this.m.matchLog;
+    return log.won && card.startsWith('COME BACK TOMORROW') ? card.replace('COME BACK TOMORROW', `WON ${log.score.replace(/ /g, '')} · COME BACK`) : card;
   }
 
   /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */
