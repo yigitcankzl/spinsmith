@@ -116,6 +116,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 7 (03:00–03:10) | First Five Minutes; Polish: audio; video | blind A/B: FFM clarity 5 → 7, clutter 4 → 6; audio 5 → 6; video 6 → 6 | Cycle 4's dropped commits re-tried under the blind A/B: no VS stamp over the first rival card, no WATCH THE TOPS REACT under the DESK KO stamp, the LEVEL card not repeated under its stamp, medal stamp without the bout number, forge/builder SFX ~2x, room tone under a decided result. first-five: 18/19 prompts, 68/73 words (was 22 / 92), come-back card seen; desk-ko-first, desk-ko, desk-guard, combat-readability, check:hands pass on a fresh page | merged |
 | 8 (03:10–03:25) | Accessibility | blind A/B (source snapshots): 6.5 → 8 | Cycle 5's dropped commits re-tried: Large text (card, stamps, bar, gauge labels 1.3x; textScale() tested), the comfort plate shows through a new smith's first session, plus colour-safe now reaches the forge preview needle (worse also dashed) and the low-spin bar fill. desk-ko-first, combat-readability, desk-guard, build pass | merged |
 | 9 (03:11–03:35) | First Five Minutes (clutter) | blind A/B prompt lists: 5.5 → 6.5 (clutter 5 → 7, clarity 6 → 6) | The result card follows the finish stamp by 0.9 s (was the same frame); the staged DESK KO lesson no longer adds PINCH BOTH GLOWS over its own card and ghosts. first-five 2 runs: 14/15 prompts, 52/52 words (was 18-19 / 68-73), come-back card seen. desk-ko-first, desk-ko, desk-guard, combat-readability, check:hands pass on a fresh page | merged |
+| 10 (03:20–03:40) | First Five Minutes (post-win) | blind A/B: 6.5 → 5.5 (one run each), 6 → 5 (two runs each) | Tried: unlocks wait for the stamp queue (pushed LEVEL onto the win card: 0.6 s after it), the finish sub-line keeps its meaning with a cause, no flick lesson on the round that can decide the first match | dropped |
+| 11 (03:40–03:55) | First Five Minutes (wording) | blind A/B two runs each: 6 → 6.5 (clarity 6 → 7) | From cycle 10 only the two parts the judge credited: YOUR RAMP → INTO THE SLAG PIT, and no flick lesson on the deciding round of match 1. first-five 2 runs pass; desk-ko-first, combat-readability, desk-ko pass | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -146,3 +148,5 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Colour-safe low-spin colour: orange on the canvas bar, yellow on the 3D gauge (judge c8)
 - [ ] End-of-match pile-up: LEVEL, BOUT WON, NEW MOVE, STREAK in ~7 s (judge A/B c9)
 - [ ] Jargon at payoffs: SLAG! with a cause sub-line hides INTO THE SLAG PIT; MEDAL 2 OF 3 · RAMP IT OUT (judge A/B c9)
+- [ ] Post-win: MATCH WON, You win the match!, BOUT WON! are three win messages; LEVEL / NEW MOVE / STREAK ~1 s apart (judge A/B c11)
+- [ ] NO TABLE · MOVE BY HANDLE right before PUT YOUR TOP IN (judge A/B c11)
