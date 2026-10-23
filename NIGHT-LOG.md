@@ -142,6 +142,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 33 (05:05–05:07) | Polish: video (end card) | blind A/B frames: 4 → 7 | The end card's dimmed background now comes from before the DESK KO stamp, so no ghosted DESK KO! sits behind the title | merged |
 | 34 (05:07–05:11) | First Five Minutes (as shown) | blind A/B reels: 7 → 8, video 7 → 7 | A running clock FROM HOME on the uncut new-player segment: carry, ghost-hand rip, ramp and the first KO inside 18 s. Also checked: the heavier saved scene is ~76 visible game meshes plus emulator room objects, no cheap draw cut | merged |
 | 35 (05:11–05:20) | Reason to Come Back (rival preview) | blind A/B frames: clarity 6 → 4, replay 6 → 6 | Tried: tomorrow's rival top spinning over the arena under the come-back card. It read as the beaten rival still standing after a 4-0 win; first-five, desk-ko-first, combat-readability passed | dropped |
+| 36 (05:20–05:30) | Exp: readability (result plate) | blind A/B frames: 3 → 5 | A top that is out shows no spin left on the match plate's fills, its canvas bar and the rim gauge (a shattered rival kept its full cyan bar on a 4-0 win screen). sim-check, combat-readability, desk-ko-first pass | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -192,3 +193,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [x] End card ghost removed (cycle 33)
 - [ ] Staged first DESK KO reads as scripted: steering only once both rim pinches glow (needs the shaping harness; judge c30)
 - [ ] Tomorrow's rival preview: tried in cycle 35, read as the beaten rival; would need its own plinth or label
+- [ ] The match's last card has no win headline; COME BACK TOMORROW alone can read like a loss (judge A/B c36)
