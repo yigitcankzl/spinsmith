@@ -149,6 +149,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 40 (05:32–05:36) | Full judge re-score | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 7, RtCB 6, Accessibility 7, Boldest 6, IWSDK 7) | lowest: Technical, RtCB, Boldest. check:net exit 0 (its "error" lines are metric labels) | judge only |
 | 41 (05:36–05:45) | Boldest (Outer Ring on screen) | blind A/B reels: Boldest 7 → 7, video 6 → 5 | Tried: a 2.3 s Outer Ring palm catch → return cut into the reel. In the capture room the thrown top flies off the desk (offDesk, logged), so it was filmed in IWER's grey default room, and that cut read as cheap | dropped |
 | 42 (05:42–05:46) | Technical (perf evidence accuracy) | blind A/B README: 5 → 7 | README quotes the saved worst case (117 draws per eye, ready-cpu1x) instead of unsaved 112/95, and says what the throttled frame is made of without claiming a GPU/CPU split it does not measure | merged |
+| 43 (05:44–05:50) | Polish: video; Accessibility as shown | blind A/B reels: 6 → 7; 5 → 6 | Comfort shot trimmed to start a beat before the pinch (3.0 s, was 4.2 s of hover) | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -204,3 +205,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Room backgrounds still murky in the splits (judge A/B c39)
 - [ ] Outer Ring in the capture room: the test throw leaves the desk there (offDesk true); film it with a table placement that keeps the top on the wood (judge c40)
 - [x] README worst-case draws (cycle 42); a GPU/CPU frame split is still not measured
+- [ ] Comfort shot still holds ~1.5 s on the static ON plate (judge A/B c43)
