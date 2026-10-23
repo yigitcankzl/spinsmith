@@ -156,6 +156,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | closing pass (05:53–06:00) | Master green | — | typecheck, check:sim, check:sim-n, check:net, build; on fresh pages desk-ko-first, desk-ko, desk-guard, combat-readability, first-five (14 prompts, 54 words, first KO 18.4 s, DESK KO 40.9 s), room-matrix (failed after other probes, passed alone on a fresh page, as the README says), check:hands. Stills refreshed from the final reel (night-2026-10-23/stills/) | — |
 | final judge (06:00–06:02) | Full re-score of the end state | mean 7.0 (Innovation 8, Experience 7, Technical 7, Polish 6; FFM 8, RtCB 7, Accessibility 7, Boldest 7, IWSDK 7) | before/after table written to judge-report-2026-10-22.md | — |
 | 47 (06:02–06:09) | Polish: video (comfort framing) | blind A/B reels: Polish 6 → 6, Accessibility 6 → 5 | Tried: comfort dial at head height with the arena behind it; the hand covers OFF and the flip no longer reads. Close-up take restored | dropped |
+| 48 (06:07–06:12) | Technical (worst-case perf coverage) | blind A/B snapshots: 4 → 6 | Saved runs for a capture-room duel fight (83 draws/eye, 96 fps) and a 4-top brawl fight (97/eye, 89 fps, update p95 1.3 ms), plus a throttled brawl (4x, ready: 86/eye, 24 fps); README table rows and the 6x guard run's 15.3 ms update spike stated | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
