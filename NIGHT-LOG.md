@@ -130,6 +130,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 22 (04:45–05:00) | Technical (safeguards) | blind A/B snapshots: 5 → 6 | `PERF_GUARD=1` runs the in-game quality guard under the emulator (it is off there by design) and the report fails if it never steps down below 60 fps; saved run at 6x throttle: full → lite → lite+foveation at 24 fps, 3 s apart | merged |
 | 21 (04:35–05:05) | Polish: visual (floor form) | blind A/B stills: 6 → 5 | Tried: each floor rise lit and shaded from its own slope beyond a plain bowl. It brightened Sumo Square's terrace step and took away the dark band that made it read as a drop; ripples unchanged | dropped |
 | 23 (04:50–05:10) | Polish: video; Accessibility as shown | blind A/B reels: 7 → 6 and 7 → 5 | Tried: the comfort dial filmed from the seat with the arena in frame, and the end card on the README's line. The wide seat shot made the plate unreadable; the judge also preferred "Your real desk is the ring-out" as the closing line | dropped (close-up comfort shot restored) |
+| 24 (05:10–05:25) | Polish: visual (real-edge bands) | blind A/B stills: 4 → 6 | The hazard-tape bands are built along the rim's own radius at every angle (rimBand) instead of a circular ring at the sector's radius, so on Sumo Square and Frost Oval they no longer cut through the wall or show twice. desk-ko-first, desk-ko, desk-guard, combat-readability, room-matrix pass | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -171,5 +172,6 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Guard test checks the label only, not that the steps help (judge A/B c22)
 - [ ] Innovation: a tray vs detected-table beat showing the room changes the outcome (judge c20)
 - [ ] Polish: comfort shot at sofa height, knob over the plate; one tagline everywhere (judge c20)
-- [ ] Hazard-tape arcs clip through the rim on Sumo Square / Ripple Pool, and a doubled white rim outline (judge A/B c21)
+- [x] Hazard-tape bands follow the rim (cycle 24); doubled white rim outline still open
 - [ ] Comfort caption says Turn the dial but no dial turns on screen; a ghosted DESK KO! shows through the end card (judge A/B c23)
+- [ ] Sumo Square: the band sits a little out on the base ring, below the wall top (judge A/B c24)
