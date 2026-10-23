@@ -231,7 +231,7 @@ export class ResultRewards {
     // The finale's own stamps replace the bout's (the stamp queue holds three).
     if (fresh && !finale) {
       const word = fresh & 1 ? (bout.boss ? 'BOSS DOWN!' : 'BOUT WON!') : 'MEDAL!';
-      this.m.stamp.later(word, `BOUT ${bout.id} · MEDAL ${have} OF 3${got.length ? ` · ${got.join(' · ')}` : ''}`, 'mine', 1.6, fresh & 1 && bout.boss ? 1.5 : 1.2);
+      this.m.stamp.later(word, `MEDAL ${have} OF 3${got.length ? ` · ${got.join(' · ')}` : ''}`, 'mine', 1.6, fresh & 1 && bout.boss ? 1.5 : 1.2);
       playStamp();
     }
     // The campaign's end: the last boss beaten for the first time is the game's finale.
