@@ -1907,7 +1907,7 @@ export class MatchSystem extends createSystem({
         gained: this.phase === 'result' ? this.rewards.xpGained : 0,
         show: this.phase === 'result',
       }, this.extras.length ? this.brawlBarField() : null, gauge);
-      this.bar.animate(this.mine.spin, this.theirs.spin, dt);
+      this.bar.animate(this.mine.alive ? this.mine.spin : 0, this.theirs.alive ? this.theirs.spin : 0, dt);
       if (gauge && this.bar.mesh.visible) {
         const L = this.arena.layout;
         const r = rimRadius(L, -Math.PI / 2);
