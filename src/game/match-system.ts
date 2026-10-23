@@ -5940,6 +5940,11 @@ export class MatchSystem extends createSystem({
         playTick();
         // The wrong-way tick has a twin: the rub is slowing your own top.
         if (!this.stamp.busy) this.stamp.show('WRONG WAY', 'RUB WITH YOUR SPIN', 'neutral', 0.4);
+        // A stamp already up: the card carries it, so the tick never plays alone.
+        else {
+          this.label.set('WRONG WAY · RUB WITH YOUR SPIN');
+          this.labelTimer = 1;
+        }
       }
       return true;
     }
@@ -7858,8 +7863,9 @@ export class MatchSystem extends createSystem({
     if (this.time - this.lockedAt < 0.6) return;
     this.lockedAt = this.time;
     playLocked();
-    // Refused for want of a charge: the charge pips at the near rim answer, so the eye finds them.
-    if (this.charges.charges < 1) this.pips.refuse();
+    // The charge pips at the near rim always answer a refusal (a visual twin of the clunk, even when
+    // a stamp and the card are both busy); for want of a charge they are where the eye should go.
+    this.pips.refuse();
     // The card is busy (or just said it): a short stamp carries the same news (never over a stamp
     // already showing), never sound alone.
     if (this.labelTimer > 0 || this.time - this.lockedSaidAt < 2) {
