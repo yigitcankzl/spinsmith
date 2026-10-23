@@ -56,7 +56,15 @@ export function boutLine(bout: { id: string; rival: string } | null): string {
   return fit(`Next bout ${bout.id}: ${bout.rival}`, `Next bout: ${bout.id}`);
 }
 
-/** The match result's last card: the streak, tomorrow's order, the next bout. */
-export function comeBackCard(streak: number, tomorrow: Order | null, bout: { id: string; rival: string } | null): string {
-  return [streakTitle(streak, true), tomorrowLine(tomorrow), boutLine(bout)].filter(Boolean).join('\n');
+/** The hand move the next match unlocks, as a line. */
+export function nextMoveLine(move: string): string {
+  return fit(`Next match: new move ${move}`, `Next match: ${move}`);
+}
+
+/**
+ * The match result's last card: the streak, what the very next match unlocks (a new hand move
+ * pulls harder than a bout number), else the next bout, and tomorrow's order.
+ */
+export function comeBackCard(streak: number, tomorrow: Order | null, bout: { id: string; rival: string } | null, nextMove?: string): string {
+  return [streakTitle(streak, true), nextMove ? nextMoveLine(nextMove) : boutLine(bout), tomorrowLine(tomorrow)].filter(Boolean).join('\n');
 }

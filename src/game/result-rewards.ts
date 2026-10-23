@@ -106,7 +106,8 @@ export class ResultRewards {
   private comeBackText() {
     const today = localDate(new Date());
     const p = this.m.progress;
-    return comeBackCard(p.streak(today), dailyOrder(addDays(today, 1), this.m.orderContext()), nextBout(p.bouts, p.matches % 2 === 0, p.matches));
+    const next = verbReleasedAt(p.matches + 1);
+    return comeBackCard(p.streak(today), dailyOrder(addDays(today, 1), this.m.orderContext()), nextBout(p.bouts, p.matches % 2 === 0, p.matches), next ? VERB_CARD[next][0] : undefined);
   }
 
   /** XP for the round just played; level-ups flare and ring, unlocks queue to be shown. */
