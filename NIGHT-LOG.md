@@ -173,6 +173,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 60 (06:47–06:51) | Accessibility as shown | blind A/B reels: Accessibility 5 → 6, Polish 7.5 → 7 | Tried: a 2.2 s colour-safe fight (yellow hazard tape, shape-coded owners) after the Large text split; wide and its caption hit a game card, so Polish regressed | dropped |
 | 61 (06:50–06:53) | IWSDK / Technical (verifiable) | blind A/B README: 5 → 8 | README table: each IWSDK feature used, its file:line, and what it has run on (depth occlusion: not yet); the judge checked every cited line | merged |
 | 62 (06:53–06:56) | Accessibility (findable, verifiable) | blind A/B README: 4 → 7 | README Accessibility section: the dial's 11 stops in order (from COMFORT_DIAL), what each does, file references for the first-session plate, ring shapes and striped band, and what check:sim covers | merged |
+| 63 (06:54–07:02) | First Five Minutes (README accuracy) | blind A/B README: 3 → 7 | README "Measured first session" from today's three first-five runs on the current code: first KO 18.1-46.9 s, DESK KO 30.5-46.9 s, match over 49.4-93.6 s, 14-16 prompts, 52-60 words; the slow run (ramp missed) is explained. Yesterday's 19-20 prompts / 70-74 words no longer reproduced | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
