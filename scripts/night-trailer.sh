@@ -44,6 +44,13 @@ EXTRA="drawtext=fontfile=$FONT:text='EMULATOR FOOTAGE':fontcolor=0xff8a2a:fontsi
   clip 00-hook "$NEW/desk-ko-first-side.mp4" 0.4 6.5 "THE ARENA IS THE WEAPON" "Squeeze the bowl / throw the rival off your desk"
 FIRST30=; if [ -s "$NEW/first-30.mp4" ]; then FIRST30=1; clip 005-first "$NEW/first-30.mp4" 0.2 17.8 "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"; fi
 clip 01-match "$NEW/first-match.mp4" 1.0 12.3 "ONE ROUND, UNCUT" "Rip  /  the rival runs to your edge  /  squeeze"
+# The room changes the outcome: the same first-match squeeze with the game's table detection
+# switched off (a ring-out lesson) and with the table detected (DESK KO). Both IWER, same seat.
+ROOMSEG=; if [ -s "$NEW/tray-squeeze.mp4" ]; then ROOMSEG=1
+  ffmpeg -y -loglevel error -ss 5.4 -t 4.2 -i "$NEW/tray-squeeze.mp4" -ss 0.7 -t 4.2 -i "$NEW/desk-ko-first-side.mp4" -filter_complex \
+    "[0:v]scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}/2:${HEIGHT},fps=${FPS}[a];[1:v]scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}/2:${HEIGHT},fps=${FPS}[b];[a][b]hstack,drawbox=x=iw/2-2:y=0:w=4:h=ih:color=0x111419:t=fill,drawtext=fontfile=$FONT:text='THE ROOM DECIDES':fontcolor=0xffa24a:fontsize=58:x=46:y=38:box=1:boxcolor=0x111419@0.74:boxborderw=15:enable='lt(t,2.2)',drawtext=fontfile=$FONT:text='TABLE DETECTION OFF':fontcolor=white:fontsize=38:x=w/4-text_w/2:y=h-120:box=1:boxcolor=0x111419@0.75:boxborderw=12,drawtext=fontfile=$FONT:text='TABLE DETECTED  -  DESK KO':fontcolor=0xffa24a:fontsize=38:x=3*w/4-text_w/2:y=h-120:box=1:boxcolor=0x111419@0.75:boxborderw=12,drawtext=fontfile=$FONT:text='$LABEL':fontcolor=white@0.55:fontsize=22:x=w-text_w-28:y=h-42[v]" \
+    -map "[v]" -map 1:a? -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/015-room.mp4"
+fi
 clip 02-squeeze "$NEW/close-squeeze.mp4" 0.3 3.2 "TWO HANDS ON THE RIM" "Squeeze / stretch / tilt / twist the live bowl"
 clip 03-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK" "Your fingertip is part of the physics"
 clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"
@@ -77,7 +84,7 @@ ffmpeg -y -loglevel error \
   -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p \
   -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/09-end.mp4"
 
-segments=(00-hook ${FIRST30:+005-first} 01-match 02-squeeze 03-flick 04-guard 05-rub 06-strike ${COMFORTSEG:+065-comfort} ${COMFORTSEG:+066-bigtext} ${parts[@]+"${parts[@]}"} 07-forge 08-workshop 085-return 09-end)
+segments=(00-hook ${FIRST30:+005-first} 01-match ${ROOMSEG:+015-room} 02-squeeze 03-flick 04-guard 05-rub 06-strike ${COMFORTSEG:+065-comfort} ${COMFORTSEG:+066-bigtext} ${parts[@]+"${parts[@]}"} 07-forge 08-workshop 085-return 09-end)
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
 mkdir -p "$(dirname "$FINAL")"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" \
