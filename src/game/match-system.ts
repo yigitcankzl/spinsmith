@@ -173,6 +173,7 @@ const ARENA_FORGE_EFFECT: Record<ArenaForgeAction, string> = {
 };
 const SLOW_MO = 0.3;
 const PIN_HEAD = new Vector3();
+const FACE_HEAD = new Vector3();
 const PIN_FWD = new Vector3();
 const PIN_AT = new Vector3();
 const PIN_HOME = new Vector3();
@@ -3706,6 +3707,12 @@ export class MatchSystem extends createSystem({
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift + (this.phase === 'result' ? HUD.resultLift : 0)) * grow;
     // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
     this.stamp.mesh.rotation.set(0, 0, 0);
+    // The round card (and the stamp in its slot) turn on their upright axis to face the head, so a
+    // player who leans or sits off-centre still reads them square on.
+    const facing = this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result';
+    const headLocal = this.root.worldToLocal(this.player.head.getWorldPosition(FACE_HEAD));
+    const lp = this.label.mesh.position;
+    this.label.mesh.rotation.y = facing ? Math.atan2(headLocal.x - lp.x, headLocal.z - lp.z) : 0;
     // Pinned over the edge only while the fight plays out; on the result it moves to its slot above
     // the card, so the result plate never covers it.
     if (this.stamp.pin && this.phase !== 'fight') this.stamp.pin = null;
@@ -3727,6 +3734,7 @@ export class MatchSystem extends createSystem({
       this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + HUD.stampLift, this.label.mesh.position.z + 0.01);
     }
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
+    if (facing && !this.stamp.pin) this.stamp.mesh.rotation.y = Math.atan2(headLocal.x - this.stamp.mesh.position.x, headLocal.z - this.stamp.mesh.position.z);
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.scale.setScalar(readScale);
     this.rematchButton.mesh.scale.setScalar(readScale);
