@@ -3715,8 +3715,8 @@ export class MatchSystem extends createSystem({
       const head = this.player.head.getWorldPosition(PIN_HEAD);
       const fwd = this.player.head.getWorldDirection(PIN_FWD).negate();
       const p = PIN_AT.copy(this.stamp.pin);
-      const home = this.root.getWorldPosition(PIN_HOME);
-      home.y = p.y;
+      // Home is the fight stamp's own slot over the far rim, clear of the gauge labels under it.
+      const home = this.root.localToWorld(PIN_HOME.set(0, (this.arena.height(0, -far / this.viewK) + WALL_HEIGHT[L.wall]) * this.viewK + 0.12, -far));
       for (let i = 0; i < 6 && PIN_DIR.subVectors(p, head).normalize().dot(fwd) < 0.92; i++) p.lerp(home, 0.35);
       this.root.worldToLocal(this.stamp.mesh.position.copy(p));
       this.stamp.mesh.lookAt(head);
