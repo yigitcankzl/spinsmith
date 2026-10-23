@@ -5739,7 +5739,9 @@ export class MatchSystem extends createSystem({
   private updateFlick(dt: number) {
     // The first match teaches it too: once its forge lesson is done, a tired rival calls for a flick.
     if (!this.flickHintShown && this.flickCount === 0 && (this.progress.matches >= 1 || this.morphedOnce || this.tutorialRound >= 3) && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
-      && this.elapsed > TUNING.grace && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) > 0.6 && this.labelTimer <= 0) {
+      && this.elapsed > TUNING.grace && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) > 0.6 && this.labelTimer <= 0
+      // Never a new lesson on the round that can decide the first match: it would land on the payoff.
+      && !(this.progress.matches === 0 && Math.max(this.myPoints, this.theirPoints) >= MATCH_HEAT - 1)) {
       this.flickHintShown = true;
       this.call(LESSON.flick, CALL.tactic, 2.2);
       this.flickGhostUntil = this.time + 2.6;
