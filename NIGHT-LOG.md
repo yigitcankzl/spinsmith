@@ -160,6 +160,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 49 (06:10–06:16) | Reason to Come Back (streak pays) | blind A/B code: 6 → 7 | From day 2 of a streak the day's first finished match earns 25 XP per streak day (cap 7 → 175 XP), stamped N-DAY STREAK! with any unlocks it opens shown; the demo save stays level 8; sim-check asserts day 1 / same day earn nothing and day 2 earns 2x25. desk-ko-first, combat-readability, first-five, build pass | merged |
 | 50 (06:16–06:22) | Reason to Come Back (tomorrow's line) | blind A/B cards: 5 → 7 (clarity 6 → 7) | Tomorrow's line says what the order pays when it fits six words (Tomorrow: beat Iron Keep · +120 XP), else rival and arena; result card re-recorded, renders on one line | merged |
 | 51 (06:20–06:23) | Polish: visual (Sumo outline) | blind A/B stills: 6 → 5 | Tried: drop the floor accent band on wall-less arenas (the berm line doubles it). The berm line alone is broken at the front and back, so the edge read worse | dropped |
+| 52 (06:23–06:28) | Polish: video (brawl on screen) | — | Tried twice to film a 4-top brawl from the demo save (seats set by probe); the player's top was out within ~1-2 s both times (SHATTER / SLAG), nothing to show. No code change; shot discarded | dropped |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -219,3 +220,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Large text split crops the FLICK! title; only the ON side shows the event banner (judge A/B c46)
 
 The before/after table is in judge-report-2026-10-22.md (git-ignored like every judge-report*.md; kept on disk).
+- [ ] A brawl shot for the reel needs a drive that keeps the player's top in for a few seconds
