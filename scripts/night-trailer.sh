@@ -76,7 +76,7 @@ done
 clip 07-forge "$NEW/forge.mp4" 2.8 3.2 "FORGE IT BY HAND" "Drag a part onto your top / it fights differently"
 clip 08-workshop "$NEW/workshop.mp4" 7.6 3.8 "BUILD THE BATTLEGROUND" "Shape the floor / place pits and bumpers"
 # Filmed wide from a fixed pose: cropped in to the card and the arena.
-PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" clip 085-return "$NEW/match-won-cards.mp4" $(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$NEW/match-won-cards.mp4") - 3.6))") 3.4 "COME BACK TOMORROW" "A day streak and a new order for tomorrow"
+PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" clip 085-return "$NEW/match-won-cards.mp4" $(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$NEW/match-won-cards.mp4") - 2.8))") 2.6 "COME BACK TOMORROW" "The next move  /  a rival tomorrow  /  a streak that pays"
 # The end card rings the game's motif (D A F high-D), so the reel never ends in silence.
 ffmpeg -y -loglevel error \
   -ss 0.2 -t 2.0 -i "$NEW/desk-ko-first-side.mp4" \
