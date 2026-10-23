@@ -35,7 +35,7 @@ clip() {
     audio+=(-shortest)
   fi
   ffmpeg -y -loglevel error "${inputs[@]}" -t "$duration" \
-    -vf "${PRE:+$PRE,}scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${WIDTH}:${HEIGHT},fps=${FPS},eq=contrast=1.06:saturation=1.13:brightness=-0.015,drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=58:x=46:y=38:box=1:boxcolor=0x111419@0.74:boxborderw=15:enable='lt(t,2.2)',drawtext=fontfile=$FONT:text='$sub':fontcolor=white:fontsize=31:x=49:y=119:box=1:boxcolor=0x111419@0.62:boxborderw=9:enable='lt(t,2.2)',drawtext=fontfile=$FONT:text='$LABEL':fontcolor=white@0.55:fontsize=22:x=w-text_w-28:y=h-42${EXTRA:+,$EXTRA}" \
+    -vf "${PRE:+$PRE,}scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${WIDTH}:${HEIGHT},fps=${FPS},eq=contrast=1.08:saturation=1.12:brightness=0.03:gamma=1.12,drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=58:x=46:y=38:box=1:boxcolor=0x111419@0.74:boxborderw=15:enable='lt(t,2.2)',drawtext=fontfile=$FONT:text='$sub':fontcolor=white:fontsize=31:x=49:y=119:box=1:boxcolor=0x111419@0.62:boxborderw=9:enable='lt(t,2.2)',drawtext=fontfile=$FONT:text='$LABEL':fontcolor=white@0.55:fontsize=22:x=w-text_w-28:y=h-42${EXTRA:+,$EXTRA}" \
     -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p "${audio[@]}" "$TMP/$file.mp4"
 }
 
