@@ -134,6 +134,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 25 (05:25–05:45) | Innovation (room changes the game), IWSDK as shown | blind A/B reels: Innovation 4 → 6, IWSDK 3 → 4, video 6 → 6 | Reel beat "THE ROOM DECIDES": the same first-match squeeze with the game's table outline cleared (no desk edge: a normal ring-out lesson) beside the detected table (DESK KO), same seat, IWER. sim-n, net, typecheck pass. Disk hit 100% (104 MB): tonight's judge frame folders removed (2.5 GB free) | merged |
 | 26 (05:45–05:55) | Polish: video (room-decides split) | blind A/B frames: 5 → 7 | Each half's crop window shifted toward the instruction card, so PINCH GLOWS · SQUEEZE INWARD and SQUEEZE! RELEASE read; the left arena's edge is now cut instead | merged |
 | 27 (05:50–06:00) | Reason to Come Back (clarity) | blind A/B cards: clarity 6 → 8, replay 6 → 6 | Day one's streak line says DAY 1 · COME BACK TOMORROW (a one-day streak is nothing to keep yet); sim-check updated | merged |
+| 28 (06:00–06:05) | Technical / IWSDK (judge self-test) | blind A/B README: 5 → 6 | README judge step 7: `?fps` readout beside MENU and `?diagnostics` copyable report after leaving XR | merged |
+| 29 (06:05–06:15) | Reason to Come Back (card bug) | blind A/B frames: 5 → 7 | Re-recording the result card showed cycle 27's title wrapping onto two lines and the card joining its two body lines ("…Forge Gust Tomorrow: vs Iron Keep"); day one's title is now COME BACK TOMORROW (one line) and the lines stay apart | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
