@@ -4,6 +4,7 @@
  * Smith's board. Every line stays at six words or fewer. No three.js or DOM here.
  */
 import type { Order } from './orders.ts';
+import { ORDER_XP } from './progress.ts';
 
 /** Most words a come-back line may use (read at a glance, from a result card over the far rim). */
 export const COME_BACK_WORDS = 6;
@@ -50,7 +51,8 @@ export function streakTitle(streak: number, playedToday: boolean): string {
 export function tomorrowLine(order: Order | null): string {
   if (!order) return 'Tomorrow: a new Smith Order';
   // "vs" says the name is the rival; the arena follows when it fits.
-  return fit(`Tomorrow: vs ${order.rival} in ${order.arena}`, `Tomorrow: vs ${order.rival}`, 'Tomorrow: a new Smith Order');
+  // What beating tomorrow's rival pays (a Smith Order's XP) when it fits, else where the fight is.
+  return fit(`Tomorrow: beat ${order.rival} · +${ORDER_XP} XP`, `Tomorrow: vs ${order.rival} in ${order.arena}`, `Tomorrow: vs ${order.rival}`, 'Tomorrow: a new Smith Order');
 }
 
 /** The next Circuit Map bout, or '' when every bout is won. */

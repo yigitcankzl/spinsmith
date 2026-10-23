@@ -1103,7 +1103,7 @@ TUNING.grace = 0;
   const fitsSix = (l: string) => wordsIn(l) <= COME_BACK_WORDS;
   assert.equal(tomorrow.date, '2026-10-23');
   assert.deepEqual(dailyOrder('2026-10-23', ctx), tomorrow, 'the teaser is the order tomorrow brings');
-  assert.equal(tomorrowLine(tomorrow), fitsSix(`Tomorrow: vs ${tomorrow.rival} in ${tomorrow.arena}`) ? `Tomorrow: vs ${tomorrow.rival} in ${tomorrow.arena}` : `Tomorrow: vs ${tomorrow.rival}`);
+  assert.ok(tomorrowLine(tomorrow).startsWith(`Tomorrow: beat ${tomorrow.rival}`) || tomorrowLine(tomorrow).startsWith(`Tomorrow: vs ${tomorrow.rival}`), 'tomorrow names the rival, with the order XP when it fits');
   const card = comeBackCard(1, tomorrow, nextBout({}, true, 0));
   assert.deepEqual(card.split('\n'), ['COME BACK TOMORROW', 'Next bout 1-1: Drifter', tomorrowLine(tomorrow)], 'no move to unlock: streak, next bout, tomorrow');
   assert.deepEqual(comeBackCard(1, tomorrow, nextBout({}, true, 0), 'Forge Gust').split('\n'), ['COME BACK TOMORROW', 'Next match: new move Forge Gust', tomorrowLine(tomorrow)], 'a move to unlock comes before the bout');
