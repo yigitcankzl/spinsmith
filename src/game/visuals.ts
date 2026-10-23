@@ -3071,8 +3071,9 @@ export class Stamp {
   }
 
   later(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1, size = 1) {
-    // At most three wait: a pile of rewards is not a sequence anyone reads.
-    if (this.queue.length < 3) this.queue.push([word, sub, side, hold, size]);
+    // At most three wait: a pile of rewards is not a sequence anyone reads; and never the same word twice
+    // (a held, refused move must not crowd out a reward).
+    if (this.queue.length < 3 && !this.queue.some((q) => q[0] === word)) this.queue.push([word, sub, side, hold, size]);
   }
 
   /** Canvas px per world metre (its usual home: the card's slot over the far rim, about 1.2 m away). */
