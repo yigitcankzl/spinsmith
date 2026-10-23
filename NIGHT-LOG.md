@@ -121,6 +121,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 12 (03:40–04:00) | First Five Minutes (post-win) | blind A/B two runs each: 6 → 6 (bout beat as MEDAL n OF 3), then 7 → 5.5 (plus a win card without "You win the match!" and a plain no-table card) | Judges read the score on the card as noise and the post-win spacing swings with bot timing more than with these lines; three post-win attempts (cycles 10, 12) moved nothing, so this line of work stops here | dropped |
 | 13 (03:50–04:05) | Exp: readability (DESK KO moment) | blind A/B frames: 3 → 8 | The pinned DESK KO stamp comes back toward the fight stamp's slot over the far rim instead of the arena centre, so DESK KO!, its sub-line and the gauge's FIRST TO 4 / YOU / rival sit in three bands (before: the sub-line garbled DRIFTER, FIRST TO 4 hidden). desk-ko-first, desk-ko, combat-readability pass | merged |
 | 14 (04:00–04:10) | Exp: comfort / FoV (off-centre seat) | blind A/B frames: 3 → 5 | The round card and the stamp in its slot yaw toward the head in ready / fight / result (the pinned DESK KO stamp already faced the eyes). Side-seat shot: the card is less skewed and fully in frame; the rest is perspective near the frame edge. desk-ko-first, combat-readability, desk-guard, sim-check (FoV anchors) pass | merged |
+| 15 (04:00–04:30) | Full judge re-score, then Polish: video / FFM / Accessibility as shown | full: mean 6.75 (Innovation 8, Experience 7, Technical 6, Polish 6; FFM 7, RtCB 7, Accessibility 8, Boldest 7, IWSDK 6). Blind A/B reels: FFM 4 → 7, Accessibility 1 → 4, video 7 → 7, RtCB 6 → 6 | Reel now 75 s: a new player's first 18 s uncut (PUT YOUR TOP IN, carry the top in, the rival's portal, ghost-hand rip, first ramp, SLAG), and the comfort dial's plate cycling stops (caption names only what is shown). room-matrix passes | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -153,3 +154,6 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Jargon at payoffs: SLAG! with a cause sub-line hides INTO THE SLAG PIT; MEDAL 2 OF 3 · RAMP IT OUT (judge A/B c9)
 - [ ] Post-win: MATCH WON, You win the match!, BOUT WON! are three win messages; LEVEL / NEW MOVE / STREAK ~1 s apart (judge A/B c11)
 - [ ] NO TABLE · MOVE BY HANDLE right before PUT YOUR TOP IN (judge A/B c11)
+- [ ] Comfort shot: toggle one stop ON on camera (the plate read OFF throughout) (judge A/B c15)
+- [ ] Technical: a CPU-throttled perf run saved next to the others (judge c15)
+- [ ] IWSDK: a shot where the desk-edge arcs line up with the visible table edge (judge c15)
