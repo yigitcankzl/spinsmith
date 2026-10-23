@@ -146,6 +146,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 37 (05:20–05:27) | Reason to Come Back / Exp readability (last card) | blind A/B frames: 4 → 6 | A won match's last card heads with the score on one line (WON 4-0 · COME BACK); a lost one keeps COME BACK TOMORROW. first-five (card seen: WON 4-3 · COME BACK), desk-ko, desk-guard, sim-check pass | merged |
 | 38 (05:27–05:40) | Polish: visual (reel grade) | blind A/B frames: 5 → 7 | Brighter grade in clip(): mean brightness 51-55 → 75-79, crushed blacks 5-12% → 0.1-1.7% (judge's measure). Split-screen segments keep the old grade. check:hands clean again on a fresh page | merged |
 | 39 (05:31–05:35) | Polish: visual (split segments) | blind A/B frames: 4 → 6 | The two split-screens (room decides, Large text) get the same grade as the rest (mean luma 63 → 76, near-black 3.6% → 0.7%) | merged |
+| 40 (05:32–05:36) | Full judge re-score | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 7, RtCB 6, Accessibility 7, Boldest 6, IWSDK 7) | lowest: Technical, RtCB, Boldest. check:net exit 0 (its "error" lines are metric labels) | judge only |
+| 41 (05:36–05:45) | Boldest (Outer Ring on screen) | blind A/B reels: Boldest 7 → 7, video 6 → 5 | Tried: a 2.3 s Outer Ring palm catch → return cut into the reel. In the capture room the thrown top flies off the desk (offDesk, logged), so it was filmed in IWER's grey default room, and that cut read as cheap | dropped |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -199,3 +201,5 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [x] Win headline on the last card (cycle 37)
 - [ ] The last card pushes tomorrow over an immediate rematch hook (judge A/B c37)
 - [ ] Room backgrounds still murky in the splits (judge A/B c39)
+- [ ] Outer Ring in the capture room: the test throw leaves the desk there (offDesk true); film it with a table placement that keeps the top on the wood (judge c40)
+- [ ] README worst-case draws per eye (117 with room planes and arcs) and why throttled fps falls while game update is small (judge c40)
