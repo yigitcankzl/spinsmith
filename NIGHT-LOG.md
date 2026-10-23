@@ -167,6 +167,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 55 (06:31–06:36) | Technical (GPU / CPU split) | blind A/B snapshots: 5 → 6 | report:runtime-performance times the GPU (EXT_disjoint_timer_query_webgl2 around each render). Capture-room ready, 95 draws/eye: GPU 0.86 ms p50 unthrottled, 2.44 ms at 4x (an upper bound, it includes waiting on submission); the 4x frame (~37 ms, 27 fps) is CPU-side submission and the emulator. Saved runs and README | merged |
 | 56 (06:35–06:38) | Boldest (opening) | blind A/B reels: 6 → 7, video 6 → 6 | The reel opens 0.9 s later into the side DESK KO take, with the hands already on the rim; the KO lands at ~2.75 s instead of ~3.75 s | merged |
 | 57 (06:36–06:41) | Reason to Come Back as shown; video | blind A/B reels: 4 → 5; 5 → 5 | Come-back segment 2.6 s (was 3.4), caption "The next move / a rival tomorrow / a streak that pays" matches the card (the old caption promised things not on screen). An apostrophe broke drawtext once; reworded | merged |
+| closing pass 2 (06:40–06:45) | Master green after every merge | — | typecheck, check:sim, check:sim-n, check:net, build; fresh pages: desk-ko-first, desk-ko, desk-guard, combat-readability, first-five (14 prompts, 50 words, first KO 17.8 s, DESK KO 30.6 s), room-matrix, check:hands. Stills refreshed from the final reel. Night 2 total: 39 cycles merged, 14 dropped, 4 judge-only | — |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
