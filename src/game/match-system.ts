@@ -7628,7 +7628,7 @@ export class MatchSystem extends createSystem({
       }
       const finishSub = deskKo
         ? `${cause ? `${cause} → ` : ''}EDGE +${DESK_KO_BONUS}${decided ? ' · WIN' : ''}`
-        : decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause || FINISH_SUB[loser.finish ?? 'spin'];
+        : decided ? (won ? 'MATCH WON' : `MATCH LOST · "${this.rival.win}"`) : cause ? `${cause} → ${FINISH_SUB[loser.finish ?? 'spin']}` : FINISH_SUB[loser.finish ?? 'spin'];
       // Match 1's DESK KO! stamp (updateDeskVerdict) already says this round; it is not said twice.
       if (!(deskKo && this.quietFirst && !decided)) this.stamp.show(`${finishWord}!`, finishSub, v === 1 ? 'mine' : 'rival', 1.1, decided ? 1.5 : 1);
       if (recent && v === 1) {
