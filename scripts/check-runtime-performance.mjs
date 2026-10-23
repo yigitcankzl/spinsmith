@@ -10,7 +10,16 @@ export default async function run({ page, frame }) {
   }
   if (!target) throw new Error('window.__game not found: enter the emulated XR session first');
 
-  return target.evaluate(async () => {
+  // PERF_THROTTLE=4 slows the page's CPU 4x (Chrome DevTools emulation) for a rough mobile-class
+  // proxy; it is still not a Quest measurement.
+  const throttle = Number(process.env.PERF_THROTTLE ?? 1);
+  let cdp = null;
+  if (throttle > 1) {
+    cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
+  }
+  try {
+  const result = await target.evaluate(async () => {
     const game = window.__game;
     const renderer = game.world?.renderer ?? game.renderer;
     const gl = renderer?.getContext?.();
@@ -70,4 +79,8 @@ export default async function run({ page, frame }) {
       },
     };
   });
+  return { ...result, cpuThrottle: throttle };
+  } finally {
+    if (cdp) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  }
 }
