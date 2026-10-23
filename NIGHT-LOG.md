@@ -161,6 +161,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 50 (06:16–06:22) | Reason to Come Back (tomorrow's line) | blind A/B cards: 5 → 7 (clarity 6 → 7) | Tomorrow's line says what the order pays when it fits six words (Tomorrow: beat Iron Keep · +120 XP), else rival and arena; result card re-recorded, renders on one line | merged |
 | 51 (06:20–06:23) | Polish: visual (Sumo outline) | blind A/B stills: 6 → 5 | Tried: drop the floor accent band on wall-less arenas (the berm line doubles it). The berm line alone is broken at the front and back, so the edge read worse | dropped |
 | 52 (06:22–06:24) | Polish: video (brawl on screen) | — | Tried twice to film a 4-top brawl from the demo save (seats set by probe); the player's top was out within ~1-2 s both times (SHATTER / SLAG), nothing to show. No code change; shot discarded | dropped |
+| final judge 2 (06:24–06:26) | Full re-score after cycles 48-50 | mean 7.0 (Innovation 8, Experience 7, Technical 6, Polish 7; FFM 8, RtCB 6, Accessibility 8, Boldest 6, IWSDK 7) | the table in judge-report-2026-10-22.md shows both end judges; check:hands clean on master (06:28) | — |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
