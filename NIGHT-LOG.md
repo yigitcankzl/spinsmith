@@ -152,6 +152,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 43 (05:41–05:44) | Polish: video; Accessibility as shown | blind A/B reels: 6 → 7; 5 → 6 | Comfort shot trimmed to start a beat before the pinch (3.0 s, was 4.2 s of hover) | merged |
 | 44 (05:44–05:48) | Polish: video (disclosure) | blind A/B frames at 640 px: 5 → 7 | The IWER / not-headset disclosure is larger (30 px), brighter and on a dark backing, readable at gallery-thumbnail size without covering the arena | merged |
 | 45 (05:47–05:55) | Polish: video (comfort hold) | blind A/B: 7 → 6 | Tried: comfort shot 2.2 s; the clean ON plate then showed for ~0.25 s. desk-ko-first, combat-readability, desk-ko pass 2/2 more on fresh pages | dropped |
+| 46 (05:48–05:55) | Accessibility as shown; video (Large text split) | blind A/B frames: 3 → 6; 4 → 5 | The OFF / ON split is cropped in on the gauge with both halves at matching arena scale (the old split's OFF side sat further back, so the smaller text came from distance, an unfair comparison) | merged |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
@@ -188,7 +189,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [x] Technical: CPU-throttled perf runs (cycle 17)
 - [ ] IWSDK: a shot where the desk-edge arcs line up with the visible table edge (judge c15)
 - [ ] Come-back card: a move name (Forge Gust) says nothing about what it does; DAY 1 STREAK means little on day one (judge A/B c16)
-- [ ] Large text split: the two halves are framed at different zoom (judge A/B c18)
+- [x] Large text split at matching scale (cycle 46)
 - [ ] Ripple rings read as painted lines, not steps: a lit and a shadowed edge per ring (judge A/B c19)
 - [ ] Guard test checks the label only, not that the steps help (judge A/B c22)
 - [x] Room-decides split (cycle 25)
@@ -208,3 +209,4 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [ ] Outer Ring in the capture room: the test throw leaves the desk there (offDesk true); film it with a table placement that keeps the top on the wood (judge c40)
 - [x] README worst-case draws (cycle 42); a GPU/CPU frame split is still not measured
 - [ ] Comfort shot still holds ~1.5 s on the static ON plate (judge A/B c43)
+- [ ] Large text split crops the FLICK! title; only the ON side shows the event banner (judge A/B c46)
