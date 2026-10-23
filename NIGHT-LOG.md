@@ -211,3 +211,5 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 - [x] README worst-case draws (cycle 42); a GPU/CPU frame split is still not measured
 - [ ] Comfort shot still holds ~1.5 s on the static ON plate (judge A/B c43)
 - [ ] Large text split crops the FLICK! title; only the ON side shows the event banner (judge A/B c46)
+
+The before/after table is in judge-report-2026-10-22.md (git-ignored like every judge-report*.md; kept on disk).
