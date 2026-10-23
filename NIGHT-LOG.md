@@ -151,6 +151,7 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 42 (05:42–05:46) | Technical (perf evidence accuracy) | blind A/B README: 5 → 7 | README quotes the saved worst case (117 draws per eye, ready-cpu1x) instead of unsaved 112/95, and says what the throttled frame is made of without claiming a GPU/CPU split it does not measure | merged |
 | 43 (05:41–05:44) | Polish: video; Accessibility as shown | blind A/B reels: 6 → 7; 5 → 6 | Comfort shot trimmed to start a beat before the pinch (3.0 s, was 4.2 s of hover) | merged |
 | 44 (05:44–05:48) | Polish: video (disclosure) | blind A/B frames at 640 px: 5 → 7 | The IWER / not-headset disclosure is larger (30 px), brighter and on a dark backing, readable at gallery-thumbnail size without covering the arena | merged |
+| 45 (05:47–05:55) | Polish: video (comfort hold) | blind A/B: 7 → 6 | Tried: comfort shot 2.2 s; the clean ON plate then showed for ~0.25 s. desk-ko-first, combat-readability, desk-ko pass 2/2 more on fresh pages | dropped |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
