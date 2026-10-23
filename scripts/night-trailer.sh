@@ -50,7 +50,7 @@ clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms 
 clip 05-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal / press it into the bowl"
 # Comfort: the dial's stops on its plate (filmed from the seat, cropped in).
-COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 0.6 5.4 "COMFORT, ONE PINCH AWAY" "One dial  /  shown here: calm, quiet, no flashes, press to strike"; fi
+COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 4.6 5.6 "COMFORT, ONE PINCH AWAY" "Turn the dial, pinch the plate  /  Large text: ON"; fi
 # Four arenas in live play, one beat each (IWER, recorded by .tmp/rec-arenas.sh style drives).
 parts=()
 for f in "$NEW"/arenas/*.mp4; do
