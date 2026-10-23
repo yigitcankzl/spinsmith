@@ -298,7 +298,7 @@ export class MatchBar {
       g.fillStyle = 'rgba(0, 0, 0, 0.55)';
       g.fillRect(s.x, BAR_Y, s.w, BAR_H);
       if (v > 0) {
-        g.fillStyle = v > 0.25 ? color : '#e0574a';
+        g.fillStyle = v > 0.25 ? color : `#${warnColor(0xe0574a, SAFE_COLORS.danger).toString(16).padStart(6, '0')}`;
         g.fillRect(s.x, BAR_Y, s.w * v, BAR_H);
       }
       g.strokeStyle = 'rgba(200, 220, 245, 0.35)';

@@ -7,6 +7,7 @@ import { AdditiveBlending, BufferAttribute, BufferGeometry, CanvasTexture, Color
 import { makeMatcap, mergeByMaterial } from './visuals.js';
 import { BRASS, GRAPHITE } from './materials.js';
 import { ARENA_SCALE } from './reach.js';
+import { SAFE_COLORS, warnColor } from './comfort.js';
 import { addSlab, engrave, metalPlate, ORANGE, PLATE_DEPTH, pxPerM, setType, SIGN_TILT, signTexture, STEEL, TEXT } from './ui.js';
 
 /** Where a drawer's i-th item is in its pop-in, 0..1, t seconds after the drawer opened. */
@@ -314,7 +315,12 @@ export class DialPlate {
       };
       if (d.preview !== undefined && d.preview !== d.value) {
         const better = d.lowerIsBetter ? d.preview < d.value : d.preview > d.value;
-        needle(d.preview, better ? '#6fd36f' : '#e0574a', 6);
+        // Better or worse reads by line as well as colour: a worse preview is dashed (colour-safe:
+        // blue / orange instead of green / red).
+        const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+        if (!better) g.setLineDash([10, 8]);
+        needle(d.preview, hex(better ? warnColor(0x6fd36f, SAFE_COLORS.safe) : warnColor(0xe0574a, SAFE_COLORS.danger)), 6);
+        g.setLineDash([]);
       }
       needle(d.value, ORANGE, 8);
       g.fillStyle = '#c9d3e0';
