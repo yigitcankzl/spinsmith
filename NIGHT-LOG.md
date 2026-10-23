@@ -154,6 +154,8 @@ First-five baseline (3 runs, IWER): words on screen to match end 70 / 74 / 90.
 | 45 (05:47–05:55) | Polish: video (comfort hold) | blind A/B: 7 → 6 | Tried: comfort shot 2.2 s; the clean ON plate then showed for ~0.25 s. desk-ko-first, combat-readability, desk-ko pass 2/2 more on fresh pages | dropped |
 | 46 (05:48–05:55) | Accessibility as shown; video (Large text split) | blind A/B frames: 3 → 6; 4 → 5 | The OFF / ON split is cropped in on the gauge with both halves at matching arena scale (the old split's OFF side sat further back, so the smaller text came from distance, an unfair comparison) | merged |
 | closing pass (05:53–06:00) | Master green | — | typecheck, check:sim, check:sim-n, check:net, build; on fresh pages desk-ko-first, desk-ko, desk-guard, combat-readability, first-five (14 prompts, 54 words, first KO 18.4 s, DESK KO 40.9 s), room-matrix (failed after other probes, passed alone on a fresh page, as the README says), check:hands. Stills refreshed from the final reel (night-2026-10-23/stills/) | — |
+| final judge (06:00–06:02) | Full re-score of the end state | mean 7.0 (Innovation 8, Experience 7, Technical 7, Polish 6; FFM 8, RtCB 7, Accessibility 7, Boldest 7, IWSDK 7) | before/after table written to judge-report-2026-10-22.md | — |
+| 47 (06:02–06:09) | Polish: video (comfort framing) | blind A/B reels: Polish 6 → 6, Accessibility 6 → 5 | Tried: comfort dial at head height with the arena behind it; the hand covers OFF and the flip no longer reads. Close-up take restored | dropped |
 
 ## Backlog (night 2)
 - [x] Show the come-back card on camera, fix its overlap with the result plate
