@@ -4193,7 +4193,7 @@ export class MatchSystem extends createSystem({
       // The rival arrives: a portal burns open beyond the far rim and its top arcs in; VS as it lands.
       const vs = `VS ${this.rival.name.toUpperCase()}`;
       const bout = this.bout;
-      const sub = bout ? bout.night ? `NIGHT CIRCUIT · REMIX ${bout.id}` : `${CHAPTERS[bout.chapter - 1].name} · ${bout.boss ? 'BOSS' : `BOUT ${bout.id}`}` : this.rival.title;
+      const sub = bout ? bout.night ? `NIGHT CIRCUIT · REMIX ${bout.id}` : `${CHAPTERS[bout.chapter - 1].name} · ${bout.boss ? 'BOSS' : `BOUT ${bout.id}`}${this.bossSeal() ? ` · CASTS ${SEAL_NAMES[this.bossSeal()!].toUpperCase()}` : ''}` : this.rival.title;
       if (this.demo) this.stamp.show(vs, sub, 'rival', 1.6);
       else if (!this.introDone) this.entrance = { t: 0, vs, sub, champion: bout ? bout.boss : !!c?.champion };
       this.introDone = true;
