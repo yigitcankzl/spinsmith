@@ -124,7 +124,7 @@ The toggles combine and are saved. `npm run check:sim` covers the dial, Large te
 
 | Mode | How to reach it |
 |---|---|
-| **Circuit Map campaign:** 15 bouts, 3 chapters, 3 medals a bout | Automatic after the first match: PLAY starts the next bout. Pinch the level plate to see the map. |
+| **Circuit Map campaign:** 15 bouts, 3 chapters, 3 medals a bout; each chapter's boss casts one of your ultimates back at you (Iron Keep Tilt, Sawtooth Hammer, Bastion Anvil Strike) after a 1.4 s telegraph your own strike can interrupt | Automatic after the first match: PLAY starts the next bout. Pinch the level plate to see the map. |
 | **Brawl:** 3 or 4 tops in three rule sets: last one spinning, first credited pocket, or Crucible (first 3-heat pocket) | Pinch the brass pegs beside the level plate (each pinch steps duel → last spinning 3, 4 → pocket 3 → Crucible 4), then PLAY. |
 | **Pass and play** on one headset | After a duel, pinch PASS: the next person fights that top and its recorded hands. |
 | **Daily Smith Order** | Point at the board over the arena and pinch. About every other day it chases a medal you left on the map, and playing it counts for that bout. |
@@ -172,7 +172,7 @@ own rays rarely line up with what you are looking at.
 | `N` | Open a cup where you are looking (during a fight) |
 | `C` | Open a cup right under the rival, to try the sling (during a fight) |
 | `J` | Fill the forge bar (then press a palm on the table beside the arena); `Shift+J` also strikes (during a fight) |
-| `T` | Fill the rival's bar: its tell starts (during a fight, after the first match) |
+| `T` | Fill the rival's bar: its tell starts, or a boss's seal (during a fight, from the fourth match) |
 | `A` | Show the next arena, locked or not (home) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
 | `K` | Shatter the opponent now (during a fight) |
