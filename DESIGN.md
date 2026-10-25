@@ -306,6 +306,8 @@ an arena. First to 4 heat wins a match.
   Strike from the far rim. A boss's first full bar each round is its seal: its ghost palm comes down
   and the spot pulses in the seal's colour for 1.4 s ("IRON KEEP: TILT INCOMING"), then the seal
   rises off its top under its stamp. Your own strike in that window interrupts it.
+  A boss starts each round with its bar 70% full (85% once you reach match point) and may press its
+  seal from 2.2 s in, so short rounds still see it; two losses on that bout drop the head start.
 - **Rival signature parts:** knock one of the seven older rivals out once and its part is yours (Rim Raider's Gale
   ring, Iron Keep's Bulwark ring, Drifter's Spindle core, ...).
 - **Framing and feel** (`Stamp` in `src/game/visuals.ts`): big stamped words over the arena for

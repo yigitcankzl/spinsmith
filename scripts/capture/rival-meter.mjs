@@ -6,7 +6,7 @@ export default async function run({ page, frame }) {
     const out = await f.evaluate((part) => {
       const g = window.__game;
       if (!g) return null;
-      const m = (window.__rivalMeter ??= { tells: 0, seals: 0, rounds: 0, matches: 0, fightSeconds: 0, last: 0 });
+      const m = (window.__rivalMeter ??= { tells: 0, seals: 0, rounds: 0, matches: 0, fightSeconds: 0, last: 0, ends: [] });
       if (part === 'hook' && !g.__meterHooked) {
         g.__meterHooked = true;
         const tell = g.setRivalTellState.bind(g);
@@ -25,12 +25,13 @@ export default async function run({ page, frame }) {
         g.finish = (v, desk) => {
           m.rounds++;
           m.fightSeconds += g.elapsed;
+          m.ends.push(`${v}${g.theirs.out ? "o" : ""}@${g.elapsed.toFixed(1)}`);
           const r = finish(v, desk);
           if (g.matchOver) m.matches++;
           return r;
         };
       }
-      if (part === 'reset') Object.assign(m, { tells: 0, seals: 0, rounds: 0, matches: 0, fightSeconds: 0 });
+      if (part === 'reset') Object.assign(m, { tells: 0, seals: 0, rounds: 0, matches: 0, fightSeconds: 0, ends: [] });
       return { ...m, fightSeconds: +m.fightSeconds.toFixed(1), tellsPerRound: +(m.tells / Math.max(1, m.rounds)).toFixed(2) };
     }, process.env.METER_PART ?? 'read').catch(() => null);
     if (out) return out;

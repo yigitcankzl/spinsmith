@@ -164,6 +164,9 @@ const RIVAL_SKILL_RATE = 0.7;
 const BOSS_SEAL: Record<string, Seal> = { 'Iron Keep': 'tilt', Sawtooth: 'hammer', Bastion: 'anvil' };
 /** A boss seal's wind-up (s): long enough to read the ghost palm and answer with your own strike. */
 const BOSS_SEAL_TELL = 1.4;
+/** A boss starts each round with its bar this full (fuller once you reach match point), so its seal lands in short rounds too. */
+const BOSS_BAR_START = 0.7;
+const BOSS_BAR_RAGE = 0.85;
 /** A finish your shape caused plays its visuals at SLOW_MO speed for this long (real s). */
 const SLOW_MO_TIME = 0.9;
 /** Seconds the placed arena takes to forge up out of the table. */
@@ -4710,6 +4713,8 @@ export class MatchSystem extends createSystem({
     if (this.progress.matches === 0 && this.tutorialRound >= 3 && !this.demo) this.forgeBar.value = 0.8;
     this.barWasFull = false;
     this.rivalBar.reset();
+    // Two losses on a boss ease its head start, as boutSkill eases its rips.
+    if (this.bossSeal() && (this.progress.boutLosses[this.bout!.id] ?? 0) < 2) this.rivalBar.value = this.bossRage() ? BOSS_BAR_RAGE : BOSS_BAR_START;
     this.tellAt = -1;
     this.setRivalTellState(null);
     this.clearCauseCue();
@@ -6110,7 +6115,7 @@ export class MatchSystem extends createSystem({
     if (full && !this.barWasFull) {
       playBarFull();
       this.fullSince = this.elapsed;
-      if (!this.photo && !this.quietFirst) this.stamp.show('ULTIMATE READY', SEAL_NAMES[this.myBuild.seal ?? 'anvil'].toUpperCase(), 'mine', 0.8, 1.15);
+      if (!this.photo && !this.quietFirst && !this.rivalSealing) this.stamp.show('ULTIMATE READY', SEAL_NAMES[this.myBuild.seal ?? 'anvil'].toUpperCase(), 'mine', 0.8, 1.15);
     }
     this.barWasFull = full;
     const rivalAtRim = this.theirs.alive && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) >= 0.68;
@@ -6424,9 +6429,10 @@ export class MatchSystem extends createSystem({
         playTell();
         return;
       }
-      if (!this.rivalBar.spend(this.elapsed, TUNING.grace + 2)) return;
-      this.rivalHeld = 0;
       const bossSeal = this.bossSeal();
+      // A boss may open with its seal (the 1.4 s telegraph still gives you the answer); others wait 2 s more.
+      if (!this.rivalBar.spend(this.elapsed, TUNING.grace + (bossSeal && !this.rivalSealUsed ? 0.4 : 2))) return;
+      this.rivalHeld = 0;
       if (bossSeal && !this.rivalSealUsed) {
         this.rivalSealUsed = true;
         const aim = this.rivalSealAim(bossSeal);
