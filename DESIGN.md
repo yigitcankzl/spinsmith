@@ -295,10 +295,17 @@ an arena. First to 4 heat wins a match.
   that has taken a beating glows red: it flies further. The strike is staged: a short freeze, the
   seal rising off your top, its name stamped over the arena.
 - **Rival tells:** from the fourth match each rival has one big move (a charge, a quake or a
-  pull). Its own bar fills like yours; when full it flashes and whines for a second, then the
+  pull). Its own bar fills like yours, under the same comeback rule (three times as fast while it is
+  behind on spin), and faster the stronger the rival (24 s on its own at skill 0, about 14 s at the
+  Crown); when full it flashes and whines for a second, then the
   move lands, unless your strike cuts it short ("INTERRUPTED!") or your Ward turns it back. Once
   you know the tells, a rival with its move ready waits a few seconds while your strike is ready
   too: strike first, or hold the strike as the answer.
+- **Boss seals:** the three Circuit bosses own an ultimate of yours, cast with the same physics
+  (`sealStrike` from their side): Iron Keep a Tilt toward you, Sawtooth a Hammer, Bastion an Anvil
+  Strike from the far rim. A boss's first full bar each round is its seal: its ghost palm comes down
+  and the spot pulses in the seal's colour for 1.4 s ("IRON KEEP: TILT INCOMING"), then the seal
+  rises off its top under its stamp. Your own strike in that window interrupts it.
 - **Rival signature parts:** knock one of the seven older rivals out once and its part is yours (Rim Raider's Gale
   ring, Iron Keep's Bulwark ring, Drifter's Spindle core, ...).
 - **Framing and feel** (`Stamp` in `src/game/visuals.ts`): big stamped words over the arena for

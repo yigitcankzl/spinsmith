@@ -158,6 +158,12 @@ const SEAL_STATE: Record<Seal, string> = {
 };
 /** Rivals from level 6 set a ramp at most this often (s). */
 const RIVAL_SHAPE_GAP = 3;
+/** A rival's strike bar fills on its own 1 + this x its skill (0..1) times as fast: 24 s at skill 0, about 14 s at 1. */
+const RIVAL_SKILL_RATE = 0.7;
+/** The Circuit bosses own a seal: their first full bar of a round is that ultimate, cast like yours. */
+const BOSS_SEAL: Record<string, Seal> = { 'Iron Keep': 'tilt', Sawtooth: 'hammer', Bastion: 'anvil' };
+/** A boss seal's wind-up (s): long enough to read the ghost palm and answer with your own strike. */
+const BOSS_SEAL_TELL = 1.4;
 /** A finish your shape caused plays its visuals at SLOW_MO speed for this long (real s). */
 const SLOW_MO_TIME = 0.9;
 /** Seconds the placed arena takes to forge up out of the table. */
@@ -988,6 +994,11 @@ export class MatchSystem extends createSystem({
   private holdSaid = false;
   private rivalFeinting = false;
   private rivalFeintUsed = false;
+  /** The rival's skill (0..1) this match (planRivalLaunch): its strike bar fills faster with it. */
+  private rivalSkill = 0;
+  /** A boss's seal this round: spent once, then its bar goes back to its named move. */
+  private rivalSealUsed = false;
+  private rivalSealing: { seal: Seal; x: number; z: number } | null = null;
   private rivalTellDuration = TELL_TIME;
   private rivalBraceShown = false;
   private strikeTouch: Record<Side, TableTouch> = { left: new TableTouch(TUNE.strikePress), right: new TableTouch(TUNE.strikePress) };
@@ -1622,7 +1633,7 @@ export class MatchSystem extends createSystem({
     this.updatePinchRings();
     if (this.sealPop.visible) {
       const t = (this.sealPop.userData.t += Math.min(delta, 0.1));
-      const me = this.mine;
+      const me = this.sealPop.userData.rival ? this.theirs : this.mine;
       this.sealPop.position.set(me.x, this.arena.height(me.x, me.z) + 0.018 + t * 0.012, me.z);
       this.sealPop.rotation.set(1.2, t * 8, 0);
       // The coin identifies the move, then gets out of the way before the action starts moving.
@@ -2017,6 +2028,7 @@ export class MatchSystem extends createSystem({
     // A bout sets the rival's skill by where it sits on the map; free play keeps the level-based one.
     const skill = this.bout ? boutSkill(this.bout, this.progress.boutLosses[this.bout.id] ?? 0) : Math.min(1, (this.progress.level - 1) / 15);
     const first = this.progress.matches === 0 && !this.demo;
+    this.rivalSkill = first ? 0 : skill;
     const min = 0.5 + 0.25 * skill;
     this.rivalLaunchPower = first ? 0.7 + Math.random() * 0.1 : Math.random() < 0.5 * skill ? 1 : min + Math.random() * (0.98 - min);
     this.rivalLaunchAim = first ? (Math.random() - 0.5) * 0.3 : (Math.random() - 0.5) * (1 - 0.6 * skill);
@@ -4809,6 +4821,8 @@ export class MatchSystem extends createSystem({
     this.rivalHeld = 0;
     this.rivalFeinting = false;
     this.rivalFeintUsed = false;
+    this.rivalSealUsed = false;
+    this.rivalSealing = null;
     this.rivalTellDuration = TELL_TIME;
     this.rivalBraceShown = false;
     const aiAim = this.rivalLaunchAim;
@@ -6387,8 +6401,10 @@ export class MatchSystem extends createSystem({
 
   private rivalTell(clash: number) {
     if (this.demo || !this.taught('tells') || this.online?.peer) return;
-    this.rivalBar.update(STEP, false);
-    if (clash) this.rivalBar.clash(clash, this.elapsed, false);
+    // The same comeback rule as yours: behind on spin, the rival's bar fills three times as fast.
+    const behind = this.elapsed >= TUNING.grace && behindOn(this.theirs, this.mine);
+    this.rivalBar.update(STEP, behind, 1 + RIVAL_SKILL_RATE * this.rivalSkill);
+    if (clash) this.rivalBar.clash(clash, this.elapsed, behind);
     const them = this.theirs;
     if (this.tellAt < 0) {
       if (!them.alive || !this.mine.alive) return;
@@ -6410,6 +6426,23 @@ export class MatchSystem extends createSystem({
       }
       if (!this.rivalBar.spend(this.elapsed, TUNING.grace + 2)) return;
       this.rivalHeld = 0;
+      const bossSeal = this.bossSeal();
+      if (bossSeal && !this.rivalSealUsed) {
+        this.rivalSealUsed = true;
+        const aim = this.rivalSealAim(bossSeal);
+        this.rivalSealing = { seal: bossSeal, ...aim };
+        this.rivalTellDuration = BOSS_SEAL_TELL;
+        this.tellAt = this.elapsed + BOSS_SEAL_TELL;
+        them.tell = BOSS_SEAL_TELL;
+        this.barMessage = `${SEAL_NAMES[bossSeal].toUpperCase()}!`;
+        playTell();
+        // The rival's ghost palm comes down where the seal will land.
+        const d = Math.hypot(aim.x, aim.z) || 1;
+        this.rivalHandMove(aim.x, aim.z, -aim.x / d, -aim.z / d);
+        this.call(`${this.rival.name.toUpperCase()}: ${SEAL_NAMES[bossSeal].toUpperCase()} INCOMING\n${this.forgeBar.full ? 'STRIKE TO INTERRUPT' : 'BRACE'}`, CALL.danger, BOSS_SEAL_TELL, 'tell');
+        if (import.meta.env.DEV) console.log(`[TELL] ${this.rival.name} seal ${bossSeal} at t ${this.elapsed.toFixed(1)}`);
+        return;
+      }
       this.rivalTellDuration = Math.max(0.88, TELL_TIME - Math.max(0, this.rivalLaunchPower - 0.55) * 0.7);
       this.tellAt = this.elapsed + this.rivalTellDuration;
       them.tell = this.rivalTellDuration;
@@ -6433,13 +6466,18 @@ export class MatchSystem extends createSystem({
     if (them.tell <= 0) {
       // Cut short by the strike (doStrike says so).
       this.tellAt = -1;
+      this.rivalSealing = null;
       this.setRivalTellState(null);
       this.barMessage = 'READY';
       this.rivalFeinting = false;
       return;
     }
     them.tell = this.tellAt - this.elapsed;
-    this.drawLane(1 - them.tell / this.rivalTellDuration);
+    const sealing = this.rivalSealing;
+    // A boss seal pulses where its palm will land; a named move draws its lane.
+    if (sealing) {
+      if (Math.floor(this.elapsed * 4) !== Math.floor((this.elapsed - STEP) * 4)) this.impacts.shock(sealing.x, this.arena.floorHeight(1), sealing.z, 0.45, SEAL_COLOR[sealing.seal]);
+    } else this.drawLane(1 - them.tell / this.rivalTellDuration);
     // The tell: the rival flashes and rings spread under it.
     // Three flashes a second at most (WCAG 2.3.1), none with flashes off.
     if (Math.floor(this.elapsed * 3) !== Math.floor((this.elapsed - STEP) * 3)) this.theirView.flash();
@@ -6455,6 +6493,11 @@ export class MatchSystem extends createSystem({
       return;
     }
     if (!them.alive) return;
+    if (sealing) {
+      this.rivalSealing = null;
+      this.rivalSeal(sealing.seal, sealing.x, sealing.z);
+      return;
+    }
     if (!rivalMove(this.arena, them, this.mine, this.rival.move)) {
       // Held in your cup: the move fizzles.
       this.label.set('HELD!');
@@ -6769,6 +6812,59 @@ export class MatchSystem extends createSystem({
   }
 
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
+  /** This match's boss seal (BOSS_SEAL), or null: only a Circuit boss bout, one on one, offline. */
+  private bossSeal(): Seal | null {
+    if (!this.bout?.boss || this.online || this.extras.length) return null;
+    return BOSS_SEAL[this.rival.name] ?? null;
+  }
+
+  /** Where a boss presses its seal: Tilt dips the arena toward you, Hammer arms the crater on your
+   * side, Anvil strikes from the far rim so the shock throws you outward. */
+  private rivalSealAim(seal: Seal) {
+    const me = this.mine;
+    const them = this.theirs;
+    const r = Math.hypot(me.x, me.z);
+    let ux = me.x / r;
+    let uz = me.z / r;
+    if (!(r > 1e-3)) {
+      const d = Math.hypot(me.x - them.x, me.z - them.z) || 1;
+      ux = (me.x - them.x) / d;
+      uz = (me.z - them.z) / d;
+    }
+    const R = this.arena.radius;
+    const k = seal === 'anvil' ? -0.9 : seal === 'hammer' ? 0.6 : 0.9;
+    return { x: ux * R * k, z: uz * R * k };
+  }
+
+  /** A boss's own ultimate: the same sealStrike as yours, cast from its side, with the same burst. */
+  rivalSeal(seal: Seal, ox: number, oz: number) {
+    const me = this.mine;
+    const them = this.theirs;
+    sealStrike(this.arena, them, me, seal, ox, oz);
+    this.shockAt.x = ox;
+    this.shockAt.z = oz;
+    this.shockT = seal === 'anvil' ? 0 : 1;
+    (this.shock.material as MeshBasicMaterial).color.setHex(SEAL_COLOR[seal]);
+    if (seal === 'anvil') this.impacts.shock(ox, this.arena.floorHeight(1), oz, 1, SEAL_COLOR[seal]);
+    this.impacts.hit(ox, this.arena.floorHeight(1), oz, 1);
+    if (them.alive) this.sparks.burst(them.x, this.arena.height(them.x, them.z), them.z, 1);
+    this.theirView.flash();
+    playUltimateSignature(seal, ox, oz);
+    this.roomLight.hit();
+    duck(0.3, 0.4);
+    this.hitStop = 0.4;
+    this.accumulator = 0;
+    this.sealPop.clear();
+    this.sealPop.add(this.sealPopModels[seal]);
+    this.sealPop.userData.t = 0;
+    this.sealPop.userData.rival = true;
+    this.sealPop.visible = true;
+    this.stamp.show(`${this.rival.name.toUpperCase()}: ${SEAL_NAMES[seal].toUpperCase()}!`, SEAL_STATE[seal], 'rival', 0.95, 1.35);
+    this.rivalShapeAt = this.elapsed;
+    this.rivalShapeKind = SEAL_NAMES[seal].toUpperCase();
+    if (import.meta.env.DEV) console.log(`[RIVAL SEAL] ${this.rival.name} ${seal} at t ${this.elapsed.toFixed(1)}`);
+  }
+
   private doStrike(ox = 0, oz = 0) {
     if (!this.forgeBar.spend(this.elapsed, TUNING.grace)) return;
     this.cancelActiveGestures();
@@ -6794,6 +6890,7 @@ export class MatchSystem extends createSystem({
     this.struckOnce = true;
     if (cut) {
       this.tellAt = -1;
+      this.rivalSealing = null;
       this.setRivalTellState(null);
       this.barMessage = 'READY';
       if (perfectInterrupt) {
@@ -6850,6 +6947,7 @@ export class MatchSystem extends createSystem({
     this.sealPop.clear();
     this.sealPop.add(this.sealPopModels[seal]);
     this.sealPop.userData.t = 0;
+    this.sealPop.userData.rival = false;
     this.sealPop.visible = true;
     this.stamp.show(SEAL_NAMES[seal].toUpperCase() + '!', this.quietFirst ? '' : SEAL_CALL[seal], 'mine', 0.95, 1.35);
     if (this.quietFirst) this.label.set('');

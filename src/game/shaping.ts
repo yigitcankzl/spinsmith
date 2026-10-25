@@ -116,8 +116,9 @@ export class StrikeBar {
     return this.value >= 1;
   }
 
-  update(dt: number, behind: boolean) {
-    this.value = Math.min(1, this.value + (dt / STRIKE_BAR.passive) * (behind ? STRIKE_BAR.behind : 1));
+  /** `rate` scales the passive fill (a skilled rival's bar fills faster); the player's is 1. */
+  update(dt: number, behind: boolean, rate = 1) {
+    this.value = Math.min(1, this.value + (dt / STRIKE_BAR.passive) * rate * (behind ? STRIKE_BAR.behind : 1));
   }
 
   clash(strength: number, t: number, behind: boolean) {
