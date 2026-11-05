@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "iwsdk dev restart --open --allow-browser-automation --foreground",
     "dev:nvidia": "env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 IWSDK_GPU=vulkan __NV_PRIME_RENDER_OFFLOAD=1 __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only DRI_PRIME=1 iwsdk dev restart --open --allow-browser-automation --foreground",
-    "dev:runtime": "env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 IWSDK_GPU=vulkan __NV_PRIME_RENDER_OFFLOAD=1 __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only DRI_PRIME=1 vite",
+    "dev:runtime": "vite",
+    "dev:runtime:nvidia": "env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 IWSDK_GPU=vulkan __NV_PRIME_RENDER_OFFLOAD=1 __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only DRI_PRIME=1 vite",
     "dev:down": "iwsdk dev down",
     "dev:status": "iwsdk dev status",
     "reference:status": "iwsdk reference status",
@@ -20,7 +21,7 @@
     "check:sim-n": "node scripts/sim-n-check.ts",
     "check:net": "node scripts/net-check.ts",
     "check:desk-ko": "bash scripts/check-desk-ko-hand.sh",
-    "check:room-matrix": "ROOM_CASES=rooms npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=variants npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=harder npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000",
+    "check:room-matrix": "bash scripts/emu.sh enter && npx @iwsdk/cli browser run scripts/capture/place.mjs --timeout 60000 >/dev/null && ROOM_CASES=rooms npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=variants npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=harder npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000",
     "check:desk-ko-first": "bash scripts/check-desk-ko-first-match.sh",
     "check:first-five": "bash scripts/check-first-five.sh",
     "check:desk-guard": "npx @iwsdk/cli browser run scripts/check-desk-guard-probe.mjs --timeout 60000",

@@ -1033,6 +1033,7 @@ TUNING.grace = 0;
   assert.equal(p.stamps, 3);
   assert.ok(p.matches >= Math.max(...Object.values(VERB_RELEASE)), 'the demo save plays with every released verb');
   assert.ok(p.champions.length >= 2 && p.marksOf('Rim Raider') === 7, 'the demo shows champions and a full medallion');
+  assert.equal(nextBout(p.bouts)?.id, '2-5', 'the demo smith plays a boss (Sawtooth) next');
   assert.ok(mem.has('spinsmith.top.v1'));
   p.reset();
   const again = new Progress(st);
