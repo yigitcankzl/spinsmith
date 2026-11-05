@@ -8,7 +8,7 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 
 ## The first minute, measured
 
-From today's scripted first sessions in the emulator (`artifacts/first-five/`, a bot that reads each card for 0.8 s; game time):
+From scripted first sessions in the emulator on 2026-10-23 (`artifacts/first-five/`, a bot that reads each card for 0.8 s; game time; before the 11-05 move of the fight text over the tops):
 
 | ~2 s | ~12 s | ~14 s | ~18 s | 30–47 s | 49–94 s |
 |---|---|---|---|---|---|
@@ -114,7 +114,7 @@ The toggles combine and are saved. `npm run check:sim` covers the dial, Large te
 ## Known limits
 
 - Nothing has been run or measured on a headset yet, including frame rate (`?fps` and `?diagnostics` are there for it).
-- Unlabelled-surface placement is probed only in IWER with synthesised planes (`npm run check:room-matrix`, last green 2026-10-24; in the current emulator it reports the tray instead of the table, also on the Oct 24 code), not in a real room; a table or desk labelled in Space Setup is preferred.
+- Unlabelled-surface placement is probed only in IWER with synthesised planes (`npm run check:room-matrix`, green 2026-11-05), not in a real room; a table or desk labelled in Space Setup is preferred.
 - Persistent anchors have only been exercised in IWER. Depth occlusion is off under IWER (no camera depth), so it has not run anywhere yet. Real hands hide the game behind them through invisible tracked-joint proxies (spheres, bone rods and a palm slab; on over passthrough, off with `?nohandocclude`), seen only in IWER.
 - Head-ray assist: on Quest (no eye tracking) looking at a far button for 0.4 s lights it and a pinch away from the bowl presses it; a real gaze source (Meta VR Glasses) gets a full pointer. Neither has run on a headset.
 - The online duel (beta) has run between two browser windows and two browser processes on one machine, not between two headsets or two homes; public STUN only, so some strict networks will not connect.
@@ -188,7 +188,7 @@ own rays rarely line up with what you are looking at.
 
 ### Testing in the emulator (IWSDK CLI)
 
-**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human): first knockout 18.1–46.9 s and first DESK KO 30.5–46.9 s of game time, match over at 49.4–93.6 s, 14–16 distinct prompts and 52–60 words on screen before the match ends (three runs, 2026-10-23, saved in `artifacts/first-five/`; in the slow run the bot's ramp missed, so its first knockout was the DESK KO). Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes). `check:desk-ko-first` and `check:room-matrix` expect a freshly loaded page (other probes can leave the arena away from the desk edge); `scripts/clear-resume.mjs` then a browser reload gives one.
+**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human): first knockout 18.1–46.9 s and first DESK KO 30.5–46.9 s of game time, match over at 49.4–93.6 s, 14–16 distinct prompts and 52–60 words on screen before the match ends (three runs, 2026-10-23, saved in `artifacts/first-five/`; in the slow run the bot's ramp missed, so its first knockout was the DESK KO). Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes). `check:desk-ko-first` and `check:room-matrix` expect the arena on the emulator's desk: a page loaded while the emulated head stood (IWER's default y = 1.6) puts it on the tray, so seat the head (`scripts/emu.sh enter`) and re-place (`P`, then pinch the print) first; other probes can also leave the arena away from the desk edge.
 
 **Hand driver** (`src/dev-drive.ts`, dev builds only): `window.drive` plays real hand motions on
 the emulated hands (tap, drag, rip, ramp, cup, sling, palm slap), so the game's own gesture

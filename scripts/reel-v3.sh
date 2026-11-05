@@ -103,7 +103,7 @@ grid 13-ults "ULTIMATES" 4.5 "$M/seal-rush.mp4" 0.9 "RUSH" "$M/seal-magnet.mp4" 
 [ -n "${BOSSI_AT:-}" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 135-bossintro "$T/boss.mp4" "$BOSSI_AT" "${BOSSI_LEN:-2.8}" "THREE BOSSES" "Each one casts one of your ultimates back at you"
 PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 14-boss "$T/boss.mp4" "$BOSS_AT" "$BOSS_LEN" "IRON KEEP CASTS TILT" "A ghost palm warns you  /  answer with your own"
 [ -n "$BOSS_KO_AT" ] && PRE="crop=iw*0.8:ih*0.8:iw*0.06:ih*0.05" clip 15-bossko "$T/boss.mp4" "$BOSS_KO_AT" "$BOSS_KO_LEN" "THROW THE BOSS OFF YOUR DESK" "Edge run  /  DESK KO"
-[ -n "$BOSS2_AT" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06" clip 16-boss2 "$T/boss.mp4" "$BOSS2_AT" "$BOSS2_LEN" "SAWTOOTH CASTS HAMMER" "Each boss owns one seal"
+[ -n "$BOSS2_AT" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06" clip 16-boss2 "${BOSS2_SRC:-$T/boss.mp4}" "$BOSS2_AT" "$BOSS2_LEN" "SAWTOOTH CASTS HAMMER" "Each boss owns one seal"
 [ -n "$BOSS3_AT" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06" clip 17-boss3 "$T/boss.mp4" "$BOSS3_AT" "$BOSS3_LEN" "BASTION CASTS ANVIL STRIKE" "Three chapters, three bosses"
 # 9. A four-top brawl on the opened-out arena.
 PRE="crop=iw*0.8:ih*0.8:iw*0.1:0" clip 18-brawl "$T/brawl.mp4" "$BRAWL_AT" "$BRAWL_LEN" "FOUR-TOP BRAWLS" "The arena opens out  /  last top spinning takes the heat"
