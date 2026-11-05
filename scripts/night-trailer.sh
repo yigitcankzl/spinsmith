@@ -57,6 +57,15 @@ clip 03-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK" "Your fingertip is part of the ph
 clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"
 clip 05-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal / press it into the bowl"
+# Optional: a boss bout uncut (BOSS=<take>, its entrance, telegraphed seal, your answer) and a second
+# boss's seal (BOSS_AT2), then a four-top brawl (BRAWL=<take>, BRAWL_AT). Wide takes, cropped in.
+BOSSSEG=; if [ -s "${BOSS:-}" ]; then BOSSSEG=1
+  PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 067-boss "$BOSS" "${BOSS_AT:-9.8}" "${BOSS_LEN:-18.8}" "BOSSES CAST YOUR ULTIMATES" "Its ghost palm warns you  /  answer with your own"
+  PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.1" clip 068-boss2 "$BOSS" "${BOSS_AT2:-105.8}" "${BOSS_LEN2:-5.1}" "ONE SEAL PER BOSS" "Tilt  /  Hammer  /  Anvil Strike"
+fi
+BRAWLSEG=; if [ -s "${BRAWL:-}" ]; then BRAWLSEG=1
+  PRE="crop=iw*0.62:ih*0.62:iw*0.19:ih*0.2" clip 069-brawl "$BRAWL" "${BRAWL_AT:-1657.4}" "${BRAWL_LEN:-9.0}" "FOUR-TOP BRAWLS" "Last top spinning takes the heat"
+fi
 # Comfort: the dial's stops on its plate (filmed from the seat, cropped in).
 COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 5.6 3.0 "COMFORT, ONE PINCH AWAY" "Pinch the comfort plate  /  Large text: ON"; fi
 # Large text, off and on side by side (the same close fight shot, IWER).
@@ -85,7 +94,7 @@ ffmpeg -y -loglevel error \
   -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p \
   -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/09-end.mp4"
 
-segments=(00-hook ${ROOMSEG:+015-room} ${FIRST30:+005-first} 01-match 02-squeeze 03-flick 04-guard 05-rub 06-strike ${COMFORTSEG:+065-comfort} ${COMFORTSEG:+066-bigtext} ${parts[@]+"${parts[@]}"} 07-forge 08-workshop 085-return 09-end)
+segments=(00-hook ${ROOMSEG:+015-room} ${FIRST30:+005-first} 01-match 02-squeeze 03-flick 04-guard 05-rub 06-strike ${BOSSSEG:+067-boss} ${BOSSSEG:+068-boss2} ${BRAWLSEG:+069-brawl} ${COMFORTSEG:+065-comfort} ${COMFORTSEG:+066-bigtext} ${parts[@]+"${parts[@]}"} 07-forge 08-workshop 085-return 09-end)
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
 mkdir -p "$(dirname "$FINAL")"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" \
