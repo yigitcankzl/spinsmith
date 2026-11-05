@@ -3052,6 +3052,8 @@ export class Stamp {
   private queue: [string, string, 'mine' | 'rival' | 'neutral', number, number][] = [];
   /** Where this stamp hangs instead of its usual slot (world), e.g. over the real edge a top went off. Cleared by the next show. */
   pin: Vector3 | null = null;
+  /** Whose moment the stamp is (the last show): in a fight it hangs over that top. */
+  side: 'mine' | 'rival' | 'neutral' = 'mine';
 
   /** Ends what shows now at once (a skipped replay's plate); what waits shows next. */
   cut() {
@@ -3093,6 +3095,7 @@ export class Stamp {
   show(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1, weight = 1) {
     this.size = weight;
     this.pin = null;
+    this.side = side;
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, 1024, 256);
     g.textAlign = 'center';

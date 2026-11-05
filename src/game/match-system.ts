@@ -181,6 +181,15 @@ const ARENA_FORGE_EFFECT: Record<ArenaForgeAction, string> = {
   tilt: 'SEND TOPS DOWNHILL',
 };
 const SLOW_MO = 0.3;
+/** How high a fight stamp hangs over the bowl under the top it names (arena units): clear of the top's crown. */
+const STAMP_OVER_TOP = 0.05;
+const STAMP_TARGET = new Vector3();
+/** The fight card over its top: a little higher than a lone stamp (it has two lines), at this scale. */
+const CARD_OVER_TOP = 0.075;
+const CARD_FIGHT_SCALE = 0.55;
+/** A stamp shown with the fight card rides this far above the card's centre. */
+const CARD_STAMP_GAP = 0.05;
+const CARD_TARGET = new Vector3();
 const PIN_HEAD = new Vector3();
 const FACE_HEAD = new Vector3();
 const PIN_FWD = new Vector3();
@@ -999,6 +1008,11 @@ export class MatchSystem extends createSystem({
   private rivalFeintUsed = false;
   /** The rival's skill (0..1) this match (planRivalLaunch): its strike bar fills faster with it. */
   private rivalSkill = 0;
+  /** The stamp was up in the fight last frame (it glides after its top; a new one snaps). */
+  private stampShown = false;
+  /** The card hung over a top in the fight last frame. */
+  private cardOverTop = false;
+  private cardAt = new Vector3();
   /** A boss's seal this round: spent once, then its bar goes back to its named move. */
   private rivalSealUsed = false;
   private rivalSealing: { seal: Seal; x: number; z: number } | null = null;
@@ -3714,7 +3728,8 @@ export class MatchSystem extends createSystem({
     const readScale = textScale() / Math.max(0.7, this.rootK);
     this.label.mesh.scale.setScalar(1.25 * grow * readScale);
     this.bar.mesh.scale.setScalar(0.21 * grow * readScale);
-    this.stamp.worldScale = readScale;
+    // Over a top in a fight it is a little smaller, so it names the top without hiding the bowl.
+    this.stamp.worldScale = readScale * (this.phase === 'fight' && !this.stamp.pin ? 0.8 : 1);
     // The bar's top edge under the card's lower edge (it leans back, the card stands upright).
     this.bar.mesh.position.z = this.label.mesh.position.z + BAR_BACK * grow;
     // Their heights grow with them, so the card stays clear above the bar.
@@ -3723,7 +3738,20 @@ export class MatchSystem extends createSystem({
     this.bar.mesh.position.y = (BAR_Y + lift) * grow;
     // On a result the bar shows its full plate (XP row): the card rides a little higher to clear it.
     if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift + (this.phase === 'result' ? HUD.resultLift : 0)) * grow;
-    // In a bout every stamp stands just above the card (the card can still be speaking), never over the tops in play.
+    // In a fight the card comes down over the top it speaks to (a rival's tell or seal over the rival,
+    // your lessons and hints over yours), smaller, just above the bowl, and glides after it.
+    const cardUp = this.phase === 'fight' && this.label.current !== '' && this.label.mesh.visible;
+    if (cardUp) {
+      const rivalCard = this.callKey === 'tell' && this.label.current === this.callText;
+      const at = this.overTop(rivalCard ? 'rival' : 'mine', CARD_OVER_TOP, CARD_TARGET);
+      // Its own smoothed spot: the card's y and z are rewritten above every frame.
+      if (!this.cardOverTop) this.cardAt.copy(at);
+      else this.cardAt.lerp(at, 1 - Math.exp(-10 * dt));
+      this.label.mesh.position.copy(this.cardAt);
+      this.label.mesh.scale.setScalar(CARD_FIGHT_SCALE * readScale);
+    } else if (this.cardOverTop) this.label.mesh.position.set(LABEL_AT.x, this.label.mesh.position.y, hudCardZ(far, p === 'forge'));
+    this.cardOverTop = cardUp;
+    // Before and after a round the stamp stands just above the card (the card can still be speaking).
     this.stamp.mesh.rotation.set(0, 0, 0);
     // The round card (and the stamp in its slot) turn on their upright axis to face the head, so a
     // player who leans or sits off-centre still reads them square on.
@@ -3746,12 +3774,20 @@ export class MatchSystem extends createSystem({
       this.root.worldToLocal(this.stamp.mesh.position.copy(p));
       this.stamp.mesh.lookAt(head);
     }
-    // In a fight the stamp sits low, just over the far rim, inside the view that watches the tops.
-    else if (this.phase === 'fight') this.stamp.mesh.position.set(0, (this.arena.height(0, -far / this.viewK) + WALL_HEIGHT[L.wall]) * this.viewK + 0.12, -far);
+    // In a fight the stamp hangs just over the top it is about (yours, the rival's, or between the
+    // two for a clash), where the eyes already are, and follows it; a top thrown out leaves it at the rim.
+    else if (this.phase === 'fight') {
+      // Over the card when the card is speaking too, so the two never overlap.
+      const at = this.cardOverTop ? STAMP_TARGET.copy(this.label.mesh.position).setY(this.label.mesh.position.y + CARD_STAMP_GAP) : this.overTop(this.stamp.side, STAMP_OVER_TOP, STAMP_TARGET);
+      // Snap when it appears, then glide after a moving top instead of jittering with it.
+      if (!this.stampShown) this.stamp.mesh.position.copy(at);
+      else this.stamp.mesh.position.lerp(at, 1 - Math.exp(-10 * dt));
+    }
     else if (this.phase === 'ready' || this.phase === 'result') {
       this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + HUD.stampLift, this.label.mesh.position.z + 0.01);
     }
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
+    this.stampShown = this.stamp.mesh.visible && this.phase === 'fight';
     if (facing && !this.stamp.pin) this.stamp.mesh.rotation.y = Math.atan2(headLocal.x - this.stamp.mesh.position.x, headLocal.z - this.stamp.mesh.position.z);
     // The menu stays where the hand finds it, however far the arena slid.
     this.menuButton.mesh.scale.setScalar(readScale);
@@ -6818,6 +6854,19 @@ export class MatchSystem extends createSystem({
   }
 
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
+  /** A point (root-local) `lift` over the bowl under a top: yours, the rival's, or between the two
+   * ('neutral'); a top thrown out of the bowl leaves it at the rim. */
+  private overTop(side: 'mine' | 'rival' | 'neutral', lift: number, out: Vector3) {
+    const a = side === 'rival' ? this.theirs : this.mine;
+    const b = side === 'neutral' ? this.theirs : a;
+    let x = (a.x + b.x) / 2;
+    let z = (a.z + b.z) / 2;
+    const rim = rimRadius(this.arena.layout, Math.atan2(z, x)) * 0.92;
+    const r = Math.hypot(x, z);
+    if (r > rim) (x *= rim / r), (z *= rim / r);
+    return out.set(x * this.viewK, (this.arena.height(x, z) + lift) * this.viewK, z * this.viewK);
+  }
+
   /** This match's boss seal (BOSS_SEAL), or null: only a Circuit boss bout, one on one, offline. */
   private bossSeal(): Seal | null {
     if (!this.bout?.boss || this.online || this.extras.length) return null;
