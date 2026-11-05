@@ -158,8 +158,6 @@ export const HUD = {
   /** The match bar's height and how far it leans back from the card. */
   barY: 0.063,
   barBack: 0.021,
-  /** A bout's stamp (count, KO, the verdict) just above the card, not grown with it, so it stays in view. */
-  stampLift: 0.04,
   /** On a result the card rides this much higher, clear of the bar's full plate (its top is at about 0.103). */
   resultLift: 0.012,
 };
@@ -185,7 +183,8 @@ export function hudAnchors(layout: ArenaLayout, lift = 0, pushed = 0): [string, 
     ['round card', { x: HUD.card.x, y: cardY, z }],
     ['result card', { x: HUD.card.x, y: (HUD.card.y + lift + HUD.resultLift) * grow, z }],
     ['match bar', { x: 0, y: (HUD.barY + lift) * grow, z: z + HUD.barBack * grow }],
-    ['stamp (count, KO, verdict)', { x: HUD.card.x, y: cardY + HUD.stampLift, z: z + 0.01 }],
+    // The stamp hangs in the bowl, over a top or the centre (match-system), a few cm above the floor.
+    ['stamp (count, KO, verdict)', { x: 0, y: 0.05, z: 0 }],
     // The buttons do not slide with the arena: arena-local they come forward by the slide.
     ...(['MENU button', 'REMATCH button'] as const).map((n, i): [string, Spot] => [n, { x: (i ? 1 : -1) * RESULT_BUTTONS.x, y: RESULT_BUTTONS.y, z: RESULT_BUTTONS.z + pushed / ARENA_SCALE }]),
   ];

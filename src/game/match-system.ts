@@ -3741,8 +3741,8 @@ export class MatchSystem extends createSystem({
     const readScale = textScale() / Math.max(0.7, this.rootK);
     this.label.mesh.scale.setScalar(1.25 * grow * readScale);
     this.bar.mesh.scale.setScalar(0.21 * grow * readScale);
-    // Over a top in a fight it is a little smaller, so it names the top without hiding the bowl.
-    this.stamp.worldScale = readScale * (this.phase === 'fight' && !this.stamp.pin ? 0.8 : 1);
+    // In the bowl (a round's count, the fight, its result) it is a little smaller, so it names the top without hiding it.
+    this.stamp.worldScale = readScale * ((this.phase === 'fight' || this.phase === 'ready' || this.phase === 'result') && !this.stamp.pin ? 0.8 : 1);
     // The bar's top edge under the card's lower edge (it leans back, the card stands upright).
     this.bar.mesh.position.z = this.label.mesh.position.z + BAR_BACK * grow;
     // Their heights grow with them, so the card stays clear above the bar.
@@ -3796,9 +3796,10 @@ export class MatchSystem extends createSystem({
       if (!this.stampShown) this.stamp.mesh.position.copy(at);
       else this.stamp.mesh.position.lerp(at, 1 - Math.exp(-10 * dt));
     }
-    else if (this.phase === 'ready' || this.phase === 'result') {
-      this.stamp.mesh.position.set(this.label.mesh.position.x, this.label.mesh.position.y + HUD.stampLift, this.label.mesh.position.z + 0.01);
-    }
+    // Before a round (ROUND 2, the count) it stands over the bowl's centre, where the rip will go; on
+    // a result (DESK KO, SLAG) over the top that is still in the bowl, never up by the result card.
+    else if (this.phase === 'ready') this.stamp.mesh.position.set(0, (this.arena.height(0, 0) + STAMP_OVER_TOP) * this.viewK, 0);
+    else if (this.phase === 'result') this.overTop(this.stamp.side, STAMP_OVER_TOP, this.stamp.mesh.position);
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.stampShown = this.stamp.mesh.visible && this.phase === 'fight';
     if (facing && !this.stamp.pin) this.stamp.mesh.rotation.y = Math.atan2(headLocal.x - this.stamp.mesh.position.x, headLocal.z - this.stamp.mesh.position.z);
