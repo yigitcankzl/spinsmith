@@ -160,6 +160,10 @@ export const HUD = {
   barBack: 0.021,
   /** On a result the card rides this much higher, clear of the bar's full plate (its top is at about 0.103). */
   resultLift: 0.012,
+  /** In a fight the card and the stamp hang over a top this high above the floor, kept within textReach of the rim. */
+  cardOverTop: 0.075,
+  stampOverTop: 0.05,
+  textReach: 0.55,
 };
 
 /** How much the card and the bar grow for an arena whose far rim is `far` out (arena-local) and slid `pushed` m back. */
@@ -173,15 +177,23 @@ export function hudCardZ(far: number, forge = false): number {
   return Math.min(HUD.card.z - (forge ? HUD.forgeBack : 0), -(far + 0.04));
 }
 
-/** Every essential read surface of an arena (arena-local), for a wall `lift` above the standard one and a slide `pushed` m back. */
-export function hudAnchors(layout: ArenaLayout, lift = 0, pushed = 0): [string, Spot][] {
+/** Every essential read surface of an arena (arena-local), for a wall `lift` above the standard one,
+ * a slide `pushed` m back and read surfaces grown by `read` (Large text; match-system readScale). */
+export function hudAnchors(layout: ArenaLayout, lift = 0, pushed = 0, read = 1): [string, Spot][] {
   const far = rimRadius(layout, -Math.PI / 2);
   const grow = hudGrow(far, pushed);
   const z = hudCardZ(far);
-  const cardY = (HUD.card.y + lift) * grow;
+  // The card's centre rises with its size above the bar's (match-system's card placement).
+  const cardY = (HUD.barY + (HUD.card.y - HUD.barY) * read + lift) * grow;
+  // In a fight the card hangs over a top, anywhere out to textReach of the rim.
+  const overTop = ([-Math.PI / 2, Math.PI / 2, 0, Math.PI] as const).map((a, i): [string, Spot] => {
+    const r = rimRadius(layout, a) * HUD.textReach;
+    return [`fight card over a top (${['far', 'near', 'right', 'left'][i]})`, { x: Math.cos(a) * r, y: HUD.cardOverTop + layout.depth, z: Math.sin(a) * r }];
+  });
   return [
     ['round card', { x: HUD.card.x, y: cardY, z }],
-    ['result card', { x: HUD.card.x, y: (HUD.card.y + lift + HUD.resultLift) * grow, z }],
+    ['result card', { x: HUD.card.x, y: (HUD.barY + (HUD.card.y - HUD.barY + HUD.resultLift) * read + lift) * grow, z }],
+    ...overTop,
     ['match bar', { x: 0, y: (HUD.barY + lift) * grow, z: z + HUD.barBack * grow }],
     // The stamp hangs in the bowl, over a top or the centre (match-system), a few cm above the floor.
     ['stamp (count, KO, verdict)', { x: 0, y: 0.05, z: 0 }],

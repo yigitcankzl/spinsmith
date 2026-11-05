@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { ARENAS } from '../src/game/arenas.ts';
-import { cloneLayout, rimRadius, validate } from '../src/game/layout.ts';
+import { brawlLayout, cloneLayout, rimRadius, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { SHAPING, ShapingCharges, STRIKE_BAR, StrikeBar } from '../src/game/shaping.ts';
 import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, rankOf, RIVAL_UNLOCKS, STAMP_UNLOCKS, STREAK_XP, VERB_CARD, VERB_RELEASE, verbReleasedAt, xpToNext } from '../src/game/progress.ts';
@@ -1183,9 +1183,10 @@ TUNING.grace = 0;
 // the eyes, on every arena (slid back as a match slides it), with a standard or a high wall.
 {
   const near = (l: ArenaLayout) => Math.max(0, rimRadius(l, Math.PI / 2) - 0.17) * 2.4;
-  for (const layout of ARENAS) {
+  // Every arena, and the same arenas opened out for a four-top brawl; Large text grows the card 1.3x.
+  for (const layout of [...ARENAS, ...ARENAS.map((l) => brawlLayout(l, 4))]) {
     const surfaces: [string, { x: number; y: number; z: number }, number][] = [
-      ...[0, 0.016].flatMap((lift) => hudAnchors(layout, lift, near(layout)).map(([n, at]): [string, typeof at, number] => [n, at, REACH + near(layout)])),
+      ...[0, 0.016].flatMap((lift) => [1, 1.3].flatMap((read) => hudAnchors(layout, lift, near(layout), read))).map(([n, at]): [string, typeof at, number] => [n, at, REACH + near(layout)]),
       ...hudAnchorsOffMatch(layout).map(([n, at]): [string, typeof at, number] => [n, at, REACH]),
     ];
     for (const drop of [0.3, 0.35, 0.4, 0.45]) {

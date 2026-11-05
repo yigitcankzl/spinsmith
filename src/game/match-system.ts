@@ -182,10 +182,12 @@ const ARENA_FORGE_EFFECT: Record<ArenaForgeAction, string> = {
 };
 const SLOW_MO = 0.3;
 /** How high a fight stamp hangs over the bowl under the top it names (arena units): clear of the top's crown. */
-const STAMP_OVER_TOP = 0.05;
+const STAMP_OVER_TOP = HUD.stampOverTop;
 const STAMP_TARGET = new Vector3();
+/** How far out (of the rim) text over a top may follow it. */
+const TEXT_REACH = HUD.textReach;
 /** The fight card over its top: a little higher than a lone stamp (it has two lines), at this scale. */
-const CARD_OVER_TOP = 0.075;
+const CARD_OVER_TOP = HUD.cardOverTop;
 const CARD_FIGHT_SCALE = 0.55;
 /** A stamp shown with the fight card rides this far above the card's centre. */
 const CARD_STAMP_GAP = 0.05;
@@ -3750,7 +3752,9 @@ export class MatchSystem extends createSystem({
     const lift = Math.max(0, WALL_HEIGHT[L.wall] - WALL_HEIGHT.standard);
     this.bar.mesh.position.y = (BAR_Y + lift) * grow;
     // On a result the bar shows its full plate (XP row): the card rides a little higher to clear it.
-    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (LABEL_AT.y + lift + (this.phase === 'result' ? HUD.resultLift : 0)) * grow;
+    // The card and the bar both grow by readScale about their centres, so the gap between the
+    // centres grows with it too: on a fitted (shrunk) arena or with Large text they never overlap.
+    if (this.phase === 'ready' || this.phase === 'fight' || this.phase === 'result') this.label.mesh.position.y = (BAR_Y + (LABEL_AT.y - BAR_Y + (this.phase === 'result' ? HUD.resultLift : 0)) * readScale + lift) * grow;
     // In a fight the card comes down over the top it speaks to (a rival's tell or seal over the rival,
     // your lessons and hints over yours), smaller, just above the bowl, and glides after it.
     const cardUp = this.phase === 'fight' && this.label.current !== '' && this.label.mesh.visible;
@@ -6870,13 +6874,14 @@ export class MatchSystem extends createSystem({
 
   /** Spends the full bar: the shockwave, both tops thrown out, the room flashes, a hammer on an anvil. */
   /** A point (root-local) `lift` over the bowl under a top: yours, the rival's, or between the two
-   * ('neutral'); a top thrown out of the bowl leaves it at the rim. */
+   * ('neutral'). It stays inside the bowl's middle (TEXT_REACH of the rim): near the far rim the
+   * text would sit on the match bar, near the near rim it would fill the view. */
   private overTop(side: 'mine' | 'rival' | 'neutral', lift: number, out: Vector3) {
     const a = side === 'rival' ? this.theirs : this.mine;
     const b = side === 'neutral' ? this.theirs : a;
     let x = (a.x + b.x) / 2;
     let z = (a.z + b.z) / 2;
-    const rim = rimRadius(this.arena.layout, Math.atan2(z, x)) * 0.92;
+    const rim = rimRadius(this.arena.layout, Math.atan2(z, x)) * TEXT_REACH;
     const r = Math.hypot(x, z);
     if (r > rim) (x *= rim / r), (z *= rim / r);
     return out.set(x * this.viewK, (this.arena.height(x, z) + lift) * this.viewK, z * this.viewK);
