@@ -235,21 +235,40 @@ export default async function run({ page, frame, cdp }) {
       wood.colorSpace = 'srgb';
       wood.needsUpdate = true;
 
+      // The stand-in matches the table the game detected (the emulator room's synthetic plane): same
+      // outline, same height, so what the footage shows as the desk is the desk the game plays on.
+      // Without a detected table it falls back to a desk under the arena.
+      const shape = game.onTable ? game.tableShape?.() : null;
+      let w = 1.1, d = 0.76, cx = game.root.position.x, cz = game.root.position.z + 0.015, yaw = game.root.rotation.y, topY = game.root.position.y - 0.08;
+      if (shape?.poly?.length >= 3) {
+        const q = shape.poly;
+        // The outline's longest side sets the yaw; its extent along and across that side the size.
+        let best = 0;
+        for (let i = 0; i < q.length; i++) { const a = q[i], b = q[(i + 1) % q.length]; const l = Math.hypot(b.x - a.x, b.z - a.z); if (l > best) { best = l; yaw = -Math.atan2(b.z - a.z, b.x - a.x); } }
+        const ux = Math.cos(-yaw), uz = Math.sin(-yaw);
+        const along = q.map((p) => p.x * ux + p.z * uz), across = q.map((p) => -p.x * uz + p.z * ux);
+        const a0 = Math.min(...along), a1 = Math.max(...along), c0 = Math.min(...across), c1 = Math.max(...across);
+        w = a1 - a0; d = c1 - c0;
+        const ma = (a0 + a1) / 2, mc = (c0 + c1) / 2;
+        cx = ma * ux - mc * uz; cz = ma * uz + mc * ux;
+        topY = shape.y;
+        result.tableFromPlane = { w: +w.toFixed(3), d: +d.toFixed(3), x: +cx.toFixed(3), z: +cz.toFixed(3), y: +topY.toFixed(3) };
+      }
       const table = new game.root.constructor();
       const base = new MeshConstructor(
-        new BoxGeometryConstructor(1.13, 0.045, 0.79, 1, 1, 1),
+        new BoxGeometryConstructor(w + 0.03, 0.045, d + 0.03, 1, 1, 1),
         new StandardMaterialConstructor({ color: 0x18120f, metalness: 0.04, roughness: 0.78 }),
       );
       const top = new MeshConstructor(
-        new BoxGeometryConstructor(1.1, 0.014, 0.76, 1, 1, 1),
+        new BoxGeometryConstructor(w, 0.014, d, 1, 1, 1),
         new StandardMaterialConstructor({ color: 0xffffff, map: wood, metalness: 0.04, roughness: 0.62 }),
       );
-      base.position.y = game.root.position.y - 0.1165;
-      top.position.y = game.root.position.y - 0.087;
+      base.position.y = topY - 0.0365;
+      top.position.y = topY - 0.007;
       table.add(base, top);
       table.name = 'capture-dev-table';
-      table.position.set(game.root.position.x, 0, game.root.position.z + 0.015);
-      table.rotation.y = game.root.rotation.y;
+      table.position.set(cx, 0, cz);
+      table.rotation.y = yaw;
       scene.add(table);
       game.__captureTable = table;
       result.devTable = true;

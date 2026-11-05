@@ -1018,6 +1018,10 @@ export class MatchSystem extends createSystem({
   private cardAt = new Vector3();
   /** 0 at the bar's usual height, 1 at its fight height (HUD.fightBarY), eased between. */
   private barRise = 0;
+  /** The shown arena's scale at home on a small table (fitHome), and what it was worked out for. */
+  private homeScale = 1;
+  private homeFitPlaced = -1;
+  private homeFitRim = 0;
   /** The arena's own layout while a brawl plays on it opened out (brawlLayout), else null. */
   private brawlBase: ArenaLayout | null = null;
   /** A boss's seal this round: spent once, then its bar goes back to its named move. */
@@ -3707,7 +3711,14 @@ export class MatchSystem extends createSystem({
     } else this.fitLayout = null;
     // While the workshop resizes, the shown size holds still so the rim follows the hand.
     const k = match ? 1 : this.builder.resizing ? this.viewK : Math.min(1, (p === 'build' ? WORKSHOP_RIM : DISPLAY_RIM) / rim);
-    const scale = match ? this.matchScale : 1;
+    // At home too the shown arena keeps its rim on a table too small for it: shrunk, then slid in.
+    const shown = rim * k;
+    if (!match && !this.builder.resizing && (this.placedAt !== this.homeFitPlaced || Math.abs(shown - this.homeFitRim) > 1e-4)) {
+      this.homeFitPlaced = this.placedAt;
+      this.homeFitRim = shown;
+      this.fitHome(shown);
+    }
+    const scale = match ? this.matchScale : this.homeScale;
     const push = match ? this.matchPush : 0;
     const e = Math.min(1, dt * 3);
     const ease = (v: number, to: number, eps: number) => (Math.abs(to - v) < eps ? to : v + (to - v) * e);
@@ -3846,6 +3857,25 @@ export class MatchSystem extends createSystem({
    * How a match arena fits: full size, slid back so its near rim stays at NEAR_RIM; on a known
    * table, shrunk in steps (to 70% at most) until it stays on the wood.
    */
+  /** fitMatch for the arena as shown at home (rim `shown`, already at display size): the scale it
+   * needs to keep its rim on the table, down to 70%, then a slide onto the wood if that is not enough. */
+  private fitHome(shown: number) {
+    this.homeScale = 1;
+    const table = this.onTable ? this.tableShape() : null;
+    if (!table) return;
+    const x = this.root.position.x;
+    const z = this.root.position.z;
+    const fits = (k: number) => insidePoly(table.poly, x, z) && edgeDistance(table.poly, x, z) >= shown * k * ARENA_SCALE + RIM_MARGIN;
+    while (this.homeScale > 0.7 + 1e-9 && !fits(this.homeScale)) this.homeScale = Math.max(0.7, this.homeScale - 0.05);
+    if (fits(this.homeScale)) return;
+    const fit = fitToTable({ x, z }, table.poly, shown * this.homeScale * ARENA_SCALE);
+    this.root.position.x = fit.x;
+    this.root.position.z = fit.z;
+    this.root.updateMatrixWorld(true);
+    this.setRoom();
+    if (import.meta.env.DEV) console.log(`[MATCH] home fit: scale ${this.homeScale.toFixed(2)}, slid ${Math.hypot(fit.x - x, fit.z - z).toFixed(3)} m`);
+  }
+
   private fitMatch(L: ArenaLayout, rim: number) {
     const yaw = this.root.rotation.y;
     const bx = this.root.position.x + Math.sin(yaw) * this.pushed;

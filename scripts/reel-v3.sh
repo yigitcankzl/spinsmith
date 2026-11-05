@@ -67,6 +67,16 @@ grid() {
   segs+=("$name")
 }
 
+# Two moves side by side, each cropped to the bowl, its name big under it; the title stays up 1.4 s.
+pair() {
+  local name=$1 title=$2 dur=$3 a=$4 as=$5 al=$6 b=$7 bs=$8 bl=$9
+  [ -s "$a" ] && [ -s "$b" ] || { echo "skip $name" >&2; return 0; }
+  ffmpeg -y -loglevel error -ss "$as" -t "$dur" -i "$a" -ss "$bs" -t "$dur" -i "$b" -filter_complex \
+    "[0:v]crop=iw*0.5:ih:iw*0.25:0,scale=$((W/2)):$H:flags=lanczos,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$al':fontcolor=white:fontsize=66:x=(w-text_w)/2:y=h-text_h-60:box=1:boxcolor=0x111419@0.8:boxborderw=14[l];[1:v]crop=iw*0.5:ih:iw*0.25:0,scale=$((W/2)):$H:flags=lanczos,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$bl':fontcolor=white:fontsize=66:x=(w-text_w)/2:y=h-text_h-60:box=1:boxcolor=0x111419@0.8:boxborderw=14[r];[l][r]hstack,drawbox=x=iw/2-3:y=0:w=6:h=ih:color=0x111419:t=fill,drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=70:x=48:y=40:box=1:boxcolor=0x111419@0.8:boxborderw=16:enable='lt(t,1.4)',$TAG[v];[0:a][1:a]amix=inputs=2:normalize=0,volume=0.75[au]" \
+    -map "[v]" -map "[au]" -t "$dur" "${enc[@]}" "$TMP/$name.mp4"
+  segs+=("$name")
+}
+
 # Two shots side by side with a label under each (the room proof, Large text off/on).
 split() {
   local name=$1 title=$2 dur=$3 a=$4 as=$5 al=$6 b=$7 bs=$8 bl=$9
@@ -78,9 +88,9 @@ split() {
 
 # 1. The hook: both hands squeeze the bowl and the rival goes off the real desk corner.
 EXTRA="drawtext=fontfile=$FONT:text='EMULATOR FOOTAGE (IWER), NOT A HEADSET':fontcolor=white:fontsize=44:x=(w-text_w)/2:y=h-110:box=1:boxcolor=0x111419@0.8:boxborderw=12:enable='lt(t,2.2)'" \
-  clip 00-hook "$S/hook-ko.mp4" "$HOOK_AT" "$HOOK_LEN" "THE ARENA IS THE WEAPON" "Squeeze the bowl with both hands  /  throw the rival off your real desk"
+  clip 00-hook "$S/hook-ko.mp4" "$HOOK_AT" "$HOOK_LEN" "THE ARENA IS THE WEAPON" "Squeeze the bowl with both hands  /  throw the rival off your real desk  (first match, guided)"
 # 2. The room proof: the same first-match squeeze without a table and on a detected table.
-split 01-room "YOUR DESK IS THE RING-OUT" 4.4 "$S/tray-squeeze.mp4" 5.4 "NO TABLE  -  A NORMAL RING-OUT" "$S/desk-ko-first-side.mp4" 0.7 "TABLE DETECTED  -  OFF THE DESK +1"
+split 01-room "YOUR DESK IS THE RING-OUT" 4.4 "$S/tray-squeeze.mp4" "${TRAY_AT:-5.4}" "NO TABLE FOUND  -  A NORMAL RING-OUT" "$S/desk-ko-first-side.mp4" 0.7 "TABLE DETECTED  -  OFF THE DESK +1"
 # 3. A new player from home, with a running clock.
 EXTRA="drawtext=fontfile=$FONT:text='FROM HOME  %{eif\\:t\\:d\\:2}.%{eif\\:mod(t*10\\,10)\\:d} s':fontcolor=0xffa24a:fontsize=64:x=w-text_w-40:y=70:box=1:boxcolor=0x111419@0.74:boxborderw=14" \
   PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.05" clip 02-first "$T/first.mp4" "$FIRST_AT" "$FIRST_LEN" "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"
@@ -94,11 +104,15 @@ clip 06-flick "$S/flick.mp4" 0.2 2.7 "FLICK" "Your fingertip is part of the phys
 clip 07-guard "$S/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"
 clip 08-rub "$S/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 09-strike "$S/seal-stamp.mp4" 0.8 3.6 "STAMP AN ULTIMATE" "Pinch the seal  /  press it into the bowl"
-# 7. Every other move, four at a time.
-grid 10-onehand "ONE HAND" 4.5 "$M/ramp.mp4" 0.4 "RAMP" "$M/rim-spring.mp4" 0.4 "RIM SPRING" "$M/gust.mp4" 0.4 "FORGE GUST" "$M/cup-sling.mp4" 0.4 "CUP AND SLING"
-grid 11-fingers "FINGERTIPS, PALMS, THE TABLE" 4.5 "$M/groove.mp4" 0.4 "FINGER GROOVE" "$M/ember.mp4" 2.4 "EMBER RIVET" "$M/wheel.mp4" 0.4 "FORGE WHEEL" "$M/outer-ring.mp4" 0.4 "OUTER RING CATCH"
-grid 12-bend "BEND IT, SLAP IT" 4.5 "$M/forge-twist.mp4" 0.4 "TWIST AND TILT" "$M/forge-stretch.mp4" 0.4 "STRETCH" "$M/slap.mp4" 0.6 "SLAP THE TABLE" "$S/close-squeeze.mp4" 0.3 "SQUEEZE"
-grid 13-ults "ULTIMATES" 4.5 "$M/seal-rush.mp4" 0.9 "RUSH" "$M/seal-magnet.mp4" 0.9 "MAGNET" "$M/seal-tilt.mp4" 0.9 "TILT" "$M/seal-ward.mp4" 0.9 "WARD"
+# 7. Every other move, two at a time, each from the moment it acts.
+pair 10a "ONE HAND" 2.6 "$M/ramp.mp4" 0.5 "RAMP" "$M/rim-spring.mp4" 0.9 "RIM SPRING"
+pair 10b "ONE HAND" 2.6 "$M/gust.mp4" 0.4 "FORGE GUST" "$M/cup-sling.mp4" 0.6 "CUP AND SLING"
+pair 11a "FINGERTIPS" 2.6 "$M/groove.mp4" 0.6 "FINGER GROOVE" "$M/ember.mp4" "${EMBER_AT:-3.2}" "EMBER RIVET"
+pair 11b "PALMS AND THE TABLE" 2.6 "$M/wheel.mp4" 0.4 "FORGE WHEEL" "$M/outer-ring.mp4" 0.5 "OUTER RING CATCH"
+pair 12a "BEND THE ARENA" 2.6 "$M/forge-twist.mp4" 0.5 "TWIST AND TILT" "$M/forge-stretch.mp4" 0.6 "STRETCH"
+pair 12b "THE ULTIMATES" 2.6 "$M/slap.mp4" 1.0 "SLAP THE TABLE" "$M/seal-rush.mp4" "${ULT_AT:-1.3}" "RUSH"
+pair 13a "THE ULTIMATES" 2.6 "$M/seal-magnet.mp4" "${ULT_AT:-1.3}" "MAGNET" "$M/seal-tilt.mp4" "${ULT_AT:-1.3}" "TILT"
+[ -s "$M/seal-hammer.mp4" ] && pair 13b "THE ULTIMATES" 2.6 "$M/seal-hammer.mp4" "${ULT_AT:-1.3}" "HAMMER" "$M/seal-ward.mp4" "${WARD_AT:-1.5}" "WARD" || clip 13b "$M/seal-ward.mp4" "${WARD_AT:-1.5}" 2.6 "WARD" "A ring that turns the rival away"
 # 8. The bosses cast your ultimates back.
 [ -n "${BOSSI_AT:-}" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 135-bossintro "$T/boss.mp4" "$BOSSI_AT" "${BOSSI_LEN:-2.8}" "THREE BOSSES" "Each one casts one of your ultimates back at you"
 PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 14-boss "$T/boss.mp4" "$BOSS_AT" "$BOSS_LEN" "IRON KEEP CASTS TILT" "A ghost palm warns you  /  answer with your own"
@@ -107,16 +121,15 @@ PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 14-boss "$T/boss.mp4" "$BOSS_AT" 
 [ -n "$BOSS3_AT" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06" clip 17-boss3 "$T/boss.mp4" "$BOSS3_AT" "$BOSS3_LEN" "BASTION CASTS ANVIL STRIKE" "Three chapters, three bosses"
 # 9. A four-top brawl on the opened-out arena.
 PRE="crop=iw*0.8:ih*0.8:iw*0.1:0" clip 18-brawl "$T/brawl.mp4" "$BRAWL_AT" "$BRAWL_LEN" "FOUR-TOP BRAWLS" "The arena opens out  /  last top spinning takes the heat"
-# 10. Comfort, one pinch away, then Large text off / on.
-PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 19-comfort "$S/comfort.mp4" 5.6 3.0 "COMFORT, ONE PINCH AWAY" "Eleven settings on one dial  /  Large text ON"
-SPLIT_AX=$((W*27/100)) SPLIT_BX=$((W*17/100)) split 20-bigtext "LARGE TEXT" 2.6 "$S/flick.mp4" 0.6 "OFF" "$S/bigtext-fight.mp4" 0.6 "ON"
+# 10. Comfort: Large text off / on in the same fight shot (one of eleven settings on the dial).
+SPLIT_AX=$((W*27/100)) SPLIT_BX=$((W*17/100)) split 20-bigtext "COMFORT DIAL  -  LARGE TEXT" 3.0 "$S/flick.mp4" "${BIG_AT:-0.6}" "LARGE TEXT OFF" "$S/bigtext-fight.mp4" "${BIG_AT:-0.6}" "LARGE TEXT ON"
 # 11. Twenty arenas (four shown).
 grid 21-arenas "TWENTY ARENAS" 3.6 "$S/arenas/05.mp4" 0.3 "TERRACES" "$S/arenas/06.mp4" 0.3 "CRATER" "$S/arenas/12.mp4" 0.3 "ICE" "$S/arenas/15.mp4" 0.3 "PITS"
 # 12. Forge and workshop.
-clip 22-forge "$S/forge.mp4" 2.8 10.0 "FORGE IT BY HAND" "Drag a part onto your top  /  it fights differently  /  226 builds"
-clip 23-workshop "$S/workshop.mp4" 7.6 4.5 "BUILD THE BATTLEGROUND" "Shape the floor  /  place pits and bumpers"
+clip 22-forge "$S/forge.mp4" "${FORGE_AT:-2.8}" "${FORGE_LEN:-8.5}" "FORGE IT BY HAND" "Drag a part onto your top  /  it fights differently  /  226 builds"
+clip 23-workshop "$S/workshop.mp4" "${WORKSHOP_AT:-7.6}" "${WORKSHOP_LEN:-3.4}" "BUILD THE BATTLEGROUND" "Shape the floor  /  place pits and bumpers"
 # 13. The home board: today's order and streak, then the Circuit Map (a demo save).
-PRE="crop=iw*0.5:ih*0.5:iw*0.25:0" clip 24-board "$M/hub-map.mp4" 1.0 6.4 "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
+PRE="crop=iw*0.5:ih*0.5:iw*0.25:0" clip 24-board "$M/hub-map.mp4" "${BOARD_AT:-1.4}" "${BOARD_LEN:-4.0}" "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
 # 14. End card, the game's motif under it.
 ffmpeg -y -loglevel error -ss 3.6 -t 5 -i "$S/hook-ko.mp4" \
   -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=5" \
