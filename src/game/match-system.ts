@@ -1787,6 +1787,8 @@ export class MatchSystem extends createSystem({
       this.desk.outerRail.visible = false;
       this.arenaView.charge = 0;
     }
+    // The placement print belongs to placing only: a match started before the arena settled must not keep it.
+    if (this.phase !== 'placing') this.print.visible = false;
     switch (this.phase) {
       case 'placing':
         // Wait for a table to be detected, but never long: without one the arena floats on a tray.
