@@ -71,6 +71,7 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 | Fight, first match | 51 | 88 | 1.2 / 1.8 / 3.1 ms |
 | Fight, first match, capture room (planes and edge arcs up) | 83 | 96 | 0.5 / 0.8 / 1.5 ms |
 | Fight, 4-top brawl, capture room | 97 | 89 | 0.8 / 1.3 / 6.7 ms |
+| Fight, 4-top brawl on the opened-out arena, capture room (2026-11-05, `brawl4-fight-room-2026-11-05.json`) | 112 | 74 | 2.0 / 2.6 / 3.6 ms |
 
 A 4-top brawl at 4x CPU throttle (next round's ready phase) reads 86 draws per eye, lowest 24 fps, update p95 3.7 ms (`brawl4-ready-room-cpu4x-2026-10-23.json`). The worst case saved is 117 draws per eye (ready phase with the capture room's planes and the desk-edge arcs up, `ready-cpu1x-2026-10-23.json`); the gate fails the script above 150 in any state.
 

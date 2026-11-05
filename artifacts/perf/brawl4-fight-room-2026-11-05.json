@@ -1,0 +1,35 @@
+{
+  "environment": "desktop IWER emulator",
+  "renderer": "ANGLE (NVIDIA, Vulkan 1.4.329 (NVIDIA NVIDIA GeForce RTX 4060 Laptop GPU (0x000028A0)), NVIDIA)",
+  "vendor": "Google Inc. (NVIDIA)",
+  "phase": "fight",
+  "lowestFpsOverFiveSeconds": 74,
+  "qualityLevel": "full",
+  "qualitySteps": "none",
+  "guardRan": false,
+  "liteMode": false,
+  "updateFrames": 430,
+  "updateMs": {
+    "p50": 2,
+    "p95": 2.6,
+    "max": 3.6
+  },
+  "gpuMs": {
+    "frames": 429,
+    "p50": 0.85,
+    "p95": 2.45,
+    "max": 2.73
+  },
+  "drawCalls": 224,
+  "views": 2,
+  "multiview": false,
+  "drawCallsPerEye": 112,
+  "budgetPerEye": 150,
+  "triangles": 151612,
+  "recorderCodecs": {
+    "h264": true,
+    "vp8": true,
+    "vp9": true
+  },
+  "cpuThrottle": 1
+}
