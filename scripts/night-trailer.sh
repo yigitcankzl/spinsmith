@@ -43,7 +43,7 @@ clip() {
 EXTRA="drawtext=fontfile=$FONT:text='EMULATOR FOOTAGE':fontcolor=0xff8a2a:fontsize=84:x=(w-text_w)/2:y=h-250:box=1:boxcolor=0x111419@0.8:boxborderw=18:enable='lt(t,1.5)',drawtext=fontfile=$FONT:text='${DISCLOSE:-IWSDK emulator (IWER)  -  not headset footage}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-140:box=1:boxcolor=0x111419@0.7:boxborderw=10:enable='lt(t,1.5)'" \
   clip 00-hook "$NEW/desk-ko-first-side.mp4" 1.3 5.6 "THE ARENA IS THE WEAPON" "Squeeze the bowl / throw the rival off your desk"
 # A running game clock on the new player's segment: the pace is the point.
-FIRST30=; if [ -s "$NEW/first-30.mp4" ]; then FIRST30=1; EXTRA="drawtext=fontfile=$FONT:text='FROM HOME  %{eif\\:t\\:d\\:2}.%{eif\\:mod(t*10\\,10)\\:d} s':fontcolor=0xffa24a:fontsize=64:x=w-text_w-46:y=40:box=1:boxcolor=0x111419@0.74:boxborderw=14" clip 005-first "$NEW/first-30.mp4" 0.2 17.8 "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"; fi
+FIRST30=; if [ -s "${FIRST:-$NEW/first-30.mp4}" ]; then FIRST30=1; EXTRA="drawtext=fontfile=$FONT:text='FROM HOME  %{eif\\:t\\:d\\:2}.%{eif\\:mod(t*10\\,10)\\:d} s':fontcolor=0xffa24a:fontsize=64:x=w-text_w-46:y=40:box=1:boxcolor=0x111419@0.74:boxborderw=14" clip 005-first "${FIRST:-$NEW/first-30.mp4}" "${FIRST_AT:-0.2}" "${FIRST_LEN:-17.8}" "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"; fi
 clip 01-match "$NEW/first-match.mp4" 1.0 12.3 "ONE ROUND, UNCUT" "Rip  /  the rival runs to your edge  /  squeeze"
 # The room changes the outcome: the same first-match squeeze with the game's table detection
 # switched off (a ring-out lesson) and with the table detected (DESK KO). Both IWER, same seat.
@@ -57,14 +57,14 @@ clip 03-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK" "Your fingertip is part of the ph
 clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"
 clip 05-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal / press it into the bowl"
-# Optional: a boss bout uncut (BOSS=<take>, its entrance, telegraphed seal, your answer) and a second
+# Optional (FIRST=<take> FIRST_AT FIRST_LEN replaces the new-player shot): a boss bout uncut (BOSS=<take>, its entrance, telegraphed seal, your answer) and a second
 # boss's seal (BOSS_AT2), then a four-top brawl (BRAWL=<take>, BRAWL_AT). Wide takes, cropped in.
 BOSSSEG=; if [ -s "${BOSS:-}" ]; then BOSSSEG=1
   PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 067-boss "$BOSS" "${BOSS_AT:-9.8}" "${BOSS_LEN:-18.8}" "BOSSES CAST YOUR ULTIMATES" "Its ghost palm warns you  /  answer with your own"
   PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.1" clip 068-boss2 "$BOSS" "${BOSS_AT2:-105.8}" "${BOSS_LEN2:-5.1}" "ONE SEAL PER BOSS" "Tilt  /  Hammer  /  Anvil Strike"
 fi
 BRAWLSEG=; if [ -s "${BRAWL:-}" ]; then BRAWLSEG=1
-  PRE="crop=iw*0.62:ih*0.62:iw*0.19:ih*0.2" clip 069-brawl "$BRAWL" "${BRAWL_AT:-1657.4}" "${BRAWL_LEN:-9.0}" "FOUR-TOP BRAWLS" "Last top spinning takes the heat"
+  PRE="${BRAWL_PRE:-crop=iw*0.62:ih*0.62:iw*0.19:ih*0.2}" clip 069-brawl "$BRAWL" "${BRAWL_AT:-1657.4}" "${BRAWL_LEN:-9.0}" "FOUR-TOP BRAWLS" "Last top spinning takes the heat"
 fi
 # Comfort: the dial's stops on its plate (filmed from the seat, cropped in).
 COMFORTSEG=; if [ -s "$NEW/comfort.mp4" ]; then COMFORTSEG=1; PRE="crop=iw*0.42:ih*0.42:iw*0.22:ih*0.38" clip 065-comfort "$NEW/comfort.mp4" 5.6 3.0 "COMFORT, ONE PINCH AWAY" "Pinch the comfort plate  /  Large text: ON"; fi
