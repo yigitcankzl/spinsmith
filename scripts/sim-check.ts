@@ -1198,6 +1198,21 @@ TUNING.grace = 0;
   }
 }
 
+// 16b3. Brawl arenas: a duel keeps its layout, three and four tops open it out 20% and 40% (floor rise
+// with it, so the bowl keeps its slope), never past the largest arena; the original is untouched.
+{
+  for (const layout of ARENAS) {
+    assert.equal(brawlLayout(layout, 2), layout, `${layout.name}: a duel keeps its arena`);
+    for (const [tops, k] of [[3, 1.2], [4, 1.4]] as const) {
+      const wide = brawlLayout(layout, tops);
+      const want = Math.min(0.26, layout.radius * k);
+      assert.ok(Math.abs(wide.radius - want) < 1e-9, `${layout.name} x${tops}: radius ${wide.radius} (want ${want})`);
+      assert.ok(Math.abs(wide.depth / wide.radius - layout.depth / layout.radius) < 1e-9, `${layout.name} x${tops}: slope kept`);
+      assert.equal(validate(wide), null, `${layout.name} x${tops}: valid layout`);
+    }
+  }
+}
+
 // 16c. Echo codes: a recorded match survives the code (to its steps), in any case, after the build.
 {
   const echo = {
