@@ -3781,8 +3781,8 @@ export class MatchSystem extends createSystem({
       const head = this.player.head.getWorldPosition(PIN_HEAD);
       const fwd = this.player.head.getWorldDirection(PIN_FWD).negate();
       const p = PIN_AT.copy(this.stamp.pin);
-      // Home is the fight stamp's own slot over the far rim, clear of the gauge labels under it.
-      const home = this.root.localToWorld(PIN_HOME.set(0, (this.arena.height(0, -far / this.viewK) + WALL_HEIGHT[L.wall]) * this.viewK + 0.12, -far));
+      // Home is low over the bowl's centre, where the other stamps hang.
+      const home = this.root.localToWorld(PIN_HOME.set(0, (this.arena.height(0, 0) + STAMP_OVER_TOP) * this.viewK, 0));
       for (let i = 0; i < 6 && PIN_DIR.subVectors(p, head).normalize().dot(fwd) < 0.92; i++) p.lerp(home, 0.35);
       this.root.worldToLocal(this.stamp.mesh.position.copy(p));
       this.stamp.mesh.lookAt(head);
@@ -3790,8 +3790,9 @@ export class MatchSystem extends createSystem({
     // In a fight the stamp hangs just over the top it is about (yours, the rival's, or between the
     // two for a clash), where the eyes already are, and follows it; a top thrown out leaves it at the rim.
     else if (this.phase === 'fight') {
-      // Over the card when the card is speaking too, so the two never overlap.
-      const at = this.cardOverTop ? STAMP_TARGET.copy(this.label.mesh.position).setY(this.label.mesh.position.y + CARD_STAMP_GAP) : this.overTop(this.stamp.side, STAMP_OVER_TOP, STAMP_TARGET);
+      // Over the card when both speak at once (only the guided first session shows them together;
+      // later a stamp hides the card), so the two never overlap.
+      const at = this.cardOverTop && this.progress.guide !== 'done' ? STAMP_TARGET.copy(this.label.mesh.position).setY(this.label.mesh.position.y + CARD_STAMP_GAP) : this.overTop(this.stamp.side, STAMP_OVER_TOP, STAMP_TARGET);
       // Snap when it appears, then glide after a moving top instead of jittering with it.
       if (!this.stampShown) this.stamp.mesh.position.copy(at);
       else this.stamp.mesh.position.lerp(at, 1 - Math.exp(-10 * dt));

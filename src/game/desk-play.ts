@@ -631,8 +631,8 @@ export class DeskPlay {
       playDeskKo(p.x);
       const cause = this.m.recentPlayerCause();
       this.m.stamp.show(staged ? 'DESK KO!' : 'OFF THE DESK!', cause ? `YOUR ${cause} → REAL EDGE +1` : 'REAL EDGE · +1', 'mine', staged ? 1.2 : 0.75, 1.6);
-      // The word hangs over the real edge the top went off, not up by the card.
-      this.m.stamp.pin = this.m.theirView.root.getWorldPosition(new Vector3()).add(new Vector3(0, 0.2, 0));
+      // The word hangs just over the real edge the top went off, not up by the card.
+      this.m.stamp.pin = this.m.theirView.root.getWorldPosition(new Vector3()).add(new Vector3(0, 0.1, 0));
       this.m.featDone('offDesk');
       if (import.meta.env.DEV) console.log(`[DESK_KO] real edge crossed; +${DESK_KO_BONUS} bonus heat`);
       return true;
