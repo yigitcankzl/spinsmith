@@ -244,7 +244,7 @@ an arena. First to 4 heat wins a match.
   direction and swing speed and the host applies it. The first match teaches it too: once its
   forge lesson is done (or in its third round), a tired rival near the rim calls for a flick.
 - **One new move per match:** after the first match's lessons (ramp, Arena Forge, strike, Flick)
-  each completed match releases exactly one more hand verb, the measured ones most useful first, and ends with its
+  each completed match releases exactly one more hand verb and ends with its
   card (NEW MOVE: name, one line on the gesture): Rim Spring for match 2, Forge Gust 3, cup and
   sling 4 (campaign bout 1-4 teaches it), Ember Rivet 5, Spin Rub 6, Crossguard 7, Finger Groove 8, Forge Wheel 9
   (`VERB_RELEASE` in `src/game/progress.ts`, checked by `npm run check:sim`). Online, brawls and
@@ -261,21 +261,17 @@ an arena. First to 4 heat wins a match.
   pushes the tops it crosses but steers around your own; swept toward a pocket mouth, the rival
   is pushed twice as hard and lifted so the pocket takes it. Pinching the rim and pulling inward
   springs that sector: your own top is pulled in and the rim holds behind it for 1 s, and a rival
-  there is slung along the wall toward its nearest pocket. In the headless sweep with human
-  reaction lag and aim error, gust moved from +0.1 to +8.9 win points over doing nothing and the
-  spring from -1.6 to +10; random sweeping or springing gains about +2.
+  there is slung along the wall toward its nearest pocket.
 - **Crossguard and Ember Rivet (from the seventh and fifth match):** two open palms make a rail; the first
   time your top crosses it (or the rival crosses it on its way out) it costs a charge, and the
   rail then stays live 0.8 s. Every save of your own top refunds that charge, and the rival's
   escape is sent on toward its nearest pocket. A caught hot rivet planted in the bowl is a live
-  post for 3 s that kicks the rival outward. Headless sweep: crossguard -0.6 -> +5.1, ember
-  -0.8 -> +7.4 win points; random use +0.8 and +1.5. The single-palm brace (and its Counterflow riposte) measured about 0
-  and was removed.
+  post for 3 s that kicks the rival outward. The single-palm brace (and its Counterflow riposte) was
+  removed.
 - **Arena Forge aim:** the two-hand forge hits the rival three times as hard when it is in the
   outer band or heading out, and only a fifth as hard in the middle, so it rewards timing.
   Squeeze pulls your own top in and throws the rival out, and the forging top's rim holds for
-  0.4 s. In the same headless sweep: squeeze -1.0 -> +7.4, stretch +3.3 -> +6.9, tilt
-  +0.1 -> +5.6, twist +0.3 -> +3.4 win points over doing nothing; random forging +2.8.
+  0.4 s.
 - Tops orbit the bowl in their spin direction, bounce off each other and spark on
   contact, lean into hits, wobble as spin drains, then topple.
 - **Far ramps:** point the hand ray at the floor during a fight and hold the pinch to

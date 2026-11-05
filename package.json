@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 IWSDK_GPU=vulkan __NV_PRIME_RENDER_OFFLOAD=1 __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only DRI_PRIME=1 iwsdk dev restart --open --allow-browser-automation --foreground",
+    "dev": "iwsdk dev restart --open --allow-browser-automation --foreground",
+    "dev:nvidia": "env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 IWSDK_GPU=vulkan __NV_PRIME_RENDER_OFFLOAD=1 __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only DRI_PRIME=1 iwsdk dev restart --open --allow-browser-automation --foreground",
     "dev:runtime": "env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 IWSDK_GPU=vulkan __NV_PRIME_RENDER_OFFLOAD=1 __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only DRI_PRIME=1 vite",
     "dev:down": "iwsdk dev down",
     "dev:status": "iwsdk dev status",
@@ -63,6 +64,6 @@
     "three": "npm:super-three@0.181.0"
   },
   "engines": {
-    "node": ">=20.19.0 <21.0.0-0 || >=22.12.0 <23.0.0-0 || >=24.0.0"
+    "node": ">=22.18.0"
   }
 }

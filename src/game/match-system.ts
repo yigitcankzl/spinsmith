@@ -1544,6 +1544,11 @@ export class MatchSystem extends createSystem({
           this.root.visible = false;
         }
         if (e.code === 'KeyL' && (this.phase === 'ready' || this.phase === 'result')) this.launch(0.8, 0);
+        if (e.code === 'KeyF' && this.phase === 'fight') {
+          // Both emulated hands grab the rim and squeeze (the real Arena Forge path, via the hand driver).
+          const drive = (window as unknown as { drive?: { arenaForge(o: object): Promise<unknown> } }).drive;
+          void drive?.arenaForge({ squeeze: 0.04, twist: 0, tilt: 0, hold: 0.35 }).catch((err) => console.warn('[DEV] squeeze', err));
+        }
         if (e.code === 'KeyK' && this.phase === 'fight') {
           // Burst the opponent now, to see the burst finish.
           this.theirs.state = 'out';

@@ -10,9 +10,9 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 
 From today's scripted first sessions in the emulator (`artifacts/first-five/`, a bot that reads each card for 0.8 s; game time):
 
-| ~2 s | ~12 s | ~14 s | ~18 s | 29–45 s | 49–94 s |
+| ~2 s | ~12 s | ~14 s | ~18 s | 30–47 s | 49–94 s |
 |---|---|---|---|---|---|
-| PUT YOUR TOP IN | RIP! (ghost hand shows it) | PINCH + DRAG: RAMP | first knockout, the ramp throws the rival into the pit (2 of 3 runs; in the third the ramp missed) | WRENCH IT OFF YOUR DESK → DESK KO | match won |
+| PUT YOUR TOP IN | RIP! (ghost hand shows it) | PINCH + DRAG: RAMP | first knockout (2 of 3 runs; in the third the first knockout was the DESK KO at 47 s) | WRENCH IT OFF YOUR DESK → DESK KO | match won |
 
 ## Try it (judges): five minutes, seated, hands only
 1. Sit at a table with a Meta Quest 3 or 3S, no controllers, and open the hosted URL in the Quest Browser.
@@ -23,7 +23,7 @@ From today's scripted first sessions in the emulator (`artifacts/first-five/`, a
 6. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared.
 7. On a headset, `?fps` puts a frame-rate readout beside MENU (fps, lowest, draw calls, quality level) and `?diagnostics` shows a copyable report (per-phase fps, quality steps) on the start page after you leave XR; together they measure what the emulator could not.
 
-**No headset?** The game runs in the IWSDK Quest emulator in Chromium: `npm install`, `npm run dev` (it opens the emulator at https://localhost:8081), press **Enter XR**, enter play mode in the emulator toolbar, then hold and release `Space` to rip and hold `B` for a ramp ([all dev keys](#dev-keys-only-in-npm-run-dev)). The production build asks for the Quest Browser; only the dev server has the emulator.
+**No headset?** The game runs in the IWSDK Quest emulator in Chromium (Node 22.18 or newer; the first `npm install` and `npm run dev` download about 1.2 GB including a Chromium, so allow 10+ minutes): `npm install`, `npm run dev` (it opens the emulator at https://localhost:8081; on an NVIDIA hybrid-GPU Linux laptop `npm run dev:nvidia` uses the discrete GPU), press **ENTER**, then `scripts/emu.sh enter` (or seat the emulated head, y <= 1.49, and press `P`) so the arena stands on the emulator's desk instead of the tray. Enter play mode in the emulator toolbar, look at PLAY and click to put your top in, hold and release `Space` to rip, hold `B` for a ramp and press `F` for the two-hand squeeze ([all dev keys](#dev-keys-only-in-npm-run-dev)). The production build asks for the Quest Browser; only the dev server has the emulator. Bosses are bouts 1-5, 2-5 and 3-5 (with `?demo` the next one is Sawtooth, four bouts on).
 
 **The first match is guided:** your top is shielded for its first rounds and the rival waits until you act; in round 2 on a detected table the rival is steered to your desk edge, so any squeeze throws it (DESK KO). From match 2 the rival plays freely and a wall or burst knockout is worth 2 heat (a pocket its marked value, a DESK KO +1).
 
@@ -36,7 +36,7 @@ From today's scripted first sessions in the emulator (`artifacts/first-five/`, a
 - **Outer Ring catch:** once a round, when your own top is thrown over the wall onto a detected table, you have 5 s to catch it with an open palm and sweep it back to the rim (it returns with less spin).
 - **Wall portal:** the rival arrives through a portal on a detected wall behind the far rim (in the dark beyond it when there is no wall).
 - **Saved pose:** carry the arena by its brass handle; its pose is saved, and kept by persistent WebXR anchors where available.
-- **Without a table** (the floating tray): no edge arcs, no drop sides, no staged or bonus DESK KO, and no Outer Ring catch (the strike slap lands on the tray's level instead); the bowl, verbs and campaign are the same.
+- **Without a table** (the floating tray, on a headset): no edge arcs, no drop sides, no staged or bonus DESK KO, and no Outer Ring catch (the strike slap lands on the tray's level instead); the bowl, verbs and campaign are the same. The dev emulator adds a stand-in desk outline instead ([The emulator's table](#testing-in-the-emulator-iwsdk-cli)).
 
 ## Hands
 
@@ -56,7 +56,7 @@ From today's scripted first sessions in the emulator (`artifacts/first-five/`, a
 | Finger Groove | Slide fingertip, then lift | Match 8 |
 | Forge Wheel | Turn the near wheel | Match 9 |
 
-Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD` in `src/game/progress.ts`). Online duels, brawls and the `?demo` save (level 8) have every verb. Every one-hand gesture (rip, ramp, cup, strike) works with either hand. Per-verb tuning and measured win-point gains are in [DESIGN.md](DESIGN.md).
+Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD` in `src/game/progress.ts`). Online duels, brawls and the `?demo` save (level 8) have every verb. Every one-hand gesture (rip, ramp, cup, strike) works with either hand. Per-verb tuning is in [DESIGN.md](DESIGN.md); Flick's measured effect comes from `npm run report:flick`.
 
 ## Measured performance (IWER on a desktop GPU, not a Quest)
 
@@ -102,19 +102,19 @@ The toggles combine and are saved. `npm run check:sim` covers the dial, Large te
 
 | Feature | Where | Run on |
 |---|---|---|
-| ECS world and systems (`World.create`, `createSystem`) | src/index.ts:37, src/game/match-system.ts:231 | IWER |
-| Scene planes with semantic labels (`XRPlane`, table/desk choice) | src/game/match-system.ts:232, src/game/placement.ts | IWER (synthesised rooms, `check:room-matrix`) |
-| Environment hit-test for unlabelled surfaces (`EnvironmentRaycastTarget`) | src/game/match-system.ts:1385 | IWER |
-| Persistent anchor for the smithy pose (`XRAnchor`) | src/game/match-system.ts:1333, 3260 | IWER |
-| Depth occlusion (`DepthOccludable`) | src/game/match-system.ts:1374-1382 | not yet (IWER has no camera depth) |
+| ECS world and systems (`World.create`, `createSystem`) | src/index.ts, src/game/match-system.ts (`createSystem`) | IWER |
+| Scene planes with semantic labels (`XRPlane`, table/desk choice) | src/game/match-system.ts (`XRPlane` query), src/game/placement.ts | IWER (synthesised rooms, `check:room-matrix`) |
+| Environment hit-test for unlabelled surfaces (`EnvironmentRaycastTarget`) | src/game/match-system.ts (`EnvironmentRaycastTarget`) | IWER |
+| Persistent anchor for the smithy pose (`XRAnchor`) | src/game/match-system.ts (`XRAnchor`) | IWER |
+| Depth occlusion (`DepthOccludable`) | src/game/match-system.ts (`DepthOccludable`) | not yet (IWER has no camera depth) |
 | Hand joints (`XRHand`), joint proxies that hide the game behind real hands | src/game/hands.ts, src/game/hand-occluder.ts | IWER |
-| Fixed foveation (`setFoveation`): 0.5 at start, full when the quality guard steps down | src/index.ts:46, src/game/match-system.ts:3052, src/game/quality.ts | IWER (`PERF_GUARD=1`) |
+| Fixed foveation (`setFoveation`): 0.5 at start, full when the quality guard steps down | src/index.ts, src/game/match-system.ts (`setFoveation`), src/game/quality.ts | IWER (`PERF_GUARD=1`) |
 | HRTF spatial audio (`PannerNode`) | src/game/audio.ts | desktop browser |
 
 ## Known limits
 
 - Nothing has been run or measured on a headset yet, including frame rate (`?fps` and `?diagnostics` are there for it).
-- Unlabelled-surface placement is probed only in IWER with synthesised planes (`npm run check:room-matrix`), not in a real room; a table or desk labelled in Space Setup is preferred.
+- Unlabelled-surface placement is probed only in IWER with synthesised planes (`npm run check:room-matrix`, last green 2026-10-24; in the current emulator it reports the tray instead of the table, also on the Oct 24 code), not in a real room; a table or desk labelled in Space Setup is preferred.
 - Persistent anchors have only been exercised in IWER. Depth occlusion is off under IWER (no camera depth), so it has not run anywhere yet. Real hands hide the game behind them through invisible tracked-joint proxies (spheres, bone rods and a palm slab; on over passthrough, off with `?nohandocclude`), seen only in IWER.
 - Head-ray assist: on Quest (no eye tracking) looking at a far button for 0.4 s lights it and a pinch away from the bowl presses it; a real gaze source (Meta VR Glasses) gets a full pointer. Neither has run on a headset.
 - The online duel (beta) has run between two browser windows and two browser processes on one machine, not between two headsets or two homes; public STUN only, so some strict networks will not connect.
@@ -124,8 +124,8 @@ The toggles combine and are saved. `npm run check:sim` covers the dial, Large te
 
 | Mode | How to reach it |
 |---|---|
-| **Circuit Map campaign:** 15 bouts, 3 chapters, 3 medals a bout; each chapter's boss casts one of your ultimates back at you (Iron Keep Tilt, Sawtooth Hammer, Bastion Anvil Strike) after a 1.4 s telegraph your own strike can interrupt | Automatic after the first match: PLAY starts the next bout. Pinch the level plate to see the map. |
-| **Brawl:** 3 or 4 tops in three rule sets: last one spinning, first credited pocket, or Crucible (first 3-heat pocket) | Pinch the brass pegs beside the level plate (each pinch steps duel → last spinning 3, 4 → pocket 3 → Crucible 4), then PLAY. |
+| **Circuit Map campaign:** 15 bouts, 3 chapters, 3 medals a bout; each chapter's boss casts one of your ultimates back at you (Iron Keep Tilt, Sawtooth Hammer, Bastion Anvil Strike) after a 1.4 s telegraph your own strike can interrupt (any seal but Ward); rival moves and boss seals start from your fourth match | Automatic after the first match: PLAY starts the next bout. Pinch the level plate to see the map. |
+| **Brawl:** 3 or 4 tops in three rule sets: last one spinning, first credited pocket, or Crucible (first 3-heat pocket); the arena opens out 20% per top past two | Pinch the brass pegs beside the level plate (each pinch steps duel → last spinning 3, 4 → pocket 3 → Crucible 4), then PLAY. |
 | **Pass and play** on one headset | After a duel, pinch PASS: the next person fights that top and its recorded hands. |
 | **Daily Smith Order** | Point at the board over the arena and pinch. About every other day it chases a medal you left on the map, and playing it counts for that bout. |
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
@@ -175,6 +175,7 @@ own rays rarely line up with what you are looking at.
 | `T` | Fill the rival's bar: its tell starts, or a boss's seal (during a fight, from the fourth match) |
 | `A` | Show the next arena, locked or not (home) |
 | `L` | Launch at 80% power without the hands (ready or result screen) |
+| `F` | Both emulated hands grab the rim and squeeze: the real two-hand Arena Forge, so the first match's round 2 DESK KO works on a desktop (during a fight, emulator in hand mode) |
 | `K` | Shatter the opponent now (during a fight) |
 | `1`-`6` | Pick a strike seal (during a fight; outside a fight, hold 1 / 2 with the mouse to move a hand) |
 | `G` | Force the rival's charge (during a fight) |
@@ -212,8 +213,10 @@ one of the Meta Quest scene captures IWER ships (`living_room`, `meeting_room`, 
 horizontal XRPlane, 1.60 m x 0.75 m with its top at 0.748 m, centred at (0.06, 0.75, -0.65): a
 desk directly in front of the origin, with a wall behind it. IWER feeds it through
 `XRFrame.detectedPlanes` like Quest's Space Setup does, so the game's production detection
-(`tables()` / `tableShape()` in `src/game/match-system.ts`) reads it unchanged: there is no fake
-plane and no dev bypass, and nothing of it is in the Quest build. The head has to be seated
+(`tables()` / `tableShape()` in `src/game/match-system.ts`) reads it unchanged. Dev builds only
+(none of this is in the Quest build): when no table is found, `setRoom` gives the emulator a 78 x 62 cm
+stand-in desk outline so the Outer Ring and the real-edge KO stay testable, and the Outer Ring palm
+catch (1.8x) and the forge's palm pick-up (14 vs 9 cm) are more forgiving for emulated hands. The head has to be seated
 (eyes at most 0.75 m above the desk, i.e. y <= 1.49), as on a headset: `scripts/emu.sh enter` /
 `front` use y = 1.45, and the pose above (1.15) works too. IWER's default standing head
 (y = 1.6) is correctly refused as "standing over the table" and the arena floats on the tray; seat
