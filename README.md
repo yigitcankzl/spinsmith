@@ -60,7 +60,7 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 
 ## Measured performance (IWER on a desktop GPU, not a Quest)
 
-**In short:** 47–117 draw calls per eye in every saved state (budget 150), the game's own update 0.4–1.4 ms per frame (p50, unthrottled), GPU time 0.86 ms per frame (p50) on the timed capture-room scene (95 draws per eye). Under a 4x CPU throttle the page drops to 24–35 fps, and the GPU timer shows why: of a ~37 ms frame, game update plus GPU are about 5 ms and the rest is CPU-side draw submission and the emulator. Nothing here is a Quest measurement.
+**In short:** 47–117 draw calls per eye in every saved state (budget 150), the game's own update 0.4–1.4 ms per frame (p50, unthrottled, 2026-10-23; up to 2.0 ms in a slower 11-05 session), GPU time 0.86 ms per frame (p50) on the timed capture-room scene (95 draws per eye). Under a 4x CPU throttle the page drops to 24–35 fps, and the GPU timer shows why: of a ~37 ms frame, game update plus GPU are about 5 ms and the rest is CPU-side draw submission and the emulator. Nothing here is a Quest measurement.
 
 `npm run report:runtime-performance` (RTX 4060 laptop, ANGLE/Vulkan) fails when a phase goes over 150 draw calls per eye. IWER renders each eye as its own camera without multiview, so the script divides the renderer's count by the number of views. Saved runs from 2026-10-23 are in `artifacts/perf/`.
 
@@ -72,6 +72,8 @@ Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD`
 | Fight, first match, capture room (planes and edge arcs up) | 83 | 96 | 0.5 / 0.8 / 1.5 ms |
 | Fight, 4-top brawl, capture room | 97 | 89 | 0.8 / 1.3 / 6.7 ms |
 | Fight, 4-top brawl on the opened-out arena, capture room (2026-11-05, `brawl4-fight-room-2026-11-05.json`) | 112 | 74 | 2.0 / 2.6 / 3.6 ms |
+
+The 2026-11-05 rows come from a later session than the 10-23 rows; an A/B in that one session (same brawl, opened-out vs original arena, two runs each) read 1.8–1.9 vs 1.8–2.0 ms update p50 and 71–74 vs 70–73 lowest fps, so the opened-out arena costs nothing measurable; the session itself runs slower than 10-23's.
 
 A 4-top brawl at 4x CPU throttle (next round's ready phase) reads 86 draws per eye, lowest 24 fps, update p95 3.7 ms (`brawl4-ready-room-cpu4x-2026-10-23.json`). The worst case saved is 117 draws per eye (ready phase with the capture room's planes and the desk-edge arcs up, `ready-cpu1x-2026-10-23.json`); the gate fails the script above 150 in any state.
 
