@@ -3860,6 +3860,21 @@ export class MatchSystem extends createSystem({
       const cz = bz - Math.cos(yaw) * this.matchPush;
       if (insidePoly(table.poly, cx, cz) && edgeDistance(table.poly, cx, cz) >= rim * k * ARENA_SCALE + RIM_MARGIN) break;
     }
+    // Shrunk as far as it goes and still over an edge (placed near a corner at display size): slide the
+    // whole arena in so its rim stays on the wood.
+    if (table) {
+      const cx = bx - Math.sin(yaw) * this.matchPush;
+      const cz = bz - Math.cos(yaw) * this.matchPush;
+      const fit = fitToTable({ x: cx, z: cz }, table.poly, rim * this.matchScale * ARENA_SCALE);
+      if (fit.x !== cx || fit.z !== cz) {
+        this.root.position.x += fit.x - cx;
+        this.root.position.z += fit.z - cz;
+        // The real table and its edges, in the arena's frame again.
+        this.root.updateMatrixWorld(true);
+        this.setRoom();
+        if (import.meta.env.DEV) console.log(`[MATCH] fit slid ${Math.hypot(fit.x - cx, fit.z - cz).toFixed(3)} m onto the table`);
+      }
+    }
     if (import.meta.env.DEV) console.log(`[MATCH] fit ${L.name}: scale ${this.matchScale.toFixed(2)}, slide ${this.matchPush.toFixed(3)} m${table ? '' : ' (no table)'}`);
   }
 
