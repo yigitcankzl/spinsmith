@@ -157,16 +157,96 @@ export const HUD = {
   forgeBack: 0.03,
   /** The match bar's height and how far it leans back from the card. */
   barY: 0.063,
+  /** In a fight the card hangs over the tops, so the bar alone rides this high: clear of the text over them. */
+  fightBarY: 0.095,
   barBack: 0.021,
   /** On a result the card rides this much higher, clear of the bar's full plate (its top is at about 0.103). */
   resultLift: 0.012,
-  /** In a fight the card and the stamp hang over a top this high above the floor, kept within textReach of the rim. */
-  cardOverTop: 0.075,
-  stampOverTop: 0.05,
   textReach: 0.55,
-  /** Toward the far rim only this far: beyond it the text sits on the match bar from the seat. */
-  textReachFar: 0.3,
+  /** fightTextSpot: a top's crown above the floor and the gap text keeps from it on screen. */
+  topCrown: 0.028,
+  textGap: 0.004,
+  /** Text keeps its upper edge this many degrees under the match bar's lower edge. */
+  barClearDeg: 0.5,
+  /** Text ends stay within this share of the side rim's reach (and text no nearer the player than that). */
+  textSpan: 0.5,
+  /** The largest stamp weight in a fight (a decided match or a level stamps up to 1.6 elsewhere). */
+  fightStampWeight: 1,
 };
+
+/** Where fight text of half-height `hh` about a top at (x, z) hangs (arena-local, before the view
+ * scale), seen from `head` (arena-local). It stands at the top's crown, moved along the view's up
+ * direction by its half-height and a gap, so on screen it sits just above the top without covering it.
+ * If its upper edge would then reach `barBottom` (the match bar's lower edge) it goes just below the
+ * top instead. `hw` is its half-width. */
+export function fightTextSpot(x: number, z: number, floor: number, hh: number, head: Spot, barBottom: Spot | null, hw = 0, halfSpan = Infinity): Spot {
+  // Sideways its ends stay over the bowl (`halfSpan` across), so a top by the side rim keeps its text in view.
+  const tx = Math.max(-(halfSpan - hw), Math.min(halfSpan - hw, x));
+  // Toward the player it stops at the same span: right under the eyes text would fill the view.
+  z = Math.min(z, halfSpan);
+  const crown = { x: tx, y: floor + HUD.topCrown, z };
+  const up = viewUp(crown, head);
+  const d = hh + HUD.textGap;
+  const above = { x: tx + up.x * d, y: crown.y + up.y * d, z: z + up.z * d };
+  if (barBottom) {
+    const edge = { x: above.x + up.x * hh, y: above.y + up.y * hh, z: above.z + up.z * hh };
+    if (elevation(edge, head) > elevation(barBottom, head) - HUD.barClearDeg) return { x: tx - up.x * d, y: floor - up.y * d, z: z - up.z * d };
+  }
+  return above;
+}
+
+/** The unit vector (arena-local) that points up on screen at `p` for an eye at `head`. */
+function viewUp(p: Spot, head: Spot): Spot {
+  let dx = p.x - head.x, dy = p.y - head.y, dz = p.z - head.z;
+  const n = Math.hypot(dx, dy, dz) || 1;
+  dx /= n; dy /= n; dz /= n;
+  // World up with its part along the view removed.
+  const ux = -dy * dx, uy = 1 - dy * dy, uz = -dy * dz;
+  const m = Math.hypot(ux, uy, uz) || 1;
+  return { x: ux / m, y: uy / m, z: uz / m };
+}
+
+/** Degrees above the horizontal of `p` from `head`. */
+function elevation(p: Spot, head: Spot): number {
+  return (Math.atan2(p.y - head.y, Math.hypot(p.x - head.x, p.z - head.z)) * 180) / Math.PI;
+}
+
+/** A seated eye `drop` m above the arena's floor level, `reach` m in front of its centre (arena-local; gazeAngles' frame). */
+export function seatedEye(drop: number, reach = REACH): Spot {
+  return { x: 0, y: drop / ARENA_SCALE, z: reach / ARENA_SCALE };
+}
+
+/** The match bar's lower edge centre (arena-local) for an arena slid `pushed` back (match-system's bar placement). */
+export function barBottomSpot(layout: ArenaLayout, pushed = 0, read = 1, lift = 0, barY = HUD.fightBarY): Spot {
+  const far = rimRadius(layout, -Math.PI / 2);
+  const grow = hudGrow(far, pushed);
+  const hh = (BAR_PLANE.h * BAR_PLANE.scale * grow * read) / 2;
+  return { x: 0, y: (barY + lift) * grow - hh * Math.cos(BAR_PLANE.tilt), z: hudCardZ(far) + HUD.barBack * grow + hh * Math.sin(BAR_PLANE.tilt) };
+}
+
+/** The view-angle box (degrees, seated head looking at the arena centre) of a flat rectangle centred
+ * at `c`, half-size hw x hh, tilted back by `tilt` radians about its horizontal axis. */
+export function viewBox(c: Spot, hw: number, hh: number, drop: number, reach: number, tilt = 0) {
+  const corners = [-1, 1].flatMap((sx) => [-1, 1].map((sy) => gazeAngles({ x: c.x + sx * hw, y: c.y + sy * hh * Math.cos(tilt), z: c.z - sy * hh * Math.sin(tilt) }, drop, reach)));
+  return { up: [Math.min(...corners.map((g) => g.up)), Math.max(...corners.map((g) => g.up))], side: [Math.min(...corners.map((g) => g.side)), Math.max(...corners.map((g) => g.side))] };
+}
+
+/** The match bar's view box for an arena slid `pushed` back, with read surfaces at `read` (match-system's bar placement). */
+export function barViewBox(layout: ArenaLayout, drop: number, pushed = 0, read = 1, lift = 0, barY = HUD.fightBarY) {
+  const far = rimRadius(layout, -Math.PI / 2);
+  const grow = hudGrow(far, pushed);
+  const z = hudCardZ(far) + HUD.barBack * grow;
+  const k = BAR_PLANE.scale * grow * read;
+  return viewBox({ x: 0, y: (barY + lift) * grow, z }, (BAR_PLANE.w * k) / 2, (BAR_PLANE.h * k) / 2, drop, REACH + pushed, BAR_PLANE.tilt);
+}
+
+/** The fight card's half-size (Label 0.22 wide, 160:512, at match-system's CARD_FIGHT_SCALE 0.55) and the
+ * largest fight stamp's (0.2 x 0.05 at 0.8 in the bowl, weight HUD.fightStampWeight). */
+export const FIGHT_CARD_HALF = { w: 0.11 * 0.55, h: ((0.22 * 160) / 512 / 2) * 0.55 };
+export const FIGHT_STAMP_HALF = { w: 0.1 * 0.8, h: 0.025 * 0.8 };
+
+/** The match bar's plane (match-bar.ts PW x PH) and how match-system scales and leans it. */
+export const BAR_PLANE = { w: 1.31, h: (1.31 * 404) / 1400, scale: 0.21, tilt: 0.55 };
 
 /** How much the card and the bar grow for an arena whose far rim is `far` out (arena-local) and slid `pushed` m back. */
 export function hudGrow(far: number, pushed = 0, reach = REACH): number {
@@ -189,14 +269,16 @@ export function hudAnchors(layout: ArenaLayout, lift = 0, pushed = 0, read = 1):
   const cardY = (HUD.barY + (HUD.card.y - HUD.barY) * read + lift) * grow;
   // In a fight the card hangs over a top, anywhere out to textReach of the rim.
   const overTop = ([-Math.PI / 2, Math.PI / 2, 0, Math.PI] as const).map((a, i): [string, Spot] => {
-    const r = rimRadius(layout, a) * (i === 0 ? HUD.textReachFar : HUD.textReach);
-    return [`fight card over a top (${['far', 'near', 'right', 'left'][i]})`, { x: Math.cos(a) * r, y: HUD.cardOverTop + layout.depth, z: Math.sin(a) * r }];
+    // A top near that rim; the floor taken at its highest (the rim's rise) as the worst case.
+    const r = rimRadius(layout, a) * 0.9;
+    return [`fight card over a top (${['far', 'near', 'right', 'left'][i]})`, fightTextSpot(Math.cos(a) * r, Math.sin(a) * r, layout.depth, FIGHT_CARD_HALF.h * read, seatedEye(0.35, REACH + pushed), barBottomSpot(layout, pushed, read, lift), FIGHT_CARD_HALF.w * read, rimRadius(layout, 0) * HUD.textSpan)];
   });
   return [
     ['round card', { x: HUD.card.x, y: cardY, z }],
     ['result card', { x: HUD.card.x, y: (HUD.barY + (HUD.card.y - HUD.barY + HUD.resultLift) * read + lift) * grow, z }],
     ...overTop,
     ['match bar', { x: 0, y: (HUD.barY + lift) * grow, z: z + HUD.barBack * grow }],
+    ['match bar in a fight', { x: 0, y: (HUD.fightBarY + lift) * grow, z: z + HUD.barBack * grow }],
     // The stamp hangs in the bowl, over a top or the centre (match-system), a few cm above the floor.
     ['stamp (count, KO, verdict)', { x: 0, y: 0.05, z: 0 }],
     // The buttons do not slide with the arena: arena-local they come forward by the slide.

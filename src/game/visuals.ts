@@ -3047,6 +3047,10 @@ export class Stamp {
   private t = -1;
   private hold = 1;
   private size = 1;
+  /** The weight of what shows now (show's `weight`: 1, up to 1.6 for a decided match or a level). */
+  get weight() {
+    return this.size;
+  }
   /** Cancels the table-fit scale so result words keep the same readable world size. */
   worldScale = 1;
   private queue: [string, string, 'mine' | 'rival' | 'neutral', number, number][] = [];

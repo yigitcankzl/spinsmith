@@ -10,7 +10,7 @@ import { FpsBook, fpsPhase, QUALITY_LEVELS, QualityGuard } from './quality.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { brawlLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
-import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow, RESULT_BUTTONS } from './reach.js';
+import { BAR_PLANE, fightTextSpot, FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow, RESULT_BUTTONS } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
 import type { ArenaLayout } from './layout.js';
@@ -182,17 +182,17 @@ const ARENA_FORGE_EFFECT: Record<ArenaForgeAction, string> = {
 };
 const SLOW_MO = 0.3;
 /** How high a fight stamp hangs over the bowl under the top it names (arena units): clear of the top's crown. */
-const STAMP_OVER_TOP = HUD.stampOverTop;
 const STAMP_TARGET = new Vector3();
 /** How far out (of the rim) text over a top may follow it. */
-const TEXT_REACH = HUD.textReach;
-const TEXT_REACH_FAR = HUD.textReachFar;
 /** The fight card over its top: a little higher than a lone stamp (it has two lines), at this scale. */
-const CARD_OVER_TOP = HUD.cardOverTop;
 const CARD_FIGHT_SCALE = 0.55;
-/** A stamp shown with the fight card rides this far above the card's centre. */
-const CARD_STAMP_GAP = 0.05;
+/** Half-heights of the card (Label 0.22 wide, 160:512) and the stamp (0.2 x 0.05) at scale 1, and the stamp's scale in the bowl. */
+const CARD_HALF_H = (0.22 * 160) / 512 / 2;
+const STAMP_HALF_H = 0.025;
+const STAMP_IN_BOWL = 0.8;
 const CARD_TARGET = new Vector3();
+const TEXT_HEAD = new Vector3();
+const TEXT_BAR = new Vector3();
 const PIN_HEAD = new Vector3();
 const FACE_HEAD = new Vector3();
 const PIN_FWD = new Vector3();
@@ -1016,6 +1016,8 @@ export class MatchSystem extends createSystem({
   /** The card hung over a top in the fight last frame. */
   private cardOverTop = false;
   private cardAt = new Vector3();
+  /** 0 at the bar's usual height, 1 at its fight height (HUD.fightBarY), eased between. */
+  private barRise = 0;
   /** The arena's own layout while a brawl plays on it opened out (brawlLayout), else null. */
   private brawlBase: ArenaLayout | null = null;
   /** A boss's seal this round: spent once, then its bar goes back to its named move. */
@@ -3751,14 +3753,18 @@ export class MatchSystem extends createSystem({
     const readScale = textScale() / Math.max(0.7, this.rootK);
     this.label.mesh.scale.setScalar(1.25 * grow * readScale);
     this.bar.mesh.scale.setScalar(0.21 * grow * readScale);
-    // In the bowl (a round's count, the fight, its result) it is a little smaller, so it names the top without hiding it.
-    this.stamp.worldScale = readScale * ((this.phase === 'fight' || this.phase === 'ready' || this.phase === 'result') && !this.stamp.pin ? 0.8 : 1);
+    const inBowl = (this.phase === 'fight' || this.phase === 'ready' || this.phase === 'result') && !this.stamp.pin;
+    // In the bowl it is a little smaller and never heavier than HUD.fightStampWeight, so it names the top without hiding it.
+    this.stamp.worldScale = readScale * (inBowl ? (STAMP_IN_BOWL * Math.min(this.stamp.weight, HUD.fightStampWeight)) / this.stamp.weight : 1);
+    const stampHalfH = STAMP_HALF_H * readScale * STAMP_IN_BOWL * Math.min(this.stamp.weight, HUD.fightStampWeight);
     // The bar's top edge under the card's lower edge (it leans back, the card stands upright).
     this.bar.mesh.position.z = this.label.mesh.position.z + BAR_BACK * grow;
     // Their heights grow with them, so the card stays clear above the bar.
     // A wall higher than the standard one lifts them clear of it.
     const lift = Math.max(0, WALL_HEIGHT[L.wall] - WALL_HEIGHT.standard);
-    this.bar.mesh.position.y = (BAR_Y + lift) * grow;
+    // In a fight it rides higher (the card is over the tops then), clear of the text over them.
+    this.barRise += ((this.phase === 'fight' ? 1 : 0) - this.barRise) * Math.min(1, dt * 4);
+    this.bar.mesh.position.y = (BAR_Y + (HUD.fightBarY - BAR_Y) * this.barRise + lift) * grow;
     // On a result the bar shows its full plate (XP row): the card rides a little higher to clear it.
     // The card and the bar both grow by readScale about their centres, so the gap between the
     // centres grows with it too: on a fitted (shrunk) arena or with Large text they never overlap.
@@ -3768,7 +3774,7 @@ export class MatchSystem extends createSystem({
     const cardUp = this.phase === 'fight' && this.label.current !== '' && this.label.mesh.visible;
     if (cardUp) {
       const rivalCard = this.callKey === 'tell' && this.label.current === this.callText;
-      const at = this.overTop(rivalCard ? 'rival' : 'mine', CARD_OVER_TOP, CARD_TARGET);
+      const at = this.overTop(rivalCard ? 'rival' : 'mine', CARD_HALF_H * CARD_FIGHT_SCALE * readScale, CARD_TARGET, 0.11 * CARD_FIGHT_SCALE * readScale);
       // Its own smoothed spot: the card's y and z are rewritten above every frame.
       if (!this.cardOverTop) this.cardAt.copy(at);
       else this.cardAt.lerp(at, 1 - Math.exp(-10 * dt));
@@ -3794,7 +3800,7 @@ export class MatchSystem extends createSystem({
       const fwd = this.player.head.getWorldDirection(PIN_FWD).negate();
       const p = PIN_AT.copy(this.stamp.pin);
       // Home is low over the bowl's centre, where the other stamps hang.
-      const home = this.root.localToWorld(PIN_HOME.set(0, (this.arena.height(0, 0) + STAMP_OVER_TOP) * this.viewK, 0));
+      const home = this.root.localToWorld(PIN_HOME.set(0, (this.arena.height(0, 0) + HUD.topCrown + stampHalfH + HUD.textGap) * this.viewK, 0));
       for (let i = 0; i < 6 && PIN_DIR.subVectors(p, head).normalize().dot(fwd) < 0.92; i++) p.lerp(home, 0.35);
       this.root.worldToLocal(this.stamp.mesh.position.copy(p));
       this.stamp.mesh.lookAt(head);
@@ -3804,15 +3810,19 @@ export class MatchSystem extends createSystem({
     else if (this.phase === 'fight') {
       // Over the card when both speak at once (only the guided first session shows them together;
       // later a stamp hides the card), so the two never overlap.
-      const at = this.cardOverTop && this.progress.guide !== 'done' ? STAMP_TARGET.copy(this.label.mesh.position).setY(this.label.mesh.position.y + CARD_STAMP_GAP) : this.overTop(this.stamp.side, STAMP_OVER_TOP, STAMP_TARGET);
+      // With the card up too (only the guided first session shows both), the stamp stacks on the card:
+      // the same rule as one taller block (and below the top together when that would reach the bar).
+      const cardHalf = CARD_HALF_H * CARD_FIGHT_SCALE * readScale;
+      const stacked = this.cardOverTop && this.progress.guide !== 'done';
+      const at = this.overTop(this.stamp.side, stacked ? stampHalfH + 2 * cardHalf + HUD.textGap : stampHalfH, STAMP_TARGET, stampHalfH * 4);
       // Snap when it appears, then glide after a moving top instead of jittering with it.
       if (!this.stampShown) this.stamp.mesh.position.copy(at);
       else this.stamp.mesh.position.lerp(at, 1 - Math.exp(-10 * dt));
     }
     // Before a round (ROUND 2, the count) it stands over the bowl's centre, where the rip will go; on
     // a result (DESK KO, SLAG) over the top that is still in the bowl, never up by the result card.
-    else if (this.phase === 'ready') this.stamp.mesh.position.set(0, (this.arena.height(0, 0) + STAMP_OVER_TOP) * this.viewK, 0);
-    else if (this.phase === 'result') this.overTop(this.stamp.side, STAMP_OVER_TOP, this.stamp.mesh.position);
+    else if (this.phase === 'ready') this.stamp.mesh.position.set(0, (this.arena.height(0, 0) + HUD.topCrown + stampHalfH + HUD.textGap) * this.viewK, 0);
+    else if (this.phase === 'result') this.overTop(this.stamp.side, stampHalfH, this.stamp.mesh.position, stampHalfH * 4);
     else this.stamp.mesh.position.set(0, 0.045, 0.03);
     this.stampShown = this.stamp.mesh.visible && this.phase === 'fight';
     if (facing && !this.stamp.pin) this.stamp.mesh.rotation.y = Math.atan2(headLocal.x - this.stamp.mesh.position.x, headLocal.z - this.stamp.mesh.position.z);
@@ -6884,17 +6894,17 @@ export class MatchSystem extends createSystem({
   /** A point (root-local) `lift` over the bowl under a top: yours, the rival's, or between the two
    * ('neutral'). It stays inside the bowl's middle (TEXT_REACH of the rim): near the far rim the
    * text would sit on the match bar, near the near rim it would fill the view. */
-  private overTop(side: 'mine' | 'rival' | 'neutral', lift: number, out: Vector3) {
+  private overTop(side: 'mine' | 'rival' | 'neutral', halfH: number, out: Vector3, halfW = 0) {
     const a = side === 'rival' ? this.theirs : this.mine;
     const b = side === 'neutral' ? this.theirs : a;
-    let x = (a.x + b.x) / 2;
-    let z = (a.z + b.z) / 2;
-    const rim = rimRadius(this.arena.layout, Math.atan2(z, x)) * TEXT_REACH;
-    const r = Math.hypot(x, z);
-    if (r > rim) (x *= rim / r), (z *= rim / r);
-    // Toward the far rim it stops sooner: seen from the seat, text there lands on the match bar.
-    z = Math.max(z, -rimRadius(this.arena.layout, -Math.PI / 2) * TEXT_REACH_FAR);
-    return out.set(x * this.viewK, (this.arena.height(x, z) + lift) * this.viewK, z * this.viewK);
+    const x = (a.x + b.x) / 2;
+    const z = (a.z + b.z) / 2;
+    // The head and the match bar's lower edge in the same (arena-local, unscaled) frame.
+    const k = 1 / this.viewK;
+    this.root.worldToLocal(this.player.head.getWorldPosition(TEXT_HEAD)).multiplyScalar(k);
+    this.root.worldToLocal(this.bar.mesh.localToWorld(TEXT_BAR.set(0, -BAR_PLANE.h / 2, 0))).multiplyScalar(k);
+    const at = fightTextSpot(x, z, this.arena.height(x, z), halfH * k, TEXT_HEAD, this.bar.mesh.visible ? TEXT_BAR : null, halfW * k, rimRadius(this.arena.layout, 0) * HUD.textSpan);
+    return out.set(at.x * this.viewK, at.y * this.viewK, at.z * this.viewK);
   }
 
   /** This match's boss seal (BOSS_SEAL), or null: only a Circuit boss bout, one on one, offline. */

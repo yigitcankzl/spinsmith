@@ -20,7 +20,7 @@ import { clearSnapshot, decodeSnapshot, encodeSnapshot, loadSnapshot, RESUME_KEY
 import type { MatchSnapshot } from '../src/game/match-resume.ts';
 import { addDays, boutLine, COME_BACK_WORDS, comeBackCard, dayStreak, nextMoveLine, streakTitle, tomorrowLine, wordsIn } from '../src/game/come-back.ts';
 import { PEDESTAL, pickTable, pickTablePlane, placeArena, polyArea, polyMinWidth, REACH, reachSpot, tableRank, TRAY_DROP } from '../src/game/placement.ts';
-import { eyeView, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, hudAnchors, hudAnchorsOffMatch, forgeGrips, touchTargets, traySpot } from '../src/game/reach.ts';
+import { barBottomSpot, barViewBox, eyeView, fightTextSpot, FIGHT_CARD_HALF, FIGHT_STAMP_HALF, FORGE_GRIP, FORGE_GRIP_MAX_COS, forgeGripIntent, gazeAngles, HUD, hudAnchors, hudAnchorsOffMatch, forgeGrips, seatedEye, touchTargets, traySpot, viewBox } from '../src/game/reach.ts';
 import { decodeEcho, encodeEcho, splitCode } from '../src/game/echo.ts';
 import { allBuilds, BALANCE_GAP, edgeOf, buildName, CORES, SEAL_NAMES, EMBLEM_COLORS, NAMED_BUILDS, PRESETS, RIVALS, roleOf, specFromBuild, statsOf, TIPS, WEIGHT_LIMIT, weightOf } from '../src/game/parts.ts';
 import { crossguard, crossguardLive, crossguardSling, CROSSGUARD_SLING, movingOut, pocketHeading, emberBumper, fingerContact, FINGER_RADIUS, FLICK_MAX, rankingN, roundOverN, stepN, sealStrike, rivalMove, stableHeading, strike, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, SLING_SPEED, TUNING, finishPoints, MATCH_HEAT, LAUNCH_HEADING_STEP, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, palmGust, springRim, SPRING_SHIELD, RUB_RATE, RUB_STEP_MAX, spinRub, STAMINA, step, STEP, Top, verdict, DESK_DROP_ON } from '../src/game/sim.ts';
@@ -1204,6 +1204,44 @@ TUNING.grace = 0;
       }
     }
   }
+}
+
+// 16b2b. Fight text over the tops (fightTextSpot): for a top anywhere in the bowl of every arena (and
+// its four-top brawl size), seated 0.30-0.45 m above the tray, with normal and Large text, the fight
+// card and the largest fight stamp never reach the match bar's fight height, stay inside +-35/40 degrees,
+// and (but for a few tops right under the eyes) never cover the top they name.
+{
+  const near = (l: ArenaLayout) => Math.max(0, rimRadius(l, Math.PI / 2) - 0.17) * 2.4;
+  let cases = 0;
+  let covered = 0;
+  for (const layout of [...ARENAS, ...ARENAS.map((l) => brawlLayout(l, 4))]) {
+    const arena = new Arena(layout);
+    const push = near(layout);
+    for (const drop of [0.3, 0.35, 0.4, 0.45]) for (const read of [1, 1.3]) {
+      const bar = barViewBox(layout, drop, push, read);
+      const barEdge = barBottomSpot(layout, push, read);
+      const eye = seatedEye(drop, REACH + push);
+      for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) {
+        const x = (i / 4) * layout.radius * 0.9;
+        const z = (j / 4) * layout.radius * 0.9;
+        if (Math.hypot(x, z) > rimRadius(layout, Math.atan2(z, x)) * 0.9) continue;
+        for (const [kind, h] of [['card', FIGHT_CARD_HALF], ['stamp', FIGHT_STAMP_HALF]] as const) {
+          cases++;
+          const floor = arena.height(x, z);
+          const at = fightTextSpot(x, z, floor, h.h * read, eye, barEdge, h.w * read, rimRadius(layout, 0) * HUD.textSpan);
+          const box = viewBox(at, h.w * read, h.h * read, drop, REACH + push);
+          const where = `${layout.name} r${layout.radius.toFixed(3)} ${kind} x${read} drop ${drop} top ${x.toFixed(3)},${z.toFixed(3)}`;
+          assert.ok(!(box.up[1] > bar.up[0] && box.side[0] < bar.side[1] && box.side[1] > bar.side[0]), `${where}: text reaches the match bar (${box.up[1].toFixed(1)} vs ${bar.up[0].toFixed(1)} deg)`);
+          assert.ok(Math.max(Math.abs(box.up[0]), Math.abs(box.up[1])) <= 35 && Math.max(Math.abs(box.side[0]), Math.abs(box.side[1])) <= 40, `${where}: text out of view`);
+          const top = viewBox({ x, y: floor + 0.015, z }, 0.02, 0.012, drop, REACH + push);
+          const mu = (top.up[0] + top.up[1]) / 2;
+          const ms = (top.side[0] + top.side[1]) / 2;
+          if (mu > box.up[0] && mu < box.up[1] && ms > box.side[0] && ms < box.side[1]) covered++;
+        }
+      }
+    }
+  }
+  assert.ok(covered / cases < 0.005, `fight text covers its top in ${covered} of ${cases} cases`);
 }
 
 // 16b3. Brawl arenas: a duel keeps its layout, three and four tops open it out 20% and 40% (floor rise
