@@ -164,6 +164,8 @@ export const HUD = {
   cardOverTop: 0.075,
   stampOverTop: 0.05,
   textReach: 0.55,
+  /** Toward the far rim only this far: beyond it the text sits on the match bar from the seat. */
+  textReachFar: 0.3,
 };
 
 /** How much the card and the bar grow for an arena whose far rim is `far` out (arena-local) and slid `pushed` m back. */
@@ -187,7 +189,7 @@ export function hudAnchors(layout: ArenaLayout, lift = 0, pushed = 0, read = 1):
   const cardY = (HUD.barY + (HUD.card.y - HUD.barY) * read + lift) * grow;
   // In a fight the card hangs over a top, anywhere out to textReach of the rim.
   const overTop = ([-Math.PI / 2, Math.PI / 2, 0, Math.PI] as const).map((a, i): [string, Spot] => {
-    const r = rimRadius(layout, a) * HUD.textReach;
+    const r = rimRadius(layout, a) * (i === 0 ? HUD.textReachFar : HUD.textReach);
     return [`fight card over a top (${['far', 'near', 'right', 'left'][i]})`, { x: Math.cos(a) * r, y: HUD.cardOverTop + layout.depth, z: Math.sin(a) * r }];
   });
   return [

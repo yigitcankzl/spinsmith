@@ -186,6 +186,7 @@ const STAMP_OVER_TOP = HUD.stampOverTop;
 const STAMP_TARGET = new Vector3();
 /** How far out (of the rim) text over a top may follow it. */
 const TEXT_REACH = HUD.textReach;
+const TEXT_REACH_FAR = HUD.textReachFar;
 /** The fight card over its top: a little higher than a lone stamp (it has two lines), at this scale. */
 const CARD_OVER_TOP = HUD.cardOverTop;
 const CARD_FIGHT_SCALE = 0.55;
@@ -6889,6 +6890,8 @@ export class MatchSystem extends createSystem({
     const rim = rimRadius(this.arena.layout, Math.atan2(z, x)) * TEXT_REACH;
     const r = Math.hypot(x, z);
     if (r > rim) (x *= rim / r), (z *= rim / r);
+    // Toward the far rim it stops sooner: seen from the seat, text there lands on the match bar.
+    z = Math.max(z, -rimRadius(this.arena.layout, -Math.PI / 2) * TEXT_REACH_FAR);
     return out.set(x * this.viewK, (this.arena.height(x, z) + lift) * this.viewK, z * this.viewK);
   }
 
