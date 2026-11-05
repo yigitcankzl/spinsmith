@@ -1346,7 +1346,9 @@ export function springRim(arena: Arena, mine: Top, others: readonly Top[], sx: n
   let hits = 0;
   for (const top of [mine, ...others]) {
     const tr = Math.hypot(top.x, top.z);
-    if (!top.alive || tr < arena.radius * 0.5) continue;
+    // The pulled rim pushes the tops in its sector inward while it is held, so the band it reaches
+    // on release starts as far inside half the radius as the rim was pulled.
+    if (!top.alive || tr < arena.radius * 0.5 - Math.max(0, pull)) continue;
     const sameSector = (top.x * sx + top.z * sz) / Math.max(1e-5, tr * r);
     if (sameSector < Math.cos(0.6)) continue;
     let impulse = (0.13 + Math.min(0.07, pull * 2)) * strength;

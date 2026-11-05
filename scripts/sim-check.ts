@@ -346,6 +346,14 @@ TUNING.grace = 0;
   const rimZ = Math.sin(sa) * springArena.radius;
   assert.equal(springRim(springArena, own, [foe, far], rimX, rimZ, rimX * 0.85, rimZ * 0.85, 1), 2, 'a rim spring reaches only tops in its sector');
   assert.ok(own.vx * Math.cos(sa) + own.vz * Math.sin(sa) < -0.1, 'a rim spring pulls your own top inward');
+  {
+    // A rival the held rim pushed in to 0.4 of the radius still takes the spring on release.
+    const pushed = new Top(ATTACK);
+    pushed.launch(Math.cos(sa) * springArena.radius * 0.4, Math.sin(sa) * springArena.radius * 0.4, 0, 0, 0.8, -1);
+    const spare = new Top(ATTACK);
+    spare.launch(-Math.cos(sa) * springArena.radius * 0.4, -Math.sin(sa) * springArena.radius * 0.4, 0, 0, 0.8, 1);
+    assert.equal(springRim(springArena, spare, [pushed], rimX, rimZ, rimX * 0.75, rimZ * 0.75, 1), 1, 'a rim spring still reaches a top its held rim pushed inward');
+  }
   assert.ok(own.shieldUntil >= springArena.elapsed + SPRING_SHIELD - 1e-9, 'a rim spring holds the wall shut behind your own top');
   const pocketX = Math.cos(pocket.angle) * springArena.radius - foe.x;
   const pocketZ = Math.sin(pocket.angle) * springArena.radius - foe.z;
