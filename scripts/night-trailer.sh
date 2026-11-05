@@ -57,10 +57,34 @@ clip 03-flick "$NEW/flick.mp4" 0.2 2.8 "FLICK" "Your fingertip is part of the ph
 clip 04-guard "$NEW/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms make a rail that saves you"
 clip 05-rub "$NEW/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 06-strike "$NEW/seal-stamp.mp4" 0.8 4.0 "STAMP AN ULTIMATE" "Pinch the seal / press it into the bowl"
+# Optional: every other hand move and all six ultimates (MORE=<dir of close shots>, one beat each).
+movesegs=(); sealsegs=()
+if [ -d "${MORE:-}" ]; then
+  mvc() { [ -s "$MORE/$1.mp4" ] || return 0; clip "m-$1" "$MORE/$1.mp4" "$2" "$3" "$4" "$5"; movesegs+=("m-$1"); }
+  mvc ramp 0.4 2.4 "PINCH THE FLOOR" "Raise a ramp under the rival"
+  mvc groove 0.4 2.4 "FINGER GROOVE" "Draw a lane into the live floor"
+  mvc rim-spring 0.4 2.6 "RIM SPRING" "Pull the rim back / let it snap"
+  mvc gust 0.4 2.4 "FORGE GUST" "A palm sweep pushes every top in its path"
+  mvc cup-sling 0.3 3.2 "CUP AND SLING" "Catch your top / pinch / pull / fire it back"
+  mvc outer-ring 0.4 2.8 "OUTER RING" "Catch a top off the table / sweep it home"
+  mvc ember "${EMBER_AT:-0.8}" 2.8 "EMBER RIVET" "Plant a hot rivet in the floor"
+  mvc wheel 0.4 2.6 "FORGE WHEEL" "Spin the whole floor under the tops"
+  mvc forge-twist 0.4 2.8 "TWIST AND TILT" "Two hands bend the arena while they fight"
+  mvc forge-stretch 0.4 2.4 "STRETCH" "Pull the bowl wide"
+  mvc slap 0.6 3.0 "OR SLAP THE TABLE" "A palm slap on your real desk fires the ultimate"
+  sv() { [ -s "$MORE/seal-$1.mp4" ] || return 0; clip "s-$1" "$MORE/seal-$1.mp4" "$2" "$3" "SIX ULTIMATES" "$4"; sealsegs+=("s-$1"); }
+  sv rush 0.9 2.6 "Rush"
+  sv magnet 0.9 2.6 "Magnet"
+  sv tilt 0.9 2.6 "Tilt"
+  sv hammer 0.9 2.8 "Hammer"
+  sv ward 1.2 3.0 "Ward"
+fi
 # Optional (FIRST=<take> FIRST_AT FIRST_LEN replaces the new-player shot): a boss bout uncut (BOSS=<take>, its entrance, telegraphed seal, your answer) and a second
 # boss's seal (BOSS_AT2), then a four-top brawl (BRAWL=<take>, BRAWL_AT). Wide takes, cropped in.
 BOSSSEG=; if [ -s "${BOSS:-}" ]; then BOSSSEG=1
   PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 067-boss "$BOSS" "${BOSS_AT:-9.8}" "${BOSS_LEN:-18.8}" "BOSSES CAST YOUR ULTIMATES" "Its ghost palm warns you  /  answer with your own"
+  [ -n "${BOSS_KO_AT:-}" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 0675-bossko "$BOSS" "$BOSS_KO_AT" "${BOSS_KO_LEN:-3.6}" "THROW THE BOSS OFF YOUR DESK" "Edge run  /  DESK KO"
+  [ -n "${BOSS_AT3:-}" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.1" clip 0685-boss3 "$BOSS" "$BOSS_AT3" "${BOSS_LEN3:-4.5}" "ONE SEAL PER BOSS" "Bastion: Anvil Strike"
   PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.1" clip 068-boss2 "$BOSS" "${BOSS_AT2:-105.8}" "${BOSS_LEN2:-5.1}" "ONE SEAL PER BOSS" "Tilt  /  Hammer  /  Anvil Strike"
 fi
 BRAWLSEG=; if [ -s "${BRAWL:-}" ]; then BRAWLSEG=1
@@ -82,8 +106,10 @@ for f in "$NEW"/arenas/*.mp4; do
   clip "arena-$n" "$f" 0.3 1.4 "EVERY ARENA PLAYS ITS OWN WAY" "Terraces  /  craters  /  ice  /  pits"
   parts+=("arena-$n")
 done
-clip 07-forge "$NEW/forge.mp4" 2.8 3.2 "FORGE IT BY HAND" "Drag a part onto your top / it fights differently"
-clip 08-workshop "$NEW/workshop.mp4" 7.6 3.8 "BUILD THE BATTLEGROUND" "Shape the floor / place pits and bumpers"
+clip 07-forge "$NEW/forge.mp4" "${FORGE_AT:-2.8}" "${FORGE_LEN:-3.2}" "FORGE IT BY HAND" "Drag a part onto your top / it fights differently"
+clip 08-workshop "$NEW/workshop.mp4" "${WORKSHOP_AT:-7.6}" "${WORKSHOP_LEN:-3.8}" "BUILD THE BATTLEGROUND" "Shape the floor / place pits and bumpers"
+# Optional: the home table's board (MORE/hub-map.mp4): the daily order and streak, then the Circuit Map.
+HUBSEG=; if [ -s "${MORE:-}/hub-map.mp4" ]; then HUBSEG=1; PRE="crop=iw*0.5:ih*0.5:iw*0.25:0" clip 084-hub "$MORE/hub-map.mp4" 1.0 6.4 "A REASON TO COME BACK" "Daily order  /  day streak  /  the Circuit Map  /  challenge codes"; fi
 # Filmed wide from a fixed pose: cropped in to the card and the arena.
 PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" clip 085-return "$NEW/match-won-cards.mp4" $(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$NEW/match-won-cards.mp4") - 2.8))") 2.6 "COME BACK TOMORROW" "The next move  /  a rival tomorrow  /  a streak that pays"
 # The end card rings the game's motif (D A F high-D), so the reel never ends in silence.
@@ -94,7 +120,7 @@ ffmpeg -y -loglevel error \
   -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p \
   -c:a aac -b:a 256k -ar 48000 -ac 2 -shortest "$TMP/09-end.mp4"
 
-segments=(00-hook ${ROOMSEG:+015-room} ${FIRST30:+005-first} 01-match 02-squeeze 03-flick 04-guard 05-rub 06-strike ${BOSSSEG:+067-boss} ${BOSSSEG:+068-boss2} ${BRAWLSEG:+069-brawl} ${COMFORTSEG:+065-comfort} ${COMFORTSEG:+066-bigtext} ${parts[@]+"${parts[@]}"} 07-forge 08-workshop 085-return 09-end)
+segments=(00-hook ${ROOMSEG:+015-room} ${FIRST30:+005-first} 01-match 02-squeeze 03-flick 04-guard 05-rub 06-strike ${movesegs[@]+"${movesegs[@]}"} ${sealsegs[@]+"${sealsegs[@]}"} ${BOSSSEG:+067-boss} ${BOSS_KO_AT:+0675-bossko} ${BOSSSEG:+068-boss2} ${BOSS_AT3:+0685-boss3} ${BRAWLSEG:+069-brawl} ${COMFORTSEG:+065-comfort} ${COMFORTSEG:+066-bigtext} ${parts[@]+"${parts[@]}"} 07-forge 08-workshop ${HUBSEG:+084-hub} 085-return 09-end)
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
 mkdir -p "$(dirname "$FINAL")"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" \
