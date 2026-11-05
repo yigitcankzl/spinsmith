@@ -88,6 +88,16 @@ export function maxRim(layout: ArenaLayout): number {
   for (let i = 0; i < 32; i++) m = Math.max(m, rimRadius(layout, (i / 32) * Math.PI * 2));
   return m;
 }
+/**
+ * The same arena opened out for a brawl of `tops` tops, so three or four have room to circle: the
+ * radius (and the floor's rise with it, keeping the bowl's slope) grows by a fifth per top past two,
+ * up to MAX_RADIUS. Pillars and pads sit in fractions of the radius, so they move out with it.
+ */
+export function brawlLayout(layout: ArenaLayout, tops: number): ArenaLayout {
+  const k = Math.min(MAX_RADIUS / layout.radius, 1 + 0.2 * Math.max(0, tops - 2));
+  return k <= 1 ? layout : { ...layout, radius: layout.radius * k, depth: layout.depth * k };
+}
+
 /** Oval arenas are this much shorter front to back than side to side. */
 const OVAL_RATIO = 0.78;
 /** Square arenas are a superellipse with this exponent (rounded corners). */

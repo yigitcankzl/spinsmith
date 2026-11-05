@@ -157,6 +157,8 @@ an arena. First to 4 heat wins a match.
   extra seats are other rivals' and named smiths' tops (in green and violet), every pair can
   collide, and the last top spinning takes the heat, scored on the foe that went out last. Bots
   raise a ramp inside their nearest foe every few seconds, aimed at the rim.
+  A brawl plays on its arena opened out (`brawlLayout`: radius and floor rise +20% per top past
+  two, so +40% for four, capped at the 0.26 maximum); the next duel gets the arena back at its size.
   Brawls are free play (no bout, order or challenge). `npm run check:sim-n` checks that the N-top
   step with two tops matches the duel step exactly, that crowded rounds always end and that they
   replay identically.

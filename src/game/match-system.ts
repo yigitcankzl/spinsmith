@@ -9,7 +9,7 @@ import { FONT, glass, GUIDE, SIGN_TILT, signTexture, TEXT, titleMesh } from './u
 import { FpsBook, fpsPhase, QUALITY_LEVELS, QualityGuard } from './quality.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
-import { DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
+import { brawlLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
 import { FORGE_GRIP_MAX_COS, forgeGripIntent, forgeGrips, HUD, hudCardZ, hudGrow, RESULT_BUTTONS } from './reach.js';
 import { ECHO_KEY, encodeEcho, splitCode } from './echo.js';
 import type { Echo } from './echo.js';
@@ -1013,6 +1013,8 @@ export class MatchSystem extends createSystem({
   /** The card hung over a top in the fight last frame. */
   private cardOverTop = false;
   private cardAt = new Vector3();
+  /** The arena's own layout while a brawl plays on it opened out (brawlLayout), else null. */
+  private brawlBase: ArenaLayout | null = null;
   /** A boss's seal this round: spent once, then its bar goes back to its named move. */
   private rivalSealUsed = false;
   private rivalSealing: { seal: Seal; x: number; z: number } | null = null;
@@ -2229,6 +2231,7 @@ export class MatchSystem extends createSystem({
 
   /** Switches to another arena layout (rebuilds the visuals). */
   setArena(layout: ArenaLayout) {
+    this.brawlBase = null;
     this.arena.reset(layout);
     this.arenaDirty = true;
     this.arenaView.build(layout);
@@ -2237,6 +2240,7 @@ export class MatchSystem extends createSystem({
 
   /** Shows a layout in the arena without changing the rotation (builder preview). */
   private showLayout(layout: ArenaLayout) {
+    this.brawlBase = null;
     this.arena.reset(layout);
     this.arenaDirty = true;
     this.arenaView.build(layout);
@@ -3473,6 +3477,15 @@ export class MatchSystem extends createSystem({
       }
       this.setupBrawl(seats - 2);
     }
+    // Three or four tops need room: a brawl plays on its arena opened out; the next duel gets it back.
+    const base = this.brawlBase ?? this.arena.layout;
+    if (this.extras.length) {
+      const wide = brawlLayout(base, this.extras.length + 2);
+      if (wide !== base && this.arena.layout === base) {
+        this.setArena(wide);
+        this.brawlBase = base;
+      }
+    } else if (this.brawlBase) this.setArena(this.brawlBase);
     this.progress.playedArena(this.arena.layout.name);
     // A built-in arena goes by name; a workshop arena goes whole (the guest does not have it).
     if (this.online?.role === 'host' && this.online.peer) this.online.launched(-1, this.arena.layout.name, ARENAS.some((a) => a.name === this.arena.layout.name) ? undefined : this.arena.layout);
