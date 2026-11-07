@@ -46,6 +46,7 @@ pids/
 .drive.json
 .drive-video
 artifacts/capture/
+artifacts/look/
 
 # Local agent and harness instructions are development-only. They stay on this machine but are
 # never part of a public source tree or a production artifact.
