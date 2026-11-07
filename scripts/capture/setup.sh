@@ -10,15 +10,7 @@ cli() {
 
 if [[ "${1:-}" == "restart" ]]; then
   echo "Restarting the managed GPU-backed IWER capture runtime..."
-  timeout 150 env -u WAYLAND_DISPLAY \
-    XDG_SESSION_TYPE=x11 \
-    IWSDK_GPU=vulkan \
-    __NV_PRIME_RENDER_OFFLOAD=1 \
-    __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 \
-    __GLX_VENDOR_LIBRARY_NAME=nvidia \
-    __VK_LAYER_NV_optimus=NVIDIA_only \
-    DRI_PRIME=1 \
-    npx @iwsdk/cli dev restart --open --allow-browser-automation >/dev/null
+  timeout 150 npx @iwsdk/cli dev restart --open --allow-browser-automation >/dev/null
   ready=false
   for _ in $(seq 1 60); do
     if cli dev status 2>/dev/null | grep -q '"browserCommandReady": true'; then

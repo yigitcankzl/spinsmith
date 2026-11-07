@@ -53,6 +53,5 @@ Run `npm run capture:room-gameplay` for two continuous room-backed gameplay take
 hands are disclosed in-frame; this is a presentation/regression view, not Quest footage.
 
 `npm run report:runtime-performance` records the active renderer, five-second FPS floor, draw calls,
-triangle count and supported recorder codecs. On this NVIDIA development machine the dev scripts
-request the patched IWSDK Vulkan path; `postinstall` reapplies that small compatibility patch after
-dependency installs and fails loudly if the upstream plugin layout changes.
+triangle count and supported recorder codecs. The capture scripts request IWSDK's hardware Vulkan
+path; always confirm the actual renderer with `scripts/capture/gpu-info.mjs` before a final take.

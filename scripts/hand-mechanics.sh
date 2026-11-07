@@ -44,15 +44,7 @@ trap cleanup EXIT
 
 if [ -z "${CAPTURE_USE_RUNNING:-}" ]; then
   echo "Starting the GPU-backed IWER hand-capture runtime..."
-  env -u WAYLAND_DISPLAY \
-    XDG_SESSION_TYPE=x11 \
-    IWSDK_GPU=vulkan \
-    __NV_PRIME_RENDER_OFFLOAD=1 \
-    __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 \
-    __GLX_VENDOR_LIBRARY_NAME=nvidia \
-    __VK_LAYER_NV_optimus=NVIDIA_only \
-    DRI_PRIME=1 \
-    npx @iwsdk/cli dev restart --headless --allow-browser-automation --timeout 60000 >/dev/null
+  npx @iwsdk/cli dev restart --headless --allow-browser-automation --timeout 60000 >/dev/null
   CAPTURE_OWNS_SERVER=1
 fi
 
