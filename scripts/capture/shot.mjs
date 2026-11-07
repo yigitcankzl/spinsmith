@@ -193,6 +193,7 @@ export default async function run({ page, frame, cdp }) {
       const scene = game.world?.scene ?? game.scene;
       game.__captureTable?.traverse?.((object) => {
         object.geometry?.dispose?.();
+        object.material?.map?.dispose?.();
         object.material?.dispose?.();
       });
       game.__captureTable?.removeFromParent();
@@ -255,23 +256,51 @@ export default async function run({ page, frame, cdp }) {
         result.tableFromPlane = { w: +w.toFixed(3), d: +d.toFixed(3), x: +cx.toFixed(3), z: +cz.toFixed(3), y: +topY.toFixed(3) };
       }
       const table = new game.root.constructor();
-      const base = new MeshConstructor(
-        new BoxGeometryConstructor(w + 0.03, 0.045, d + 0.03, 1, 1, 1),
-        new StandardMaterialConstructor({ color: 0x18120f, metalness: 0.04, roughness: 0.78 }),
-      );
-      const top = new MeshConstructor(
-        new BoxGeometryConstructor(w, 0.014, d, 1, 1, 1),
-        new StandardMaterialConstructor({ color: 0xffffff, map: wood, metalness: 0.04, roughness: 0.62 }),
-      );
-      base.position.y = topY - 0.0365;
-      top.position.y = topY - 0.007;
-      table.add(base, top);
+      const woodMaterial = new StandardMaterialConstructor({ color: 0xffffff, map: wood, metalness: 0.02, roughness: 0.58 });
+      const frameMaterial = new StandardMaterialConstructor({ color: 0x3b2419, metalness: 0.02, roughness: 0.78 });
+      const top = new MeshConstructor(new BoxGeometryConstructor(w, 0.032, d, 1, 1, 1), woodMaterial);
+      top.name = 'capture-table-top';
+      top.position.y = topY - 0.016;
+      const lip = new MeshConstructor(new BoxGeometryConstructor(w - 0.018, 0.018, d - 0.018, 1, 1, 1), frameMaterial);
+      lip.name = 'capture-table-lip';
+      lip.position.y = topY - 0.041;
+      table.add(top, lip);
+
+      // A complete dining-table silhouette keeps the synthetic surface from reading as a floating
+      // board. The detected plane still owns the exact playable top; the frame stays safely below it.
+      const apronY = topY - 0.082;
+      const apronLong = new BoxGeometryConstructor(Math.max(0.2, w - 0.12), 0.075, 0.035, 1, 1, 1);
+      const apronShort = new BoxGeometryConstructor(0.035, 0.075, Math.max(0.2, d - 0.12), 1, 1, 1);
+      for (const z of [-d / 2 + 0.055, d / 2 - 0.055]) {
+        const rail = new MeshConstructor(apronLong, frameMaterial);
+        rail.name = 'capture-table-apron-long';
+        rail.position.set(0, apronY, z);
+        table.add(rail);
+      }
+      for (const x of [-w / 2 + 0.055, w / 2 - 0.055]) {
+        const rail = new MeshConstructor(apronShort, frameMaterial);
+        rail.name = 'capture-table-apron-short';
+        rail.position.set(x, apronY, 0);
+        table.add(rail);
+      }
+      const legTop = topY - 0.06;
+      const floorY = 0.015;
+      const legHeight = Math.max(0.3, legTop - floorY);
+      const legGeometry = new BoxGeometryConstructor(0.058, legHeight, 0.058, 1, 1, 1);
+      for (const x of [-w / 2 + 0.09, w / 2 - 0.09]) {
+        for (const z of [-d / 2 + 0.09, d / 2 - 0.09]) {
+          const leg = new MeshConstructor(legGeometry, frameMaterial);
+          leg.name = 'capture-table-leg';
+          leg.position.set(x, floorY + legHeight / 2, z);
+          table.add(leg);
+        }
+      }
       table.name = 'capture-dev-table';
       table.position.set(cx, 0, cz);
       table.rotation.y = yaw;
       scene.add(table);
       game.__captureTable = table;
-      result.devTable = true;
+      result.devTable = { parts: table.children.length, legs: 4, topY: +topY.toFixed(3), floorY };
     }
 
     if (p.pose === 'arena-forge') {

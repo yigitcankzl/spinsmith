@@ -17,9 +17,11 @@ loads IWER's `office_small` scene capture, whose `table`-labelled XRPlane (1.60 
 `tables()` / `tableShape()` path a Quest uses. DESK KO, the DESK GUARD rival, the real-edge danger
 arcs and desk trophies therefore run against a detected plane in captures (check the log for
 `[MATCH] arena on table` and `[MATCH] fit ...` lines without `(no table)`). The head must be seated
-(y <= 1.49; `setup.sh` uses 1.45). The wooden box drawn by `shot.mjs` `devTable` is still only a
-visual stand-in under the arena, because the capture hides IWER's flat-shaded room; the game logic
-never reads it. Both the plane and the room are synthetic, so footage stays labelled as IWER.
+(y <= 1.49; `setup.sh` uses 1.45). The complete dining-table stand-in drawn by `shot.mjs`
+`devTable`—wooden top, apron and four floor-contacting legs—is still presentation-only, because the
+capture hides IWER's flat-shaded room; the game logic never reads it. Its top matches the detected
+plane's exact outline and height. Both the plane and the room are synthetic, so footage stays
+labelled as IWER.
 
 This rig is for presentation and regression comparison. It is not evidence of
 Quest performance, real passthrough, or physical-device hand tracking.
