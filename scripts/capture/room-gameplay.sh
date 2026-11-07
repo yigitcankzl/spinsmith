@@ -67,7 +67,7 @@ label() {
   local input=$1 output=$2 title=$3 subtitle=$4
   ffmpeg -y -loglevel error -i "$input" -f lavfi -i anullsrc=r=48000:cl=stereo \
     -map 0:v:0 -map 1:a:0 -shortest \
-    -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${WIDTH}:${HEIGHT},fps=${FPS},drawtext=fontfile=$FONT:text='$title':fontcolor=0xff9b42:fontsize=46:x=42:y=34:box=1:boxcolor=0x101318@0.72:boxborderw=14,drawtext=fontfile=$FONT:text='$subtitle':fontcolor=white:fontsize=27:x=45:y=106:box=1:boxcolor=0x101318@0.58:boxborderw=9,drawtext=fontfile=$FONT:text='IWER EMULATOR  -  CC0 360 ROOM  -  QUEST FOOTAGE DEGIL':fontcolor=white@0.58:fontsize=20:x=w-text_w-26:y=h-38" \
+    -vf "scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop=${WIDTH}:${HEIGHT},fps=${FPS},drawtext=fontfile=$FONT:text='$title':fontcolor=0xff9b42:fontsize=46:x=42:y=34:box=1:boxcolor=0x101318@0.72:boxborderw=14,drawtext=fontfile=$FONT:text='$subtitle':fontcolor=white:fontsize=27:x=45:y=106:box=1:boxcolor=0x101318@0.58:boxborderw=9,drawtext=fontfile=$FONT:text='IWER EMULATOR  -  SYNTHETIC 360 ROOM  -  QUEST FOOTAGE DEGIL':fontcolor=white@0.58:fontsize=20:x=w-text_w-26:y=h-38" \
     -c:v h264_nvenc -preset p6 -tune hq -rc vbr -cq 14 -b:v 0 -pix_fmt yuv420p -r "$FPS" \
     -c:a aac -b:a 192k -ar 48000 -ac 2 -movflags +faststart "$output"
 }

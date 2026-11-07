@@ -7,9 +7,10 @@ apply a repeatable seated camera, and save a clean 1920×1080 frame under
 The capture setup mutes game audio only for that automated IWER session. It does not change the
 player's saved comfort mode or disable sound in production.
 
-The capture always labels itself as emulator footage. The bundled background is
-**Comfy Cafe** by Sergej Majboroda from Poly Haven, licensed CC0:
-https://polyhaven.com/a/comfy_cafe
+The capture always labels itself as emulator footage. `empty-room-2k.jpg` removes the nearby cafe
+furniture so the presentation table sits in one clear floor area instead of intersecting a second
+table or booth. It is an AI-edited derivative of **Comfy Cafe** by Sergej Majboroda from Poly Haven,
+licensed CC0: https://polyhaven.com/a/comfy_cafe
 
 Captures get their table from the emulator's room, not from the capture layer: the dev server
 loads IWER's `office_small` scene capture, whose `table`-labelled XRPlane (1.60 m x 0.75 m, top at
@@ -51,7 +52,7 @@ The script relabels and rejoins all fourteen files after replacing those capture
 is still available when every clip from a given number onward should be refreshed.
 
 Run `npm run capture:room-gameplay` for two continuous room-backed gameplay takes and their joined
-1080p60 file under `~/Desktop/spinsmith-videos/room-gameplay/`. The synthetic CC0 room and emulated
+1080p60 file under `~/Desktop/spinsmith-videos/room-gameplay/`. The synthetic 360 room and emulated
 hands are disclosed in-frame; this is a presentation/regression view, not Quest footage.
 
 Run `npm run capture:first-match` for one uninterrupted, sounded current-build first match under

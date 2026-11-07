@@ -67,7 +67,7 @@ export default async function run({ page, frame, cdp }) {
       document.querySelector('#spinsmith-capture-disclosure')?.remove();
       const badge = document.createElement('div');
       badge.id = 'spinsmith-capture-disclosure';
-      badge.textContent = 'IWER EMULATOR · CC0 360° ENVIRONMENT · NO HEADSET FOOTAGE';
+      badge.textContent = 'IWER EMULATOR · SYNTHETIC 360° ENVIRONMENT · NO HEADSET FOOTAGE';
       document.body.appendChild(badge);
     });
   }

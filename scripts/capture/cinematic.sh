@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUTPUT="${1:-$ROOT/artifacts/capture/spinsmith-cinematic.png}"
-BACKGROUND="$ROOT/scripts/capture/assets/comfy-cafe-2k.jpg"
+BACKGROUND="$ROOT/scripts/capture/assets/empty-room-2k.jpg"
 PARAMS="$(mktemp --suffix=.spinsmith-capture.json)"
 trap 'rm -f "$PARAMS"' EXIT
 
