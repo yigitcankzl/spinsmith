@@ -17,6 +17,7 @@
     "preview": "vite preview",
     "check:sim": "node scripts/sim-check.ts",
     "check:sim-n": "node scripts/sim-n-check.ts",
+    "check:xr-entry": "npx @iwsdk/cli browser run scripts/check-xr-entry.mjs --timeout 30000",
     "check:net": "node scripts/net-check.ts",
     "check:desk-ko": "bash scripts/check-desk-ko-hand.sh",
     "check:room-matrix": "bash scripts/emu.sh enter && npx @iwsdk/cli browser run scripts/capture/place.mjs --timeout 60000 >/dev/null && ROOM_CASES=rooms npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=variants npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000 && ROOM_CASES=harder npx @iwsdk/cli browser run scripts/check-room-matrix.mjs --timeout 105000",

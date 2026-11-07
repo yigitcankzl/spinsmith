@@ -84,6 +84,11 @@ loadFonts()
         enter.textContent = reloadRequired ? 'RELOAD SPINSMITH' : 'TRY AGAIN';
       }
     };
+    const resetLaunchButton = () => {
+      if (!enter || reloadRequired) return;
+      enter.disabled = false;
+      enter.textContent = preparedDemo ? 'ENTER SHOWCASE' : 'ENTER';
+    };
     const launchXR = async () => {
       if (reloadRequired) {
         location.reload();
@@ -102,16 +107,17 @@ loadFonts()
         }
         // The click is the browser-approved gesture for WebAudio; do this before XR takes focus.
         await unlockAudio();
-        await Promise.resolve(world.launchXR());
+        world.launchXR();
+        // IWSDK reports requestSession failures internally; wait for its request to settle so the
+        // landing page never stays stuck on ENTERING… after a denied permission.
+        while (world.sessionRequestPending) await new Promise((resolve) => setTimeout(resolve, 50));
+        if (!world.session) failLaunch('Mixed reality could not start. Check browser permission, then try again.');
       } catch (error) {
         failLaunch('Mixed reality could not start. Check browser permission, then try again.', error);
       }
     };
     // Ready: the button wakes up (it waits while the fonts and the world load).
-    if (enter) {
-      enter.disabled = false;
-      enter.textContent = preparedDemo ? 'ENTER SHOWCASE' : 'ENTER';
-    }
+    resetLaunchButton();
     enter?.addEventListener('click', () => void launchXR());
     if (diagnosticsMode && diagnostics && copyDiagnostics) {
       diagnostics.classList.add('visible');
@@ -133,7 +139,10 @@ loadFonts()
         if (v === VisibilityState.NonImmersive) void refreshDiagnostics();
       });
     }
-    world.visibilityState.subscribe((v) => landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive));
+    world.visibilityState.subscribe((v) => {
+      landing?.classList.toggle('hidden', v !== VisibilityState.NonImmersive);
+      if (v === VisibilityState.NonImmersive && !world.sessionRequestPending) resetLaunchButton();
+    });
     // Installed from the store (a standalone PWA): straight into the game, no 2D page (Meta's PWA
     // rule; opening the app's icon counts as the user's gesture). In a browser tab, ENTER as usual.
     if (matchMedia('(display-mode: standalone)').matches) {
