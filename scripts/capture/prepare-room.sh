@@ -12,12 +12,9 @@ printf '%s\n' \
   '  "screenshot": false,' \
   '  "width": 1920,' \
   '  "height": 1080,' \
-  "  \"background\": \"$ROOT/scripts/capture/assets/empty-room-2k.jpg\"," \
-  '  "backgroundYaw": 0,' \
-  '  "backgroundBlur": 0,' \
-  '  "backgroundIntensity": 0.9,' \
   '  "skinHands": true,' \
   '  "devTable": true,' \
+  '  "devRoom": true,' \
   '  "disclosure": false,' \
   '  "settleFrames": 4' \
   '}' >"$PARAMS"

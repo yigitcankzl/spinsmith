@@ -13,8 +13,8 @@ WIDTH=1920
 HEIGHT=1080
 FPS=60
 FONT=$(realpath public/fonts/Rajdhani-Bold.woff2)
-# The disclosure burned into every shot (the room shots use the synthetic 360 backdrop from prepare-room.sh).
-LABEL=${LABEL:-IWER EMULATOR  /  SYNTHETIC 360 ROOM  /  NOT HEADSET FOOTAGE}
+# The disclosure burned into every shot (the room shots use the synthetic 3D set from prepare-room.sh).
+LABEL=${LABEL:-IWER EMULATOR  /  SYNTHETIC 3D ROOM  /  NOT HEADSET FOOTAGE}
 
 for file in "$NEW/desk-ko-first-side.mp4" "$NEW/close-squeeze.mp4" "$NEW/first-match.mp4" "$NEW/flick.mp4" "$NEW/seal-stamp.mp4" \
   "$NEW/close-crossguard.mp4" "$NEW/close-rub.mp4" "$NEW/forge.mp4" "$NEW/workshop.mp4" "$NEW/match-won-cards.mp4"; do

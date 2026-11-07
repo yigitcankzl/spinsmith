@@ -67,7 +67,7 @@ export default async function run({ page, frame, cdp }) {
       document.querySelector('#spinsmith-capture-disclosure')?.remove();
       const badge = document.createElement('div');
       badge.id = 'spinsmith-capture-disclosure';
-      badge.textContent = 'IWER EMULATOR · SYNTHETIC 360° ENVIRONMENT · NO HEADSET FOOTAGE';
+      badge.textContent = 'IWER EMULATOR · SYNTHETIC 3D ROOM · NO HEADSET FOOTAGE';
       document.body.appendChild(badge);
     });
   }
@@ -96,6 +96,8 @@ export default async function run({ page, frame, cdp }) {
       sem.scene.children.forEach((child) => {
         if (child.type === 'GridHelper') child.visible = false;
       });
+
+      if (p.devRoom && !backgroundData) sem.scene.background = null;
 
       if (backgroundData) {
         const image = new Image();
@@ -197,6 +199,12 @@ export default async function run({ page, frame, cdp }) {
         object.material?.dispose?.();
       });
       game.__captureTable?.removeFromParent();
+      game.__captureRoom?.traverse?.((object) => {
+        object.geometry?.dispose?.();
+        object.material?.map?.dispose?.();
+        object.material?.dispose?.();
+      });
+      game.__captureRoom?.removeFromParent();
       let MeshConstructor = null;
       let BoxGeometryConstructor = null;
       let StandardMaterialConstructor = null;
@@ -301,6 +309,82 @@ export default async function run({ page, frame, cdp }) {
       scene.add(table);
       game.__captureTable = table;
       result.devTable = { parts: table.children.length, legs: 4, topY: +topY.toFixed(3), floorY };
+
+      if (p.devRoom) {
+        const room = new game.root.constructor();
+        room.name = 'capture-room';
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = floorCanvas.height = 512;
+        const floorContext = floorCanvas.getContext('2d');
+        floorContext.fillStyle = '#a98868';
+        floorContext.fillRect(0, 0, 512, 512);
+        for (let row = 0; row < 32; row += 1) {
+          const y = row * 16;
+          floorContext.fillStyle = row % 3 === 0 ? '#b49372' : row % 3 === 1 ? '#9f7c5f' : '#aa8768';
+          floorContext.fillRect(0, y, 512, 15);
+          floorContext.strokeStyle = 'rgba(48,29,18,.34)';
+          floorContext.lineWidth = 2;
+          floorContext.beginPath();
+          floorContext.moveTo(0, y);
+          floorContext.lineTo(512, y);
+          floorContext.stroke();
+          const offset = row % 2 ? 52 : 0;
+          for (let x = offset; x < 512; x += 104) {
+            floorContext.beginPath();
+            floorContext.moveTo(x, y);
+            floorContext.lineTo(x, y + 15);
+            floorContext.stroke();
+          }
+          for (let grain = 0; grain < 2; grain += 1) {
+            floorContext.strokeStyle = `rgba(255,225,188,${0.025 + grain * 0.008})`;
+            floorContext.beginPath();
+            floorContext.moveTo(0, y + 5 + grain * 5);
+            floorContext.bezierCurveTo(140, y + 3 + grain * 5, 350, y + 8 + grain * 5, 512, y + 5 + grain * 5);
+            floorContext.stroke();
+          }
+        }
+        const floorTexture = new TextureConstructor(floorCanvas);
+        floorTexture.colorSpace = 'srgb';
+        floorTexture.needsUpdate = true;
+        const floorMaterial = new StandardMaterialConstructor({ color: 0xffffff, map: floorTexture, metalness: 0, roughness: 0.82 });
+        const wallMaterial = new StandardMaterialConstructor({ color: 0xd8d2c8, metalness: 0, roughness: 0.94 });
+        const trimMaterial = new StandardMaterialConstructor({ color: 0xeee9df, metalness: 0, roughness: 0.82 });
+        const rugMaterial = new StandardMaterialConstructor({ color: 0x81786e, metalness: 0, roughness: 1 });
+        const rugEdgeMaterial = new StandardMaterialConstructor({ color: 0xb0a69a, metalness: 0, roughness: 1 });
+        const addBox = (name, sx, sy, sz, x, y, z, material, castShadow = false) => {
+          const mesh = new MeshConstructor(new BoxGeometryConstructor(sx, sy, sz, 1, 1, 1), material);
+          mesh.name = name;
+          mesh.position.set(x, y, z);
+          mesh.castShadow = castShadow;
+          mesh.receiveShadow = true;
+          room.add(mesh);
+          return mesh;
+        };
+
+        // All presentation geometry shares the XR camera and world scale. Unlike a 360 photo,
+        // the floor, walls, rug and table therefore keep correct perspective as the head moves.
+        addBox('capture-room-floor', 6.2, 0.04, 6.4, 0, floorY - 0.025, -1.05, floorMaterial);
+        addBox('capture-room-back-wall', 6.2, 2.8, 0.08, 0, 1.4, -3.55, wallMaterial);
+        addBox('capture-room-left-wall', 0.08, 2.8, 6.4, -3.05, 1.4, -1.05, wallMaterial);
+        addBox('capture-room-right-wall', 0.08, 2.8, 6.4, 3.05, 1.4, -1.05, wallMaterial);
+        addBox('capture-room-back-trim', 6.05, 0.11, 0.055, 0, 0.07, -3.49, trimMaterial);
+        addBox('capture-room-left-trim', 0.055, 0.11, 6.2, -2.99, 0.07, -1.05, trimMaterial);
+        addBox('capture-room-right-trim', 0.055, 0.11, 6.2, 2.99, 0.07, -1.05, trimMaterial);
+        const rugW = 2.12, rugD = 1.4;
+        addBox('capture-room-rug', rugW, 0.012, rugD, cx, floorY + 0.006, cz, rugMaterial);
+        addBox('capture-room-rug-front', rugW, 0.006, 0.025, cx, floorY + 0.014, cz + rugD / 2, rugEdgeMaterial);
+        addBox('capture-room-rug-back', rugW, 0.006, 0.025, cx, floorY + 0.014, cz - rugD / 2, rugEdgeMaterial);
+        addBox('capture-room-rug-left', 0.025, 0.006, rugD, cx - rugW / 2, floorY + 0.014, cz, rugEdgeMaterial);
+        addBox('capture-room-rug-right', 0.025, 0.006, rugD, cx + rugW / 2, floorY + 0.014, cz, rugEdgeMaterial);
+
+        for (const object of table.children) {
+          object.castShadow = true;
+          object.receiveShadow = true;
+        }
+        scene.add(room);
+        game.__captureRoom = room;
+        result.devRoom = { parts: room.children.length, floorY };
+      }
     }
 
     if (p.pose === 'arena-forge') {

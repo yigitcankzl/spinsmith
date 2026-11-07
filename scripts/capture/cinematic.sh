@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUTPUT="${1:-$ROOT/artifacts/capture/spinsmith-cinematic.png}"
-BACKGROUND="$ROOT/scripts/capture/assets/empty-room-2k.jpg"
 PARAMS="$(mktemp --suffix=.spinsmith-capture.json)"
 trap 'rm -f "$PARAMS"' EXIT
 
@@ -15,12 +14,9 @@ cat >"$PARAMS" <<JSON
   "output": "$OUTPUT",
   "width": 1920,
   "height": 1080,
-  "background": "$BACKGROUND",
-  "backgroundYaw": 0,
-  "backgroundBlur": 0,
-  "backgroundIntensity": 0.9,
   "skinHands": true,
   "devTable": true,
+  "devRoom": true,
   "pose": "${SPINSMITH_CAPTURE_POSE:-}",
   "disclosure": true,
   "settleFrames": 6
