@@ -2,16 +2,16 @@
  * Headless estimate of a new player's first five minutes: match 1 (bout 1-1, Drifter in the Forge
  * Bowl, your Striker against its Halo) played by the HUMAN-lag shaper of shaping-report.ts, with
  * the first match's lesson rules: every finish scores 1 heat (first to MATCH_HEAT), each round's
- * rim shield (6 s, the forge round 10 s) holds the rival only until your first shape, ramps from
- * round 1 and the Anvil Strike from round 3 (its bar starting at 0.8). The staged DESK KO and the
- * two-hand Arena Forge are not in the headless sim, so round 2 is played with ramps only.
+ * rim shield (6 s, the forge round 10 s) holds the rival only until your first shape. The staged
+ * DESK KO and the two-hand Arena Forge are not in the headless sim, so round 2 is played with
+ * ramps only. Strike and Flick are deliberately absent: they unlock in later matches.
  * Off-fight time is added from the game's own constants and a seated player's gesture times.
  * Run: npm run report:first-five   (FIRST_FIVE_MATCHES=400 for more samples)
  */
 import { ARENAS } from '../src/game/arenas.ts';
 import { PRESETS, RIVALS, specFromBuild } from '../src/game/parts.ts';
-import { HUMAN, humanRamp, humanStrike } from '../src/game/shaping-report.ts';
-import { ShapingCharges, StrikeBar, behindOn } from '../src/game/shaping.ts';
+import { HUMAN, humanRamp } from '../src/game/shaping-report.ts';
+import { ShapingCharges } from '../src/game/shaping.ts';
 import { Arena, LAUNCH_TILT, MATCH_HEAT, STEP, TUNING, Top, launchSpeed, launchSpin, step, verdict } from '../src/game/sim.ts';
 
 const MATCHES = Number(process.env.FIRST_FIVE_MATCHES ?? 200);
@@ -35,11 +35,9 @@ let seed = 11;
 const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
 
 function round(n: number) {
-  const policy = n >= 3 ? humanStrike(humanRamp(HUMAN.reaction + HUMAN.gesture + HUMAN.tracking)) : humanRamp(HUMAN.reaction + HUMAN.gesture + HUMAN.tracking);
+  const policy = humanRamp(HUMAN.reaction + HUMAN.gesture + HUMAN.tracking);
   const arena = new Arena(layout);
   const charges = new ShapingCharges();
-  const bar = new StrikeBar();
-  if (n >= 3) bar.value = 0.8;
   const a = new Top(mineSpec);
   const b = new Top(rivalSpec);
   const spawn = layout.radius * 0.72;
@@ -54,19 +52,16 @@ function round(n: number) {
   let shaped = false;
   while (verdict(a, b, t) === 0) {
     const before = arena.shapes.length;
-    policy(arena, a, b, t, charges, rnd, 'me', bar);
+    policy(arena, a, b, t, charges, rnd, 'me');
     // recordIntervention: the player's first move drops the rival's lesson shield.
-    if (!shaped && (arena.shapes.length > before || bar.value === 0)) {
+    if (!shaped && arena.shapes.length > before) {
       shaped = true;
       b.shieldUntil = 0;
     }
     charges.update(STEP);
-    const lagging = t >= TUNING.grace && behindOn(a, b);
-    bar.update(STEP, lagging);
     const clash = step(arena, a, b);
     if (clash) {
       if (clash.shapeOwner?.startsWith('me')) charges.clash(clash.strength, t);
-      bar.clash(clash.strength, t, lagging);
     }
     t += STEP;
   }
