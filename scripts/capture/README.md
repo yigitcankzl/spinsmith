@@ -52,6 +52,11 @@ Run `npm run capture:room-gameplay` for two continuous room-backed gameplay take
 1080p60 file under `~/Desktop/spinsmith-videos/room-gameplay/`. The synthetic CC0 room and emulated
 hands are disclosed in-frame; this is a presentation/regression view, not Quest footage.
 
+Run `npm run capture:first-match` for one uninterrupted, sounded current-build first match under
+`~/Desktop/spinsmith-videos/current-build/first-match.raw`. It uses the normal carry, rip, ramp and
+two-hand forge paths, restores every `spinsmith.*` save key even when interrupted, and is picked up
+automatically by `npm run capture:hero`. The final hero always adds the IWER disclosure in-frame.
+
 `npm run report:runtime-performance` records the active renderer, five-second FPS floor, draw calls,
 triangle count and supported recorder codecs. The capture scripts request IWSDK's hardware Vulkan
 path; always confirm the actual renderer with `scripts/capture/gpu-info.mjs` before a final take.

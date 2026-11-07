@@ -122,7 +122,9 @@ Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-hero-1080p60.mp4` (1:
 FOOTAGE`. The capture uses a CC0 360 cafe backdrop, an emulator table plane and synthetic hands.
 `scripts/reel-hero.sh` rebuilds the cut. The persistence clip uses a temporary showcase save and
 restores the player's storage afterwards. Still to do: replace the older source takes with a full
-current-build capture and add physical-headset footage if a Quest becomes available.
+current-build capture. The uninterrupted opening exchange is from the 2026-11-07 build; specialised
+boss, brawl and workshop inserts still use earlier IWER takes. Physical-headset footage remains
+pending if a Quest becomes available.
 
 ## How it was tested (card for the Devpost gallery)
 

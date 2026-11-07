@@ -39,6 +39,7 @@
     "capture:hero": "scripts/reel-hero.sh",
     "capture:hands": "scripts/hand-mechanics.sh",
     "capture:room-gameplay": "scripts/capture/room-gameplay.sh",
+    "capture:first-match": "LONG_FIRST_ONLY=1 scripts/capture/long-first-session.sh \"$HOME/Desktop/spinsmith-videos/current-build/first-match.raw\"",
     "capture:persistence": "scripts/capture/persistence-proof.sh",
     "view:clean": "npx @iwsdk/cli browser run scripts/capture/clean-view.mjs --timeout 30000",
     "capture:cinematic": "scripts/capture/cinematic.sh",
