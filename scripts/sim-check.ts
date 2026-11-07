@@ -863,6 +863,14 @@ TUNING.grace = 0;
   assert.deepEqual(later, first, 'the order is kept for the day');
   assert.deepEqual(new Progress(st).orderFor('2026-10-07', () => dailyOrder('2026-10-07', { ...ctx, rivals: ['Leech'] })), first);
   assert.notDeepEqual(back.orderFor('2026-10-08', () => dailyOrder('2026-10-08', ctx)).date, first.date);
+  const deskOrder = back.orderFor('2026-10-09', () => ({ date: '2026-10-09', rival: 'Rim Raider', arena: 'Forge Bowl', goal: 'deskKO', text: 'desk' }));
+  assert.equal(deskOrder.goal, 'deskKO');
+  const roomChanged = new Progress(st).orderFor(
+    '2026-10-09',
+    () => dailyOrder('2026-10-09', { ...ctx, table: false }),
+    (order) => order.goal !== 'deskKO',
+  );
+  assert.notEqual(roomChanged.goal, 'deskKO', 'an unfinished real-desk order is replaced after moving to a room without a table');
 
   // A lost match names one evidenced cause, in priority order, and one concrete correction.
   const evidence = { openingOutcome: '', zone: 'edge' as const, rip: 0.9, finish: 'over' as const, ownBackfire: null, rivalMove: null, shaped: true };

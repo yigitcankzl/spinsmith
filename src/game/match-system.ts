@@ -2353,7 +2353,7 @@ export class MatchSystem extends createSystem({
     this.orderMatch = false;
     const today = localDate(new Date());
     const ctx = this.orderContext();
-    this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
+    this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx), (order) => order.goal !== 'deskKO' || !!ctx.table);
     // Tomorrow's room can change which order is playable, so promise a fresh order, not a false target.
     const tomorrow = null;
     this.hub.show(this.myBuild, this.progress, this.order, tomorrow, this.nextRival ? `${this.nextRival.name} in ${this.arenas[this.arenaIndex].name}${this.boutText(this.nextRival.name)}` : null);

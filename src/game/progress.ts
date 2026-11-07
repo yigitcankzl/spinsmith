@@ -452,9 +452,9 @@ export class Progress {
     return this.orders.size;
   }
 
-  /** The order for a date: the one already made that day, else a new one from `make`. */
-  orderFor(date: string, make: () => Order): Order {
-    if (this.order?.date !== date) {
+  /** The order for a date: keep it unless an unfinished room-dependent goal became unusable. */
+  orderFor(date: string, make: () => Order, usable: (order: Order) => boolean = () => true): Order {
+    if (this.order?.date !== date || (!this.orders.has(date) && !usable(this.order))) {
       this.order = make();
       this.save();
     }
