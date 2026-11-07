@@ -52,8 +52,8 @@ export interface BoardState {
   featsOf: number;
   /** Your top's challenge code (a friend opens the game with it to fight your top). */
   code: string;
-  /** One compact persistent-history line that makes returning progress visible at a glance. */
-  history: string;
+  /** The newest move learned and how to perform it. */
+  lastMove: string;
   /** Days in a row with a finished match (come-back.ts dayStreak), and whether today counts yet. */
   streak: number;
   playedToday: boolean;
@@ -200,6 +200,7 @@ export class SmithBoard {
     const glow = s.nextGlow ? ` · NEXT EMBLEM GLOW AT ${s.nextGlow}` : '';
     const ledger = hover ? `${s.stamps} STAMP${s.stamps === 1 ? '' : 'S'}${glow} · ${s.feats} OF ${s.featsOf} FEATS` : ledgerLine(s.stamps, s.feats, s.featsOf);
     engrave(g, ledger, W / 2, 362, STEEL, W - 120);
+    engrave(g, `LAST MOVE · ${s.lastMove}`.toUpperCase(), W / 2, 398, TEXT_DIM, W - 120);
     // Your top as a short code for a friend's game: shown here, on request, never as an address.
     const label = 'CHALLENGE CODE';
     setType(g, 'caption', this.k, DIST);
@@ -209,9 +210,9 @@ export class SmithBoard {
     const cw = Math.min(g.measureText(s.code).width, W - 160 - lw - 32);
     const x = (W - lw - 32 - cw) / 2;
     g.textAlign = 'left';
-    engrave(g, s.code, x + lw + 32, 424, TEXT, cw);
+    engrave(g, s.code, x + lw + 32, 448, TEXT, cw);
     setType(g, 'caption', this.k, DIST);
-    engrave(g, label, x, 428, TEXT_DIM);
+    engrave(g, label, x, 452, TEXT_DIM);
     g.textAlign = 'center';
   }
 

@@ -7,8 +7,8 @@ import type { ArenaLayout } from './layout.js';
 import { Top } from './sim.js';
 import type { Seal } from './sim.js';
 import { itemKey, itemModel, ROWS, sealModel } from './forge.js';
-import { MARK, VERB_CARD, verbReleasedAt } from './progress.js';
-import type { ReleasedVerb } from './progress.js';
+import { MARK, MOVE_CARD, moveTaughtAt } from './progress.js';
+import type { TaughtMove } from './progress.js';
 import { localDate, orderMet } from './orders.js';
 import { comeBackCard } from './come-back.js';
 import { circuitOf, CORES, EMBLEM_COLORS, EMBLEM_NAMES, RINGS, RIVALS, SEAL_BLURBS, SEAL_NAMES, roleOf, specFromBuild, TIPS } from './parts.js';
@@ -25,7 +25,7 @@ function revealText(key: string): string {
   const [kind, id] = key.split(':');
   if (kind === 'rival') return `NEW RIVAL!\n${id} · ${RIVALS.find((r) => r.name === id)?.style ?? ''}`;
   if (kind === 'stamp') return `ORDER DONE!\nStamp ${id} in your ledger`;
-  if (kind === 'move') return `NEW MOVE: ${VERB_CARD[id as ReleasedVerb][0]}\n${VERB_CARD[id as ReleasedVerb][1]}`;
+  if (kind === 'move') return `NEW MOVE: ${MOVE_CARD[id as TaughtMove][0]}\n${MOVE_CARD[id as TaughtMove][1]}`;
   return `NEW: ${unlockName(key)}\n${unlockBlurb(key)}`;
 }
 
@@ -106,8 +106,8 @@ export class ResultRewards {
   private comeBackText() {
     const today = localDate(new Date());
     const p = this.m.progress;
-    const next = verbReleasedAt(p.matches + 1);
-    const card = comeBackCard(p.streak(today), null, nextBout(p.bouts, p.matches % 2 === 0, p.matches), next ? VERB_CARD[next][0] : undefined);
+    const next = moveTaughtAt(p.matches + 1);
+    const card = comeBackCard(p.streak(today), null, nextBout(p.bouts, p.matches % 2 === 0, p.matches), next ? MOVE_CARD[next][0] : undefined);
     // A won match's last card still says it was won: the score heads it on day one (one short line).
     const log = this.m.matchLog;
     return log.won && card.startsWith('COME BACK TOMORROW') ? card.replace('COME BACK TOMORROW', `WON ${log.score.replace(/ /g, '')} · COME BACK`) : card;
@@ -137,8 +137,8 @@ export class ResultRewards {
     // The first session's own part goes first: the forge calls for it next.
     this.reveals.sort((a, b) => Number(b === 'tip:spur') - Number(a === 'tip:spur'));
     // One new hand verb per completed match: its card leads the reveals (after the first part).
-    const verb = matchOver && !this.m.demo ? verbReleasedAt(this.m.progress.matches) : undefined;
-    if (verb) this.reveals.splice(this.reveals[0] === 'tip:spur' ? 1 : 0, 0, `move:${verb}`);
+    const move = matchOver && !this.m.demo ? moveTaughtAt(this.m.progress.matches) : undefined;
+    if (move) this.reveals.splice(this.reveals[0] === 'tip:spur' ? 1 : 0, 0, `move:${move}`);
     // Online matches give XP for your own result, but no marks, bouts, orders or champions.
     if (!this.m.demo && !this.m.online) this.trackComeBack(won, loser, matchOver, matchWon);
     // The forge is earned only after the player has actually raised a ramp. Finishing a match

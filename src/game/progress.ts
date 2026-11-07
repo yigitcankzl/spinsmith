@@ -145,6 +145,22 @@ export const VERB_CARD: Record<ReleasedVerb, [string, string]> = {
   groove: ['Finger Groove', 'Slide fingertip, then lift'],
   wheel: ['Forge Wheel', 'Turn the near wheel'],
 };
+export const MOVE_RELEASE = { ...VERB_RELEASE, strike: STRIKE_RELEASE, flick: FLICK_RELEASE } as const;
+export type TaughtMove = keyof typeof MOVE_RELEASE;
+export const MOVE_CARD: Record<TaughtMove, [string, string]> = {
+  ...VERB_CARD,
+  strike: ['Forge Strike', 'Palm the seal, stamp arena'],
+  flick: ['Fingertip Flick', 'Swing fingertip through a top'],
+};
+export function moveTaughtAt(matches: number): TaughtMove | undefined {
+  return (Object.keys(MOVE_RELEASE) as TaughtMove[]).find((move) => MOVE_RELEASE[move] === matches);
+}
+export function lastMoveAt(matches: number): [string, string] | undefined {
+  const move = (Object.keys(MOVE_RELEASE) as TaughtMove[])
+    .filter((candidate) => MOVE_RELEASE[candidate] <= matches)
+    .sort((a, b) => MOVE_RELEASE[b] - MOVE_RELEASE[a])[0];
+  return move ? MOVE_CARD[move] : undefined;
+}
 /** The verb whose card shows when the completed-match count reaches `matches`, if any. */
 export function verbReleasedAt(matches: number): ReleasedVerb | undefined {
   return (Object.keys(VERB_RELEASE) as ReleasedVerb[]).find((v) => VERB_RELEASE[v] === matches);

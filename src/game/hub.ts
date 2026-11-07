@@ -44,7 +44,6 @@ import type { Progress } from './progress.js';
 import { addSlab, engrave, GUIDE, metalPlate, Nameplate, ORANGE, PLATE_DEPTH, pxPerM, setType, SIGN_TILT, signTexture, STEEL as UI_STEEL, tag, TEXT, TEXT_DIM } from './ui.js';
 import type { HandState } from './hands.js';
 import type { TopBuild } from './parts.js';
-import { buildName } from './parts.js';
 import { BOUTS, boutOpen, CHAPTERS, gateOf, MEDAL_SHORT, medalCount, nextBout, nextGate } from './campaign.js';
 import { gateShort, playSub, rankLine } from './hub-copy.js';
 import type { BoutRecord } from './campaign.js';
@@ -56,7 +55,7 @@ import { popIn } from './rim.js';
 import { ARENA_SCALE, BLUEPRINT_PULL, BRAWL_AT, COMFORT_AT, SIGN, STATION_PULL, BLUEPRINT_AT as REACH_BLUEPRINT, DOCK_AT as REACH_DOCK, FORGE_AT as REACH_FORGE, TABLE_Y as REACH_TABLE_Y } from './reach.js';
 import type { Order } from './orders.js';
 import { localDate } from './orders.js';
-import { FEATS, MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
+import { FEATS, lastMoveAt, MAX_LEVEL, STAMP_UNLOCKS } from './progress.js';
 import { mergeByMaterial, SOFT_SHADOW, TopView } from './visuals.js';
 import { bevelBox, BRASS, FORGED, GRAPHITE, GRAPHITE_AO, plastic, STEEL } from './materials.js';
 
@@ -281,7 +280,6 @@ export class Hub {
     this.champions.visible = !this.teaching;
     if (!this.teaching) {
       const next = Object.keys(STAMP_UNLOCKS).map(Number).find((n) => n > progress.stamps) ?? null;
-      const champion = progress.champions[0];
       this.boardState = {
         order,
         done: order ? progress.hasOrder(order.date) : false,
@@ -291,17 +289,7 @@ export class Hub {
         map: boardMap(progress.bouts, progress.matches),
         gilded: progress.isUnlocked('ledger:gold') || progress.level >= MAX_LEVEL,
         code: echoCode(encodeBuild(build)),
-        history: [
-          (() => {
-            if (this.roomCode) return `online room ${this.roomCode}: a friend opens ?online=${this.roomCode}`;
-            // A pinned arena is free play: say so, or PLAY and the map disagree.
-            if (progress.arenaPin) return `free play in ${progress.arenaPin} (pinned)`;
-            const next = nextBout(progress.bouts, progress.matches % 2 === 0, progress.matches);
-            return next ? `next bout ${next.id}: ${next.rival}` : 'every bout won';
-          })(),
-          `${medalCount(progress.bouts)}/${BOUTS.length * 3} medals`,
-          champion ? `champion: ${buildName(champion.build)} ×${champion.wins}` : 'first champion awaits',
-        ].join(' · '),
+        lastMove: (lastMoveAt(progress.matches) ?? ['Ramp', 'Pinch floor, pull outward']).join(' · '),
         feats: progress.feats.size,
         featsOf: Object.keys(FEATS).length,
         streak: progress.streak(localDate(new Date())),
