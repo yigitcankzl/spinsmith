@@ -75,7 +75,7 @@
       </ul>
       <div class="launches">
         <button id="enter" type="button" disabled>HEATING THE FORGE…</button>
-        <a id="showcase" href="?demo">SHOWCASE: A LEVEL 8 SMITH</a>
+        <a id="showcase" href="?demo" onclick="return confirm('Reset your SpinSmith save and load the level 8 showcase?')">RESET TO LEVEL 8 SHOWCASE</a>
       </div>
       <p id="launch-status" role="status" aria-live="polite"></p>
       <ol class="how">
@@ -85,7 +85,7 @@
       </ol>
       <button id="copy-diagnostics" type="button">COPY QUEST TEST REPORT</button>
       <pre id="diagnostics" aria-live="polite"></pre>
-      <p class="foot">Showcase starts as a level 8 smith with chapter 1 cleared and chapter 2 up to its boss; normal Enter keeps your own progress. · <a href="./privacy.html">Privacy</a> · Font: Rajdhani (SIL OFL)</p>
+      <p class="foot">Showcase replaces this browser's save with a level 8 smith; normal Enter keeps your own progress. · <a href="./privacy.html">Privacy</a> · Font: Rajdhani (SIL OFL)</p>
     </div>
     <div id="scene-container"></div>
     <script type="module" src="/src/index.ts"></script>

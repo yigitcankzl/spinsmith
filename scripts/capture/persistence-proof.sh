@@ -7,8 +7,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT=${1:-$HOME/Desktop/spinsmith-videos/persistence-proof}
 RAW="$OUT/raw"
 FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+STORAGE=$(mktemp --suffix=.spinsmith-storage.json)
 mkdir -p "$RAW"
 cd "$ROOT"
+
+restore_storage() {
+  if [[ -s "$STORAGE" ]]; then
+    SPINSMITH_STORAGE_FILE="$STORAGE" SPINSMITH_STORAGE_MODE=restore \
+      npx @iwsdk/cli browser run scripts/capture/storage.mjs --timeout 30000 >/dev/null 2>&1 || true
+    npx @iwsdk/cli browser reload >/dev/null 2>&1 || true
+  fi
+  rm -f "$STORAGE"
+}
+trap restore_storage EXIT
 
 phase() { scripts/drive.sh '["peek","phase"]' 2>/dev/null; }
 saved_state() {
@@ -41,6 +52,8 @@ record_hub() {
 }
 
 # The prepared save makes the persistent objects visible without first grinding through matches.
+SPINSMITH_STORAGE_FILE="$STORAGE" SPINSMITH_STORAGE_MODE=save \
+  npx @iwsdk/cli browser run scripts/capture/storage.mjs --timeout 30000 >/dev/null
 scripts/drive.sh '["demo"]' >/dev/null
 sleep 1
 enter_hub
@@ -56,11 +69,12 @@ after=$(saved_state)
 record_hub "$RAW/after.mp4"
 
 ffmpeg -y -loglevel error \
-  -i "$RAW/before.mp4" -i "$RAW/after.mp4" -f lavfi -i anullsrc=r=48000:cl=stereo \
+  -i "$RAW/before.mp4" -i "$RAW/after.mp4" -f lavfi \
+  -i "aevalsrc='0.028*sin(2*PI*55*t)+0.014*sin(2*PI*110*t)+gte(t,2.3)*0.08*sin(2*PI*440*(t-2.3))*exp(-5*(t-2.3))+gte(t,2.45)*0.06*sin(2*PI*660*(t-2.45))*exp(-5*(t-2.45))':s=48000:c=stereo:d=5.4" \
   -filter_complex "\
 [0:v]scale=1920:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1920:1080,fps=60,\
 drawtext=fontfile=$FONT:text='BEFORE RELOAD':fontcolor=0xff9b42:fontsize=48:x=44:y=38:box=1:boxcolor=0x101318@0.74:boxborderw=14,\
-drawtext=fontfile=$FONT:text='LV 8  /  3 CHAMPIONS  /  RIVAL MARKS':fontcolor=white:fontsize=27:x=47:y=112:box=1:boxcolor=0x101318@0.60:boxborderw=9,\
+drawtext=fontfile=$FONT:text='LV 8  /  2 CHAMPION TOPS  /  3 WINS':fontcolor=white:fontsize=27:x=47:y=112:box=1:boxcolor=0x101318@0.60:boxborderw=9,\
 trim=duration=2.4,setpts=PTS-STARTPTS[a];\
 [1:v]scale=1920:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1920:1080,fps=60,\
 drawtext=fontfile=$FONT:text='AFTER REAL BROWSER RELOAD':fontcolor=0xff9b42:fontsize=48:x=44:y=38:box=1:boxcolor=0x101318@0.74:boxborderw=14,\

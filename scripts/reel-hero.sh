@@ -76,7 +76,7 @@ arena_grid
 plain_clip 12-return "$PERSISTENCE" 5.4
 
 ffmpeg -y -loglevel error -ss 3.6 -t 4 -i "$S/hook-ko.mp4" -f lavfi \
-  -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3)))':s=48000:c=stereo:d=4" \
+  -i "aevalsrc='0.025*sin(2*PI*55*t)+0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3)))':s=48000:c=stereo:d=4" \
   -map 0:v -map 1:a -vf "scale=$W:$H:force_original_aspect_ratio=increase,crop=$W:$H,fps=$FPS,gblur=sigma=16,eq=brightness=-0.42:saturation=0.7,drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=(h-text_h)/2-80,drawtext=fontfile=$FONT:text='The arena is the weapon. Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=54:x=(w-text_w)/2:y=h/2+50,$TAG" \
   -t 4 "${enc[@]}" "$TMP/13-end.mp4"
 segments+=(13-end)
