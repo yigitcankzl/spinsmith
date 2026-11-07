@@ -122,7 +122,7 @@ export const STAMP_UNLOCKS: Record<number, string> = {
 };
 
 /**
- * Hand verbs past the first match's lessons (rip, ramp, Arena Forge, strike, Flick) arrive one per
+ * Hand verbs past the first match's lessons (rip, ramp and Arena Forge) arrive one per
  * completed match, most useful first (headless win points over doing nothing: spring +10, gust
  * +8.9, ember +7.4, rub +5.9, crossguard +5.1; cup, groove and wheel unmeasured). The value is the
  * completed-match count that releases the verb; its card shows as that match ends. Online, brawl

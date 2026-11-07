@@ -1,6 +1,6 @@
 /**
- * The first match's words. A ghost hand demonstrates each lesson in place (rip, ramp, forge,
- * strike, flick), so the card only names the gesture: every prompt here stays within
+ * The first match's words. A ghost hand demonstrates each lesson in place (rip, ramp and forge),
+ * so the card only names the gesture: every prompt here stays within
  * PROMPT_WORDS (checked headless in scripts/sim-check.ts). No three.js here.
  *
  * Probes look for some of these exact substrings: 'SQUEEZE INWARD', 'WRENCH IT OFF YOUR DESK',

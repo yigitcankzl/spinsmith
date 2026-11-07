@@ -116,8 +116,8 @@ an arena. First to 4 heat wins a match.
   arena; the anvil and the workshop come after. The first launch shows arrows
   running toward you and how to rip; the first fight puts a breathing ring on the floor beside
   the rival where lifting would push it, until your first ramp. The first match lasts at least
-  four rounds and adds one move per round: ramp, then a two-hand arena squeeze, then the ultimate (its third
-  round starts with the bar nearly full); rival tells come after that. Finishing the first match, won or
+  three rounds and teaches only the core: ramp, then a two-hand arena squeeze. Strike, Flick and rival
+  tells come after that. Finishing the first match, won or
   lost, earns the Spur tip: the anvil appears and calls for it, the forge highlights only that
   part, and after saving the dock calls you back for the rematch.
 - **Smith levels** (`src/game/progress.ts`): every round gives XP (more for a win and for a
@@ -241,9 +241,9 @@ an arena. First to 4 heat wins a match.
   headless sim a human-paced flicker (0.32 s lag, 15° aim error) wins 68% against an equal rival
   (no hands 51%, random flicking 52%) and comes back from a spin deficit in 18% of rounds instead
   of 7% (`npm run report:flick`, 6 rounds per arena and type pairing). Online, the guest's flick is sent as a
-  direction and swing speed and the host applies it. The first match teaches it too: once its
-  forge lesson is done (or in its third round), a tired rival near the rim calls for a flick.
-- **One new move per match:** after the first match's lessons (ramp, Arena Forge, strike, Flick)
+  direction and swing speed and the host applies it. Once the first match is done, a tired rival
+  near the rim calls for a flick.
+- **One new move per match:** after the first match's lessons (ramp and Arena Forge)
   each completed match releases exactly one more hand verb and ends with its
   card (NEW MOVE: name, one line on the gesture): Rim Spring for match 2, Forge Gust 3, cup and
   sling 4 (campaign bout 1-4 teaches it), Ember Rivet 5, Spin Rub 6, Crossguard 7, Finger Groove 8, Forge Wheel 9
@@ -344,4 +344,3 @@ an arena. First to 4 heat wins a match.
   own pitch (an Anvil clangs lower than a Striker).
 - The finish stamps first; a result card follows 0.9 s later (none in the first match's rounds),
   and the next round starts after 4 s, sooner on a pinch.
-

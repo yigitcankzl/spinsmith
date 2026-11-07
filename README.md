@@ -6,19 +6,19 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 
 **Status:** tested only in IWSDK's Quest emulator (IWER), headless simulations and browser windows; not yet run on a headset. **Hosted URL:** _PLACEHOLDER: hosted URL goes here_
 
-## The first minute, measured
+## The opening, measured
 
-From scripted first sessions in the emulator on 2026-10-23 (`artifacts/first-five/`, a bot that reads each card for 0.8 s; game time; before the 11-05 move of the fight text over the tops):
+From a scripted first session in IWER on 2026-11-07 (a bot that reads each card for 0.8 s; game time from XR entry, including emulated room placement):
 
-| ~2 s | ~12 s | ~14 s | ~18 s | 30–47 s | 49–94 s |
+| 34 s | 42 s | 46 s | 48 s | 59–65 s | 108 s |
 |---|---|---|---|---|---|
-| PUT YOUR TOP IN | RIP! (ghost hand shows it) | PINCH + DRAG: RAMP | first knockout (2 of 3 runs; in the third the first knockout was the DESK KO at 47 s) | WRENCH IT OFF YOUR DESK → DESK KO | match won |
+| PUT YOUR TOP IN | rip (ghost hand shows it) | PINCH + DRAG: RAMP | first knockout | WRENCH IT OFF YOUR DESK → DESK KO | match won |
 
 ## Try it (judges): five minutes, seated, hands only
 1. Sit at a table with a Meta Quest 3 or 3S, no controllers, and open the hosted URL in the Quest Browser.
 2. Press **ENTER** and allow spatial data. The arena rises on your real table (a labelled table or desk, or any flat unlabelled surface at desk height); with none it stands on a floating tray and says so.
 3. Pinch your top, pinch near it, pull back and let go: the rip launches it.
-4. The first match teaches one move a round: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — on a detected table the rival is steered to your real desk edge and flies off it (**DESK KO**; on the tray it is a normal ring-out); **round 3** pinch the seal that rises from your top and stamp it into the bowl (the Anvil Strike; after 4 s a palm slap on the table works too). Your fingertip can flick a top from the start; its hint comes after the forge lesson (never on the round that can decide the match, then in match 2).
+4. The first match teaches only the signature loop: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — on a detected table the rival is steered to your real desk edge and flies off it (**DESK KO**; on the tray it is a normal ring-out). Strike and direct-touch Flick stay out of this opening and appear after the first match.
 5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, cup and sling, Ember Rivet, Spin Rub, Crossguard, Finger Groove, Forge Wheel); the last card of a match names the next one, with the day streak and tomorrow's rival. From day 2 of a streak, the day's first finished match pays 25 XP per streak day (up to 7).
 6. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared and the second up to its boss (PLAY is Sawtooth, who casts Hammer).
 7. On a headset, `?fps` puts a frame-rate readout beside MENU (fps, lowest, draw calls, quality level) and `?diagnostics` shows a copyable report (per-phase fps, quality steps) on the start page after you leave XR; together they measure what the emulator could not.
@@ -43,10 +43,10 @@ From scripted first sessions in the emulator on 2026-10-23 (`artifacts/first-fiv
 | Verb | Gesture | Unlocks |
 |---|---|---|
 | Rip | Pinch your top (or near it), pull back, let go | Start |
-| Flick | Swing an open fingertip through a top at its height | Start (hint after the first match's forge lesson) |
+| Flick | Swing an open fingertip through a top at its height | Match 2 hint |
 | Ramp | Pinch the floor and hold; drag to aim | First match, round 1 |
 | Arena Forge | Grab the rim with both hands: squeeze, stretch, tilt, twist | First match, round 2 |
-| Strike | Full bar: pinch the seal, stamp it into the bowl (after 4 s, or gentle mode: slap the table) | First match, round 3 |
+| Strike | Full bar: pinch the seal, stamp it into the bowl (after 4 s, or gentle mode: slap the table) | Match 2 |
 | Rim Spring | Pinch rim, pull, release | Match 2 |
 | Forge Gust | Sweep palm toward pocket | Match 3 |
 | Cup and sling | Jab floor, catch, sling | Match 4 |
@@ -191,7 +191,7 @@ own rays rarely line up with what you are looking at.
 
 ### Testing in the emulator (IWSDK CLI)
 
-**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human): first knockout 18.1–46.9 s and first DESK KO 30.5–46.9 s of game time, match over at 49.4–93.6 s, 14–16 distinct prompts and 52–60 words on screen before the match ends (three runs, 2026-10-23, saved in `artifacts/first-five/`; in the slow run the bot's ramp missed, so its first knockout was the DESK KO). Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes). `check:desk-ko-first` and `check:room-matrix` expect the arena on the emulator's desk: a page loaded while the emulated head stood (IWER's default y = 1.6) puts it on the tray, so both scripts first seat the head (`scripts/emu.sh enter`) and re-place it (`scripts/capture/place.mjs`); other probes can also leave the arena away from the desk edge.
+**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human; 2026-11-07): first knockout at 48.2 s, first DESK KO at 64.5 s and match over at 107.7 s from XR entry, including placement. The match showed 10 distinct prompts / 43 words, and the probe fails on missing carry, rip, ramp or Arena Forge actions, driver errors, strike/Flick teaching, more than 10 prompts / 45 words, no match end, or a first KO after 90 s. Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes). `check:desk-ko-first` and `check:room-matrix` expect the arena on the emulator's desk: a page loaded while the emulated head stood (IWER's default y = 1.6) puts it on the tray, so both scripts first seat the head (`scripts/emu.sh enter`) and re-place it (`scripts/capture/place.mjs`); other probes can also leave the arena away from the desk edge.
 
 **Hand driver** (`src/dev-drive.ts`, dev builds only): `window.drive` plays real hand motions on
 the emulated hands (tap, drag, rip, ramp, cup, sling, palm slap), so the game's own gesture

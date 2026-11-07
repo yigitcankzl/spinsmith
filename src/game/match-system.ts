@@ -2963,8 +2963,8 @@ export class MatchSystem extends createSystem({
       }
       if (claim !== this.handHoverClaim[side]) {
         this.handHoverClaim[side] = claim;
-        // In the staged DESK KO lesson the card and the ghost hands already say where to grip.
-        const lessonSays = claim === 'FORGE' && this.progress.matches === 0 && this.desk.deskWrenchAt() !== null;
+        // The first match's card and ghost hands already say where to grip.
+        const lessonSays = claim === 'FORGE' && this.progress.matches === 0;
         if (claim && !lessonSays && this.labelTimer <= 0 && this.progress.guide !== 'done' && (claim !== 'RIM' || this.taught('spring'))) {
           this.label.set(CLAIM[claim]);
           this.labelTimer = 0.65;
@@ -4333,8 +4333,8 @@ export class MatchSystem extends createSystem({
       this.label.set('');
       // Later rounds are framed: the round, or what is at stake.
       const point = MATCH_HEAT - 1;
-      const word = this.quietFirst ? `ROUND ${this.round + 1}` : this.myPoints >= point && this.theirPoints >= point ? 'FINAL ROUND' : this.myPoints >= point || this.theirPoints >= point ? 'MATCH POINT' : `ROUND ${this.round + 1}`;
-      this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
+      const word = this.myPoints >= point && this.theirPoints >= point ? 'FINAL ROUND' : this.myPoints >= point || this.theirPoints >= point ? 'MATCH POINT' : `ROUND ${this.round + 1}`;
+      if (!this.quietFirst) this.stamp.show(word, `${this.myPoints} - ${this.theirPoints}`, 'neutral', 0.9);
       // A boss one round from defeat finds its second wind: it says so, then fights harder.
       // A bout's twist is said once, as its second round starts (the intro card names its lesson).
       if (this.bout && this.round === 1 && !this.rivalRead && this.progress.guide === 'done') {
@@ -4827,8 +4827,6 @@ export class MatchSystem extends createSystem({
     if (this.progress.matches === 0 && !this.demo) this.tutorialRound++;
     this.desk.deskWrench.armed = this.progress.matches === 0 && !this.demo && this.tutorialRound === 2 && !this.extras.length && !this.online;
     this.desk.deskWrench.fired = false;
-    // Round three teaches the ultimate; start it nearly full so the lesson arrives before the fight ends.
-    if (this.progress.matches === 0 && this.tutorialRound >= 3 && !this.demo) this.forgeBar.value = 0.8;
     this.barWasFull = false;
     this.rivalBar.reset();
     // Two losses on a boss ease its head start, as boutSkill eases its rips.
@@ -4848,8 +4846,7 @@ export class MatchSystem extends createSystem({
     if (!this.demo && this.progress.guide === 'launch') this.progress.advance('bump');
     playLaunch(power, perfect);
     this.count = null;
-    if (this.quietFirst) this.stamp.show('RIP!', '', 'mine', 0.35);
-    else this.stamp.show(perfect ? 'WHITE HOT!' : braced ? 'BRACED RIP!' : this.launchTiming > 1.04 ? 'PERFECT RIP!' : this.launchTiming > 1 ? 'ON BEAT!' : 'RIP!', braced ? 'two hands · stable launch' : '', 'mine', 0.35);
+    if (!this.quietFirst) this.stamp.show(perfect ? 'WHITE HOT!' : braced ? 'BRACED RIP!' : this.launchTiming > 1.04 ? 'PERFECT RIP!' : this.launchTiming > 1 ? 'ON BEAT!' : 'RIP!', braced ? 'two hands · stable launch' : '', 'mine', 0.35);
     if (perfect) this.featDone('whiteHot');
     this.matchLog.rip = Math.max(this.matchLog.rip, power);
     this.lastRip = power;
@@ -5190,7 +5187,7 @@ export class MatchSystem extends createSystem({
     const liveAction = classifyArenaForge({ pull: this.arenaMorphPull, twist: this.arenaMorphTwist, tilt: this.arenaMorph.tilt });
     if ((liveAction ?? 'none') !== this.arenaForgeAction) {
       this.arenaForgeAction = liveAction ?? 'none';
-      if (liveAction) {
+      if (liveAction && !this.quietFirst) {
         this.label.set(lessonText.forgeLive(ARENA_FORGE_TITLE[liveAction]));
         this.labelTimer = 0.45;
       }
@@ -5615,11 +5612,8 @@ export class MatchSystem extends createSystem({
     return this.oneHand.side === 'left' ? [real, ghost] : [ghost, real];
   }
 
-  /**
-   * The first fight teaches ramp, the signature two-hand arena forge, then an ultimate (Flick is
-   * hinted there too and is never gated). Every later verb is released one per completed match
-   * (VERB_RELEASE); online, brawl and the demo save have them all.
-   */
+  /** The first fight teaches only ramp and the signature two-hand arena forge. Later verbs arrive
+   * one per completed match (VERB_RELEASE); online, brawl and the demo save have them all. */
   /**
    * The first match says only its lessons and results: no launch chatter, readouts, cause cards
    * or mid-match rewards (they wait for the verdict, or for match 2, which says them all again).
@@ -5632,7 +5626,7 @@ export class MatchSystem extends createSystem({
     const m = this.progress.matches;
     // The two-hand forge is the first match's second lesson.
     if (verb === 'forge') return m >= 1 || (m === 0 && this.tutorialRound >= 2);
-    if (verb === 'strike') return m >= 1 || (m === 0 && this.tutorialRound >= 3);
+    if (verb === 'strike') return m >= 1;
     if (verb === 'tells') return m >= 3;
     return !!this.online || this.extras.length > 0 || this.everyVerb || m >= VERB_RELEASE[verb];
   }
@@ -5885,11 +5879,10 @@ export class MatchSystem extends createSystem({
    * its gesture first: pinches, presses, palm walls, gusts and two-hand forging never flick.
    */
   private updateFlick(dt: number) {
-    // The first match teaches it too: once its forge lesson is done, a tired rival calls for a flick.
-    if (!this.flickHintShown && this.flickCount === 0 && (this.progress.matches >= 1 || this.morphedOnce || this.tutorialRound >= 3) && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
+    // Direct touch is always usable, but its lesson waits until the player has finished one match.
+    if (!this.flickHintShown && this.flickCount === 0 && this.progress.matches >= 1 && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
       && this.elapsed > TUNING.grace && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) > 0.6 && this.labelTimer <= 0
-      // Never a new lesson on the round that can decide the first match: it would land on the payoff.
-      && !(this.progress.matches === 0 && Math.max(this.myPoints, this.theirPoints) >= MATCH_HEAT - 1)) {
+      && Math.max(this.myPoints, this.theirPoints) < MATCH_HEAT - 1) {
       this.flickHintShown = true;
       this.call(LESSON.flick, CALL.tactic, 2.2);
       this.flickGhostUntil = this.time + 2.6;
@@ -7900,7 +7893,7 @@ export class MatchSystem extends createSystem({
         // The decisive move plays out slowly for a moment, in a shower of sparks, then again as a replay.
         // The replay means the finishing blow: the knockout that wins the match, and the session's first
         // knockout of your making (so the move is seen once); the rest go straight on (~4 s a match saved).
-        if (loser.finish !== 'spin' && !this.demo && (decided || !this.replayedOnce)) {
+        if (loser.finish !== 'spin' && !this.demo && (decided || (!this.quietFirst && !this.replayedOnce))) {
           this.replayedOnce = true;
           this.startReplay();
         }
@@ -8062,10 +8055,9 @@ export class MatchSystem extends createSystem({
       this.lane.visible = false;
       this.rivalTellFx.visible = false;
     }
-    // The first match's ultimate: the ghost pinches the docked seal and stamps it into the floor;
-    // once the palm-slap fallback mark is up, the second ghost slaps a flat palm onto it. Both go
-    // with the first strike.
-    if (!ghost && this.phase === 'fight' && !this.demo && this.progress.matches === 0 && !this.struckOnce && this.taught('strike')
+    // The first strike's ghost pinches the docked seal and stamps it into the floor; once the
+    // palm-slap fallback mark is up, the second ghost slaps a flat palm onto it.
+    if (!ghost && this.phase === 'fight' && !this.demo && this.progress.matches === 1 && !this.struckOnce && this.taught('strike')
       && this.overforgeSeal.visible && !this.overforgeHeld && !this.overforgeControl) {
       const { x: sx, y: sy, z: sz } = this.overforgeSeal.position;
       const h = this.arena.height(0, 0);

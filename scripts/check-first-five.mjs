@@ -1,13 +1,14 @@
 // First Five Minutes probe: a brand-new player's first session, driven with the emulated hands the
 // way a newcomer would play it (wait for each card, read it, then do what it says), timed in game
-// seconds from ENTER. Run end to end with scripts/check-first-five.sh (npm run check:first-five).
+// seconds from ENTER, including placement. Run end to end with scripts/check-first-five.sh
+// (npm run check:first-five).
 //
 // A browser lease is capped at 110 s, so the session spans several leases (FIRST_FIVE_PART):
 //   fresh   wipe the save (demo-save.ts freshSave) and reload; then enter XR again
 //   drive   play on from wherever the page is, for about FIRST_FIVE_BUDGET ms (default 80000), then
 //           pause the game system (elics stop()) so no game time passes between leases; repeat
 //           until the result says done
-//   report  the JSON summary; throws when the first knockout took 90 s of game time or more
+//   report  the JSON summary; throws when the core hand path is incomplete or too slow
 // Everything lives in the page (window.__firstFive) between leases. The office_small room's real
 // table is where the staged DESK KO of the forge lesson round can happen.
 //
@@ -153,12 +154,12 @@ export default async function run({ page, frame }) {
         drive.key('KeyP');
         await sleep(100);
       }
-      // On a detected table the arena can rise and settle before this lease starts: the clock then
-      // starts at the ready card (placement time is not counted, and the summary says so).
+      // On a detected table the arena can rise before this lease starts. The game clock began at
+      // XR entry, so zero includes that placement wait in the first-session measurement.
       ff.autoPlaced = g.phase === 'ready';
       if (g.phase !== 'placing' && !ff.autoPlaced) throw new Error(`expected placement after ENTER, got ${g.phase}`);
       g.settle = 0;
-      ff.t0 = g.time;
+      ff.t0 = 0;
       ff.started = true;
     }
 
@@ -275,6 +276,13 @@ export default async function run({ page, frame }) {
     if (result.failed) fails.push(result.failed);
     if (result.secondsTo.firstKo === null) fails.push('no knockout of yours in the first match');
     else if (result.secondsTo.firstKo >= 90) fails.push(`first knockout at ${result.secondsTo.firstKo} s of game time (want < 90 s)`);
+    if (result.secondsTo.matchEnd === null) fails.push('the first match never ended');
+    else if (result.secondsTo.matchEnd >= 300) fails.push(`first match ended at ${result.secondsTo.matchEnd} s (want < 300 s)`);
+    for (const verb of ['carry', 'rip', 'ramp', 'arenaForge']) if (!result.verbs.performed[verb]) fails.push(`${verb} was not performed`);
+    for (const verb of ['strike', 'flick']) if (result.verbs.taught[verb] !== undefined) fails.push(`${verb} was taught during the overloaded first match`);
+    if (result.prompts.distinctToMatchEnd > 10) fails.push(`${result.prompts.distinctToMatchEnd} prompts before match end (want <= 10)`);
+    if (result.prompts.wordsToMatchEnd > 45) fails.push(`${result.prompts.wordsToMatchEnd} prompt words before match end (want <= 45)`);
+    if (result.errors.length) fails.push(`driver errors: ${result.errors.join('; ')}`);
     if (fails.length) throw new Error(`first five minutes failed: ${fails.join('; ')}\n${JSON.stringify(result, null, 2)}`);
     return { ok: true, ...result };
   }
