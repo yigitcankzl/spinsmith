@@ -1191,6 +1191,7 @@ export function installDriver() {
       Object.assign(g.theirs, { x: g.arena.radius * 0.6, z: 0, vx: 0, vz: 0 });
       const pin = setInterval(() => Object.assign(top, { ...hold, vx: 0, vz: 0 }), 16);
       const before = top.spin;
+      let after = before;
       const r = top.spec.radius + 0.006;
       // The rim surface runs along (sin a, -cos a) * hand, so the finger's angle must fall for hand +1.
       const turn = (against ? 1 : -1) * top.hand;
@@ -1209,6 +1210,8 @@ export function installDriver() {
           a += turn * 0.2;
           await glide(side, 'index', at(), 0.04, 0, 'linear');
         }
+        // Measure the stroke itself; withdrawing and parking the hand lets normal spin drain resume.
+        after = top.spin;
         await glide(side, 'index', above(at(), 0.1), 0.25, 0, 'natural', 'release');
         // Home over the rim, high, as a hand does: a straight line down to the lap would skim the
         // bowl and the rival in it.
@@ -1217,7 +1220,7 @@ export function installDriver() {
         clearInterval(pin);
       }
       await park(side);
-      return { before: +before.toFixed(3), after: +game().mine.spin.toFixed(3), gain: +(game().rubGain ?? 0).toFixed(3) };
+      return { before: +before.toFixed(3), after: +after.toFixed(3), gain: +(game().rubGain ?? 0).toFixed(3) };
     },
 
     /** Moves a point of a hand to a world point in `dur` seconds (low-level). */
