@@ -45,7 +45,7 @@ export function boardHead(streakLine: string | null, done: boolean): string {
   return fitHub(streakLine ?? '', done ? 'ORDER DONE' : "TODAY'S ORDER");
 }
 
-/** Under a finished order at rest; the hover names tomorrow's rival and arena. */
+/** Under a finished order at rest; tomorrow's room decides the new order. */
 export const ORDER_DONE_SUB = 'NEW ORDER TOMORROW';
 
 /** The Circuit Map's headline: 'CINDER CIRCUIT · 4/45 MEDALS'. */

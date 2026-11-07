@@ -3,8 +3,8 @@
  * arena that teaches one thing, twists it, and asks for two medals beyond the win. The fifth bout
  * of a chapter is its boss. Difficulty comes from where you are on the map, not from how long you
  * have played: rival skill climbs through a chapter and dips at the next one's start (a sawtooth),
- * and two losses in a row on a bout quietly ease it. Medals open chapters, so skill stands in for
- * grinding. No three.js or DOM here.
+ * and two losses in a row on a bout quietly ease it. Beating each chapter's five bouts opens the
+ * next; optional medals remain replay goals, never mandatory grind. No three.js or DOM here.
  */
 import type { Goal, OrderEvent } from './orders.ts';
 
@@ -34,8 +34,8 @@ export interface Bout {
 
 export const CHAPTERS = [
   { name: 'Cinder Circuit', need: 0 },
-  { name: 'Iron Circuit', need: 8 },
-  { name: 'The Crown', need: 18 },
+  { name: 'Iron Circuit', need: 5 },
+  { name: 'The Crown', need: 10 },
 ] as const;
 
 const b = (id: string, rival: string, arena: string, skill: number, lesson: string, twist: string, medals: [Medal, Medal], extra: Partial<Bout> = {}): Bout => {
@@ -139,7 +139,7 @@ export function gateOf(rec: BoutRecord): { c: number; boss: string } | { c: numb
   return null;
 }
 
-/** What blocks the next chapter, for the map ('8 medals to open the Iron Circuit'), or '' when nothing does. */
+/** What blocks the next chapter, for the map, or '' when nothing does. */
 export function nextGate(rec: BoutRecord): string {
   const g = gateOf(rec);
   if (!g) return '';

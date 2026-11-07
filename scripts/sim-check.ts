@@ -1906,13 +1906,10 @@ TUNING.grace = 0;
   assert.equal(p.boutLosses['1-1'], 0, 'a win clears the loss streak');
   assert.equal(nextBout(p.bouts)?.id, '1-2', 'winning 1-1 opens 1-2');
   assert.ok(r.unlocked.includes('arena:Ember Ring') || p.isUnlocked('arena:Ember Ring'), "the next bout's arena opens");
-  // Win every Cinder bout with the win alone: the Iron Circuit still needs medals.
+  // The main route never asks for medal grind: five wins plus the boss open the next chapter.
   for (const b of BOUTS.filter((x) => x.chapter === 1)) p.recordBout(b.id, 1, true);
   assert.equal(medalCount(p.bouts), 6, 'six medals: five wins and 1-1\'s ramp');
-  assert.ok(nextGate(p.bouts).includes('2 more medals to open the Iron Circuit'), `the map says what opens the next chapter (${nextGate(p.bouts)})`);
-  assert.equal(nextBout(p.bouts)?.id, '1-1', 'with the chapter won, the map points back at missing medals');
-  p.recordBout('1-2', 7, true);
-  assert.equal(nextBout(p.bouts)?.id, '2-1', 'eight medals and the boss open the Iron Circuit');
+  assert.equal(nextBout(p.bouts)?.id, '2-1', 'five wins and the boss open the Iron Circuit');
   // The record survives a reload.
   const store = new Map<string, string>();
   const st = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
@@ -1928,9 +1925,6 @@ TUNING.grace = 0;
   const all: Record<string, number> = {};
   for (const b of BOUTS) all[b.id] = 1;
   assert.ok(nextBout(all, true) && nextBout(all, false) === null, 'with the map won, medal turns alternate with free play');
-  // Bouts missing medals take turns instead of one bout repeating.
-  const short = { '1-1': 3, '1-2': 1, '1-3': 5, '1-4': 1, '1-5': 1 };
-  assert.deepEqual([0, 1, 2, 3].map((r) => nextBout(short, true, r)?.id), ['1-1', '1-2', '1-3', '1-4'], 'missing-medal bouts rotate (seven medals: the Iron Circuit is still shut)');
   // With every bout won, medal turns come on even match counts: every missing bout still gets a turn.
   const won: Record<string, number> = {};
   for (const b of BOUTS) won[b.id] = 7;

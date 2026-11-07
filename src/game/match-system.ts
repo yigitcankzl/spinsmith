@@ -23,7 +23,6 @@ import { HUB_NOTE } from './hub-copy.js';
 import type { OpeningZone, ReleasedVerb } from './progress.js';
 import { rematchAdvice } from './mastery.js';
 import { dailyOrder, localDate } from './orders.js';
-import { addDays } from './come-back.js';
 import { nextArena } from './rotation.js';
 import { SAVE_KEYS } from './demo-save.js';
 import type { Order } from './orders.js';
@@ -2355,8 +2354,8 @@ export class MatchSystem extends createSystem({
     const today = localDate(new Date());
     const ctx = this.orderContext();
     this.order = this.progress.orderFor(today, () => dailyOrder(today, ctx));
-    // A teaser of tomorrow's order once today's is done (as things stand now).
-    const tomorrow = this.progress.hasOrder(today) ? dailyOrder(addDays(today, 1), ctx) : null;
+    // Tomorrow's room can change which order is playable, so promise a fresh order, not a false target.
+    const tomorrow = null;
     this.hub.show(this.myBuild, this.progress, this.order, tomorrow, this.nextRival ? `${this.nextRival.name} in ${this.arenas[this.arenaIndex].name}${this.boutText(this.nextRival.name)}` : null);
     this.desk.rebuildDeskMemory();
     if (import.meta.env.DEV) console.log(`[ORDER] today ${this.order.date}: ${this.order.text} in ${this.order.arena}${this.progress.hasOrder(this.order.date) ? ' (done)' : ''} · ${this.progress.stamps} stamps`);

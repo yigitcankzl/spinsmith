@@ -146,8 +146,8 @@ an arena. First to 4 heat wins a match.
   KO). The fifth bout of each chapter is its boss; bouts 2-3 and 3-3 are crowded (three and four
   tops, last top spinning wins). Rival skill follows the map, not your level:
   it climbs through a chapter and dips at the next one's start, and two losses in a row on a
-  bout quietly ease it. A chapter opens with 8 or 18 medals and the previous boss beaten, so
-  skill stands in for grinding. The intro card names the bout's lesson and the medals still
+  bout quietly ease it. Beating a chapter's five bouts and its boss opens the next; optional medals
+  stay replay goals instead of mandatory grind. The intro card names the bout's lesson and the medals still
   open; medals are kept win or lose, stamped at the match's end; the board's back (a pinch on
   the level plate) shows the chapter as five medallions. Pinning an arena in the workshop
   switches to free play. Checked by `npm run check:sim` (every bout's rival and arena exist,
@@ -185,7 +185,7 @@ an arena. First to 4 heat wins a match.
   board to play it; doing it strikes a stamp into the ledger (stamps 5, 10 and 15 earn emblem
   glows). Missed days cost only the streak. A match ends on a come-back card: the streak (COME
   BACK TOMORROW on day one, WON 4-0 · COME BACK after a win), the next match's new move (or the
-  next bout), and tomorrow's order (Tomorrow: beat RIVAL · +120 XP). The board's back (a pinch on the level plate) shows the
+  next bout), and a fresh order tomorrow. The board's back (a pinch on the level plate) shows the
   current chapter of the Circuit Map as medallions with three medal notches each, and the medals
   the next bout still asks for. The last three tops
   that won a match stand as champions on the left rim with their record; pinch one to make it
