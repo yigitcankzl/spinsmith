@@ -20,7 +20,7 @@ export function promptWords(text: string): number {
 export const LESSON = {
   /** The palm print where the arena rises. */
   palmPrint: 'PRESS YOUR PALM HERE',
-  noTable: 'NO TABLE · MOVE BY HANDLE',
+  noTable: 'NO TABLE · DESK KOS OFF',
   hubLaunch: 'PUT YOUR TOP IN',
   hubMatch: 'FINISH YOUR FIRST MATCH',
   rip: 'PINCH, PULL BACK, RELEASE',
