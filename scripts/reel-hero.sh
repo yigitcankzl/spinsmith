@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 R=${1:-$HOME/Desktop/spinsmith-videos/reel-2026-11-05}
 FINAL=${2:-$R/spinsmith-hero-1080p60.mp4}
 S=$R/shots M=$R/shots/more T=$R/takes
+PERSISTENCE=${SPINSMITH_PERSISTENCE_VIDEO:-$HOME/Desktop/spinsmith-videos/persistence-proof/spinsmith-persistence-proof-1080p60.mp4}
 W=1920 H=1080 FPS=60
 FONT=$(realpath public/fonts/Rajdhani-Bold.woff2)
 TAG="drawtext=fontfile=$FONT:text='IWER EMULATOR  /  SYNTHETIC ROOM + TABLE PLANE  /  NOT HEADSET FOOTAGE':fontcolor=white@0.78:fontsize=24:x=w-text_w-24:y=20:box=1:boxcolor=0x111419@0.55:boxborderw=7"
@@ -25,6 +26,15 @@ clip() {
   ffmpeg -y -loglevel error -ss "$start" -t "$dur" -i "$src" "${audio[@]:0:${#audio[@]}-2}" \
     -filter_complex "[0:v]scale=$W:$H:force_original_aspect_ratio=increase:flags=lanczos,crop=$W:$H,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=76:x=48:y=40:box=1:boxcolor=0x111419@0.78:boxborderw=16:enable='lt(t,1.65)',drawtext=fontfile=$FONT:text='$sub':fontcolor=white:fontsize=40:x=52:y=146:box=1:boxcolor=0x111419@0.66:boxborderw=10:enable='lt(t,1.65)',$TAG[v]" \
     -map '[v]' "${audio[@]: -2}" -t "$dur" "${enc[@]}" "$TMP/$name.mp4"
+  segments+=("$name")
+}
+
+plain_clip() {
+  local name=$1 src=$2 dur=$3
+  test -s "$src" || { echo "Missing source: $src" >&2; exit 1; }
+  ffmpeg -y -loglevel error -t "$dur" -i "$src" \
+    -vf "scale=$W:$H:force_original_aspect_ratio=increase:flags=lanczos,crop=$W:$H,fps=$FPS" \
+    -t "$dur" "${enc[@]}" "$TMP/$name.mp4"
   segments+=("$name")
 }
 
@@ -63,7 +73,7 @@ clip 08-brawl "$T/brawl.mp4" 0.8 7.0 'FOUR-TOP BRAWL' 'The arena opens out  /  l
 clip 09-forge "$S/forge.mp4" 2.8 5.0 'FORGE YOUR FIGHTER' 'Drag real parts  /  every build changes the physics'
 clip 10-workshop "$S/workshop.mp4" 7.6 4.0 'FORGE YOUR ARENA' 'Shape the floor  /  place hazards and boosts'
 arena_grid
-clip 12-return "$M/hub-map.mp4" 1.4 4.0 'YOUR TABLE REMEMBERS' 'Daily order  /  streak  /  champion tops  /  rival record'
+plain_clip 12-return "$PERSISTENCE" 5.4
 
 ffmpeg -y -loglevel error -ss 3.6 -t 4 -i "$S/hook-ko.mp4" -f lavfi \
   -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3)))':s=48000:c=stereo:d=4" \

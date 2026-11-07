@@ -39,6 +39,7 @@
     "capture:hero": "scripts/reel-hero.sh",
     "capture:hands": "scripts/hand-mechanics.sh",
     "capture:room-gameplay": "scripts/capture/room-gameplay.sh",
+    "capture:persistence": "scripts/capture/persistence-proof.sh",
     "view:clean": "npx @iwsdk/cli browser run scripts/capture/clean-view.mjs --timeout 30000",
     "capture:cinematic": "scripts/capture/cinematic.sh",
     "capture:heroes": "scripts/capture/heroes.sh"
