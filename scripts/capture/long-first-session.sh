@@ -6,6 +6,23 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 OUT=${1:-$HOME/Desktop/spinsmith-videos/long-2026-10-25/01-first-session.raw}
 L=scripts/capture/long.sh
+STORAGE="$(mktemp)"
+SAVED=false
+RECORDING=false
+
+cleanup() {
+  if [[ "$RECORDING" == true ]]; then "$L" stop >/dev/null 2>&1 || true; fi
+  if [[ "$SAVED" == true ]]; then
+    SPINSMITH_STORAGE_FILE="$STORAGE" SPINSMITH_STORAGE_MODE=restore \
+      npx @iwsdk/cli browser run scripts/capture/storage.mjs --timeout 30000 >/dev/null 2>&1 || true
+  fi
+  rm -f "$STORAGE"
+}
+trap cleanup EXIT
+mkdir -p "$(dirname "$OUT")"
+SPINSMITH_STORAGE_FILE="$STORAGE" SPINSMITH_STORAGE_MODE=save \
+  npx @iwsdk/cli browser run scripts/capture/storage.mjs --timeout 30000 >/dev/null
+SAVED=true
 npx @iwsdk/cli browser run scripts/clear-resume.mjs --timeout 20000 >/dev/null
 scripts/drive.sh '["fresh"]' >/dev/null
 sleep 2
@@ -14,7 +31,13 @@ scripts/capture/setup.sh >/dev/null
 scripts/capture/prepare-room.sh >/dev/null
 npx @iwsdk/cli browser run scripts/capture/unmute-audio.mjs --timeout 30000 >/dev/null
 $L start "$OUT"
+RECORDING=true
 LONG_CARRY=1 LONG_HOLD=16 $L auto 8
+if [[ "${LONG_FIRST_ONLY:-0}" == 1 ]]; then
+  $L stop
+  RECORDING=false
+  exit 0
+fi
 $L steps '["tap","menu"]' '["wait",4]'
 $L steps '["wait",1.5]' '["tap","forge"]' '["wait",3]'
 $L steps '["wait",1.5]' '["drag","Spur","top"]' '["wait",3]' '["tap","tab_ring"]' '["wait",2.5]' '["tap","tab_core"]' '["wait",2.5]' \
@@ -25,3 +48,4 @@ for _ in 1 2 3 4 5; do
   $L steps '["tap","menu"]' '["wait",4]'
 done
 $L stop
+RECORDING=false

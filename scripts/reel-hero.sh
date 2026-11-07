@@ -7,6 +7,11 @@ R=${1:-$HOME/Desktop/spinsmith-videos/reel-2026-11-05}
 FINAL=${2:-$R/spinsmith-hero-1080p60.mp4}
 S=$R/shots M=$R/shots/more T=$R/takes
 PERSISTENCE=${SPINSMITH_PERSISTENCE_VIDEO:-$HOME/Desktop/spinsmith-videos/persistence-proof/spinsmith-persistence-proof-1080p60.mp4}
+CURRENT_FIRST=$HOME/Desktop/spinsmith-videos/current-build/first-match.raw
+FIRST=${SPINSMITH_FIRST_VIDEO:-}
+if [[ -z "$FIRST" ]]; then
+  if [[ -s "$CURRENT_FIRST" ]]; then FIRST=$CURRENT_FIRST; else FIRST=$T/first.mp4; fi
+fi
 W=1920 H=1080 FPS=60
 FONT=$(realpath public/fonts/Rajdhani-Bold.woff2)
 TAG="drawtext=fontfile=$FONT:text='IWER EMULATOR  /  SYNTHETIC ROOM + TABLE PLANE  /  NOT HEADSET FOOTAGE':fontcolor=white@0.78:fontsize=24:x=w-text_w-24:y=20:box=1:boxcolor=0x111419@0.55:boxborderw=7"
@@ -63,7 +68,7 @@ arena_grid() {
 
 clip 00-hook "$S/hook-ko.mp4" 2.0 5.0 'THE ARENA IS THE WEAPON' 'Squeeze the live bowl  /  throw the rival off your desk'
 split_room
-clip 02-rip "$T/first.mp4" 3.0 16.0 'ONE UNBROKEN EXCHANGE' 'Carry  /  rip  /  raise a ramp  /  watch the collision'
+clip 02-rip "$FIRST" 3.0 16.0 'ONE UNBROKEN EXCHANGE' 'Carry  /  rip  /  raise a ramp  /  watch the collision'
 clip 03-ramp "$M/ramp.mp4" 0.5 3.0 'RAISE A RAMP' 'Touch the bowl and change the next collision'
 clip 04-squeeze "$S/close-squeeze.mp4" 0.3 4.0 'BEND THE FIGHT' 'Squeeze  /  stretch  /  tilt  /  twist'
 clip 05-flick "$S/flick.mp4" 0.2 3.0 'YOUR FINGERTIP IS PHYSICS' 'Flick a top at the exact moment it opens'
@@ -83,8 +88,10 @@ segments+=(13-end)
 
 printf "file '%s.mp4'\n" "${segments[@]/#/$TMP/}" > "$TMP/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/joined.mp4"
-ffmpeg -y -loglevel error -i "$TMP/joined.mp4" -c:v copy -af loudnorm=I=-14:TP=-1.5:LRA=11 \
-  -c:a aac -b:a 256k -ar 48000 -movflags +faststart "$FINAL"
+ffmpeg -y -loglevel error -i "$TMP/joined.mp4" -f lavfi \
+  -i "aevalsrc='0.003*sin(2*PI*55*t)+0.0015*sin(2*PI*82.5*t)':s=48000:c=stereo" \
+  -filter_complex "[0:a][1:a]amix=inputs=2:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11[a]" \
+  -map 0:v -map '[a]' -c:v copy -c:a aac -b:a 256k -ar 48000 -movflags +faststart "$FINAL"
 duration=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$FINAL")
 awk -v d="$duration" 'BEGIN { if (d < 60 || d > 75) exit 1 }' || { echo "Hero cut must be 60-75 seconds, got $duration" >&2; exit 1; }
 echo "$FINAL ($duration s)"
