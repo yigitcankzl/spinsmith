@@ -259,7 +259,8 @@ export class Hub {
     this.rankFrom = { progress, nextMatch };
     this.drawRank(false);
     // Coming home, the stations pop up one after another.
-    if (!this.root.visible) this.shownAt = this.time;
+    const opening = !this.root.visible;
+    if (opening) this.shownAt = this.time;
     this.root.visible = true;
     // Before the first match the smithy is just your top and the arena: the anvil, the arena
     // shelf and the workshop come once the player knows a fight.
@@ -270,6 +271,9 @@ export class Hub {
     this.beacon.visible = progress.guide !== 'done';
     this.pathOn = progress.guide === 'launch' || progress.guide === 'bump' || progress.guide === 'match';
     this.teaching = progress.guide !== 'done';
+    // Keep accessibility discoverable without leaving its long description beside the only first-
+    // session action. The dial remains usable; its plate returns whenever the player points at it.
+    if (opening && this.teaching) this.comfortShow = Math.max(this.comfortShow, 3);
     // The brawl pegs wait until the first session is over: one top and one verb first.
     this.brawlPegs.visible = !this.teaching;
     // The board and the champions come once the first session is over.
@@ -407,16 +411,13 @@ export class Hub {
     this.hoverWas = hovered;
     // The comfort plate lies beside the dial while either is pointed at, and a moment after.
     if (hovered?.action.kind === 'comfort' || hovered?.action.kind === 'comfortToggle') this.comfortShow = Math.max(this.comfortShow, 1.5);
-    // Through a new smith's first session home shows where comfort lives (Quiet, One hand, Large
-    // text...), without waiting for a hand to find the dial.
-    if (this.teaching) this.comfortShow = Math.max(this.comfortShow, 0.3);
     this.comfortShow = Math.max(0, this.comfortShow - dt);
     this.comfortGroup.visible = !this.photoMode && this.comfortShow > 0;
     this.items.forEach((it, i) => {
       const on = it === hovered;
-      // The three stations always say what they are; the rest only in the first session or when pointed at.
-      const station = it.action.kind === 'play' || it.action.kind === 'forge' || it.action.kind === 'workshop';
-      if (it.name) it.name.visible = !this.photoMode && ((!it.quiet && (this.teaching || station)) || on);
+      // PLAY is the only permanent call to action. Secondary stations name themselves on hover.
+      const primary = it.action.kind === 'play';
+      if (it.name) it.name.visible = !this.photoMode && ((!it.quiet && (this.teaching || primary)) || on);
       const p = popIn(this.time - this.shownAt, i);
       const k = (on ? 1.15 + 0.03 * Math.sin(this.time * 8) : 1) * Math.max(0.001, p);
       it.model.scale.setScalar(k);
