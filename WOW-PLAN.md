@@ -98,9 +98,10 @@ Completed on 2026-10-18 in four isolated feature commits plus a capture pass:
   and ember shoulder seam; touchable UI plates now use the same brass perimeter language.
 - Repeatable `capture:heroes` evidence now records a real two-hand forge pose and only captures
   DESK KO after the production palm path asserts +3, a 3–0 score and a persisted trophy.
-- Capture uses a 55° seated camera, synthetic-hand wrist fade, a disclosed CC0 backdrop and the
-  NVIDIA PRIME path. `gpu-info.mjs` verified the renderer as RTX 4060. The captures still say
-  `IWER EMULATOR · CC0 360° ENVIRONMENT · NO HEADSET FOOTAGE` in-frame.
+- Capture uses a 55° seated camera, synthetic-hand wrist fade and a disclosed CC0 backdrop. Record
+  the renderer identity with `gpu-info.mjs` for each take; the current verified path is hardware
+  Vulkan. The captures still say `IWER EMULATOR · CC0 360° ENVIRONMENT · NO HEADSET FOOTAGE`
+  in-frame.
 
 Still intentionally unclaimed: physical Quest frame rate, real Quest hand reliability, real depth
 occlusion and real passthrough alignment. Those remain device-test work.

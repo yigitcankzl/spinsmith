@@ -5,9 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "iwsdk dev restart --open --allow-browser-automation --foreground",
-    "dev:nvidia": "iwsdk dev restart --open --allow-browser-automation --foreground",
     "dev:runtime": "scripts/dev-runtime.sh",
-    "dev:runtime:nvidia": "scripts/dev-runtime.sh",
     "dev:down": "iwsdk dev down",
     "dev:status": "iwsdk dev status",
     "reference:status": "iwsdk reference status",

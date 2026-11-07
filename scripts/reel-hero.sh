@@ -63,7 +63,7 @@ clip 08-brawl "$T/brawl.mp4" 0.8 7.0 'FOUR-TOP BRAWL' 'The arena opens out  /  l
 clip 09-forge "$S/forge.mp4" 2.8 5.0 'FORGE YOUR FIGHTER' 'Drag real parts  /  every build changes the physics'
 clip 10-workshop "$S/workshop.mp4" 7.6 4.0 'FORGE YOUR ARENA' 'Shape the floor  /  place hazards and boosts'
 arena_grid
-clip 12-return "$M/hub-map.mp4" 1.4 4.0 'A REASON TO RETURN' 'Daily order  /  streak  /  circuit map  /  rivals'
+clip 12-return "$M/hub-map.mp4" 1.4 4.0 'YOUR TABLE REMEMBERS' 'Daily order  /  streak  /  champion tops  /  rival record'
 
 ffmpeg -y -loglevel error -ss 3.6 -t 4 -i "$S/hook-ko.mp4" -f lavfi \
   -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3)))':s=48000:c=stereo:d=4" \
