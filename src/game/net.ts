@@ -73,11 +73,23 @@ export type NetMsg =
   | { type: 'bye' };
 
 const MSG_TYPES = new Set(['hello', 'start', 'snapshot', 'event', 'hands', 'ack', 'result', 'bye']);
+const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const vec3 = (value: unknown): value is Vec3 => Array.isArray(value) && value.length === 3 && value.every(finite);
+const pair = (value: unknown): value is [number, number] => Array.isArray(value) && value.length === 2 && value.every(finite);
 
 /** Accepts a decoded wire message only if it looks like ours; anything else is dropped. */
 export function parseMsg(data: unknown): NetMsg | null {
   const m = typeof data === 'string' ? safeJson(data) : data;
   if (!m || typeof m !== 'object' || !MSG_TYPES.has((m as { type?: string }).type ?? '')) return null;
+  const msg = m as Record<string, unknown>;
+  if (msg.type === 'start' && !(typeof msg.arena === 'string' && msg.arena.length > 0 && msg.arena.length <= 80
+    && finite(msg.seed) && Number.isInteger(msg.round)
+    && (msg.builds === undefined || (Array.isArray(msg.builds) && msg.builds.length === 2
+      && msg.builds.every((build) => typeof build === 'string' && build.length <= 64))))) return null;
+  if (msg.type === 'result' && !([1, -1, 2].includes(msg.winner as number) && pair(msg.heat))) return null;
+  if (msg.type === 'hands' && !(Number.isInteger(msg.seq) && (msg.seq as number) >= 0
+    && (msg.l === null || vec3(msg.l)) && (msg.r === null || vec3(msg.r))
+    && typeof msg.lp === 'boolean' && typeof msg.rp === 'boolean')) return null;
   return m as NetMsg;
 }
 

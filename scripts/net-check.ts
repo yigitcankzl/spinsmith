@@ -52,6 +52,13 @@ function curve(i: 0 | 1, tMs: number): TopLike {
   assert.equal(parseMsg('{"type":"nope"}'), null);
   assert.equal(parseMsg('not json'), null);
   assert.equal(parseMsg('{"type":"bye"}')?.type, 'bye');
+  for (const bad of [
+    { type: 'result', winner: 1, heat: null },
+    { type: 'start', arena: 'Forge Bowl', seed: 0, round: NaN },
+    { type: 'hands', seq: 1, l: [0, Infinity, 0], r: null, lp: false, rp: false },
+  ]) assert.equal(parseMsg(bad), null, `malformed ${bad.type} packet is dropped`);
+  assert.deepEqual(parseMsg({ type: 'result', winner: -1, heat: [2, 3] }), { type: 'result', winner: -1, heat: [2, 3] });
+  assert.deepEqual(parseMsg({ type: 'hands', seq: 4, l: [0, 0.1, 0], r: null, lp: true, rp: false }), { type: 'hands', seq: 4, l: [0, 0.1, 0], r: null, lp: true, rp: false });
   const reveal = parseMsg({ type: 'start', arena: 'Forge Bowl', seed: 0, round: 1, builds: ['HOST', 'GUEST'] });
   assert.deepEqual(reveal?.type === 'start' ? reveal.builds : null, ['HOST', 'GUEST'], 'a round start carries both committed deck reveals');
 }
