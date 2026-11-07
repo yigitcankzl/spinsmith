@@ -1,6 +1,6 @@
 // SpinSmith's service worker. The install pass follows the built index and stores its hashed app
 // bundle, so the *next* launch works offline even if the app has not already been reloaded once.
-const CACHE = 'spinsmith-v2';
+const CACHE = 'spinsmith-v3';
 const CORE = [
   './',
   './index.html',
@@ -24,14 +24,14 @@ async function seed() {
   const cache = await caches.open(CACHE);
   const urls = CORE.map((path) => new URL(path, self.registration.scope).href);
   // The built HTML names Vite's content-hashed JavaScript and CSS. Store those too rather than
-  // guessing their names here. Optional files may fail without aborting the whole installation.
+  // guessing their names here. The worker must not activate unless the complete app shell exists.
   const index = await store(cache, urls[0]);
   const html = await index.text();
   for (const match of html.matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
     const url = new URL(match[1], self.registration.scope);
     if (url.origin === self.location.origin) urls.push(url.href);
   }
-  await Promise.allSettled([...new Set(urls.slice(1))].map((url) => store(cache, url)));
+  await Promise.all([...new Set(urls.slice(1))].map((url) => store(cache, url)));
 }
 
 self.addEventListener('install', (e) => e.waitUntil(seed().then(() => self.skipWaiting())));
