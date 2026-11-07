@@ -53,7 +53,7 @@ arena_grid() {
 
 clip 00-hook "$S/hook-ko.mp4" 2.0 5.0 'THE ARENA IS THE WEAPON' 'Squeeze the live bowl  /  throw the rival off your desk'
 split_room
-clip 02-rip "$T/first.mp4" 0.0 5.0 'PINCH  PULL  RIP' 'Hands only  /  seated  /  no controllers'
+clip 02-rip "$T/first.mp4" 3.0 16.0 'ONE UNBROKEN EXCHANGE' 'Carry  /  rip  /  raise a ramp  /  watch the collision'
 clip 03-ramp "$M/ramp.mp4" 0.5 3.0 'RAISE A RAMP' 'Touch the bowl and change the next collision'
 clip 04-squeeze "$S/close-squeeze.mp4" 0.3 4.0 'BEND THE FIGHT' 'Squeeze  /  stretch  /  tilt  /  twist'
 clip 05-flick "$S/flick.mp4" 0.2 3.0 'YOUR FINGERTIP IS PHYSICS' 'Flick a top at the exact moment it opens'
