@@ -137,8 +137,9 @@ current-build capture and add physical-headset footage if a Quest becomes availa
 - **In the emulator, with emulated hands:** the first match's rip, ramp and two-hand forge;
   campaign bouts and medals; four-top brawls; PASS; the one-hand forge; online pairing, rounds,
   scores and live hands.
-- **Render budget (emulator, per eye, 2026-10-23, saved runs in `artifacts/perf/`):** 47-117 draw
-  calls in every saved state incl. a 4-top brawl (97) (budget 150, the script fails above it); the
+- **Render budget (desktop IWER, per eye, 2026-11-07):** the automated matrix measures hub 99,
+  forge 99, workshop 85, a normal fight up to 118 and a 4-top brawl up to 136 draw calls per eye
+  (budget 150; the script fails above it); the
   game's update 0.4-1.4 ms median; GPU 0.86 ms median on the timed scene. Under a 4x CPU throttle
   the page drops to 24-35 fps and the GPU timer shows that frame is CPU-side submission and the
   emulator; the quality guard steps down when frames run long (tested under throttle). Real Quest
@@ -165,4 +166,4 @@ current-build capture and add physical-headset footage if a Quest becomes availa
 - Upload the competition MP4 to the video host accepted by Devpost and paste the public link.
 - A physical Quest is unavailable, so 72/90 fps, true hand tracking, passthrough, real-table
   placement, depth-edge quality, anchor drift, gaze input and store packaging remain unverified.
-  The systems and fallbacks pass IWER tests only (all suites green 2026-11-05); do not describe them as device-tested.
+  The systems and fallbacks pass the listed IWER tests only; do not describe them as device-tested.
