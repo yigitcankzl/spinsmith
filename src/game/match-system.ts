@@ -17,7 +17,7 @@ import type { ArenaLayout } from './layout.js';
 import { CROSSGUARD_LIVE, crossguardLive, movingOut, RUB_MIN, RUB_SLACK, RUB_WINDOW_MAX, spinRub, controlSeal, crossguardCrosses, emberBumper, EMBER_RIVAL_KICK, fingerContact, fingerTouches, FINGER_RADIUS, FLICK_HARD, rivalMove, sealStrike, sealTarget, SEALS, springRim, stableHeading, TELL_TIME, Arena, ATTACK, CUP_DEPTH, CUP_SIGMA, DEFENSE, finishPoints, HAMMER_TIME, MATCH_HEAT, RIVAL_RAMP_SIGMA, LAUNCH_SPEED, LAUNCH_TILT, launchSpeed, launchSpin, rankingN, roundOverN, step, stepN, STEP, TILT, Top, TopSpec, TUNING, verdict, WARD_HALF, WARD_TIME } from './sim.js';
 import type { Clash, FloorShape, RivalMove, Seal, ShapeKind } from './sim.js';
 import { Forge, FORGE_SINK, loadBuild, saveBuild, sealModel } from './forge.js';
-import { FEATS, MARK, Progress, VERB_RELEASE } from './progress.js';
+import { FEATS, FLICK_RELEASE, MARK, Progress, STRIKE_RELEASE, VERB_RELEASE } from './progress.js';
 import { CLAIM, LESSON, lessonText } from './lessons.js';
 import { HUB_NOTE } from './hub-copy.js';
 import type { OpeningZone, ReleasedVerb } from './progress.js';
@@ -5625,7 +5625,7 @@ export class MatchSystem extends createSystem({
     const m = this.progress.matches;
     // The two-hand forge is the first match's second lesson.
     if (verb === 'forge') return m >= 1 || (m === 0 && this.tutorialRound >= 2);
-    if (verb === 'strike') return m >= 1;
+    if (verb === 'strike') return m >= STRIKE_RELEASE;
     if (verb === 'tells') return m >= 3;
     return !!this.online || this.extras.length > 0 || this.everyVerb || m >= VERB_RELEASE[verb];
   }
@@ -5879,7 +5879,7 @@ export class MatchSystem extends createSystem({
    */
   private updateFlick(dt: number) {
     // Direct touch is always usable, but its lesson waits until the player has finished one match.
-    if (!this.flickHintShown && this.flickCount === 0 && this.progress.matches >= 1 && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
+    if (!this.flickHintShown && this.flickCount === 0 && this.progress.matches >= FLICK_RELEASE && this.theirs.alive && this.theirs.spin < 0.5 && this.charges.charges >= 1
       && this.elapsed > TUNING.grace && normRadius(this.arena.layout, this.theirs.x, this.theirs.z) > 0.6 && this.labelTimer <= 0
       && Math.max(this.myPoints, this.theirPoints) < MATCH_HEAT - 1) {
       this.flickHintShown = true;
@@ -8056,7 +8056,7 @@ export class MatchSystem extends createSystem({
     }
     // The first strike's ghost pinches the docked seal and stamps it into the floor; once the
     // palm-slap fallback mark is up, the second ghost slaps a flat palm onto it.
-    if (!ghost && this.phase === 'fight' && !this.demo && this.progress.matches === 1 && !this.struckOnce && this.taught('strike')
+    if (!ghost && this.phase === 'fight' && !this.demo && this.progress.matches === STRIKE_RELEASE && !this.struckOnce && this.taught('strike')
       && this.overforgeSeal.visible && !this.overforgeHeld && !this.overforgeControl) {
       const { x: sx, y: sy, z: sz } = this.overforgeSeal.position;
       const h = this.arena.height(0, 0);

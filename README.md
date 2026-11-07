@@ -56,7 +56,7 @@ From a scripted first session in IWER on 2026-11-07 (a bot that reads each card 
 | Finger Groove | Slide fingertip, then lift | Match 8 |
 | Forge Wheel | Turn the near wheel | Match 9 |
 
-Each later verb comes with its own NEW MOVE card (`VERB_RELEASE` and `VERB_CARD` in `src/game/progress.ts`). Online duels, brawls and the `?demo` save (level 8) have every verb. Every one-hand gesture (rip, ramp, cup, strike) works with either hand. Per-verb tuning is in [DESIGN.md](DESIGN.md); Flick's measured effect comes from `npm run report:flick`.
+Each later match teaches one move: Rim Spring, Forge Gust, Cup/Sling, Strike, Flick, then the remaining `VERB_RELEASE` moves, each with its own NEW MOVE card. Online duels, brawls and the `?demo` save have every verb. Every one-hand gesture (rip, ramp, cup, strike) works with either hand. Per-verb tuning is in [DESIGN.md](DESIGN.md); Flick's measured effect comes from `npm run report:flick`.
 
 ## Measured performance (IWER on a desktop GPU, not a Quest)
 

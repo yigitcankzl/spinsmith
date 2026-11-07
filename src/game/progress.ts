@@ -124,12 +124,15 @@ export const STAMP_UNLOCKS: Record<number, string> = {
 /**
  * Hand verbs past the first match's lessons (rip, ramp and Arena Forge) arrive one per
  * completed match, most useful first (headless win points over doing nothing: spring +10, gust
- * +8.9, ember +7.4, rub +5.9, crossguard +5.1; cup, groove and wheel unmeasured). The value is the
- * completed-match count that releases the verb; its card shows as that match ends. Online, brawl
- * and the demo save (level 8) play with every verb.
+ * +8.9, ember +7.4, rub +5.9, crossguard +5.1; cup, groove and wheel unmeasured). Strike and Flick
+ * take matches 5 and 6, so later verbs resume after them. The value is the completed-match count
+ * that releases the verb; its card shows as that match ends. Online, brawl and the demo save play
+ * with every verb.
  */
 // Cup and sling come third: campaign bout 1-4 (the fourth match) teaches them and asks for a cup medal.
-export const VERB_RELEASE = { spring: 1, gust: 2, cup: 3, ember: 4, rub: 5, crossguard: 6, groove: 7, wheel: 8 } as const;
+export const STRIKE_RELEASE = 4;
+export const FLICK_RELEASE = 5;
+export const VERB_RELEASE = { spring: 1, gust: 2, cup: 3, ember: 6, rub: 7, crossguard: 8, groove: 9, wheel: 10 } as const;
 export type ReleasedVerb = keyof typeof VERB_RELEASE;
 /** The unlock card for each released verb: name, and what the hand does (at most CARD_HOW_WORDS words). */
 export const VERB_CARD: Record<ReleasedVerb, [string, string]> = {

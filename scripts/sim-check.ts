@@ -8,7 +8,7 @@ import { ARENAS } from '../src/game/arenas.ts';
 import { brawlLayout, cloneLayout, rimRadius, validate } from '../src/game/layout.ts';
 import type { ArenaLayout } from '../src/game/layout.ts';
 import { SHAPING, ShapingCharges, STRIKE_BAR, StrikeBar } from '../src/game/shaping.ts';
-import { ARENA_UNLOCKS, CHAMPIONS, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, rankOf, RIVAL_UNLOCKS, STAMP_UNLOCKS, STREAK_XP, VERB_CARD, VERB_RELEASE, verbReleasedAt, xpToNext } from '../src/game/progress.ts';
+import { ARENA_UNLOCKS, CHAMPIONS, FLICK_RELEASE, LEVEL_UNLOCKS, MARK, MAX_LEVEL, Progress, rankOf, RIVAL_UNLOCKS, STAMP_UNLOCKS, STREAK_XP, STRIKE_RELEASE, VERB_CARD, VERB_RELEASE, verbReleasedAt, xpToNext } from '../src/game/progress.ts';
 import { canKnockOut, dailyOrder, localDate, orderMet } from '../src/game/orders.ts';
 import type { OrderEvent } from '../src/game/orders.ts';
 import { reportArena } from '../src/game/arena-report.ts';
@@ -984,8 +984,9 @@ TUNING.grace = 0;
 // card) is released per completed match, the most useful (measured) first.
 {
   const order = Object.entries(VERB_RELEASE).sort((a, b) => a[1] - b[1]);
-  assert.deepEqual(order.map(([, m]) => m), order.map((_, i) => i + 1), 'one verb per completed match, from the second match on');
-  assert.deepEqual(order.filter(([v]) => v !== 'cup').slice(0, 5).map(([v]) => v), ['spring', 'gust', 'ember', 'rub', 'crossguard'], 'measured verbs arrive by win points');
+  const taught = [...order.map(([, m]) => m), STRIKE_RELEASE, FLICK_RELEASE].sort((a, b) => a - b);
+  assert.deepEqual(taught, taught.map((_, i) => i + 1), 'exactly one new move is taught per completed match');
+  assert.deepEqual(order.slice(0, 3).map(([v]) => v), ['spring', 'gust', 'cup'], 'the first circuit keeps its authored lessons');
   // Bouts 1-2 to 1-4 teach the move the previous match's card just released (bout n is match n).
   for (let i = 1; i <= 3; i++) assert.ok(BOUTS[i].lesson.toLowerCase().includes(VERB_CARD[verbReleasedAt(i)!][0].split(' ')[0].toLowerCase()), `bout ${BOUTS[i].id} teaches ${verbReleasedAt(i)}`);
   // Campaign lessons and medals only ask for a verb its bout has released (bout n is match n).
@@ -996,7 +997,7 @@ TUNING.grace = 0;
     const [name, blurb] = VERB_CARD[v as keyof typeof VERB_CARD];
     assert.ok(name.length > 0 && name.length <= 16 && blurb.length > 0 && blurb.length <= 60, `${v} has one short unlock card`);
   }
-  assert.equal(verbReleasedAt(order.length + 1), undefined);
+  assert.equal(verbReleasedAt(Math.max(...Object.values(VERB_RELEASE)) + 1), undefined);
 }
 
 // 14d. The first match teaches with ghost hands, not paragraphs: every prompt a new smith reads in
