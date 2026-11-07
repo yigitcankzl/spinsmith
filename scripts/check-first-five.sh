@@ -9,12 +9,23 @@ cd "$(dirname "$0")/.."
 CLI=(npx @iwsdk/cli)
 PROBE=scripts/check-first-five.mjs
 LEASES=${FIRST_FIVE_LEASES:-8}
+STORAGE="$(mktemp)"
+
+restore_storage() {
+  SPINSMITH_STORAGE_FILE="$STORAGE" SPINSMITH_STORAGE_MODE=restore \
+    "${CLI[@]}" browser run scripts/capture/storage.mjs --timeout 30000 >/dev/null 2>&1 || true
+  rm -f "$STORAGE"
+}
+trap restore_storage EXIT
 
 status="$("${CLI[@]}" dev status)"
 jq -e '.data.state.browserCommandReady == true' >/dev/null <<<"$status" || {
   echo 'Managed IWSDK browser is not ready. Run: npx @iwsdk/cli dev up' >&2
   exit 1
 }
+
+SPINSMITH_STORAGE_FILE="$STORAGE" SPINSMITH_STORAGE_MODE=save \
+  "${CLI[@]}" browser run scripts/capture/storage.mjs --timeout 30000 >/dev/null
 
 echo 'first-five: fresh save, reload' >&2
 FIRST_FIVE_PART=fresh "${CLI[@]}" browser run "$PROBE" --timeout 30000 >/dev/null

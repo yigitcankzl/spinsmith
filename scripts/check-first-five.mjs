@@ -99,7 +99,15 @@ export default async function run({ page, frame }) {
           if (ff.started && !ff.done) {
             const t = now();
             const ko = v !== 2 && how !== 'spin' && how !== null;
-            ff.events.push({ at: t, winner: v === 1 ? 'you' : v === -1 ? 'rival' : 'draw', finish: deskKo ? 'desk' : how, round: this.tutorialRound, heat: [...this.barPoints] });
+            ff.events.push({
+              at: t,
+              winner: v === 1 ? 'you' : v === -1 ? 'rival' : 'draw',
+              finish: deskKo ? 'desk' : how,
+              round: this.tutorialRound,
+              heat: [...this.barPoints],
+              causeChain: this.causeCue?.stage ?? 0,
+              cause: this.lastCause,
+            });
             if (ko) ff.firstAnyKo ??= t;
             if (ko && v === 1) ff.firstKo ??= t;
             if (deskKo && v === 1) ff.firstDeskKo ??= t;
@@ -280,6 +288,9 @@ export default async function run({ page, frame }) {
     else if (result.secondsTo.matchEnd >= 300) fails.push(`first match ended at ${result.secondsTo.matchEnd} s (want < 300 s)`);
     for (const verb of ['carry', 'rip', 'ramp', 'arenaForge']) if (!result.verbs.performed[verb]) fails.push(`${verb} was not performed`);
     for (const verb of ['strike', 'flick']) if (result.verbs.taught[verb] !== undefined) fails.push(`${verb} was taught during the overloaded first match`);
+    if (!result.rounds.some((round) => round.winner === 'you' && round.finish !== 'spin' && round.causeChain === 3 && /^YOUR /.test(round.cause))) {
+      fails.push('no natural player knockout showed the full hand move → impact → finish cause chain');
+    }
     if (result.prompts.distinctToMatchEnd > 10) fails.push(`${result.prompts.distinctToMatchEnd} prompts before match end (want <= 10)`);
     if (result.prompts.wordsToMatchEnd > 45) fails.push(`${result.prompts.wordsToMatchEnd} prompt words before match end (want <= 45)`);
     if (result.errors.length) fails.push(`driver errors: ${result.errors.join('; ')}`);

@@ -7423,12 +7423,14 @@ export class MatchSystem extends createSystem({
           this.accumulator = 0;
           const charge = this.charges.reward();
           this.forgeBar.value = Math.min(1, this.forgeBar.value + 0.12);
-          if (heroRamp || !this.quietFirst) this.stamp.show(
-            heroRamp ? 'YOU CHANGED THE FIGHT' : `${s.kind === 'well' ? 'CUP' : s.kind === 'groove' ? 'GROOVE' : 'RAMP'} → ${s.kind === 'groove' ? 'DASH' : 'IMPACT'}`,
-            heroRamp ? 'RAMP → IMPACT' : `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`,
+          // The first ramp already has a lesson card, a visible cause trace and usually an immediate
+          // finish stamp. A second text stamp here made the opening harder to read, not clearer.
+          if (!this.quietFirst) this.stamp.show(
+            `${s.kind === 'well' ? 'CUP' : s.kind === 'groove' ? 'GROOVE' : 'RAMP'} → ${s.kind === 'groove' ? 'DASH' : 'IMPACT'}`,
+            `${charge ? '+CHARGE · ' : ''}+ULTIMATE HEAT`,
             'mine',
-            heroRamp ? 0.7 : 0.5,
-            heroRamp ? 1.15 : 1.05,
+            0.5,
+            1.05,
           );
         }
       }
