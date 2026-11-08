@@ -95,7 +95,7 @@ split 01-room "YOUR DESK IS THE RING-OUT" 4.4 "$S/tray-squeeze.mp4" "${TRAY_AT:-
 EXTRA="drawtext=fontfile=$FONT:text='FROM HOME  %{eif\\:t\\:d\\:2}.%{eif\\:mod(t*10\\,10)\\:d} s':fontcolor=0xffa24a:fontsize=64:x=w-text_w-40:y=70:box=1:boxcolor=0x111419@0.74:boxborderw=14" \
   PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.05" clip 02-first "$T/first.mp4" "$FIRST_AT" "$FIRST_LEN" "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"
 # 5. Its last card: one new move every match.
-PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" clip 04-won "$S/match-won-cards.mp4" "$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 3.0))")" 2.8 "ONE NEW MOVE EVERY MATCH" "The last card names the next move and the next rival"
+PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" clip 04-won "$S/match-won-cards.mp4" "$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - ${WON_LEN:-2.8} - 0.2))")" "${WON_LEN:-2.8}" "ONE NEW MOVE EVERY MATCH" "The last card names the next move and the next rival"
 # 6. The core moves up close.
 clip 05-squeeze "$S/close-squeeze.mp4" 0.3 3.0 "TWO HANDS ON THE RIM" "Squeeze  /  stretch  /  tilt  /  twist the live bowl"
 clip 06-flick "$S/flick.mp4" 0.2 2.7 "FLICK" "Your fingertip is part of the physics"
@@ -103,14 +103,14 @@ clip 07-guard "$S/close-crossguard.mp4" 0.0 2.6 "CROSSGUARD" "Two still palms ma
 clip 08-rub "$S/close-rub.mp4" 0.6 2.4 "SPIN RUB" "A fingertip along your rim spins it back up"
 clip 09-strike "$S/seal-stamp.mp4" 0.8 3.6 "STAMP AN ULTIMATE" "Pinch the seal  /  press it into the bowl"
 # 7. Every other move, two at a time, each from the moment it acts.
-pair 10a "ONE HAND" 2.6 "$M/ramp.mp4" 0.5 "RAMP" "$M/rim-spring.mp4" 0.9 "RIM SPRING"
-pair 10b "ONE HAND" 2.6 "$M/gust.mp4" 0.4 "FORGE GUST" "$M/cup-sling.mp4" 0.6 "CUP AND SLING"
-pair 11a "FINGERTIPS" 2.6 "$M/groove.mp4" 0.6 "FINGER GROOVE" "$M/ember.mp4" "${EMBER_AT:-3.2}" "EMBER RIVET"
-pair 11b "PALMS AND THE TABLE" 2.6 "$M/wheel.mp4" 0.4 "FORGE WHEEL" "$M/outer-ring.mp4" "${OUTER_AT:-3.4}" "OUTER RING CATCH"
-pair 12a "BEND THE ARENA" 2.6 "$M/forge-twist.mp4" 0.5 "TWIST AND TILT" "$M/forge-stretch.mp4" 0.6 "STRETCH"
-pair 12b "THE ULTIMATES" 2.6 "$M/slap.mp4" 1.0 "SLAP THE TABLE" "$M/seal-rush.mp4" "${ULT_AT:-1.3}" "RUSH"
-pair 13a "THE ULTIMATES" 2.6 "$M/seal-magnet.mp4" "${ULT_AT:-1.3}" "MAGNET" "$M/seal-tilt.mp4" "${ULT_AT:-1.3}" "TILT"
-[ -s "$M/seal-hammer.mp4" ] && pair 13b "THE ULTIMATES" 2.6 "$M/seal-hammer.mp4" "${ULT_AT:-1.3}" "HAMMER" "$M/seal-ward.mp4" "${WARD_AT:-1.5}" "WARD" || clip 13b "$M/seal-ward.mp4" "${WARD_AT:-1.5}" 2.6 "WARD" "A ring that turns the rival away"
+pair 10a "ONE HAND" "${PAIR_LEN:-2.6}" "$M/ramp.mp4" 0.5 "RAMP" "$M/rim-spring.mp4" 0.9 "RIM SPRING"
+pair 10b "ONE HAND" "${PAIR_LEN:-2.6}" "$M/gust.mp4" 0.4 "FORGE GUST" "$M/cup-sling.mp4" 0.6 "CUP AND SLING"
+pair 11a "FINGERTIPS" "${PAIR_LEN:-2.6}" "$M/groove.mp4" 0.6 "FINGER GROOVE" "$M/ember.mp4" "${EMBER_AT:-3.2}" "EMBER RIVET"
+pair 11b "PALMS AND THE TABLE" "${PAIR_LEN:-2.6}" "$M/wheel.mp4" 0.4 "FORGE WHEEL" "$M/outer-ring.mp4" "${OUTER_AT:-3.4}" "OUTER RING CATCH"
+pair 12a "BEND THE ARENA" "${PAIR_LEN:-2.6}" "$M/forge-twist.mp4" 0.5 "TWIST AND TILT" "$M/forge-stretch.mp4" 0.6 "STRETCH"
+pair 12b "THE ULTIMATES" "${PAIR_LEN:-2.6}" "$M/slap.mp4" 1.0 "SLAP THE TABLE" "$M/seal-rush.mp4" "${ULT_AT:-1.3}" "RUSH"
+pair 13a "THE ULTIMATES" "${PAIR_LEN:-2.6}" "$M/seal-magnet.mp4" "${ULT_AT:-1.3}" "MAGNET" "$M/seal-tilt.mp4" "${ULT_AT:-1.3}" "TILT"
+[ -s "$M/seal-hammer.mp4" ] && pair 13b "THE ULTIMATES" 2.6 "$M/seal-hammer.mp4" "${ULT_AT:-1.3}" "HAMMER" "$M/seal-ward.mp4" "${WARD_AT:-1.5}" "WARD" || clip 13b "$M/seal-ward.mp4" "${WARD_AT:-1.5}" "${PAIR_LEN:-2.6}" "WARD" "A ring that turns the rival away"
 # 8. The bosses cast your ultimates back.
 [ -n "${BOSSI_AT:-}" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 135-bossintro "$T/boss.mp4" "$BOSSI_AT" "${BOSSI_LEN:-2.8}" "THREE BOSSES" "Each one casts one of your ultimates back at you"
 PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 14-boss "$T/boss.mp4" "$BOSS_AT" "$BOSS_LEN" "IRON KEEP CASTS TILT" "A ghost palm warns you  /  answer with your own"
@@ -137,10 +137,10 @@ clip 23-workshop "$S/workshop.mp4" "${WORKSHOP_AT:-7.6}" "${WORKSHOP_LEN:-3.4}" 
 # 13. The home board: today's order and streak, then the Circuit Map (a demo save).
 PRE="${BOARD_PRE:-crop=iw*0.4:ih*0.4:iw*0.3:ih*0.06}" clip 24-board "$M/hub-map.mp4" "${BOARD_AT:-1.4}" "${BOARD_LEN:-4.0}" "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
 # 14. End card, the game's motif under it.
-ffmpeg -y -loglevel error -ss 3.6 -t 5 -i "$S/hook-ko.mp4" \
-  -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=5" \
+ffmpeg -y -loglevel error -ss 3.6 -t "${END_LEN:-5}" -i "$S/hook-ko.mp4" \
+  -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=${END_LEN:-5}" \
   -map 0:v -map 1:a -vf "scale=$W:$H:force_original_aspect_ratio=increase,crop=$W:$H,fps=$FPS,gblur=sigma=16,eq=brightness=-0.42:saturation=0.7,drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=(h-text_h)/2-90,drawtext=fontfile=$FONT:text='The arena is the weapon. Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=54:x=(w-text_w)/2:y=h/2+40,drawtext=fontfile=$FONT:text='Hands only  /  seated  /  Meta Quest 3 and 3S  /  play it in the Quest Browser, link on the Devpost page':fontcolor=0xe7edf4@0.75:fontsize=34:x=(w-text_w)/2:y=h/2+125,$TAG" \
-  -t 5 "${enc[@]}" "$TMP/25-end.mp4"
+  -t "${END_LEN:-5}" "${enc[@]}" "$TMP/25-end.mp4"
 segs+=(25-end)
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"

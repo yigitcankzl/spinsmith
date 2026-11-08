@@ -102,7 +102,7 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (2:00, cut 2026-11-09, with the game's sound)
+## Competition video (2:54, cut 2026-11-09, with the game's sound)
 
 The one sentence the video must show: *The arena is the weapon: squeeze it and throw the rival off
 your desk.*
@@ -110,21 +110,21 @@ your desk.*
 | Time | Shot | Point proved |
 |---|---|---|
 | 0:00-0:05 | Both hands squeeze the bowl on the table's corner; the rival goes over the real edge: DESK KO (first match, guided; labelled) | The one beat that needs your desk, first |
-| 0:05-0:09 | YOUR DESK IS THE RING-OUT: the same squeeze with no table found (the arena on its own, a normal ring-out) and on a detected table (off the desk, +1) | The room changes the outcome |
-| 0:09-0:20 | A NEW PLAYER, UNCUT, with a clock FROM HOME: carry the top in, the rival's portal, ghost-hand rip, first ramp | Hands only; the game teaches by showing |
-| 0:20-0:22 | The first match's last card: one new move every match, the next rival | Why play match 2 |
-| 0:22-0:37 | Squeeze, flick, Crossguard, Spin Rub, stamp an ultimate, up close | The core hands |
-| 0:37-0:57 | Every other move two at a time, each from the moment it acts: ramp, rim spring, forge gust, cup and sling, finger groove, ember rivet, forge wheel, outer ring catch, twist and tilt, stretch, slap the table, and the ultimates Rush, Magnet, Tilt, Hammer, Ward | No move skipped |
-| 0:57-1:14 | THREE BOSSES: Iron Keep's TILT INCOMING and Tilt, Sawtooth's Hammer, Bastion's Anvil Strike | The rival fights back with your own seals |
-| 1:14-1:26 | FOUR-TOP BRAWL on the opened-out arena, to a SHATTER | Crowded play |
-| 1:26-1:29 | COMFORT DIAL: Large text OFF / ON in the same fight | Accessibility you can see |
-| 1:29-1:40 | TWENTY ARENAS: one fight whose arena turns into the next every 1.2 s under the same two tops (eight arenas, each named) | Every arena plays its own way |
-| 1:40-1:51 | Forge a part onto the top; build an arena in the workshop | Depth behind the fight |
-| 1:51-1:55 | The home board: daily order and streak, then the Circuit Map, last move and challenge code (demo save) | A reason to come back |
-| 1:55-2:00 | End card: SPINSMITH / The arena is the weapon. Your desk is the ring-out. | The line to remember |
+| 0:05-0:10 | YOUR DESK IS THE RING-OUT: the same squeeze with no table found (the arena on its own, a normal ring-out) and on a detected table (off the desk, +1) | The room changes the outcome |
+| 0:10-0:37 | A NEW PLAYER, UNCUT, with a clock FROM HOME: carry the top in, the rival's portal, ghost-hand rip, first ramp, first knockout (SHATTER at 26 s from home) | Hands only; the game teaches by showing |
+| 0:37-0:42 | The first match's last card: one new move every match, the next rival | Why play match 2 |
+| 0:42-0:56 | Squeeze, flick, Crossguard, Spin Rub, stamp an ultimate, up close | The core hands |
+| 0:56-1:22 | Every other move two at a time, each from the moment it acts: ramp, rim spring, forge gust, cup and sling, finger groove, ember rivet, forge wheel, outer ring catch, twist and tilt, stretch, slap the table, and the ultimates Rush, Magnet, Tilt, Hammer, Ward | No move skipped |
+| 1:22-1:49 | THREE BOSSES: Iron Keep's TILT INCOMING and Tilt, Sawtooth's Hammer, Bastion's Anvil Strike | The rival fights back with your own seals |
+| 1:49-2:02 | FOUR-TOP BRAWL on the opened-out arena, to a SHATTER | Crowded play |
+| 2:02-2:05 | COMFORT DIAL: Large text OFF / ON in the same fight | Accessibility you can see |
+| 2:05-2:23 | TWENTY ARENAS: one fight whose arena turns into the next every 1.1 s under the same two tops (sixteen arenas, each named) | Every arena plays its own way |
+| 2:23-2:42 | Forge a part onto the top; build an arena in the workshop | Depth behind the fight |
+| 2:42-2:49 | The home board: daily order and streak, then the Circuit Map, last move and challenge code (demo save) | A reason to come back |
+| 2:49-2:54 | End card: SPINSMITH / The arena is the weapon. Your desk is the ring-out. | The line to remember |
 
-Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v3-1080p60.mp4` (2:00, 1080p60, about
--14.5 LUFS). Every frame says `IWER EMULATOR / SYNTHETIC 3D ROOM AND TABLE / NOT HEADSET FOOTAGE`: the
+Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v3-1080p60.mp4` (2:54, 1080p60, about
+-14.4 LUFS). Every frame says `IWER EMULATOR / SYNTHETIC 3D ROOM AND TABLE / NOT HEADSET FOOTAGE`: the
 capture layer (`scripts/capture/prepare-room.sh`) draws a plain 3D room and a table matched to the
 emulator's synthesised table plane, and skinned hands. The arena-cycle beat is a capture script
 (`scripts/capture/arena-cycle.mjs`) that swaps the arena mid-fight; in play an arena holds for a match.
