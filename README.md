@@ -43,18 +43,18 @@ From a scripted first session in IWER on 2026-11-07 (a bot that reads each card 
 | Verb | Gesture | Unlocks |
 |---|---|---|
 | Rip | Pinch your top (or near it), pull back, let go | Start |
-| Flick | Swing an open fingertip through a top at its height | Match 2 hint |
+| Flick | Swing an open fingertip through a top at its height | Always live; its card comes in match 6 |
 | Ramp | Pinch the floor and hold; drag to aim | First match, round 1 |
 | Arena Forge | Grab the rim with both hands: squeeze, stretch, tilt, twist | First match, round 2 |
-| Strike | Full bar: pinch the seal, stamp it into the bowl (after 4 s, or gentle mode: slap the table) | Match 2 |
+| Strike | Full bar: pinch the seal, stamp it into the bowl (after 4 s, or gentle mode: slap the table) | Match 5 |
 | Rim Spring | Pinch rim, pull, release | Match 2 |
 | Forge Gust | Sweep palm toward pocket | Match 3 |
 | Cup and sling | Jab floor, catch, sling | Match 4 |
-| Ember Rivet | Pinch hot rivet, plant | Match 5 |
-| Spin Rub | Fingertip along your rim | Match 6 |
-| Crossguard | Two palms on rim | Match 7 |
-| Finger Groove | Slide fingertip, then lift | Match 8 |
-| Forge Wheel | Turn the near wheel | Match 9 |
+| Ember Rivet | Pinch hot rivet, plant | Match 7 |
+| Spin Rub | Fingertip along your rim | Match 8 |
+| Crossguard | Two palms on rim | Match 9 |
+| Finger Groove | Slide fingertip, then lift | Match 10 |
+| Forge Wheel | Turn the near wheel | Match 11 |
 
 Each later match teaches one move: Rim Spring, Forge Gust, Cup/Sling, Strike, Flick, then the remaining `VERB_RELEASE` moves, each with its own NEW MOVE card. Online duels, brawls and the `?demo` save have every verb. Every one-hand gesture (rip, ramp, cup, strike) works with either hand. Per-verb tuning is in [DESIGN.md](DESIGN.md); Flick's measured effect comes from `npm run report:flick`.
 

@@ -123,11 +123,9 @@ export const STAMP_UNLOCKS: Record<number, string> = {
 
 /**
  * Hand verbs past the first match's lessons (rip, ramp and Arena Forge) arrive one per
- * completed match, most useful first (headless win points over doing nothing: spring +10, gust
- * +8.9, ember +7.4, rub +5.9, crossguard +5.1; cup, groove and wheel unmeasured). Strike and Flick
- * take matches 5 and 6, so later verbs resume after them. The value is the completed-match count
- * that releases the verb; its card shows as that match ends. Online, brawl and the demo save play
- * with every verb.
+ * completed match. Each value is the completed-match count that releases the move (so 4 = from the
+ * fifth match); its card shows as that match ends. Strike (4) and Flick's card (5) sit between cup
+ * and ember. Online, brawl and the demo save play with every verb.
  */
 // Cup and sling come third: campaign bout 1-4 (the fourth match) teaches them and asks for a cup medal.
 export const STRIKE_RELEASE = 4;
