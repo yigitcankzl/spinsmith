@@ -15,7 +15,7 @@ FINAL=${2:-$R/spinsmith-reel-v3-1080p60.mp4}
 S=$R/shots; M=$R/shots/more; T=$R/takes
 W=1920; H=1080; FPS=60
 FONT=$(realpath public/fonts/Rajdhani-Bold.woff2)
-LABEL=${LABEL:-IWER EMULATOR  /  360 PHOTO ROOM + SYNTHETIC TABLE PLANE  /  NOT HEADSET FOOTAGE}
+LABEL=${LABEL:-IWER EMULATOR  /  SYNTHETIC 3D ROOM AND TABLE  /  NOT HEADSET FOOTAGE}
 LOOK="eq=contrast=1.08:saturation=1.12:brightness=0.03:gamma=1.12"
 TAG="drawtext=fontfile=$FONT:text='$LABEL':fontcolor=white@0.8:fontsize=24:x=w-text_w-24:y=20:box=1:boxcolor=0x111419@0.55:boxborderw=7"
 
