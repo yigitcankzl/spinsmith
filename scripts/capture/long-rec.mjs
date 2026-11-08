@@ -54,7 +54,8 @@ export default async function run({ page, frame }) {
         if (sa > oa) { sw = s.height * oa; sx = (s.width - sw) / 2; } else if (sa < oa) { sh = s.width / oa; sy = (s.height - sh) / 2; }
         g.drawImage(s, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
       };
-      const r = { parts: [], on: true, b64: '' };
+      // t0: the recording's own clock, so in-page events can be placed on the take's timeline.
+      const r = { parts: [], on: true, b64: '', t0: performance.now() };
       const draw = () => {
         if (!r.on) return;
         g.clearRect(0, 0, cv.width, cv.height);

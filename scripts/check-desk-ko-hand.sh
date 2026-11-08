@@ -19,6 +19,9 @@ echo 'desk-ko: entering hand mode' >&2
 "${CLI[@]}" xr set-transform --input-json '{"device":"hand-right","position":{"x":0,"y":1.6,"z":-0.6}}' --timeout "$TIMEOUT" >/dev/null
 "${CLI[@]}" browser run scripts/capture/mute-audio.mjs --timeout "$TIMEOUT" >/dev/null
 
+# A page loaded with the emulated head standing puts the arena on the tray: seat it and re-place.
+bash scripts/emu.sh front >/dev/null
+"${CLI[@]}" browser run scripts/capture/place.mjs --timeout "$TIMEOUT" >/dev/null
 echo 'desk-ko: preparing deterministic fight' >&2
 setup="$("${CLI[@]}" browser run scripts/reset-desk-ko-target.mjs --timeout "$TIMEOUT")"
 before="$(jq -r '.data.result.interventions' <<<"$setup")"
