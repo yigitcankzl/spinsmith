@@ -69,10 +69,10 @@ grid() {
 
 # Two moves side by side, each cropped to the bowl, its name big under it; the title stays up 1.4 s.
 pair() {
-  local name=$1 title=$2 dur=$3 a=$4 as=$5 al=$6 b=$7 bs=$8 bl=$9
+  local name=$1 title=$2 dur=$3 a=$4 as=$5 al=$6 b=$7 bs=$8 bl=$9 px=${PX:-${PAIR_X:-0.3}}
   [ -s "$a" ] && [ -s "$b" ] || { echo "skip $name" >&2; return 0; }
   ffmpeg -y -loglevel error -ss "$as" -t "$dur" -i "$a" -ss "$bs" -t "$dur" -i "$b" -filter_complex \
-    "[0:v]crop=iw*0.425:ih*0.85:iw*${PAIR_X:-0.3}:ih*0.15,scale=$((W/2)):$H:flags=lanczos,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$al':fontcolor=white:fontsize=66:x=(w-text_w)/2:y=h-text_h-60:box=1:boxcolor=0x111419@0.8:boxborderw=14[l];[1:v]crop=iw*0.425:ih*0.85:iw*${PAIR_X:-0.3}:ih*0.15,scale=$((W/2)):$H:flags=lanczos,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$bl':fontcolor=white:fontsize=66:x=(w-text_w)/2:y=h-text_h-60:box=1:boxcolor=0x111419@0.8:boxborderw=14[r];[l][r]hstack,drawbox=x=iw/2-3:y=0:w=6:h=ih:color=0x111419:t=fill,drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=70:x=48:y=40:box=1:boxcolor=0x111419@0.8:boxborderw=16:enable='lt(t,2.0)',$TAG[v];[0:a][1:a]amix=inputs=2:normalize=0,volume=0.75[au]" \
+    "[0:v]crop=iw*0.425:ih*0.85:iw*$px:ih*0.15,scale=$((W/2)):$H:flags=lanczos,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$al':fontcolor=white:fontsize=66:x=(w-text_w)/2:y=h-text_h-60:box=1:boxcolor=0x111419@0.8:boxborderw=14[l];[1:v]crop=iw*0.425:ih*0.85:iw*$px:ih*0.15,scale=$((W/2)):$H:flags=lanczos,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$bl':fontcolor=white:fontsize=66:x=(w-text_w)/2:y=h-text_h-60:box=1:boxcolor=0x111419@0.8:boxborderw=14[r];[l][r]hstack,drawbox=x=iw/2-3:y=0:w=6:h=ih:color=0x111419:t=fill,drawtext=fontfile=$FONT:text='$title':fontcolor=0xffa24a:fontsize=70:x=48:y=40:box=1:boxcolor=0x111419@0.8:boxborderw=16:enable='lt(t,2.0)',$TAG[v];[0:a][1:a]amix=inputs=2:normalize=0,volume=0.75[au]" \
     -map "[v]" -map "[au]" -t "$dur" "${enc[@]}" "$TMP/$name.mp4"
   segs+=("$name")
 }
@@ -90,7 +90,7 @@ split() {
 EXTRA="drawtext=fontfile=$FONT:text='EMULATOR FOOTAGE (IWER), NOT A HEADSET':fontcolor=white:fontsize=40:x=(w-text_w)/2:y=h-100:box=1:boxcolor=0x111419@0.8:boxborderw=10:enable='lt(t,1.5)'" \
   clip 00-hook "${HOOK_SRC:-$S/hook-ko.mp4}" "$HOOK_AT" "$HOOK_LEN" "THE ARENA IS THE WEAPON" "Squeeze the bowl  -  throw the rival off your desk  (first match, guided)"
 # 2. The room proof: the same first-match squeeze without a table and on a detected table.
-split 01-room "YOUR DESK IS THE RING-OUT" 4.4 "$S/tray-squeeze.mp4" "${TRAY_AT:-5.4}" "NO TABLE FOUND  -  A NORMAL RING-OUT" "$S/desk-ko-first-side.mp4" 0.7 "TABLE DETECTED  -  OFF THE DESK +1"
+[ "${ROOM:-1}" = 1 ] && split 01-room "YOUR DESK IS THE RING-OUT" 4.4 "$S/tray-squeeze.mp4" "${TRAY_AT:-5.4}" "NO TABLE FOUND  -  A NORMAL RING-OUT" "$S/desk-ko-first-side.mp4" 0.7 "TABLE DETECTED  -  OFF THE DESK +1"
 # 3. A new player from home, with a running clock: real time up to the first ramp, then a marked jump
 # to the first knockout (the clock keeps showing seconds from home).
 clock() { echo "drawtext=fontfile=$FONT:text='FROM HOME  %{eif\\:t+$1\\:d\\:2}.%{eif\\:mod((t+$1)*10\\,10)\\:d} s':fontcolor=0xffa24a:fontsize=64:x=w-text_w-40:y=70:box=1:boxcolor=0x111419@0.74:boxborderw=14"; }
@@ -102,18 +102,18 @@ fi
 # 5. Its last card: one new move every match.
 PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" clip 04-won "$S/match-won-cards.mp4" "$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - ${WON_LEN:-2.8} - 0.2))")" "${WON_LEN:-2.8}" "AFTER THE MATCH" "One new move every match  /  the card names the next one"
 # 6. The core moves up close.
-clip 05-squeeze "$S/close-squeeze.mp4" 0.3 "${SQ_LEN:-3.0}" "TWO HANDS ON THE RIM" "Squeeze  /  stretch  /  tilt  /  twist the live bowl"
+clip 05-squeeze "$S/close-squeeze.mp4" "${SQ_AT:-0.3}" "${SQ_LEN:-3.0}" "TWO HANDS ON THE RIM" "Squeeze  /  stretch  /  tilt  /  twist the live bowl"
 clip 06-flick "$S/flick.mp4" 0.2 "${FL_LEN:-2.7}" "FLICK" "Your fingertip is part of the physics"
 clip 07-guard "$S/close-crossguard.mp4" 0.0 "${GU_LEN:-2.6}" "CROSSGUARD" "Two still palms make a rail that saves you"
 clip 08-rub "$S/close-rub.mp4" 0.6 "${RU_LEN:-2.4}" "SPIN RUB" "A fingertip along your rim spins it back up"
-clip 09-strike "$S/seal-stamp.mp4" 0.8 "${ST_LEN:-3.6}" "STAMP AN ULTIMATE" "Pinch the seal  /  press it into the bowl"
+clip 09-strike "$S/seal-stamp.mp4" "${ST_AT:-0.8}" "${ST_LEN:-3.6}" "STAMP AN ULTIMATE" "Pinch the seal  /  press it into the bowl"
 # 7. Every other move, two at a time, each from the moment it acts.
 pair 10a "ONE HAND" "${PAIR_LEN:-2.6}" "$M/ramp.mp4" 0.5 "RAMP" "$M/rim-spring.mp4" 0.9 "RIM SPRING"
 pair 10b "ONE HAND" "${PAIR_LEN:-2.6}" "$M/gust.mp4" 0.4 "FORGE GUST" "$M/cup-sling.mp4" 0.6 "CUP AND SLING"
-pair 11a "FINGERTIPS" "${PAIR_LEN:-2.6}" "$M/groove.mp4" 0.6 "FINGER GROOVE" "$M/ember.mp4" "${EMBER_AT:-3.2}" "EMBER RIVET"
+PX=0.42 pair 11a "FINGERTIPS" "${PAIR_LEN:-2.6}" "$M/groove.mp4" "${GROOVE_AT:-0.9}" "FINGER GROOVE" "$M/ember.mp4" "${EMBER_AT:-3.2}" "EMBER RIVET"
 pair 11b "PALMS AND THE TABLE" "${PAIR_LEN:-2.6}" "$M/wheel.mp4" 0.4 "FORGE WHEEL" "$M/outer-ring.mp4" "${OUTER_AT:-3.4}" "OUTER RING CATCH"
 pair 12a "BEND THE ARENA" "${PAIR_LEN:-2.6}" "$M/forge-twist.mp4" 0.5 "TWIST AND TILT" "$M/forge-stretch.mp4" 0.6 "STRETCH"
-pair 12b "THE TABLE AND THE ULTIMATES" "${PAIR_LEN:-2.6}" "$M/slap.mp4" 1.0 "SLAP THE TABLE" "$M/seal-rush.mp4" "${RUSH_AT:-6.6}" "RUSH"
+PX=0.2 pair 12b "THE TABLE AND THE ULTIMATES" "${PAIR_LEN:-2.6}" "$M/slap.mp4" "${SLAP_AT:-3.5}" "SLAP THE TABLE" "$M/seal-rush.mp4" "${RUSH_AT:-6.6}" "RUSH"
 pair 13a "THE ULTIMATES" "${PAIR_LEN:-2.6}" "$M/seal-magnet.mp4" "${MAGNET_AT:-4.6}" "MAGNET" "$M/seal-tilt.mp4" "${TILT_AT:-4.6}" "TILT"
 [ -s "$M/seal-hammer.mp4" ] && pair 13b "THE ULTIMATES" "${PAIR_LEN:-2.6}" "$M/seal-hammer.mp4" "${HAMMER_AT:-1.6}" "HAMMER" "$M/seal-ward.mp4" "${WARD_AT:-4.6}" "WARD" || clip 13b "$M/seal-ward.mp4" "${WARD_AT:-1.5}" "${PAIR_LEN:-2.6}" "WARD" "A ring that turns the rival away"
 # 8. The bosses cast your ultimates back.
@@ -122,6 +122,7 @@ PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 14-boss "$T/boss.mp4" "$BOSS_AT" 
 [ -n "$BOSS_KO_AT" ] && PRE="crop=iw*0.8:ih*0.8:iw*0.06:ih*0.05" clip 15-bossko "$T/boss.mp4" "$BOSS_KO_AT" "$BOSS_KO_LEN" "THROW THE BOSS OFF YOUR DESK" "Edge run  /  DESK KO"
 [ -n "$BOSS2_AT" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06" clip 16-boss2 "${BOSS2_SRC:-$T/boss.mp4}" "$BOSS2_AT" "$BOSS2_LEN" "SAWTOOTH CASTS HAMMER" "Each boss owns one seal"
 [ -n "$BOSS3_AT" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06" clip 17-boss3 "$T/boss.mp4" "$BOSS3_AT" "$BOSS3_LEN" "BASTION CASTS ANVIL STRIKE" "Three chapters, three bosses"
+[ -n "${CROWN_AT:-}" ] && PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06" clip 175-crown "$T/boss.mp4" "$CROWN_AT" "${CROWN_LEN:-5}" "BEAT ALL THREE" "Bastion falls  /  the Crown is yours"
 # 9. A four-top brawl on the opened-out arena.
 PRE="${BRAWL_PRE:-crop=iw*0.8:ih*0.8:iw*0.1:0}" clip 18-brawl "${BRAWL_SRC:-$T/brawl.mp4}" "$BRAWL_AT" "$BRAWL_LEN" "FOUR-TOP BRAWLS" "A wider arena for four  /  last top spinning takes the heat"
 # 10. Comfort: Large text off / on in the same fight shot (one of eleven settings on the dial).
@@ -142,10 +143,10 @@ clip 22-forge "$S/forge.mp4" "${FORGE_AT:-2.8}" "${FORGE_LEN:-8.5}" "FORGE IT BY
 clip 23-workshop "$S/workshop.mp4" "${WORKSHOP_AT:-7.6}" "${WORKSHOP_LEN:-3.4}" "BUILD THE BATTLEGROUND" "Shape the floor of your own arena, by hand"
 # 13. The home board: today's order and streak, then the Circuit Map (a demo save).
 PRE="${BOARD_PRE:-crop=iw*0.4:ih*0.4:iw*0.3:ih*0.06}" clip 24-board "$M/hub-map.mp4" "${BOARD_AT:-1.4}" "${BOARD_LEN:-4.0}" "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
-# 14. End card, the game's motif under it.
-ffmpeg -y -loglevel error -ss 3.6 -t "${END_LEN:-5}" -i "$S/hook-ko.mp4" \
+# 14. End card over the hook's DESK KO at half speed (labelled), the game's motif under it.
+ffmpeg -y -loglevel error -ss "${END_SRC_AT:-2.6}" -t "$(python3 -c "print(${END_LEN:-5}/2)")" -i "${HOOK_SRC:-$S/hook-ko.mp4}" \
   -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=${END_LEN:-5}" \
-  -map 0:v -map 1:a -vf "scale=$W:$H:force_original_aspect_ratio=increase,crop=$W:$H,fps=$FPS,gblur=sigma=16,eq=brightness=-0.42:saturation=0.7,drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=(h-text_h)/2-90,drawtext=fontfile=$FONT:text='The arena is the weapon. Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=54:x=(w-text_w)/2:y=h/2+40,drawtext=fontfile=$FONT:text='Hands only  /  seated  /  Meta Quest 3 and 3S  /  play it in the Quest Browser, link on the Devpost page':fontcolor=0xe7edf4@0.75:fontsize=34:x=(w-text_w)/2:y=h/2+125,$TAG" \
+  -map 0:v -map 1:a -vf "setpts=2*PTS,scale=$W:$H:force_original_aspect_ratio=increase,crop=$W:$H,fps=$FPS,eq=brightness=-0.22:saturation=0.85,drawbox=x=0:y=ih/2-170:w=iw:h=330:color=0x111419@0.72:t=fill,drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=120:x=(w-text_w)/2:y=(h-text_h)/2-90,drawtext=fontfile=$FONT:text='The arena is the weapon. Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=54:x=(w-text_w)/2:y=h/2+30,drawtext=fontfile=$FONT:text='Hands only  /  seated  /  Meta Quest 3 and 3S  /  play it in the Quest Browser, link on the Devpost page':fontcolor=0xe7edf4@0.85:fontsize=36:x=(w-text_w)/2:y=h/2+105,drawtext=fontfile=$FONT:text='0.5x':fontcolor=white:fontsize=36:x=40:y=h-80:box=1:boxcolor=0x111419@0.7:boxborderw=8,$TAG" \
   -t "${END_LEN:-5}" "${enc[@]}" "$TMP/25-end.mp4"
 segs+=(25-end)
 
