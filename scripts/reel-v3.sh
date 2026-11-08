@@ -143,11 +143,16 @@ clip 22-forge "$S/forge.mp4" "${FORGE_AT:-2.8}" "${FORGE_LEN:-8.5}" "FORGE IT BY
 clip 23-workshop "$S/workshop.mp4" "${WORKSHOP_AT:-7.6}" "${WORKSHOP_LEN:-3.4}" "BUILD THE BATTLEGROUND" "Shape the floor of your own arena, by hand"
 # 13. The home board: today's order and streak, then the Circuit Map (a demo save).
 PRE="${BOARD_PRE:-crop=iw*0.4:ih*0.4:iw*0.3:ih*0.06}" clip 24-board "$M/hub-map.mp4" "${BOARD_AT:-1.4}" "${BOARD_LEN:-4.0}" "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
-# 14. End card over the hook's DESK KO at half speed (labelled), the game's motif under it.
-ffmpeg -y -loglevel error -ss "${END_SRC_AT:-2.6}" -t "$(python3 -c "print(${END_LEN:-5}/2)")" -i "${HOOK_SRC:-$S/hook-ko.mp4}" \
-  -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=${END_LEN:-5}" \
-  -map 0:v -map 1:a -vf "setpts=2*PTS,scale=$W:$H:force_original_aspect_ratio=increase,crop=$W:$H,fps=$FPS,eq=brightness=-0.22:saturation=0.85,drawbox=x=0:y=ih/2-170:w=iw:h=330:color=0x111419@0.72:t=fill,drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=120:x=(w-text_w)/2:y=(h-text_h)/2-90,drawtext=fontfile=$FONT:text='The arena is the weapon. Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=54:x=(w-text_w)/2:y=h/2+30,drawtext=fontfile=$FONT:text='Hands only  /  seated  /  Meta Quest 3 and 3S  /  play it in the Quest Browser, link on the Devpost page':fontcolor=0xe7edf4@0.85:fontsize=36:x=(w-text_w)/2:y=h/2+105,drawtext=fontfile=$FONT:text='0.5x':fontcolor=white:fontsize=36:x=40:y=h-80:box=1:boxcolor=0x111419@0.7:boxborderw=8,$TAG" \
-  -t "${END_LEN:-5}" "${enc[@]}" "$TMP/25-end.mp4"
+# 14. The hook's DESK KO again at half speed, clean (only a 0.5x tag), then the title card.
+ffmpeg -y -loglevel error -ss "${END_SRC_AT:-2.6}" -t "$(python3 -c "print(${REPLAY_LEN:-2.6}/2)")" -i "${HOOK_SRC:-$S/hook-ko.mp4}" \
+  -f lavfi -i anullsrc=r=48000:cl=stereo -map 0:v -map 1:a \
+  -vf "setpts=2*PTS,${REPLAY_PRE:+$REPLAY_PRE,}scale=$W:$H:force_original_aspect_ratio=increase:flags=lanczos,crop=$W:$H,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='0.5x':fontcolor=white:fontsize=40:x=40:y=h-90:box=1:boxcolor=0x111419@0.7:boxborderw=8,$TAG" \
+  -t "${REPLAY_LEN:-2.6}" "${enc[@]}" "$TMP/245-replay.mp4"
+segs+=(245-replay)
+ffmpeg -y -loglevel error -sseof -0.1 -i "${HOOK_SRC:-$S/hook-ko.mp4}" \
+  -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=${END_LEN:-3}" \
+  -map 0:v -map 1:a -vf "loop=-1:1:0,setpts=N/$FPS/TB,scale=$W:$H:force_original_aspect_ratio=increase,crop=$W:$H,fps=$FPS,gblur=sigma=18,eq=brightness=-0.4:saturation=0.7,drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=(h-text_h)/2-90,drawtext=fontfile=$FONT:text='The arena is the weapon. Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=54:x=(w-text_w)/2:y=h/2+40,drawtext=fontfile=$FONT:text='Hands only  /  seated  /  Meta Quest 3 and 3S  /  play it in the Quest Browser, link on the Devpost page':fontcolor=0xe7edf4@0.85:fontsize=36:x=(w-text_w)/2:y=h/2+120,$TAG" \
+  -t "${END_LEN:-3}" "${enc[@]}" "$TMP/25-end.mp4"
 segs+=(25-end)
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
