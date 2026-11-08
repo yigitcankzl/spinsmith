@@ -135,7 +135,7 @@ fi
 clip 22-forge "$S/forge.mp4" "${FORGE_AT:-2.8}" "${FORGE_LEN:-8.5}" "FORGE IT BY HAND" "Drag a part onto your top  /  it fights differently  /  226 builds"
 clip 23-workshop "$S/workshop.mp4" "${WORKSHOP_AT:-7.6}" "${WORKSHOP_LEN:-3.4}" "BUILD THE BATTLEGROUND" "Shape the floor  /  place pits and bumpers"
 # 13. The home board: today's order and streak, then the Circuit Map (a demo save).
-PRE="${BOARD_PRE:-crop=iw*0.34:ih*0.34:iw*0.285:ih*0.25}" clip 24-board "$M/hub-map.mp4" "${BOARD_AT:-1.4}" "${BOARD_LEN:-4.0}" "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
+PRE="${BOARD_PRE:-crop=iw*0.4:ih*0.4:iw*0.3:ih*0.06}" clip 24-board "$M/hub-map.mp4" "${BOARD_AT:-1.4}" "${BOARD_LEN:-4.0}" "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
 # 14. End card, the game's motif under it.
 ffmpeg -y -loglevel error -ss 3.6 -t 5 -i "$S/hook-ko.mp4" \
   -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=5" \
