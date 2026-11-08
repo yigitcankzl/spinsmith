@@ -42,6 +42,9 @@ reset_demo() {
   sleep 1
   npx @iwsdk/cli runtime wait --timeout 60000 >/dev/null
   "$EMU" enter
+  npx @iwsdk/cli browser run scripts/capture/viewport.mjs --timeout 60000 >/dev/null
+  npx @iwsdk/cli browser run scripts/capture/mute-audio.mjs --timeout 60000 >/dev/null
+  scripts/capture/prepare-room.sh >/dev/null
   "$DRIVE" '["wait",8]' >/dev/null
   if [ "$(phase)" != '"hub"' ]; then
     echo "Expected hub after demo reset, got $(phase)" >&2
@@ -182,7 +185,7 @@ for file in "${required[@]}"; do
   title=${title//-/ }
   out="$TMP/$file.mp4"
   ffmpeg -y -loglevel error -i "$SHOTS/$file.mp4" \
-    -vf "drawtext=fontfile=$FONT:text='${title^^}':fontcolor=white:fontsize=38:x=42:y=h-82:box=1:boxcolor=0x101218@0.66:boxborderw=12:enable='between(t,0,2.5)'" \
+    -vf "drawtext=fontfile=$FONT:text='${title^^}':fontcolor=white:fontsize=38:x=42:y=h-82:box=1:boxcolor=0x101218@0.66:boxborderw=12:enable='between(t,0,2.5)',drawtext=fontfile=$FONT:text='IWER EMULATOR  /  SYNTHETIC 3D ROOM  /  NOT HEADSET FOOTAGE':fontcolor=white@0.72:fontsize=22:x=w-text_w-24:y=22:box=1:boxcolor=0x101218@0.50:boxborderw=7" \
     -c:v libx264 -crf 14 -preset medium -tune animation -pix_fmt yuv420p \
     -c:a aac -b:a 256k -ar 48000 -ac 2 "$out"
   labelled+=("$out")

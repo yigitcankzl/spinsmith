@@ -45,11 +45,14 @@ ready_match() {
 
 start_fight() {
   ready_match
-  "$DRIVE" '["dualRip",{"power":0.86,"onBeat":true}]' '["fightAt",1.5]' '["key","KeyU"]' >/dev/null
-  if [ "$(phase)" != '"fight"' ]; then
-    echo "Expected fight phase, got $(phase)" >&2
-    exit 1
-  fi
+  for _ in 1 2; do
+    "$DRIVE" '["dualRip",{"power":0.86,"onBeat":true}]' '["key","KeyU"]' '["fightAt",1.5]' >/dev/null
+    if [ "$(phase)" = '"fight"' ]; then
+      return
+    fi
+  done
+  echo "Expected fight phase after two launch attempts, got $(phase)" >&2
+  exit 1
 }
 
 record() {

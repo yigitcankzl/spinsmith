@@ -62,6 +62,7 @@ if [ "$browser_ready" != true ]; then
 fi
 
 phase() { "$DRIVE" '["peek","phase"]' 2>/dev/null; }
+arena_name() { "$DRIVE" '["peek","arena.layout.name"]' 2>/dev/null; }
 
 reset_demo() {
   "$DRIVE" '["demo"]' >/dev/null
@@ -76,6 +77,12 @@ reset_demo() {
     echo "Expected hub after reset, got $(phase)" >&2
     exit 1
   fi
+  for _ in $(seq 1 20); do
+    [ "$(arena_name)" = '"Forge Bowl"' ] && return
+    "$DRIVE" '["key","KeyA"]' '["wait",0.1]' >/dev/null
+  done
+  echo "Could not select Forge Bowl for the hand-mechanics capture." >&2
+  exit 1
 }
 
 ready_match() {
@@ -88,22 +95,30 @@ ready_match() {
 
 start_fight() {
   ready_match
-  "$DRIVE" '["dualRip",{"power":0.84,"onBeat":true}]' '["fightAt",2.2]' >/dev/null
-  if [ "$(phase)" != '"fight"' ]; then
-    echo "Expected fight phase, got $(phase)" >&2
-    exit 1
-  fi
+  for _ in 1 2; do
+    "$DRIVE" '["dualRip",{"power":0.84,"onBeat":true}]' '["key","KeyU"]' '["fightAt",0.65]' >/dev/null
+    [ "$(phase)" = '"fight"' ] && return
+  done
+  echo "Expected fight phase after two launch attempts, got $(phase)" >&2
+  exit 1
 }
 
 record() {
   local file=$1
   shift
   echo "Recording $file"
-  DRIVE_TIMEOUT=100000 \
+  local result
+  if ! result=$(DRIVE_TIMEOUT=100000 \
     DRIVE_VIDEO_WIDTH=$CAPTURE_WIDTH DRIVE_VIDEO_HEIGHT=$CAPTURE_HEIGHT DRIVE_VIDEO_FPS=$FPS \
     DRIVE_VIDEO="$RAW/$file.mp4" \
-    "$DRIVE" "$@" >/dev/null
-  test -s "$RAW/$file.mp4"
+    "$DRIVE" "$@"); then
+    echo "$result" >&2
+    return 1
+  fi
+  if [ ! -s "$RAW/$file.mp4" ]; then
+    echo "$result" >&2
+    return 1
+  fi
 }
 
 if [ -z "${CUT_ONLY:-}" ]; then
@@ -120,7 +135,7 @@ if should_capture 2; then
 reset_demo
 start_fight
 record 02-finger-groove \
-  '["wait",0.6]' '["groove",{"at":{"x":-0.07,"z":0.015},"angle":12,"length":0.12}]' '["wait",2.2]'
+  '["wait",0.2]' '["groove",{"at":{"x":-0.085,"z":0.02},"angle":10,"length":0.07}]' '["wait",2.2]'
 fi
 
 # 03 — Pinch and drag the floor to raise a ramp under the moving rival.
@@ -175,7 +190,7 @@ fi
 if should_capture 9; then
 reset_demo
 start_fight
-"$DRIVE" '["key","KeyU"]' '["wait",0.8]' >/dev/null
+"$DRIVE" '["key","KeyJ"]' '["wait",0.8]' >/dev/null
 record 09-palm-slap-ultimate \
   '["wait",0.5]' '["slap",{"angle":"rival","fallback":true}]' '["wait",4.0]'
 fi
@@ -184,7 +199,7 @@ fi
 if should_capture 10; then
 reset_demo
 start_fight
-"$DRIVE" '["key","KeyU"]' '["wait",0.8]' >/dev/null
+"$DRIVE" '["key","KeyJ"]' '["wait",0.8]' >/dev/null
 record 10-seal-stamp-ultimate \
   '["wait",0.5]' '["stampUltimate",{"at":"rival","steerAngle":20,"hold":1.0}]' '["wait",4.0]'
 fi
@@ -218,7 +233,7 @@ if should_capture 14; then
 reset_demo
 start_fight
 record 14-flick \
-  '["wait",0.5]' '["flick",{"target":"rival","angle":0,"speed":1.4,"side":"right"}]' '["wait",2.4]'
+  '["wait",0.5]' '["flick",{"target":"rival","angle":0,"speed":0.65,"side":"right"}]' '["wait",2.4]'
 fi
 fi
 

@@ -853,15 +853,21 @@ export function installDriver() {
     async cup(opts: { at?: 'rival' | 'mine' | { x: number; z: number }; side?: Side } = {}) {
       const { at = 'rival', side = 'right' } = opts;
       const g = game();
-      // Commit to one anticipated contact point; following the top during the reach looks erratic.
       const top = at === 'rival' ? g.theirs : at === 'mine' ? g.mine : null;
-      const target = top ? { x: top.x + top.vx * 0.2, z: top.z + top.vz * 0.2 } : (at as { x: number; z: number });
-      await glide(side, 'index', local(target.x, target.z, 0.1 / ARENA_SCALE), 0.2, 0);
-      const down = local(target.x, target.z, -0.025 / ARENA_SCALE);
-      await glide(side, 'index', down, 0.08, 0, 'linear');
-      await wait(0.1);
-      await glide(side, 'index', above(down, 0.1), 0.25, 0);
-      await park(side);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        // Commit to one anticipated point per jab; a miss reads better as another deliberate press
+        // than as a hand zig-zagging after a curved top throughout the reach.
+        const target = top ? { x: top.x + top.vx * 0.14, z: top.z + top.vz * 0.14 } : (at as { x: number; z: number });
+        await glide(side, 'index', local(target.x, target.z, 0.1 / ARENA_SCALE), 0.2, 0);
+        const down = local(target.x, target.z, -0.025 / ARENA_SCALE);
+        await glide(side, 'index', down, 0.045, 0, 'linear');
+        await wait(0.1);
+        await glide(side, 'index', above(down, 0.1), 0.2, 0);
+        await park(side);
+        await wait(0.12);
+        if (g.cups.left || g.cups.right) return;
+      }
+      throw new Error('cup press did not commit after three attempts');
     },
 
     /** The sling: pinch the top held in your cup, pull back the other way, let go. angle: throw direction (degrees, arena frame); default out through the nearest side. */
@@ -1161,7 +1167,9 @@ export function installDriver() {
       await glide(side, 'index', above(local((side === 'left' ? -1 : 1) * g.arena.radius * 1.3, g.arena.radius * 1.7), 0.16), 0.2, 0, 'natural', 'reach');
       await glide(side, 'index', above(local(0, g.arena.radius * 1.2), 0.14), 0.25, 0, 'natural', 'reach');
       await glide(side, 'index', () => above(start(), 0.06), 0.3, 0, 'natural', 'reach');
-      await glide(side, 'index', start, 0.16, 0, 'natural', 'grip');
+      // Settle beside the top below Cup's downward-jab speed; the following horizontal stroke,
+      // not this approach, must own the hand.
+      await glide(side, 'index', start, 0.32, 0, 'natural', 'grip');
       Object.assign(top, { vx: 0, vz: 0 });
       parkOther();
       // Constant velocity through the top: the collider must see a real swing, not a teleport.
