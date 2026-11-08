@@ -94,8 +94,6 @@ split 01-room "YOUR DESK IS THE RING-OUT" 4.4 "$S/tray-squeeze.mp4" "${TRAY_AT:-
 # 3. A new player from home, with a running clock.
 EXTRA="drawtext=fontfile=$FONT:text='FROM HOME  %{eif\\:t\\:d\\:2}.%{eif\\:mod(t*10\\,10)\\:d} s':fontcolor=0xffa24a:fontsize=64:x=w-text_w-40:y=70:box=1:boxcolor=0x111419@0.74:boxborderw=14" \
   PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.05" clip 02-first "$T/first.mp4" "$FIRST_AT" "$FIRST_LEN" "A NEW PLAYER, UNCUT" "Carry the top in  /  the ghost hand shows the rip  /  first ramp"
-# 4. The first match, guided, uncut, over the desk corner.
-clip 03-round "$S/first-match-corner.mp4" 1.0 12.5 "FIRST MATCH (GUIDED), UNCUT" "Rip  /  ramp  /  two-hand squeeze  /  off the desk"
 # 5. Its last card: one new move every match.
 PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" clip 04-won "$S/match-won-cards.mp4" "$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 3.0))")" 2.8 "ONE NEW MOVE EVERY MATCH" "The last card names the next move and the next rival"
 # 6. The core moves up close.
@@ -108,7 +106,7 @@ clip 09-strike "$S/seal-stamp.mp4" 0.8 3.6 "STAMP AN ULTIMATE" "Pinch the seal  
 pair 10a "ONE HAND" 2.6 "$M/ramp.mp4" 0.5 "RAMP" "$M/rim-spring.mp4" 0.9 "RIM SPRING"
 pair 10b "ONE HAND" 2.6 "$M/gust.mp4" 0.4 "FORGE GUST" "$M/cup-sling.mp4" 0.6 "CUP AND SLING"
 pair 11a "FINGERTIPS" 2.6 "$M/groove.mp4" 0.6 "FINGER GROOVE" "$M/ember.mp4" "${EMBER_AT:-3.2}" "EMBER RIVET"
-pair 11b "PALMS AND THE TABLE" 2.6 "$M/wheel.mp4" 0.4 "FORGE WHEEL" "$M/outer-ring.mp4" 0.5 "OUTER RING CATCH"
+pair 11b "PALMS AND THE TABLE" 2.6 "$M/wheel.mp4" 0.4 "FORGE WHEEL" "$M/outer-ring.mp4" "${OUTER_AT:-3.4}" "OUTER RING CATCH"
 pair 12a "BEND THE ARENA" 2.6 "$M/forge-twist.mp4" 0.5 "TWIST AND TILT" "$M/forge-stretch.mp4" 0.6 "STRETCH"
 pair 12b "THE ULTIMATES" 2.6 "$M/slap.mp4" 1.0 "SLAP THE TABLE" "$M/seal-rush.mp4" "${ULT_AT:-1.3}" "RUSH"
 pair 13a "THE ULTIMATES" 2.6 "$M/seal-magnet.mp4" "${ULT_AT:-1.3}" "MAGNET" "$M/seal-tilt.mp4" "${ULT_AT:-1.3}" "TILT"
@@ -123,13 +121,21 @@ PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.0" clip 14-boss "$T/boss.mp4" "$BOSS_AT" 
 PRE="crop=iw*0.8:ih*0.8:iw*0.1:0" clip 18-brawl "$T/brawl.mp4" "$BRAWL_AT" "$BRAWL_LEN" "FOUR-TOP BRAWLS" "The arena opens out  /  last top spinning takes the heat"
 # 10. Comfort: Large text off / on in the same fight shot (one of eleven settings on the dial).
 SPLIT_AX=$((W*27/100)) SPLIT_BX=$((W*17/100)) split 20-bigtext "COMFORT DIAL  -  LARGE TEXT" 3.0 "$S/flick.mp4" "${BIG_AT:-0.6}" "LARGE TEXT OFF" "$S/bigtext-fight.mp4" "${BIG_AT:-0.6}" "LARGE TEXT ON"
-# 11. Twenty arenas (four shown).
-grid 21-arenas "TWENTY ARENAS" 3.6 "$S/arenas/05.mp4" 0.3 "TERRACES" "$S/arenas/06.mp4" 0.3 "CRATER" "$S/arenas/12.mp4" 0.3 "ICE" "$S/arenas/15.mp4" 0.3 "PITS"
+# 11. One fight, eight arenas: the arena turns into the next every 1.2 s under the same two tops
+# (takes/cycle.mp4 from scripts/capture/arena-cycle.mjs); each arena named as it arrives.
+if [ -s "$T/cycle.mp4" ] && [ -s "$T/cycle-log.json" ]; then
+  CYCLE_AT=${CYCLE_AT:-$(jq '.log[0][0] + 0.1' "$T/cycle-log.json")}
+  names=$(jq -r --argjson a "$CYCLE_AT" '.log as $l | [range(0; $l|length)] | map(($l[.][0] - $a) as $s | (if . + 1 < ($l|length) then $l[.+1][0] - $a else 99 end) as $e | "drawtext=fontfile=FONT:text=\u0027\($l[.][1] | ascii_upcase)\u0027:fontcolor=white:fontsize=60:x=(w-text_w)/2:y=h-150:box=1:boxcolor=0x111419@0.8:boxborderw=14:enable=\u0027between(t,\([$s,0]|max),\($e))\u0027") | join(",")' "$T/cycle-log.json")
+  CYCLE_LEN=${CYCLE_LEN:-$(jq --argjson a "$CYCLE_AT" '.log[-1][0] - $a + 1.2' "$T/cycle-log.json")}
+  EXTRA="${names//FONT/$FONT}" PRE="crop=iw*0.84:ih*0.84:iw*0.08:ih*0.04" clip 21-arenas "$T/cycle.mp4" "$CYCLE_AT" "$CYCLE_LEN" "TWENTY ARENAS" "One fight, eight of them  /  every one plays its own way"
+else
+  grid 21-arenas "TWENTY ARENAS" 3.6 "$S/arenas/05.mp4" 0.3 "TERRACES" "$S/arenas/06.mp4" 0.3 "CRATER" "$S/arenas/12.mp4" 0.3 "ICE" "$S/arenas/15.mp4" 0.3 "PITS"
+fi
 # 12. Forge and workshop.
 clip 22-forge "$S/forge.mp4" "${FORGE_AT:-2.8}" "${FORGE_LEN:-8.5}" "FORGE IT BY HAND" "Drag a part onto your top  /  it fights differently  /  226 builds"
 clip 23-workshop "$S/workshop.mp4" "${WORKSHOP_AT:-7.6}" "${WORKSHOP_LEN:-3.4}" "BUILD THE BATTLEGROUND" "Shape the floor  /  place pits and bumpers"
 # 13. The home board: today's order and streak, then the Circuit Map (a demo save).
-PRE="crop=iw*0.5:ih*0.5:iw*0.25:0" clip 24-board "$M/hub-map.mp4" "${BOARD_AT:-1.4}" "${BOARD_LEN:-4.0}" "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
+PRE="${BOARD_PRE:-crop=iw*0.34:ih*0.34:iw*0.285:ih*0.25}" clip 24-board "$M/hub-map.mp4" "${BOARD_AT:-1.4}" "${BOARD_LEN:-4.0}" "A REASON TO COME BACK" "Daily order  /  streak  /  Circuit Map  /  challenge code  (demo save)"
 # 14. End card, the game's motif under it.
 ffmpeg -y -loglevel error -ss 3.6 -t 5 -i "$S/hook-ko.mp4" \
   -f lavfi -i "aevalsrc='0.25*(sin(2*PI*587*t)*exp(-4*t)+gte(t,0.15)*sin(2*PI*880*t)*exp(-4*(t-0.15))+gte(t,0.3)*sin(2*PI*698*t)*exp(-4*(t-0.3))+gte(t,0.45)*sin(2*PI*1175*t)*exp(-3*(t-0.45)))':s=48000:c=stereo:d=5" \

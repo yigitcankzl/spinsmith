@@ -195,12 +195,13 @@ export class SmithBoard {
     }
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(80, 268, W - 160, 3);
-    this.drawStamps(g, s, 304);
+    // Rows sized for the caption type (42 px on this plate): stamps, ledger, last move, then the code.
+    this.drawStamps(g, s, 296);
     setType(g, 'caption', this.k, DIST);
     const glow = s.nextGlow ? ` · NEXT EMBLEM GLOW AT ${s.nextGlow}` : '';
     const ledger = hover ? `${s.stamps} STAMP${s.stamps === 1 ? '' : 'S'}${glow} · ${s.feats} OF ${s.featsOf} FEATS` : ledgerLine(s.stamps, s.feats, s.featsOf);
-    engrave(g, ledger, W / 2, 362, STEEL, W - 120);
-    engrave(g, `LAST MOVE · ${s.lastMove}`.toUpperCase(), W / 2, 398, TEXT_DIM, W - 120);
+    engrave(g, ledger, W / 2, 344, STEEL, W - 120);
+    engrave(g, `LAST MOVE · ${s.lastMove}`.toUpperCase(), W / 2, 388, TEXT_DIM, W - 120);
     // Your top as a short code for a friend's game: shown here, on request, never as an address.
     const label = 'CHALLENGE CODE';
     setType(g, 'caption', this.k, DIST);
@@ -210,9 +211,9 @@ export class SmithBoard {
     const cw = Math.min(g.measureText(s.code).width, W - 160 - lw - 32);
     const x = (W - lw - 32 - cw) / 2;
     g.textAlign = 'left';
-    engrave(g, s.code, x + lw + 32, 448, TEXT, cw);
+    engrave(g, s.code, x + lw + 32, 444, TEXT, cw);
     setType(g, 'caption', this.k, DIST);
-    engrave(g, label, x, 452, TEXT_DIM);
+    engrave(g, label, x, 448, TEXT_DIM);
     g.textAlign = 'center';
   }
 
