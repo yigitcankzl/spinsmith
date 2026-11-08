@@ -102,29 +102,34 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:14, 1080p60, with the game's sound)
+## Competition video (2:00, cut 2026-11-09, with the game's sound)
 
 The one sentence the video must show: *The arena is the weapon: squeeze it and throw the rival off
 your desk.*
 
 | Time | Shot | Point proved |
 |---|---|---|
-| 0:00-0:09 | Two hands bend the bowl at the desk edge for DESK KO, followed by a room/no-room comparison | The arena is the weapon; the room changes the result |
-| 0:09-0:24 | One uninterrupted exchange: rip, readable rival, arena response and finish | It is a game, not a montage of isolated effects |
-| 0:24-0:37 | Ramp, squeeze, Flick and Anvil Strike, close enough to read the hand and consequence together | Different gestures create different tactical outcomes |
-| 0:37-0:51 | Boss counterplay and a four-top brawl | The rival fights back and the system scales beyond a duel |
-| 0:51-1:04 | Top forge, arena workshop and arena variants | Progression changes what returns to the table |
-| 1:04-1:11 | Reload the browser and reveal the same wins, champion tops and latest move | Local progress survives a real reload |
-| 1:11-1:14 | End card | The arena is the weapon. Your desk is the ring-out. |
+| 0:00-0:05 | Both hands squeeze the bowl on the table's corner; the rival goes over the real edge: DESK KO (first match, guided; labelled) | The one beat that needs your desk, first |
+| 0:05-0:09 | YOUR DESK IS THE RING-OUT: the same squeeze with no table found (the arena on its own, a normal ring-out) and on a detected table (off the desk, +1) | The room changes the outcome |
+| 0:09-0:20 | A NEW PLAYER, UNCUT, with a clock FROM HOME: carry the top in, the rival's portal, ghost-hand rip, first ramp | Hands only; the game teaches by showing |
+| 0:20-0:22 | The first match's last card: one new move every match, the next rival | Why play match 2 |
+| 0:22-0:37 | Squeeze, flick, Crossguard, Spin Rub, stamp an ultimate, up close | The core hands |
+| 0:37-0:57 | Every other move two at a time, each from the moment it acts: ramp, rim spring, forge gust, cup and sling, finger groove, ember rivet, forge wheel, outer ring catch, twist and tilt, stretch, slap the table, and the ultimates Rush, Magnet, Tilt, Hammer, Ward | No move skipped |
+| 0:57-1:14 | THREE BOSSES: Iron Keep's TILT INCOMING and Tilt, Sawtooth's Hammer, Bastion's Anvil Strike | The rival fights back with your own seals |
+| 1:14-1:26 | FOUR-TOP BRAWL on the opened-out arena, to a SHATTER | Crowded play |
+| 1:26-1:29 | COMFORT DIAL: Large text OFF / ON in the same fight | Accessibility you can see |
+| 1:29-1:40 | TWENTY ARENAS: one fight whose arena turns into the next every 1.2 s under the same two tops (eight arenas, each named) | Every arena plays its own way |
+| 1:40-1:51 | Forge a part onto the top; build an arena in the workshop | Depth behind the fight |
+| 1:51-1:55 | The home board: daily order and streak, then the Circuit Map, last move and challenge code (demo save) | A reason to come back |
+| 1:55-2:00 | End card: SPINSMITH / The arena is the weapon. Your desk is the ring-out. | The line to remember |
 
-Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-hero-1080p60.mp4` (1:14.569,
-1080p60). Every frame says `IWER EMULATOR / 360 PHOTO ROOM + SYNTHETIC TABLE PLANE / NOT HEADSET
-FOOTAGE`. The capture uses a CC0 360 cafe backdrop, an emulator table plane and synthetic hands.
-`scripts/reel-hero.sh` rebuilds the cut. The persistence clip uses a temporary showcase save and
-restores the player's storage afterwards. Still to do: replace the older source takes with a full
-current-build capture. The uninterrupted opening exchange is from the 2026-11-07 build; specialised
-boss, brawl and workshop inserts still use earlier IWER takes. Physical-headset footage remains
-pending if a Quest becomes available.
+Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v3-1080p60.mp4` (2:00, 1080p60, about
+-14.5 LUFS). Every frame says `IWER EMULATOR / SYNTHETIC 3D ROOM AND TABLE / NOT HEADSET FOOTAGE`: the
+capture layer (`scripts/capture/prepare-room.sh`) draws a plain 3D room and a table matched to the
+emulator's synthesised table plane, and skinned hands. The arena-cycle beat is a capture script
+(`scripts/capture/arena-cycle.mjs`) that swaps the arena mid-fight; in play an arena holds for a match.
+`scripts/reel-v3.sh` cuts it; the shot sources and in-points are in that folder's README.txt. The streak
+and level 8 come from the `?demo` save. Still to do: real-headset footage if any Quest becomes available.
 
 ## How it was tested (card for the Devpost gallery)
 
