@@ -102,7 +102,7 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (0:56, cut 2026-11-09, game sound and a synthesized music bed)
+## Competition video (0:58, cut 2026-11-09, game sound and a synthesized music bed)
 
 The one sentence the video must show: *The arena is the weapon: squeeze it and throw the rival off
 your desk.* Built from three research passes (Meta competition winners' videos, mixed-reality
@@ -110,7 +110,7 @@ trailers, trailer craft) and review rounds. A judge and a trailer editor who fol
 scored 8.0 to 9.0/10 (emulator-only ceiling about 9.1). Two independent reviewers who saw none of
 that (Gemini and a fresh Claude agent) scored the 1:25 cut 6.5/10 (later rounds: 6.8-7.0, plateaued; what is left is real passthrough footage and real hands), then 6.8 and 7.0 after the hand
 re-records; this 1:12 cut answers their next round (a 12-tile grid instead of a one-second strip,
-the table and hands in the boss shots, real-time first match, a second DESK KO take at the end). The capture room then gained an ordinary work desk (monitor, keyboard, mug, notebook, plant, a window) and parked emulator hands now come alive (after 0.6 s at rest: breathing sway, wrist roll, finger curl, and now and then a tap, a lift toward the arena, a curl or a shift; stopped the instant a move starts), rest on the desk instead of below it, and cast a soft contact shadow on the desk or floor; every desk-visible shot was re-recorded with it (old files in before-desk-props/).
+the table and hands in the boss shots, real-time first match, a second DESK KO take at the end). The capture room then gained an ordinary work desk (monitor, keyboard, mug, notebook, plant, a window) and parked emulator hands now come alive (after 0.6 s at rest: breathing sway, wrist roll, finger curl, and now and then a tap, a lift toward the arena, a curl or a shift; stopped the instant a move starts), rest on the desk instead of below it, and cast a soft contact shadow on the desk or floor, and hold a relaxed curled-finger rest pose (IWER only ships an open hand and a pinch); every desk-visible shot was re-recorded with it (old files in before-desk-props/).
 
 | Time | Shot | Point proved |
 |---|---|---|
@@ -119,12 +119,12 @@ the table and hands in the boss shots, real-time first match, a second DESK KO t
 | 0:05-0:14 | YOUR HANDS RESHAPE THE ARENA (squeeze), flick and Spin Rub (the fingertip in frame), Crossguard (from above; the rail forms between the palms at half speed), stamp an ultimate | The core hands |
 | 0:14-0:19 | Forge: a hand drags a part onto the top and it snaps on; reshape an arena in the workshop | Depth |
 | 0:19-0:30 | EVERY MOVE BY HAND, counted: palm catch, twist, ember rivet and slap the table (slowed) held long enough to see the hand and then the effect; then + 12 MORE MOVES (5-16 of 16) as a 4x3 grid, every tile named and moving | No move skipped, and the hand is on screen |
-| 0:30-0:38 | A BOSS TILTS YOUR ARENA: Iron Keep casts Tilt, both hands answer with a squeeze, the whole desk in frame; THE FINAL BOSS FALLS, 5-0 (Bastion) | The rival fights back with your own seals |
+| 0:30-0:38 | A BOSS TILTS YOUR ARENA: Iron Keep casts Tilt, both hands answer with a squeeze, the whole desk in frame; THE FINAL BOSS FALLS, 4-0 (Bastion) | The rival fights back with your own seals |
 | 0:38-0:44 | FOUR-TOP BRAWLS: two rivals knocked out | Crowded play |
 | 0:44-0:49 | 20 ARENAS: three of them in real matches, ending on your point | Every arena plays its own way |
-| 0:49-0:56 | An unstaged DESK KO from the Bastion bout (Bastion casts Anvil Strike, the player's ramp drives it off the desk) at half speed with its sound, then the end card | The line to remember, and what to do next |
+| 0:49-0:56 | An unstaged DESK KO from the Iron Keep bout (after the player's Anvil Strike, an edge run off the desk) at half speed with its sound, then the end card | The line to remember, and what to do next |
 
-Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v4-1080p60.mp4` (0:56, 1080p60, about
+Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v4-1080p60.mp4` (0:58, 1080p60, about
 -14 LUFS). Every frame says `IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE`: the capture layer
 (`scripts/capture/prepare-room.sh`) draws a plain 3D room and a table matched to the emulator's
 synthesised table plane, and skinned hands. `scripts/reel-v4.sh` cuts it; the music is synthesized on

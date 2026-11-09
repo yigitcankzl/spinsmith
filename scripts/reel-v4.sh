@@ -114,19 +114,19 @@ EOF
 # 6. A boss casts your own ultimate back (Iron Keep tilts the arena, both hands answer), then the crown.
 MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
 B="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.2"  # the table, its legs and both hands in frame
-PRE=$B seg 13-boss1 "$T/boss.mp4" 28.0 5.0 "$(title 'A BOSS TILTS YOUR ARENA' 'Answer with both hands' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
+PRE=$B seg 13-boss1 "$T/boss.mp4" 8.2 6.3 "$(title 'A BOSS TILTS YOUR ARENA' 'Answer with both hands' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
 B2=$B
-PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.06" seg 16-crown "$T/boss.mp4" 151.6 2.8 "$(label 'THE FINAL BOSS FALLS, 5-0')"
+PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.06" seg 16-crown "$T/boss.mp4" 145.7 2.8 "$(label 'THE FINAL BOSS FALLS, 4-0')"
 # 7. A four-top brawl on the opened-out arena.
 PRE="crop=iw*0.9:ih*0.9:iw*0.05:0" seg 17-brawl "$T/brawl2.mp4" 57.4 6.0 "$(title 'FOUR-TOP BRAWLS' 'Last top spinning wins')"
 # 8. Real matches on three of the arenas, ending on your point.
-PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 18-ar15 "$S/arenas/15.mp4" 0.0 1.2 "$(title '20 ARENAS' 'Each one plays differently')"
+PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 18-ar15 "$S/arenas/15.mp4" 0.25 1.2 "$(title '20 ARENAS' 'Each one plays differently')"
 seg 19-ar12 "$S/arenas/12.mp4" 0.9 2.0
 seg 20-ar06 "$S/arenas/06.mp4" 1.0 2.0
-# 9. An unstaged DESK KO from the Bastion bout (Bastion casts Anvil Strike, a ramp drives it off the desk) at half speed
+# 9. An unstaged DESK KO from the Iron Keep bout (an edge run off the desk after your Anvil Strike) at half speed
 # with its sound, the end card over it.
-MUSIC+=("$(at 1.3):x" "hit:$(at 1.8)" "$(at 1.8):b")
-SPEED=0.5 PRE="crop=iw*0.85:ih*0.85:iw*0.05:ih*0.15" seg 21-end "$T/boss.mp4" 113.1 6.4 "drawtext=fontfile=$FONT:text='HALF SPEED':fontcolor=white:fontsize=40:x=40:y=h-90:box=1:boxcolor=0x111419@0.7:boxborderw=8:enable='lt(t,3.4)',split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,3.4)',$(logo 180 '(W-w)/2' 210 'gte(t,3.4)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,3.4)'"
+MUSIC+=("$(at 2.2):x" "hit:$(at 2.7)" "$(at 2.7):b")
+SPEED=0.5 PRE="crop=iw*0.8:ih*0.8:iw*0.02:ih*0.14" seg 21-end "$T/boss.mp4" 24.9 6.8 "drawtext=fontfile=$FONT:text='HALF SPEED':fontcolor=white:fontsize=40:x=40:y=h-90:box=1:boxcolor=0x111419@0.7:boxborderw=8:enable='lt(t,4.0)',split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,4.0)',$(logo 180 '(W-w)/2' 210 'gte(t,4.0)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,4.0)',drawtext=fontfile=$FONT:text='Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,4.0)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,4.0)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,4.0)'"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/joined.mp4"

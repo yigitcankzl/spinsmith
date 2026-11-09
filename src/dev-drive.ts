@@ -11,7 +11,7 @@
  * asked. Pinching uses the emulator's pinch value (which also blends the fingers closed).
  * Coordinates: world metres, or arena-local {x, z} where an option says so.
  */
-import { Euler, Quaternion, Vector3 } from '@iwsdk/core';
+import { Euler, Matrix4, Quaternion, Vector3 } from '@iwsdk/core';
 import { rimRadius, type ArenaLayout } from './game/layout.js';
 import { forgeGrips } from './game/reach.js';
 
@@ -252,6 +252,34 @@ export function installDriver() {
     return out;
   };
   const toArena = new Vector3();
+  // A relaxed resting hand for captures: IWER only has an open, splayed "relaxed" pose and a pinch,
+  // so a parked hand gets its own pose, blended per finger from those (pinky and ring curl most,
+  // index and thumb least), by how far the rest has faded in. Moves always run on IWER's own poses.
+  type PoseCfg = { jointTransforms: Record<string, { offsetMatrix: number[]; radius: number }>; gripOffsetMatrix: number[] };
+  const FINGER_CURL: [string, 'pinch' | 'point', number][] = [['thumb', 'pinch', 0.2], ['index', 'pinch', 0.28], ['middle', 'point', 0.5], ['ring', 'point', 0.62], ['pinky', 'point', 0.72]];
+  const pm = [new Matrix4(), new Matrix4()], pp = [new Vector3(), new Vector3()], pq = [new Quaternion(), new Quaternion()], ps = [new Vector3(), new Vector3()];
+  const lerpInto = (out: number[], a: number[], b: number[], k: number) => {
+    pm[0].fromArray(a).decompose(pp[0], pq[0], ps[0]);
+    pm[1].fromArray(b).decompose(pp[1], pq[1], ps[1]);
+    pm[0].compose(pp[0].lerp(pp[1], k), pq[0].slerp(pq[1], k), ps[0].lerp(ps[1], k)).toArray(out);
+  };
+  const restPose = (hand: EmuHand, side: Side, amt: number, t: number, fidgetCurl: number) => {
+    const sym = Object.getOwnPropertySymbols(hand).find((k) => (hand as unknown as Record<symbol, { poses?: Record<string, PoseCfg> }>)[k]?.poses);
+    if (!sym) return;
+    const poses = (hand as unknown as Record<symbol, { poses: Record<string, PoseCfg> }>)[sym].poses;
+    const base = poses.default, pinch = poses.pinch, point = poses.point ?? poses.pinch;
+    if (!poses.lifeRest) poses.lifeRest = { gripOffsetMatrix: [...base.gripOffsetMatrix], jointTransforms: Object.fromEntries(Object.entries(base.jointTransforms).map(([n, j]) => [n, { offsetMatrix: [...j.offsetMatrix], radius: j.radius }])) };
+    const rest = poses.lifeRest;
+    const breathe = 1 + 0.12 * Math.sin(t * 0.9 + (side === 'left' ? 0 : 2.1));
+    for (const [name, j] of Object.entries(rest.jointTransforms)) {
+      const f = FINGER_CURL.find(([prefix]) => name.startsWith(prefix));
+      const extra = f && f[0] !== 'thumb' ? Math.max(0, fidgetCurl - 0.25) * 1.4 : 0;
+      const k = f ? Math.min(0.9, (f[2] * breathe + extra) * amt) : 0;
+      const target = f?.[1] === 'point' ? point : pinch;
+      lerpInto(j.offsetMatrix, base.jointTransforms[name].offsetMatrix, target.jointTransforms[name].offsetMatrix, k);
+      j.radius = base.jointTransforms[name].radius;
+    }
+  };
   const pinchNow: Record<Side, number> = { left: 0, right: 0 };
   const lastRoot: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
   const lastPinch: Record<Side, number> = { left: 0, right: 0 };
@@ -338,7 +366,12 @@ export function installDriver() {
       const l = handLife(side, now, toArena);
       v.add(sway);
       life.offset[side].copy(sway);
-      if (pinchOut < 0.05) pinchOut += Math.min(0.45, l.curl);
+      if (pinchOut < 0.05) pinchOut += Math.min(0.12, l.curl * 0.3);
+      const restAmt = life.amt[side];
+      if (restAmt > 0.002) {
+        restPose(hand, side, restAmt, now / 1000, l.curl);
+        if (hand.poseId !== 'lifeRest') hand.poseId = 'lifeRest';
+      } else if (hand.poseId === 'lifeRest') hand.poseId = 'default';
       // Rotate only while resting, from the orientation the hand had when it came to rest, and hand
       // that exact orientation back as the rest fades, so moves always run on IWER's own pose.
       const q = hand.quaternion;
