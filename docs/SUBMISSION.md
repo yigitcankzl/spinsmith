@@ -106,7 +106,7 @@ has been tested across real networks and headsets.
 
 The one sentence the video must show: *The arena is the weapon: squeeze it and throw the rival off
 your desk.* Built from three research passes (Meta competition winners' videos, mixed-reality
-trailers, trailer craft) and two review passes (a judge, 8.0, 8.5, 8.5, 8.8, 8.9 and a final 9.0/10 over six rounds; the judge puts the emulator-only ceiling at about 9.1, and a
+trailers, trailer craft) and two review passes (a judge, 8.0, 8.5, 8.5, 8.8, 8.9 and a final 9.0/10 over six rounds; the judge puts the emulator-only ceiling at about 9.1. Two independent reviewers who saw none of that (Gemini and a fresh Claude agent) each scored the same cut 6.5/10: the 16-move montage reads as a checklist, several moves show their effect but not the hand, and the MR desk only shows at the start and the end, and a
 trailer editor): the name in the first seconds, one title per shot, one move per full frame, real
 gameplay only, the energy rising to the brawl, an end card with the call to action.
 
@@ -114,7 +114,7 @@ gameplay only, the energy rising to the brawl, an end card with the call to acti
 |---|---|---|
 | 0:00-0:04 | SPINSMITH logo and name; both hands squeeze the bowl on the table's corner; the frame holds and punches in 2x as the rival leaves the edge (OFF THE DESK EDGE), then DESK KO | The one beat that needs your desk, first |
 | 0:04-0:07 | YOUR DESK IS THE RING-OUT: the same squeeze from low at the desk; the rival lands on the floor | The desk edge, seen from the side |
-| 0:07-0:16 | FIRST MATCH, UNCUT at 3x (labelled, the clock in real seconds): ghost-hand rip, first ramp, the first knockout at about 27 s | Hands only; the game teaches by showing |
+| 0:07-0:16 | FIRST KNOCKOUT, UNCUT at 3x (labelled, the clock in real seconds from the home screen): ghost-hand rip, first ramp, the first knockout at about 27 s | Hands only; the game teaches by showing |
 | 0:16-0:19 | ONE NEW MOVE EVERY MATCH (the match-won card names the next move), then the streak and Circuit Map board (demo save) | Why play match 2, and tomorrow |
 | 0:19-0:28 | Squeeze, flick, Crossguard (from above; the rail forms between the palms at 0.5x), Spin Rub, stamp an ultimate, full frame | The core hands |
 | 0:28-0:33 | Forge a part onto the top; reshape an arena in the workshop | Depth |

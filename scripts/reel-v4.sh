@@ -55,7 +55,7 @@ SIDE="crop=iw*0.9:ih*0.9:iw*0.1:ih*0.08"
 PRE=$SIDE seg 01-side "$S/desk-ko-first-side.mp4" 2.0 3.0 "eq=brightness=0.3:enable='between(t,2.0,2.05)',$(title 'YOUR DESK IS THE RING-OUT')"
 # 3. The first match from home to the first knockout, at 3x, the clock in real seconds.
 MUSIC+=("$(at 0):1")
-SPEED=3 PRE="crop=iw*0.56:ih*0.56:iw*0.22:ih*0.13" seg 02-first "$T/first.mp4" 0 9.5 "$(title 'FIRST MATCH, UNCUT' 'Home to first knockout  /  3x speed'),drawtext=fontfile=$FONT:text='%{eif\\:t*3\\:d} s  (3x)':fontcolor=0xffa24a:fontsize=64:x=w-text_w-40:y=70:box=1:boxcolor=0x111419@0.74:boxborderw=14"
+SPEED=3 PRE="crop=iw*0.56:ih*0.56:iw*0.22:ih*0.13" seg 02-first "$T/first.mp4" 0 9.5 "$(title 'FIRST KNOCKOUT, UNCUT' 'From the home screen  /  3x speed'),drawtext=fontfile=$FONT:text='%{eif\\:t*3\\:d} s  (3x)':fontcolor=0xffa24a:fontsize=64:x=w-text_w-40:y=70:box=1:boxcolor=0x111419@0.74:boxborderw=14"
 won=$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 1.7))")
 PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" seg 03-won "$S/match-won-cards.mp4" "$won" 1.2 "$PUSH,$(title 'ONE NEW MOVE EVERY MATCH')"
 PRE="crop=iw*0.4:ih*0.4:iw*0.3:ih*0.06" seg 03b-board "$M/hub-map.mp4" 5.1 1.5 "$PUSH,$(title 'A REASON TO COME BACK' 'Daily order, streak, map  (demo save)')"
@@ -65,10 +65,10 @@ seg 04-squeeze "$S/close-squeeze.mp4" 1.9 1.6 "$(title 'SQUEEZE THE BOWL' 'Two h
 seg 05-flick "$S/flick.mp4" 0.2 1.45 "$(title 'FLICK' 'Your fingertip is part of the physics')"
 # Crossguard: the rail forms at half speed (labelled), then the hit at full speed.
 G="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.08"
-SPEED=0.5 PRE=$G seg 06-guard "$S/close-crossguard2.mp4" 0.30 1.2 "$(title 'CROSSGUARD' 'Two still palms make a rail  (0.5x)')"
+SPEED=0.5 PRE=$G seg 06-guard "$S/close-crossguard2.mp4" 0.30 1.2 "$(title 'CROSSGUARD' 'Two still palms make a rail  (half speed)')"
 PRE=$G seg 06b-guard "$S/close-crossguard2.mp4" 0.90 0.7
 seg 07-rub "$S/close-rub.mp4" 1.0 1.6 "$(title 'SPIN RUB' 'A fingertip spins your top back up')"
-seg 08-stamp "$S/seal-stamp.mp4" 0.5 2.5 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, press it in')"
+seg 08-stamp "$S/seal-stamp.mp4" 0.5 2.5 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, stamp it down')"
 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.28" seg 09-forge "$S/forge.mp4" 9.4 2.5 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
 seg 10-workshop "$S/workshop.mp4" 7.9 2.0 "eq=brightness=0.25:enable='lt(t,0.05)',$(title 'BUILD YOUR OWN ARENA')"
 # 5. Every other move, about a second each, from the moment it acts (file, in-point, length, name).
@@ -79,7 +79,7 @@ while read -r f s d n; do
   i=$((i + 1))
   head=""; [ $i = 1 ] && head="eq=brightness=0.25:enable='lt(t,0.05)',"; [ $i -le 2 ] && head+="$(title 'EVERY MOVE BY HAND' 'No controllers'),"
   crop="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.18"; sp=1
-  [ "$f" = slap2 ] && { crop="crop=iw*0.5:ih*0.5:iw*0.29:ih*0.3"; sp=0.75; n="$n  (0.75x)"; }
+  [ "$f" = slap2 ] && { crop="crop=iw*0.5:ih*0.5:iw*0.29:ih*0.3"; sp=0.75; n="$n  (slowed)"; }
   SPEED=$sp PRE=$crop seg "12-m$(printf %02d $i)" "$M/$f.mp4" "$s" "$d" "$head$(label "$n     $i / 16")"
 done <<'EOF'
 ramp 0.6 1.0 RAMP
@@ -102,7 +102,7 @@ EOF
 # 6. The bosses cast your ultimates back; a short break into them.
 MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
 B="crop=iw*0.55:ih*0.55:iw*0.2:ih*0.15"
-PRE=$B seg 13-boss1 "$T/boss.mp4" 9.9 3.5 "$(title 'THREE BOSSES' 'Each casts your own ultimate back' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
+PRE=$B seg 13-boss1 "$T/boss.mp4" 9.9 3.5 "$(title 'THREE BOSSES' 'Each boss uses your ultimate against you' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
 PRE=$B seg 14-boss2 "$T/boss.mp4" 96.6 3.7 "$(title 'SAWTOOTH CASTS HAMMER')"
 B2="crop=iw*0.7:ih*0.7:iw*0.14:ih*0.06"
 PRE=$B2 seg 15-boss3 "$T/boss.mp4" 190.3 4.5 "$(title 'BASTION CASTS ANVIL STRIKE')"
@@ -110,12 +110,12 @@ PRE=$B2 seg 16-crown "$T/boss.mp4" 205.9 3.0 "$(label 'BEAT ALL THREE')"
 # 7. A four-top brawl on the opened-out arena.
 PRE="crop=iw*0.9:ih*0.9:iw*0.05:0" seg 17-brawl "$T/brawl2.mp4" 54.9 9.5 "$(title 'FOUR-TOP BRAWLS' 'Last top spinning wins')"
 # 8. Real matches on three of the arenas, ending on your point.
-PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 18-ar15 "$S/arenas/15.mp4" 0.0 1.2 "$(title '20 ARENAS')"
+PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 18-ar15 "$S/arenas/15.mp4" 0.0 1.2 "$(title '20 ARENAS' 'Three of them, real matches')"
 seg 19-ar12 "$S/arenas/12.mp4" 0.9 2.0
 seg 20-ar06 "$S/arenas/06.mp4" 1.0 2.0
 # 9. The low-angle DESK KO at half speed with its sound, the end card over it.
 MUSIC+=("$(at 1.1):x" "hit:$(at 1.6)" "$(at 1.6):b")
-SPEED=0.5 PRE=$SIDE seg 21-end "$S/desk-ko-first-side.mp4" 3.2 6.4 "drawtext=fontfile=$FONT:text='0.5x':fontcolor=white:fontsize=40:x=40:y=h-90:box=1:boxcolor=0x111419@0.7:boxborderw=8:enable='lt(t,3.4)',split[sa][sb];[sb]gblur=sigma=16,eq=brightness=-0.35:saturation=0.7[sbb];[sa][sbb]overlay=enable='gte(t,3.4)',$(logo 180 '(W-w)/2' 210 'gte(t,3.4)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,3.4)'"
+SPEED=0.5 PRE=$SIDE seg 21-end "$S/desk-ko-first-side.mp4" 3.2 6.4 "drawtext=fontfile=$FONT:text='HALF SPEED':fontcolor=white:fontsize=40:x=40:y=h-90:box=1:boxcolor=0x111419@0.7:boxborderw=8:enable='lt(t,3.4)',split[sa][sb];[sb]gblur=sigma=16,eq=brightness=-0.35:saturation=0.7[sbb];[sa][sbb]overlay=enable='gte(t,3.4)',$(logo 180 '(W-w)/2' 210 'gte(t,3.4)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,3.4)'"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/joined.mp4"
