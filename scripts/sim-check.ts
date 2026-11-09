@@ -2129,15 +2129,17 @@ assert.equal(edgeOf('defense', 'defense'), 0);
   // Centre off the table, or no table: none.
   assert.equal(deskSectors(square(2, 0, 0.5), 0.15, 0.1).length, 0, 'off table: no sectors');
   assert.equal(deskSectors(null, 0.15, 0.1).length, 0, 'no table: no sectors');
-  // The staged first DESK KO never goes over the player's own edge, nor an edge with a wall behind it.
+  // The staged first DESK KO never goes over an edge with a wall behind it, and over the player's own
+  // edge only when nothing else is in reach.
   const corner = deskSectors(square(-0.3, -0.3, 0.5), 0.15, 0.1); // sectors at +x and +z
   const atX = corner.find((s) => Math.abs(s.angle) < 0.05)!;
   const atZ = corner.find((s) => Math.abs(s.angle - Math.PI / 2) < 0.05)!;
   assert.equal(wrenchSector(corner, Math.PI / 2), atX, 'player on the +z side: the KO goes over +x, not into the lap');
   assert.equal(wrenchSector(corner, 0), atZ, 'player on the +x side: the KO goes over +z');
-  assert.equal(wrenchSector(corner, Math.PI / 2, (s) => s === atX), null, 'player side and walled side both out: no staged KO (a plain ring-out)');
+  assert.equal(wrenchSector(corner, Math.PI / 2, (s) => s === atX), atZ, 'the other edge walled: the player side is the last resort');
+  assert.equal(wrenchSector(corner, Math.PI / 2, () => true), null, 'every edge walled: no staged KO (a plain ring-out)');
   assert.equal(wrenchSector(one, Math.PI), one[0], 'player opposite the only edge: that edge');
-  assert.equal(wrenchSector(one, 0.2), null, 'the only edge is the player\'s own: no staged KO');
+  assert.equal(wrenchSector(one, 0.2), one[0], 'the only edge is the player\'s own: that edge (no other is in reach)');
   assert.equal(wrenchSector(one, null), one[0], 'head unknown: the nearest edge');
 }
 
