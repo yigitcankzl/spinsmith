@@ -308,6 +308,65 @@ export default async function run({ page, frame, cdp }) {
       table.rotation.y = yaw;
       scene.add(table);
       game.__captureTable = table;
+
+      // An ordinary work desk at the end away from the arena (monitor, keyboard, mug, notebook,
+      // plant), so a wide shot reads as "your desk" and not a bare plank. Presentation only.
+      window.__captureIdleSway = p.idleSway !== false;
+      if (p.deskProps !== false) {
+        let CylinderConstructor = null;
+        scene.traverse((object) => { if (!CylinderConstructor && object.geometry?.type === 'CylinderGeometry') CylinderConstructor = object.geometry.constructor; });
+        const V3 = game.root.position.constructor;
+        const toLocal = (wp) => { const dx = wp.x - cx, dz = wp.z - cz; return { x: dx * Math.cos(yaw) - dz * Math.sin(yaw), z: dx * Math.sin(yaw) + dz * Math.cos(yaw) }; };
+        const arenaL = toLocal(game.root.getWorldPosition(new V3()));
+        const camL = toLocal((game.player ?? game.root).getWorldPosition(new V3()));
+        const ex = -Math.sign(arenaL.x || 1) * (w / 2 - 0.3);
+        const back = -Math.sign(camL.z || 1), front = -back;
+        const surface = topY;
+        const mat = (color, extra = {}) => new StandardMaterialConstructor({ color, metalness: 0.05, roughness: 0.6, ...extra });
+        const canvasTex = (wd, ht, draw) => { const c = document.createElement('canvas'); c.width = wd; c.height = ht; draw(c.getContext('2d'), wd, ht); const t = new TextureConstructor(c); t.colorSpace = 'srgb'; t.needsUpdate = true; return t; };
+        const prop = (name, geo, material, x, y, z, ry = 0) => { const m = new MeshConstructor(geo, material); m.name = `capture-desk-${name}`; m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; m.receiveShadow = true; table.add(m); return m; };
+        const box = (sx, sy, sz) => new BoxGeometryConstructor(sx, sy, sz, 1, 1, 1);
+        const cyl = (r, h) => (CylinderConstructor ? new CylinderConstructor(r, r, h, 24) : box(r * 2, h, r * 2));
+        const mz = back * (d / 2 - 0.16);
+        // Monitor: base, neck, panel and a lit screen facing the player.
+        const screenTex = canvasTex(512, 300, (g2, W2, H2) => {
+          g2.fillStyle = '#1b2230'; g2.fillRect(0, 0, W2, H2);
+          g2.fillStyle = '#26324a'; g2.fillRect(0, 0, W2, 22); g2.fillRect(0, 22, 120, H2);
+          const cols = ['#7fb7ff', '#e6c07b', '#98c379', '#c678dd', '#9aa5b8'];
+          for (let r = 0; r < 14; r += 1) for (let k = 0; k < 4; k += 1) { g2.fillStyle = cols[(r * 3 + k) % cols.length]; g2.globalAlpha = 0.75; g2.fillRect(140 + k * 80 + (r % 3) * 12, 36 + r * 18, 40 + ((r * 7 + k * 13) % 50), 7); }
+          g2.globalAlpha = 1;
+        });
+        const screenFacing = back > 0 ? Math.PI : 0;
+        prop('monitor-base', box(0.22, 0.012, 0.16), mat(0x2a2d33), ex, surface + 0.006, mz);
+        prop('monitor-neck', box(0.04, 0.16, 0.03), mat(0x2a2d33), ex, surface + 0.09, mz + back * 0.03);
+        prop('monitor-panel', box(0.58, 0.35, 0.025), mat(0x18191c), ex, surface + 0.31, mz + front * 0.005);
+        prop('monitor-screen', box(0.55, 0.32, 0.002), mat(0x000000, { emissive: 0xffffff, emissiveMap: screenTex, emissiveIntensity: 0.85 }), ex, surface + 0.31, mz + front * 0.019, screenFacing);
+        // Keyboard and mouse in front of it.
+        const keyTex = canvasTex(512, 160, (g2, W2, H2) => {
+          g2.fillStyle = '#2c2f35'; g2.fillRect(0, 0, W2, H2);
+          g2.fillStyle = '#4a4f58';
+          for (let r = 0; r < 5; r += 1) for (let k = 0; k < 15; k += 1) g2.fillRect(8 + k * 33, 8 + r * 30, 28, 24);
+        });
+        const kz = mz + front * 0.24;
+        prop('keyboard', box(0.43, 0.018, 0.14), mat(0xffffff, { map: keyTex }), ex, surface + 0.009, kz, back > 0 ? Math.PI : 0);
+        prop('mouse', box(0.06, 0.03, 0.1), mat(0x2c2f35), ex + Math.sign(arenaL.x || 1) * 0.3, surface + 0.015, kz);
+        // A mug and a notebook with a pen between the keyboard and the arena.
+        const mx2 = ex + Math.sign(arenaL.x || 1) * 0.42;
+        prop('mug', cyl(0.04, 0.095), mat(0xe9e2d6, { roughness: 0.35 }), mx2, surface + 0.048, mz + front * 0.05);
+        prop('mug-coffee', cyl(0.034, 0.002), mat(0x3a2414, { roughness: 0.2 }), mx2, surface + 0.09, mz + front * 0.05);
+        prop('mug-handle', box(0.014, 0.05, 0.03), mat(0xe9e2d6), mx2 + 0.05, surface + 0.05, mz + front * 0.05);
+        prop('notebook', box(0.2, 0.012, 0.27), mat(0x35506b), ex - Math.sign(arenaL.x || 1) * 0.36, surface + 0.006, kz - front * 0.04, 0.18);
+        prop('pen', box(0.012, 0.01, 0.14), mat(0xd6a33c), ex - Math.sign(arenaL.x || 1) * 0.3, surface + 0.017, kz - front * 0.04, 0.3);
+        // A small plant in the far corner.
+        const px = ex - Math.sign(arenaL.x || 1) * 0.42;
+        prop('plant-pot', cyl(0.055, 0.1), mat(0xb5653b, { roughness: 0.8 }), px, surface + 0.05, mz);
+        for (let i = 0; i < 7; i += 1) {
+          const a = (i / 7) * Math.PI * 2;
+          const leaf = prop(`plant-leaf-${i}`, box(0.03, 0.16, 0.008), mat(0x3f7d3a, { roughness: 0.7 }), px + Math.cos(a) * 0.025, surface + 0.17, mz + Math.sin(a) * 0.025, a);
+          leaf.rotation.z = Math.cos(a) * 0.45; leaf.rotation.x = Math.sin(a) * 0.45;
+        }
+        result.deskProps = { side: Math.sign(ex), back };
+      }
       result.devTable = { parts: table.children.length, legs: 4, topY: +topY.toFixed(3), floorY };
 
       if (p.devRoom) {
@@ -367,6 +426,17 @@ export default async function run({ page, frame, cdp }) {
         addBox('capture-room-back-wall', 6.2, 2.8, 0.08, 0, 1.4, -3.55, wallMaterial);
         addBox('capture-room-left-wall', 0.08, 2.8, 6.4, -3.05, 1.4, -1.05, wallMaterial);
         addBox('capture-room-right-wall', 0.08, 2.8, 6.4, 3.05, 1.4, -1.05, wallMaterial);
+        // A daylight window and a framed print, so the walls read as a room.
+        const glassMaterial = new StandardMaterialConstructor({ color: 0x000000, emissive: 0xe8f2ff, emissiveIntensity: 2.2, roughness: 1 });
+        const frameWhite = new StandardMaterialConstructor({ color: 0xf2efe8, roughness: 0.7 });
+        addBox('capture-room-window', 1.5, 1.05, 0.02, cx, 1.55, -3.5, glassMaterial);
+        addBox('capture-room-window-top', 1.62, 0.06, 0.06, cx, 2.1, -3.49, frameWhite);
+        addBox('capture-room-window-bottom', 1.62, 0.06, 0.09, cx, 1.0, -3.47, frameWhite);
+        addBox('capture-room-window-left', 0.06, 1.12, 0.06, cx - 0.78, 1.55, -3.49, frameWhite);
+        addBox('capture-room-window-right', 0.06, 1.12, 0.06, cx + 0.78, 1.55, -3.49, frameWhite);
+        addBox('capture-room-window-mid', 0.04, 1.05, 0.05, cx, 1.55, -3.49, frameWhite);
+        addBox('capture-room-print', 0.5, 0.65, 0.025, cx - 1.7, 1.55, -3.5, new StandardMaterialConstructor({ color: 0x2e5a6b, roughness: 0.9 }));
+        addBox('capture-room-print-frame', 0.56, 0.71, 0.015, cx - 1.7, 1.55, -3.505, new StandardMaterialConstructor({ color: 0x1d1d1d, roughness: 0.6 }));
         addBox('capture-room-back-trim', 6.05, 0.11, 0.055, 0, 0.07, -3.49, trimMaterial);
         addBox('capture-room-left-trim', 0.055, 0.11, 6.2, -2.99, 0.07, -1.05, trimMaterial);
         addBox('capture-room-right-trim', 0.055, 0.11, 6.2, 2.99, 0.07, -1.05, trimMaterial);

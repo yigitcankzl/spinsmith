@@ -52,10 +52,11 @@ PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.08" seg 00-hook "$S/hook-ko-close.mp4" 1.7 
 # 2. The same squeeze from low at the desk: the rival lands on the floor.
 MUSIC+=("$(at 1.5):x" "hit:$(at 2.0)" "$(at 2.0):2")
 SIDE="crop=iw*0.9:ih*0.9:iw*0.1:ih*0.08"
-PRE=$SIDE seg 01-side "$S/desk-ko-first-side.mp4" 2.0 3.0 "eq=brightness=0.3:enable='between(t,2.0,2.05)',$(title 'YOUR DESK IS THE RING-OUT')"
+PRE=$SIDE seg 01-side "$S/desk-ko-first-side.mp4" 2.5 3.0 "eq=brightness=0.3:enable='between(t,2.0,2.05)',$(title 'YOUR DESK IS THE RING-OUT')"
 # 3. The guided first match in real time: the ghost hand shows the ramp, then the first point.
 MUSIC+=("$(at 0):1")
-PRE="crop=iw*0.56:ih*0.56:iw*0.22:ih*0.13" seg 02-first "$T/first.mp4" 20.0 6.5 "$(title 'YOUR FIRST MATCH' 'A ghost hand shows each move  /  real time')"
+MUSIC+=("$(at 4.5):x" "hit:$(at 5.0)" "$(at 5.0):1")
+PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.1" seg 02-first "$T/first.mp4" 25.5 6.5 "$(title 'YOUR FIRST MATCH' 'Guided, real time: squeeze, and off the desk')"
 won=$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 1.7))")
 PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" seg 03-won "$S/match-won-cards.mp4" "$won" 1.2 "$PUSH,$(title 'ONE NEW MOVE EVERY MATCH')"
 # 4. Five hero moves, full frame, then the forge and workshop.
@@ -86,7 +87,7 @@ done <<'EOF'
 outer-ring 3.9 2.2 1 n PALM CATCH
 forge-twist 1.4 2.2 1 n TWIST
 ember 7.4 2.0 1 n EMBER RIVET
-slap2 4.3 1.8 0.75 w SLAP THE TABLE = STRIKE
+slap2 4.0 2.2 0.75 w SLAP THE TABLE = STRIKE
 EOF
 # The other twelve at once, each in its own tile with its name, all moving for 3.5 s.
 grid12() {
@@ -110,29 +111,30 @@ cup-sling 0.3 n CUP AND SLING
 groove 1.2 n FINGER GROOVE
 wheel 2.5 n FORGE WHEEL
 forge-stretch 2.1 n STRETCH
-seal-rush2 4.6 w RUSH
-seal-magnet2 4.6 w MAGNET
-seal-tilt2 6.5 w TILT
-seal-hammer2 1.8 w HAMMER
-seal-ward2 1.6 w WARD
+seal-rush2 3.4 w RUSH
+seal-magnet2 4.2 w MAGNET
+seal-tilt2 3.0 w TILT
+seal-hammer2 1.4 w HAMMER
+seal-ward2 3.8 w WARD
 EOF
 # 6. The bosses cast your ultimates back; a short break into them.
 MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
 B="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.2"  # the table, its legs and both hands in frame
-PRE=$B seg 13-boss1 "$T/boss.mp4" 9.9 3.5 "$(title 'THREE BOSSES' 'Each boss uses your ultimate against you' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
-PRE=$B seg 14-boss2 "$T/boss.mp4" 96.6 3.7 "$(title 'SAWTOOTH CASTS HAMMER')"
+PRE=$B seg 13-boss1 "$T/boss.mp4" 27.3 6.3 "$(title 'THREE BOSSES' 'Each boss uses your ultimate against you' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
+PRE=$B seg 14-boss2 "$T/boss.mp4" 122.0 4.6 "$(title 'SAWTOOTH CASTS HAMMER')"
 B2=$B
-PRE=$B2 seg 15-boss3 "$T/boss.mp4" 190.3 4.5 "$(title 'BASTION CASTS ANVIL STRIKE')"
-PRE=$B2 seg 16-crown "$T/boss.mp4" 205.9 3.0 "$(label 'BEAT ALL THREE')"
+PRE=$B2 seg 15-boss3 "$T/boss.mp4" 150.6 4.4 "$(title 'BASTION CASTS ANVIL STRIKE')"
+PRE=$B2 seg 16-crown "$T/boss.mp4" 188.8 3.0 "$(label 'BEAT ALL THREE')"
 # 7. A four-top brawl on the opened-out arena.
 PRE="crop=iw*0.9:ih*0.9:iw*0.05:0" seg 17-brawl "$T/brawl2.mp4" 57.4 6.0 "$(title 'FOUR-TOP BRAWLS' 'Last top spinning wins')"
 # 8. Real matches on three of the arenas, ending on your point.
 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 18-ar15 "$S/arenas/15.mp4" 0.0 1.2 "$(title '20 ARENAS' 'Three of them, real matches')"
 seg 19-ar12 "$S/arenas/12.mp4" 0.9 2.0
 seg 20-ar06 "$S/arenas/06.mp4" 1.0 2.0
-# 9. A second DESK KO take (the wide corner view) at half speed with its sound, the end card over it.
-MUSIC+=("$(at 1.3):x" "hit:$(at 1.8)" "$(at 1.8):b")
-SPEED=0.5 PRE="crop=iw*0.6:ih*0.6:iw*0.25:ih*0.12" seg 21-end "$S/hook-ko.mp4" 2.9 6.4 "drawtext=fontfile=$FONT:text='HALF SPEED':fontcolor=white:fontsize=40:x=40:y=h-90:box=1:boxcolor=0x111419@0.7:boxborderw=8:enable='lt(t,3.4)',split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,3.4)',$(logo 180 '(W-w)/2' 210 'gte(t,3.4)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,3.4)'"
+# 9. An unstaged DESK KO from the Iron Keep bout (a ramp drives the boss off the desk) at half speed
+# with its sound, the end card over it.
+MUSIC+=("$(at 1.1):x" "hit:$(at 1.6)" "$(at 1.6):b")
+SPEED=0.5 PRE="crop=iw*0.8:ih*0.8:iw*0.05:ih*0.12" seg 21-end "$T/boss.mp4" 59.6 6.4 "drawtext=fontfile=$FONT:text='HALF SPEED':fontcolor=white:fontsize=40:x=40:y=h-90:box=1:boxcolor=0x111419@0.7:boxborderw=8:enable='lt(t,3.4)',split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,3.4)',$(logo 180 '(W-w)/2' 210 'gte(t,3.4)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Your desk is the ring-out.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,3.4)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,3.4)'"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/joined.mp4"

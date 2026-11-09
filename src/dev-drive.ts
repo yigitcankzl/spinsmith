@@ -172,7 +172,7 @@ const PEDESTAL = 0.08;
 const ARENA_SCALE = 2.4;
 
 export function installDriver() {
-  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand>; primaryInputMode: 'controller' | 'hand' }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; __spinDriveGeneration?: number; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
+  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand>; primaryInputMode: 'controller' | 'hand' }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; __spinDriveGeneration?: number; __captureIdleSway?: boolean; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
   // Vite HMR re-evaluates this module without cancelling requestAnimationFrame callbacks created by
   // the previous copy. Give the newest driver sole ownership so an old closure cannot keep writing
   // a parked pose over a fresh test after a source edit.
@@ -183,6 +183,9 @@ export function installDriver() {
   const aim: Record<Side, { point: Point; at: Vector3 } | null> = { left: null, right: null };
   /** Hands the driver holds (until rest()); their last commanded root, world space. */
   const held: Record<Side, Vector3 | null> = { left: null, right: null };
+  // Parked in the lap after a move; only then may the capture layer add an idle sway.
+  const resting: Record<Side, boolean> = { left: false, right: false };
+  const sway = new Vector3();
   const pinchNow: Record<Side, number> = { left: 0, right: 0 };
   const lastRoot: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
   const lastPinch: Record<Side, number> = { left: 0, right: 0 };
@@ -262,7 +265,14 @@ export function installDriver() {
     if (hand.setPinchValueImmediate) hand.setPinchValueImmediate(pinchNow[side]);
     else hand.updatePinchValue(pinchNow[side]);
     lastRoot[side].copy(root);
-    const local = game().player.worldToLocal(v.copy(root));
+    v.copy(root);
+    // Capture only (set by scripts/capture/shot.mjs): a parked hand breathes a few millimetres
+    // instead of freezing like a mannequin. Never while a move holds a hand still.
+    if (w.__captureIdleSway && resting[side] && !goals[side]) {
+      const t = now / 1000, ph = side === 'left' ? 0 : 1.7;
+      v.add(sway.set(0.006 * Math.sin(t * 1.45 + ph), 0.004 * Math.sin(t * 1.95 + ph * 0.6), 0.005 * Math.sin(t * 1.07 + ph * 1.3)));
+    }
+    const local = game().player.worldToLocal(v);
     hand.position.set(local.x, local.y, local.z);
     // `position` is only IWER's public input value; its XRSpace matrix is normally copied in
     // onFrameStart. Browser-run automation and the renderer can use different RAF turns, so sync
@@ -363,6 +373,7 @@ export function installDriver() {
     intent?: Goal['intent'],
   ) => {
     await prime(side);
+    resting[side] = false;
     return new Promise<void>((done) => {
       pinchNow[side] = pinch;
       const a = aim[side];
@@ -432,7 +443,10 @@ export function installDriver() {
     const x = g.arena.radius * (side === 'left' ? -1.3 : 1.3);
     return g.root.localToWorld(new Vector3(x, -0.11, g.arena.radius * 1.7));
   };
-  const park = async (side: Side) => glide(side, 'pinch', idlePoint(side), 0.42, 0, 'natural', 'release');
+  const park = async (side: Side) => {
+    await glide(side, 'pinch', idlePoint(side), 0.42, 0, 'natural', 'release');
+    resting[side] = true;
+  };
 
   const api = {
     /** What an agent needs to choose the next move. */
