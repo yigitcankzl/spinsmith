@@ -102,7 +102,7 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:16, cut 2026-11-09, game sound and a synthesized music bed)
+## Competition video (1:00, cut 2026-11-09, game sound and a synthesized music bed)
 
 The one sentence the video must show: *The arena is the weapon: squeeze it and throw the rival off
 your desk.* Built from three research passes (Meta competition winners' videos, mixed-reality
@@ -116,16 +116,16 @@ the table and hands in the boss shots, real-time first match, a second DESK KO t
 |---|---|---|
 | 0:00-0:04 | SPINSMITH logo and name; both hands squeeze the bowl on the desk's corner (monitor, plant, keyboard behind); the frame holds and punches in 2x as the rival leaves the edge (OFF THE DESK EDGE), then DESK KO | The one beat that needs your desk, first |
 | 0:04-0:07 | YOUR DESK IS THE RING-OUT: the same squeeze from low at the desk; the rival lands on the floor | The desk edge, seen from the side |
-| 0:07-0:14 | YOUR FIRST MATCH in real time: the guided two-hand squeeze, and the rival goes off the desk; ONE NEW MOVE EVERY MATCH | Hands only; the game teaches by showing |
-| 0:14-0:24 | Squeeze, flick and Spin Rub (the fingertip in frame), Crossguard (from above; the rail forms between the palms at half speed), stamp an ultimate | The core hands |
-| 0:24-0:28 | Forge a part onto the top; reshape an arena in the workshop | Depth |
-| 0:28-0:40 | EVERY MOVE BY HAND, counted: palm catch, twist, ember rivet and slap the table (slowed) held long enough to see the hand and then the effect; then + 12 MORE MOVES (5-16 of 16) as a 4x3 grid, every tile named and moving | No move skipped, and the hand is on screen |
-| 0:40-0:58 | THREE BOSSES with the whole desk and both hands in frame: Iron Keep's tilt answered by a two-hand squeeze; Sawtooth's Hammer; Bastion's Anvil Strike; BEAT ALL THREE (5-0, THE CROWN IS YOURS) | The rival fights back with your own seals |
-| 0:58-1:04 | FOUR-TOP BRAWLS: two rivals knocked out | Crowded play |
-| 1:04-1:10 | 20 ARENAS: three of them, real matches, ending on your point | Every arena plays its own way |
-| 1:10-1:16 | An unstaged DESK KO from the Iron Keep bout (a ramp drives the boss off the desk) at half speed with its sound, then the end card | The line to remember, and what to do next |
+| 0:07-0:08 | ONE NEW MOVE EVERY MATCH | Why play match 2 |
+| 0:08-0:17 | YOUR HANDS RESHAPE THE ARENA (squeeze), flick and Spin Rub (the fingertip in frame), Crossguard (from above; the rail forms between the palms at half speed), stamp an ultimate | The core hands |
+| 0:17-0:22 | Forge a part onto the top; reshape an arena in the workshop | Depth |
+| 0:22-0:34 | EVERY MOVE BY HAND, counted: palm catch, twist, ember rivet and slap the table (slowed) held long enough to see the hand and then the effect; then + 12 MORE MOVES (5-16 of 16) as a 4x3 grid, every tile named and moving | No move skipped, and the hand is on screen |
+| 0:34-0:43 | A BOSS TILTS YOUR ARENA: Iron Keep casts Tilt, both hands answer with a squeeze, the whole desk in frame; BEAT ALL THREE BOSSES (5-0, THE CROWN IS YOURS) | The rival fights back with your own seals |
+| 0:43-0:49 | FOUR-TOP BRAWLS: two rivals knocked out | Crowded play |
+| 0:49-0:54 | 20 ARENAS: three of them in real matches, ending on your point | Every arena plays its own way |
+| 0:54-1:00 | An unstaged DESK KO from the Iron Keep bout (a ramp drives the boss off the desk) at half speed with its sound, then the end card | The line to remember, and what to do next |
 
-Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v4-1080p60.mp4` (1:16, 1080p60, about
+Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v4-1080p60.mp4` (1:00, 1080p60, about
 -14 LUFS). Every frame says `IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE`: the capture layer
 (`scripts/capture/prepare-room.sh`) draws a plain 3D room and a table matched to the emulator's
 synthesised table plane, and skinned hands. `scripts/reel-v4.sh` cuts it; the music is synthesized on

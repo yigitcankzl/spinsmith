@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cuts the competition reel, about 1:40 (IWER emulator footage, labelled on every frame), from the
+# Cuts the competition reel, about 1:00 (IWER emulator footage, labelled on every frame), from the
 # shots and takes recorded on 2026-11-05: the DESK KO from two angles, the first match at 3x, five hero
 # moves, forge/workshop/board, every other move in a one-second montage, the three bosses, a brawl,
 # real matches on three arenas, then the low DESK KO at half speed under the end card.
@@ -53,15 +53,13 @@ PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.08" seg 00-hook "$S/hook-ko-close.mp4" 1.7 
 MUSIC+=("$(at 1.5):x" "hit:$(at 2.0)" "$(at 2.0):2")
 SIDE="crop=iw*0.9:ih*0.9:iw*0.1:ih*0.08"
 PRE=$SIDE seg 01-side "$S/desk-ko-first-side.mp4" 2.5 3.0 "eq=brightness=0.3:enable='between(t,2.0,2.05)',$(title 'YOUR DESK IS THE RING-OUT')"
-# 3. The guided first match in real time: the ghost hand shows the ramp, then the first point.
+# 3. One new move every match.
 MUSIC+=("$(at 0):1")
-MUSIC+=("$(at 4.5):x" "hit:$(at 5.0)" "$(at 5.0):1")
-PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.1" seg 02-first "$T/first.mp4" 25.5 6.5 "$(title 'YOUR FIRST MATCH' 'Guided, real time: squeeze, and off the desk')"
 won=$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 1.7))")
 PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" seg 03-won "$S/match-won-cards.mp4" "$won" 1.2 "$PUSH,$(title 'ONE NEW MOVE EVERY MATCH')"
 # 4. Five hero moves, full frame, then the forge and workshop.
 MUSIC+=("$(at 0):2")
-seg 04-squeeze "$S/close-squeeze.mp4" 1.9 1.6 "$(title 'SQUEEZE THE BOWL' 'Two hands bend the live arena')"
+seg 04-squeeze "$S/close-squeeze.mp4" 1.9 1.6 "$(title 'YOUR HANDS RESHAPE THE ARENA' 'Squeeze the live bowl')"
 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 05-flick "$S/flick2.mp4" 0.6 1.7 "$(title 'FLICK' 'Your fingertip is part of the physics')"
 # Crossguard: the rail forms at half speed (labelled), then the hit at full speed.
 G="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.08"
@@ -117,18 +115,16 @@ seal-tilt2 3.0 w TILT
 seal-hammer2 1.4 w HAMMER
 seal-ward2 3.8 w WARD
 EOF
-# 6. The bosses cast your ultimates back; a short break into them.
+# 6. A boss casts your own ultimate back (Iron Keep tilts the arena, both hands answer), then the crown.
 MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
 B="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.2"  # the table, its legs and both hands in frame
-PRE=$B seg 13-boss1 "$T/boss.mp4" 27.3 6.3 "$(title 'THREE BOSSES' 'Each boss uses your ultimate against you' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
-PRE=$B seg 14-boss2 "$T/boss.mp4" 122.0 4.6 "$(title 'SAWTOOTH CASTS HAMMER')"
+PRE=$B seg 13-boss1 "$T/boss.mp4" 27.3 6.3 "$(title 'A BOSS TILTS YOUR ARENA' 'Answer with both hands' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
 B2=$B
-PRE=$B2 seg 15-boss3 "$T/boss.mp4" 150.6 4.4 "$(title 'BASTION CASTS ANVIL STRIKE')"
-PRE=$B2 seg 16-crown "$T/boss.mp4" 188.8 3.0 "$(label 'BEAT ALL THREE')"
+PRE=$B2 seg 16-crown "$T/boss.mp4" 188.8 3.0 "$(label 'BEAT ALL THREE BOSSES')"
 # 7. A four-top brawl on the opened-out arena.
 PRE="crop=iw*0.9:ih*0.9:iw*0.05:0" seg 17-brawl "$T/brawl2.mp4" 57.4 6.0 "$(title 'FOUR-TOP BRAWLS' 'Last top spinning wins')"
 # 8. Real matches on three of the arenas, ending on your point.
-PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 18-ar15 "$S/arenas/15.mp4" 0.0 1.2 "$(title '20 ARENAS' 'Three of them, real matches')"
+PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 18-ar15 "$S/arenas/15.mp4" 0.0 1.2 "$(title '20 ARENAS' 'Each one plays differently')"
 seg 19-ar12 "$S/arenas/12.mp4" 0.9 2.0
 seg 20-ar06 "$S/arenas/06.mp4" 1.0 2.0
 # 9. An unstaged DESK KO from the Iron Keep bout (a ramp drives the boss off the desk) at half speed
