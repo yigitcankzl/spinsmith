@@ -3,10 +3,16 @@
  * one-second fps windows in; the guard answers with a quality level. Rendering only: the fixed-step
  * 120 Hz simulation never reads it.
  *
- * Levels, stepped down one at a time: 0 full, 1 lite (no room dimming), 2 lite + full fixed
+ * Levels, stepped down one at a time: 0 full, 1 lite (no room dimming), 2 lite + hard depth
+ * occlusion (one depth sample a pixel instead of the min-max soft pass), 3 that + full fixed
  * foveation. The eye-buffer scale is not a step: WebXR fixes it when the session starts.
  */
-export const QUALITY_LEVELS = ['full', 'lite', 'lite+foveation'] as const;
+export const QUALITY_LEVELS = ['full', 'lite', 'lite+hard-occlusion', 'lite+hard-occlusion+foveation'] as const;
+/** The level from which depth occlusion is hard, and the one from which foveation is full. */
+export const QUALITY_HARD_OCCLUSION = 2;
+export const QUALITY_FOVEATION = 3;
+/** After this many steps down a session stops stepping back up (a level that keeps failing is not retried). */
+export const QUALITY_MAX_DOWNS = 3;
 export const QUALITY_MAX = QUALITY_LEVELS.length - 1;
 /** Seconds of slow windows before a step down, and of comfortable windows before a step up. */
 export const QUALITY_DOWN_AFTER = 3;
@@ -32,6 +38,7 @@ export interface QualityStep {
 
 export class QualityGuard {
   level = 0;
+  downs = 0;
   private slowFor = 0;
   private comfortFor = 0;
 
@@ -41,8 +48,10 @@ export class QualityGuard {
     this.slowFor = fps < slow ? this.slowFor + seconds : 0;
     this.comfortFor = fps >= comfort ? this.comfortFor + seconds : 0;
     const from = this.level;
-    if (this.slowFor >= QUALITY_DOWN_AFTER && this.level < QUALITY_MAX) this.level++;
-    else if (this.comfortFor >= QUALITY_UP_AFTER && this.level > 0) this.level--;
+    if (this.slowFor >= QUALITY_DOWN_AFTER && this.level < QUALITY_MAX) {
+      this.level++;
+      this.downs++;
+    } else if (this.comfortFor >= QUALITY_UP_AFTER && this.level > 0 && this.downs < QUALITY_MAX_DOWNS) this.level--;
     else return null;
     this.slowFor = 0;
     this.comfortFor = 0;

@@ -21,6 +21,10 @@ export const LESSON = {
   /** The palm print where the arena rises. */
   palmPrint: 'PRESS YOUR PALM HERE',
   noTable: 'NO TABLE · DESK KOS OFF',
+  /** Placed on a surface with no outline (a palm press, no table plane): the real edges are not known. */
+  noEdges: 'EDGES UNSEEN · DESK KOS OFF',
+  /** No table and the head at standing height. */
+  sitDown: 'SIT AT A TABLE',
   hubLaunch: 'PUT YOUR TOP IN',
   hubMatch: 'FINISH YOUR FIRST MATCH',
   rip: 'PINCH, PULL BACK, RELEASE',

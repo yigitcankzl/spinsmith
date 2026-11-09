@@ -119,7 +119,7 @@ the table and hands in the boss shots, real-time first match, a second DESK KO t
 | 0:14-0:15 | A LATER MATCH: WON 4-0 (every win unlocks a new move; the card is from another first-match take, captioned so) | Why play match 2 |
 | 0:15-0:25 | The moves earned: squeeze, flick, Crossguard (half speed), Spin Rub, stamp an ultimate | The core hands |
 | 0:25-0:29 | Forge a part onto the top; reshape an arena | Depth |
-| 0:29-0:41 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held, then a named 4x3 grid) | No move skipped |
+| 0:29-0:41 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held, then a named 4x3 grid). The 16 shots are the README's hand moves plus the arena-forge variants (twist, stretch) and each ultimate seal (Rush, Magnet, Tilt, Hammer, Ward) as its own shot | No move skipped |
 | 0:41-0:51 | FOUR-TOP BRAWLS; 20 ARENAS (three real matches) | Breadth |
 | 0:51-1:07 | The boss arc: BOSS ONE: IRON KEEP goes off the desk (unstaged, half speed), THEN IT CASTS YOUR MOVES (its tilt throws you), LOST 3-4; TWO BOUTS LATER: THE FINAL BOSS, Bastion casts Anvil Strike, the ramp answers | A setback and a comeback |
 | 1:07-1:14 | THE FINAL BOSS FALLS, 4-0, then the end card over it: Squeeze the arena. Throw them off your desk. | The payoff and the line to remember |

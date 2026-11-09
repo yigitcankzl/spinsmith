@@ -32,7 +32,7 @@ From a scripted first session in IWER on 2026-11-07 (a bot that reads each card 
 ## What uses your real room
 - **Placement:** the arena stands on a labelled table or desk, or on an unlabelled flat surface at desk height (at least 30 cm wide); with none it floats on a tray and says so.
 - **Real edges:** red-orange arcs on the rim face real table edges within about 25 cm; from the second match those sides are lower drop sides, and the first match stages a DESK KO across the nearest one.
-- **Strike on the real table:** with the bar full, pinch the seal and stamp it into the bowl; if you wait 4 s (or in gentle mode) a palm slap on the real table beside the arena does it instead and leaves a molten print that cools to a scorch.
+- **Strike on the real table:** with the bar full, pinch the seal and stamp it into the bowl; if you wait 4 s a palm slap on the real table beside the arena does it instead (with the Press to strike comfort stop on: press and hold) and leaves a molten print that cools to a scorch.
 - **Outer Ring catch:** once a round, when your own top is thrown over the wall onto a detected table, you have 5 s to catch it with an open palm and sweep it back to the rim (it returns with less spin).
 - **Wall portal:** the rival arrives through a portal on a detected wall behind the far rim (in the dark beyond it when there is no wall).
 - **Saved pose:** carry the arena by its brass handle; its pose is saved, and kept by persistent WebXR anchors where available.
@@ -46,7 +46,7 @@ From a scripted first session in IWER on 2026-11-07 (a bot that reads each card 
 | Flick | Swing an open fingertip through a top at its height | Always live; its card comes in match 6 |
 | Ramp | Pinch the floor and hold; drag to aim | First match, round 1 |
 | Arena Forge | Grab the rim with both hands: squeeze, stretch, tilt, twist | First match, round 2 |
-| Strike | Full bar: pinch the seal, stamp it into the bowl (after 4 s, or gentle mode: slap the table) | Match 5 |
+| Strike | Full bar: pinch the seal, stamp it into the bowl (after 4 s: slap the table; with Press to strike: press and hold) | Match 5 |
 | Rim Spring | Pinch rim, pull, release | Match 2 |
 | Forge Gust | Sweep palm toward pocket | Match 3 |
 | Cup and sling | Jab floor, catch, sling | Match 4 |
@@ -60,7 +60,7 @@ Each later match teaches one move: Rim Spring, Forge Gust, Cup/Sling, Strike, Fl
 
 ## Measured performance (IWER on a desktop GPU, not a Quest)
 
-**In short:** 47–117 draw calls per eye in every saved state (budget 150), the game's own update 0.4–1.4 ms per frame (p50, unthrottled, 2026-10-23; up to 2.0 ms in a slower 11-05 session), GPU time 0.86 ms per frame (p50) on the timed capture-room scene (95 draws per eye). Under a 4x CPU throttle the page drops to 24–35 fps, and the GPU timer shows why: of a ~37 ms frame, game update plus GPU are about 5 ms and the rest is CPU-side draw submission and the emulator. Nothing here is a Quest measurement.
+**In short:** up to 136 draw calls per eye (a 4-top brawl; hub 99, forge 99, a normal fight up to 118) in the 2026-11-07 matrix, 47–117 in the 2026-10-23 saved states (budget 150), the game's own update 0.4–1.4 ms per frame (p50, unthrottled, 2026-10-23; up to 2.0 ms in a slower 11-05 session), GPU time 0.86 ms per frame (p50) on the timed capture-room scene (95 draws per eye). Under a 4x CPU throttle the page drops to 24–35 fps, and the GPU timer shows why: of a ~37 ms frame, game update plus GPU are about 5 ms and the rest is CPU-side draw submission and the emulator. Nothing here is a Quest measurement.
 
 `npm run report:runtime-performance` reports the active renderer and fails when a phase goes over 150 draw calls per eye. IWER renders each eye as its own camera without multiview, so the script divides the renderer's count by the number of views. Saved runs from 2026-10-23 are in `artifacts/perf/`.
 
@@ -85,7 +85,7 @@ The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rat
 
 ## Accessibility (seated, hands only)
 
-One brass dial on the home table (its plate shows unasked through a new player's first session, src/game/hub.ts:412); each pinch turns it, a pinch on its plate toggles the stop. Stops in order (src/game/comfort.ts):
+One brass dial on the home table (its plate, src/game/hub.ts:622, shows unasked through a new player's first session); each pinch turns it, a pinch on its plate toggles the stop. Stops in order (src/game/comfort.ts):
 
 1. **Calm**: no flashes and press-to-strike together
 2. **Large text**: cards, stamps, match bar and gauge labels 1.3x

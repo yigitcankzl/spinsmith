@@ -147,7 +147,7 @@ export const MOVE_RELEASE = { ...VERB_RELEASE, strike: STRIKE_RELEASE, flick: FL
 export type TaughtMove = keyof typeof MOVE_RELEASE;
 export const MOVE_CARD: Record<TaughtMove, [string, string]> = {
   ...VERB_CARD,
-  strike: ['Forge Strike', 'Palm the seal, stamp arena'],
+  strike: ['Forge Strike', 'Pinch the seal, stamp arena'],
   flick: ['Fingertip Flick', 'Swing fingertip through a top'],
 };
 export function moveTaughtAt(matches: number): TaughtMove | undefined {

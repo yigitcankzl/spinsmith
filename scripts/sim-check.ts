@@ -31,7 +31,7 @@ import { ARENA_FORGE_SHIELD, arenaForgeAim, arenaForgeDanger, arenaForgeImpulse,
 import { brawlSlots, spinStep, targetWinner } from '../src/game/brawl.ts';
 import { boardHead, gateShort, HUB_NOTE, HUB_WORDS, ledgerLine, mapHead, ORDER_DONE_SUB, orderShort, playSub, rankLine } from '../src/game/hub-copy.ts';
 import { CARD_HOW_WORDS, CLAIM, LESSON, lessonText, PROMPT_WORDS, promptWords } from '../src/game/lessons.ts';
-import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from '../src/game/desk-edge.ts';
+import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector, wrenchSector } from '../src/game/desk-edge.ts';
 import { FpsBook, fpsPhase, QUALITY_MAX, QualityGuard, qualityThresholds } from '../src/game/quality.ts';
 import { commitBlocker, FLICK_AFTER_RELEASE, FREE_HAND, gestureOwner, heldElsewhere, listenBlocker, mayCommit, mayListen, RELEASE_LOCK, RUB_STROKE_GAP, RUB_TIP_GUST, RUB_TOUCH_SLACK, rubStrokeStep, SHAPING_RELEASE_LOCK } from '../src/game/gesture-owner.ts';
 import type { GestureOwner, HandFacts, HandVerb } from '../src/game/gesture-owner.ts';
@@ -969,8 +969,11 @@ TUNING.grace = 0;
   assert.equal(pickTable(head, [surface]), null, 'an unlabelled surface needs the spot it must be under');
   const chair = { x: 0, y: 0.74, z: 0, rank: 1 as const, poly: rect(0, 0, 1.6, 2) };
   assert.equal(pickTable(head, [chair], spot), null, 'a surface the head is above is not used');
-  const labelled = { x: 0.8, y: 0.7, z: -0.6, rank: 0 as const, poly: rect(0.8, -0.6, 0.6, 0.6) };
-  assert.equal(pickTablePlane(head, [surface, labelled], spot), labelled, 'a labelled table outranks a nearer unlabelled one');
+  const labelled = { x: 0.1, y: 0.7, z: -0.8, rank: 0 as const, poly: rect(0.1, -0.8, 0.8, 0.6) };
+  assert.equal(pickTablePlane(head, [surface, labelled], spot), labelled, 'a labelled table under the spot outranks a nearer unlabelled one');
+  const besideLabelled = { x: 0.8, y: 0.7, z: -0.6, rank: 0 as const, poly: rect(0.8, -0.6, 0.6, 0.6) };
+  assert.equal(pickTablePlane(head, [surface, besideLabelled], spot), surface, 'a labelled table beside the spot (outline known) is not used: the arena would float beside it');
+  assert.equal(pickTable(head, [besideLabelled], spot), null, 'only a labelled table beside the spot: the tray, not mid-air');
   const nearSurface = { ...surface, x: 0.2, poly: rect(0.2, -0.75, 1.2, 0.6) };
   const sideSurface = { x: 0.9, y: 0.8, z: -0.5, rank: 1 as const, poly: rect(0.9, -0.5, 0.6, 0.6) };
   assert.equal(pickTablePlane(head, [sideSurface, nearSurface], spot), nearSurface, 'of two surfaces, the one under the spot');
@@ -2126,6 +2129,16 @@ assert.equal(edgeOf('defense', 'defense'), 0);
   // Centre off the table, or no table: none.
   assert.equal(deskSectors(square(2, 0, 0.5), 0.15, 0.1).length, 0, 'off table: no sectors');
   assert.equal(deskSectors(null, 0.15, 0.1).length, 0, 'no table: no sectors');
+  // The staged first DESK KO never goes over the player's own edge, nor an edge with a wall behind it.
+  const corner = deskSectors(square(-0.3, -0.3, 0.5), 0.15, 0.1); // sectors at +x and +z
+  const atX = corner.find((s) => Math.abs(s.angle) < 0.05)!;
+  const atZ = corner.find((s) => Math.abs(s.angle - Math.PI / 2) < 0.05)!;
+  assert.equal(wrenchSector(corner, Math.PI / 2), atX, 'player on the +z side: the KO goes over +x, not into the lap');
+  assert.equal(wrenchSector(corner, 0), atZ, 'player on the +x side: the KO goes over +z');
+  assert.equal(wrenchSector(corner, Math.PI / 2, (s) => s === atX), null, 'player side and walled side both out: no staged KO (a plain ring-out)');
+  assert.equal(wrenchSector(one, Math.PI), one[0], 'player opposite the only edge: that edge');
+  assert.equal(wrenchSector(one, 0.2), null, 'the only edge is the player\'s own: no staged KO');
+  assert.equal(wrenchSector(one, null), one[0], 'head unknown: the nearest edge');
 }
 
 // The drop side: the rim facing a close real desk edge is lower for both tops, every round. A throw
@@ -2222,11 +2235,16 @@ if (DESK_DROP_ON) {
   assert.deepEqual(q.sample(60, 1), { from: 0, to: 1, fps: 60, reason: 'slow' }, 'third slow second: lite');
   assert.equal(q.sample(60, 1), null, 'the slow clock restarts after a step');
   q.sample(60, 1);
-  assert.equal(q.sample(60, 1)?.to, 2, 'three more slow seconds: foveation');
+  assert.equal(q.sample(60, 1)?.to, 2, 'three more slow seconds: hard depth occlusion');
+  q.sample(60, 1);
+  q.sample(60, 1);
+  assert.equal(q.sample(60, 1)?.to, 3, 'three more slow seconds: foveation');
   for (let i = 0; i < 6; i++) assert.equal(q.sample(50, 1), null, 'no step below the lowest level');
   assert.equal(q.level, QUALITY_MAX, 'stays at the lowest level');
+  q.downs = 0; // (the retry cap is checked below)
   for (let i = 0; i < 9; i++) assert.equal(q.sample(72, 1), null, 'comfort must last 10 s');
-  assert.deepEqual(q.sample(72, 1), { from: 2, to: 1, fps: 72, reason: 'comfortable' }, 'ten comfortable seconds: one step up');
+  assert.deepEqual(q.sample(72, 1), { from: 3, to: 2, fps: 72, reason: 'comfortable' }, 'ten comfortable seconds: one step up');
+  for (let i = 0; i < 10; i++) q.sample(72, 1);
   for (let i = 0; i < 9; i++) q.sample(72, 1);
   q.sample(68, 1);
   assert.equal(q.level, 1, 'a merely-ok window (between thresholds) resets the comfort clock');
@@ -2238,6 +2256,10 @@ if (DESK_DROP_ON) {
   q.sample(60, 1);
   q.sample(60, 1);
   assert.equal(q.level, 0, 'slow seconds must be consecutive');
+  const cap = new QualityGuard();
+  for (let i = 0; i < 9; i++) cap.sample(50, 1);
+  assert.equal(cap.downs, 3, 'three steps down');
+  for (let i = 0; i < 30; i++) assert.equal(cap.sample(72, 1), null, 'after three steps down a session no longer steps back up (no flapping)');
   const r = new QualityGuard();
   for (let i = 0; i < 3; i++) r.sample(85, 1, 90);
   assert.equal(r.level, 0, '90 Hz session at 85 fps is fine');

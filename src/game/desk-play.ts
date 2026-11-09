@@ -7,7 +7,7 @@ import { DESK_DROP_HALF_MAX, STEP } from './sim.js';
 import type { DropSide } from './sim.js';
 import { LESSON } from './lessons.js';
 import { edgeDistance, insidePoly } from './room.js';
-import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector } from './desk-edge.js';
+import { deskSectors, deskWrenchAngle, deskWrenchSteer, inSector, wrenchSector } from './desk-edge.js';
 import type { DeskSector } from './desk-edge.js';
 import type { XZ } from './room.js';
 import { mergeByMaterial, OPPONENT_COLOR, ROOM, TopView, WALL_HEIGHT } from './visuals.js';
@@ -153,16 +153,37 @@ export class DeskPlay {
   /** Root-local rescue target and rim goal, exposed to the emulator driver without allocating. */
   outerRingAt = new Vector3();
   outerRingGoal = new Vector3();
+  private readonly wrenchHead = new Vector3();
 
   /**
    * Where the staged first DESK KO aims (stage frame), or null when it is not live: armed for the
    * forge-lesson round, on a real table with a desk edge in reach (no table: a plain ring-out).
    */
   deskWrenchAt(): number | null {
-    const sec = this.deskEdgeSectors[0];
-    if (!this.deskWrench.armed || this.m.phase !== 'fight' || !ROOM.poly || !this.m.onTable || !sec || !this.m.theirs.alive) return null;
+    if (!this.deskWrench.armed || this.m.phase !== 'fight' || !ROOM.poly || !this.m.onTable || !this.m.theirs.alive) return null;
+    const sec = this.wrenchSector();
+    if (!sec) return null;
     // Sectors are root-local; the tops and pockets live on the stage, turned by its yaw.
     return deskWrenchAngle({ ...sec, angle: sec.angle + this.m.stage.rotation.y }, this.m.arena.layout.pockets);
+  }
+
+  /**
+   * The edge the staged KO goes over: never the player's own side (a top in the lap) and never an
+   * edge with a detected wall right behind it. Root-local, like the sectors.
+   */
+  private wrenchSector(): DeskSector | null {
+    const root = this.m.root;
+    root.updateWorldMatrix(true, false);
+    const head = root.worldToLocal(this.wrenchHead.copy(this.m.headWorld()));
+    const playerAngle = Math.hypot(head.x, head.z) > 0.05 ? Math.atan2(head.z, head.x) : null;
+    const walls = this.m.wallPlanes();
+    const s = root.scale.x || 1;
+    return wrenchSector(this.deskEdgeSectors, playerAngle, (sec) => {
+      if (!walls.length) return false;
+      // The real point just past the edge, in world space: a wall within 15 cm of it blocks the fall.
+      const p = root.localToWorld(this.wrenchHead.set(Math.cos(sec.angle) * (sec.distance + 0.02 / s), 0, Math.sin(sec.angle) * (sec.distance + 0.02 / s)));
+      return walls.some((w) => Math.abs((p.x - w.x) * w.nx + (p.z - w.z) * w.nz) < 0.15);
+    });
   }
 
   /** Until the staged forge fires, the rival drifts to the rim facing the nearest real edge. */
@@ -317,7 +338,7 @@ export class DeskPlay {
         d.half = Math.min(sec.halfWidth, DESK_DROP_HALF_MAX);
         this.m.arena.drops.push(d);
       }
-      const now = (rivalNear && inSector(sec, rivalAngle)) || (i === 0 && this.deskWrenchAt() !== null);
+      const now = (rivalNear && inSector(sec, rivalAngle)) || (this.deskWrench.armed && this.deskWrenchAt() !== null && sec === this.wrenchSector());
       const m = arc.material;
       // Painted, not glowing (it sits on the light enamel): solid enough to read, throbbing when it is the move.
       m.opacity = now ? 0.8 + 0.2 * Math.sin(this.m.time * 9) : 0.55 + 0.1 * Math.sin(this.m.time * 1.8 + i);

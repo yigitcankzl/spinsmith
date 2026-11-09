@@ -129,6 +129,13 @@ export function pickTablePlane(head: Point, tables: TablePlane[], spot?: XZ): Ta
     let key = d;
     if (rank === 0) {
       if (t.y < TABLE_MIN_H || t.y > TABLE_MAX_H) continue;
+      // The arena goes at the spot, at this table's height: a labelled table beside the spot (with
+      // its outline known) would leave it floating in mid-air beside the table.
+      if (spot && t.poly && t.poly.length >= 3) {
+        const off = insidePoly(t.poly, spot.x, spot.z) ? 0 : edgeDistance(t.poly, spot.x, spot.z);
+        if (off > MAX_FIT_MOVE) continue;
+        key = d + off * 10;
+      }
     } else {
       if (!spot || !t.poly || t.poly.length < 3 || insidePoly(t.poly, head.x, head.z)) continue;
       const off = insidePoly(t.poly, spot.x, spot.z) ? 0 : edgeDistance(t.poly, spot.x, spot.z);

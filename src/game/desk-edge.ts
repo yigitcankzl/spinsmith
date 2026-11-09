@@ -77,6 +77,21 @@ export function deskSectors(poly: XZ[] | null, rim: number, reach: number, max =
   return out.sort((a, b) => a.distance - b.distance).slice(0, max);
 }
 
+/**
+ * The sector the staged first DESK KO may aim through: the nearest one that does not face the
+ * player (the rival would land in their lap) and is not blocked (a wall right behind the edge).
+ * `playerAngle` is the direction from the arena centre to the head, in the sectors' frame; a
+ * sector whose middle is within `facing` of it is skipped. Null when every sector is ruled out.
+ */
+export function wrenchSector(sectors: DeskSector[], playerAngle: number | null, blocked: (s: DeskSector) => boolean = () => false, facing = Math.PI / 3): DeskSector | null {
+  for (const s of sectors) {
+    if (playerAngle !== null && Math.abs(Math.atan2(Math.sin(s.angle - playerAngle), Math.cos(s.angle - playerAngle))) < facing) continue;
+    if (blocked(s)) continue;
+    return s;
+  }
+  return null;
+}
+
 /** True when `angle` is inside the sector (wrap-safe). */
 export function inSector(s: DeskSector, angle: number): boolean {
   const d = Math.atan2(Math.sin(angle - s.angle), Math.cos(angle - s.angle));

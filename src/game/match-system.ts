@@ -6,7 +6,7 @@ import { HandInput, HandState, Side } from './hands.js';
 import { ARENAS } from './arenas.js';
 import { Builder, Button, loadArenas } from './builder.js';
 import { FONT, glass, GUIDE, SIGN_TILT, signTexture, TEXT, titleMesh } from './ui.js';
-import { FpsBook, fpsPhase, QUALITY_LEVELS, QualityGuard } from './quality.js';
+import { FpsBook, fpsPhase, QUALITY_FOVEATION, QUALITY_HARD_OCCLUSION, QUALITY_LEVELS, QualityGuard } from './quality.js';
 import { RIP_RELEASE, RipMeter, ripPower } from './rip.js';
 import { decodeBuild, encodeBuild } from './challenge.js';
 import { brawlLayout, DISPLAY_RIM, maxRim, normRadius, pocketAt, railAt, rimRadius, spawnDistance } from './layout.js';
@@ -82,6 +82,10 @@ const PRESS_WAIT = 8;
 /** A press moves the arena at most this far from its comfortable spot toward the hand (m). */
 const PRESS_PULL = 0.15;
 /** A table found within this long after placing on the tray still gets the arena (s). */
+/** Eye height (above the floor) over which the player is taken to be standing (the capture rig seats at 1.45). */
+const SEATED_EYE_MAX = 1.5;
+/** With no table plane, a palm press counts only this close (horizontally) to the print. */
+const NO_TABLE_PRESS_R = 0.3;
 const LATE_TABLE = 30;
 /** The move handle: grabbed within this distance (world m); the arena moves at most this far up or down. */
 const HANDLE_GRAB = 0.06;
@@ -777,6 +781,8 @@ export class MatchSystem extends createSystem({
   private introDone = false;
   /** The frame-rate guard (src/game/quality.ts): steps rendering down and back up; never the sim. */
   private quality = new QualityGuard();
+  /** The arena layers that take real-world depth (their occlusion mode follows the quality level). */
+  private occludedEntities: (typeof this.stageEntity)[] = [];
   private qualityLog: string[] = [];
   private fpsBook = new FpsBook();
   private lastFps = 0;
@@ -1420,6 +1426,7 @@ export class MatchSystem extends createSystem({
     this.desk.deskMemory.position.y = (-PEDESTAL + 0.004) / ARENA_SCALE;
     const deskMemoryEntity = this.world.createTransformEntity(this.desk.deskMemory, this.rootEntity);
     deskMemoryEntity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
+    this.occludedEntities = [this.stageEntity, outerRailEntity, imprintsEntity, deskMemoryEntity];
     this.placementProbe.name = 'table-hit-probe';
     const placementProbeEntity = this.world.createTransformEntity(this.placementProbe);
     placementProbeEntity.addComponent(EnvironmentRaycastTarget, {
@@ -3097,9 +3104,11 @@ export class MatchSystem extends createSystem({
     const session = this.world.renderer.xr.getSession() as (XRSession & { frameRate?: number }) | null;
     const step = this.quality.sample(fps, seconds, session?.frameRate);
     if (!step) return;
-    // Level 2 adds full fixed foveation (WebXR allows changing it mid-session); level 1 and up
-    // drop the room dimming. The framebuffer scale stays: WebXR fixes it at session start.
-    this.world.renderer.xr.setFoveation?.(step.to >= 2 ? 1 : 0.5);
+    // Level 1 and up drop the room dimming; level 2 swaps the min-max soft depth occlusion (an
+    // extra depth pass and 12 samples a pixel) for hard occlusion; level 3 adds full fixed
+    // foveation (WebXR allows changing it mid-session). The framebuffer scale stays: WebXR fixes it.
+    this.world.renderer.xr.setFoveation?.(step.to >= QUALITY_FOVEATION ? 1 : 0.5);
+    if ((step.from >= QUALITY_HARD_OCCLUSION) !== (step.to >= QUALITY_HARD_OCCLUSION)) this.setOcclusionMode();
     const line = `${Math.round(performance.now() / 1000)}s ${this.phase} ${fps.toFixed(0)}fps ${QUALITY_LEVELS[step.from]}->${QUALITY_LEVELS[step.to]}`;
     this.qualityLog.push(line);
     if (this.qualityLog.length > 12) this.qualityLog.shift();
@@ -3362,12 +3371,26 @@ export class MatchSystem extends createSystem({
     return true;
   }
 
+  /** The depth occlusion the quality level asks for: min-max soft, or hard once frames run slow. */
+  private get occlusionMode() {
+    return this.quality.level >= QUALITY_HARD_OCCLUSION ? OcclusionShadersMode.HardOcclusion : OcclusionShadersMode.MinMaxSoftOcclusion;
+  }
+
   /** Re-runs depth material discovery after a forged top replaced its meshes. */
   private refreshDepthOcclusion() {
     const entity = this.stageEntity;
     if (!entity?.active || !entity.hasComponent(DepthOccludable)) return;
     entity.removeComponent(DepthOccludable);
-    entity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.MinMaxSoftOcclusion });
+    entity.addComponent(DepthOccludable, { mode: this.occlusionMode });
+  }
+
+  /** Every depth-occluded layer re-registered with the current mode (a one-off shader rebuild). */
+  private setOcclusionMode() {
+    for (const entity of this.occludedEntities) {
+      if (!entity?.active || !entity.hasComponent(DepthOccludable)) continue;
+      entity.removeComponent(DepthOccludable);
+      entity.addComponent(DepthOccludable, { mode: this.occlusionMode });
+    }
   }
 
   /** Where a hand points at the arena (near pinch first, else its ray), including just past the rim. */
@@ -3642,7 +3665,10 @@ export class MatchSystem extends createSystem({
         this.toHub();
         return true;
       }
-      const hit = this.touches[side].update(h.tracked ? h.low : null, dt, lo, hi);
+      // With no known surface the band spans every desk height, so the press must also be near the
+      // print: a hand resting in the lap (low and still) is not a desk.
+      const nearPrint = surfaceY !== null || Math.hypot(h.indexSmooth.x - at.x, h.indexSmooth.z - at.z) < NO_TABLE_PRESS_R;
+      const hit = this.touches[side].update(h.tracked && nearPrint ? h.low : null, dt, lo, hi);
       if (hit === null) continue;
       this.placeRoot(raycastTable ? at : undefined);
       // Toward the hand a little, standing on the height the palm found.
@@ -3665,6 +3691,7 @@ export class MatchSystem extends createSystem({
       for (let i = 0; i < 3; i++) this.sparks.burst((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1, 1);
       console.log(`[MATCH] forged by press at y=${hit.toFixed(3)}${table !== null ? ` (table plane ${table.toFixed(3)})` : ''}`);
       this.toHub();
+      this.tableNotice();
       return true;
     }
     return false;
@@ -3677,16 +3704,26 @@ export class MatchSystem extends createSystem({
     this.toHub();
     if (snap) this.tryResume(snap);
 
-    if (!this.onTable) {
-      // No table found (or none labelled one): say so once the title is gone, then the first
-      // session's note returns.
-      const notice = () => {
-        this.label.set(LESSON.noTable);
-        this.labelTimer = 5;
-      };
-      if (this.title.visible) this.afterTitle = notice;
-      else notice();
-    }
+    this.tableNotice();
+  }
+
+  /**
+   * Say what the room took away, once the title is gone (then the first session's note returns):
+   * no table (and "sit at a table" when the head is at standing height), or a table whose real
+   * edges are unknown (a palm press with no table plane), where DESK KOs and drop sides are off.
+   */
+  private tableNotice() {
+    let text: string | null = null;
+    if (!this.onTable) text = this.headWorld().y > SEATED_EYE_MAX ? LESSON.sitDown : LESSON.noTable;
+    else if (!ROOM.poly) text = LESSON.noEdges;
+    if (!text) return;
+    console.log(`[MATCH] table notice: ${text}`);
+    const notice = () => {
+      this.label.set(text!);
+      this.labelTimer = 5;
+    };
+    if (this.title.visible) this.afterTitle = notice;
+    else notice();
   }
 
   /**
@@ -4132,6 +4169,28 @@ export class MatchSystem extends createSystem({
       }
     }
     return found ? this.stage.worldToLocal(out) : null;
+  }
+
+  /** The head in world space, now. */
+  headWorld(): Vector3 {
+    return this.player.head.getWorldPosition(this.head);
+  }
+
+  /** Detected walls as a point and a horizontal unit normal each (world space), for the staged DESK KO. */
+  wallPlanes(): { x: number; z: number; nx: number; nz: number }[] {
+    const out: { x: number; z: number; nx: number; nz: number }[] = [];
+    for (const e of this.queries.planes.entities) {
+      const plane = e.getValue(XRPlane, '_plane') as RawPlane | undefined;
+      if (plane?.orientation !== 'vertical' || !/wall/.test(plane.semanticLabel ?? '')) continue;
+      const o = e.object3D!;
+      const p = o.getWorldPosition(this.planeW);
+      // A WebXR plane's normal is its local +Y.
+      const n = new Vector3(0, 1, 0).applyQuaternion(o.getWorldQuaternion(this.planeQ));
+      const len = Math.hypot(n.x, n.z);
+      if (len < 0.5) continue;
+      out.push({ x: p.x, z: p.z, nx: n.x / len, nz: n.z / len });
+    }
+    return out;
   }
 
   /** A table detected after the arena went on the tray: the arena eases down onto it. */
