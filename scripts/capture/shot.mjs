@@ -312,6 +312,79 @@ export default async function run({ page, frame, cdp }) {
       // An ordinary work desk at the end away from the arena (monitor, keyboard, mug, notebook,
       // plant), so a wide shot reads as "your desk" and not a bare plank. Presentation only.
       window.__captureIdleSway = p.idleSway !== false;
+      // Soft contact shadows under both hands, on the desk top inside it and on the floor outside,
+      // darker as the hand comes down: emulator hands otherwise float with nothing under them.
+      window.__captureShadowFrame = { cx, cz, yaw, w, d, topY, floorY: 0.015 };
+      // Rebuilt on every run (a page that survives several captures keeps working on fresh state).
+      for (const { m } of window.__captureHandShadows ?? []) m.removeFromParent();
+      window.__captureHandShadows = null;
+      window.__captureShadowTick = null;
+      if (p.handShadows !== false) {
+        let BasicMaterial = null;
+        scene.traverse((object) => { if (!BasicMaterial && object.material?.isMeshBasicMaterial) BasicMaterial = object.material.constructor; });
+        if (BasicMaterial) {
+          const sc = document.createElement('canvas');
+          sc.width = sc.height = 128;
+          const sg = sc.getContext('2d');
+          const grad = sg.createRadialGradient(64, 64, 2, 64, 64, 62);
+          grad.addColorStop(0, 'rgba(0,0,0,0.9)');
+          grad.addColorStop(0.45, 'rgba(0,0,0,0.45)');
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          sg.fillStyle = grad;
+          sg.fillRect(0, 0, 128, 128);
+          const shadowTex = new TextureConstructor(sc);
+          shadowTex.needsUpdate = true;
+          const discs = ['left', 'right'].map((side) => {
+            const m = new MeshConstructor(new BoxGeometryConstructor(1, 0.0004, 1, 1, 1, 1), new BasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: 0.5, color: 0x000000 }));
+            m.name = `capture-hand-shadow-${side}`;
+            m.renderOrder = 2;
+            m.visible = false;
+            scene.add(m);
+            return { side, m };
+          });
+          const tick = () => {
+            const g = window.__game, f = window.__captureShadowFrame;
+            const now = performance.now();
+            for (const disc of discs) {
+              const { side, m } = disc;
+              const h = g?.hands?.[side];
+              // Tracking can drop for a frame between XR and page frames: hold the last shadow briefly.
+              m.visible = now - (disc.seen ?? 0) < 300;
+              if (!h?.tracked || !f) continue;
+              const px = h.wrist.x * 0.35 + h.index.x * 0.65, pz = h.wrist.z * 0.35 + h.index.z * 0.65;
+              const dx = px - f.cx, dz = pz - f.cz;
+              const lx = dx * Math.cos(f.yaw) - dz * Math.sin(f.yaw), lz = dx * Math.sin(f.yaw) + dz * Math.cos(f.yaw);
+              const onDesk = Math.abs(lx) < f.w / 2 && Math.abs(lz) < f.d / 2;
+              const surface = onDesk ? f.topY : f.floorY;
+              const height = Math.min(h.wrist.y, h.index.y) - surface;
+              if (height < -0.03 || height > 0.45) { disc.seen = 0; m.visible = false; continue; }
+              disc.seen = now;
+              m.visible = true;
+              const size = 0.11 + Math.max(0, height) * 0.3;
+              m.scale.set(size, 1, size * 1.3);
+              m.rotation.y = Math.atan2(h.index.x - h.wrist.x, h.index.z - h.wrist.z);
+              m.position.set(px, surface + 0.0015, pz);
+              m.material.opacity = Math.max(0, 0.85 * (1 - Math.max(0, height) / 0.5));
+            }
+          };
+          window.__captureShadowTick = tick;
+          window.__captureHandShadows = discs;
+        }
+      }
+      // The page's requestAnimationFrame pauses during the immersive session, so the shadows update
+      // from the render itself: the desk top and the floor run the tick before they draw.
+      if (window.__captureShadowTick) {
+        for (const name of ['capture-table-top', 'capture-room-floor']) {
+          const mesh = scene.getObjectByName(name);
+          if (!mesh) continue;
+          mesh.onBeforeRender = () => {
+            const now = performance.now();
+            if (now - (window.__captureShadowLast ?? 0) < 4) return;
+            window.__captureShadowLast = now;
+            window.__captureShadowTick();
+          };
+        }
+      }
       if (p.deskProps !== false) {
         let CylinderConstructor = null;
         scene.traverse((object) => { if (!CylinderConstructor && object.geometry?.type === 'CylinderGeometry') CylinderConstructor = object.geometry.constructor; });

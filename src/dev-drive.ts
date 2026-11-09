@@ -173,7 +173,7 @@ const PEDESTAL = 0.08;
 const ARENA_SCALE = 2.4;
 
 export function installDriver() {
-  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand>; primaryInputMode: 'controller' | 'hand' }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; __spinDriveGeneration?: number; __captureIdleSway?: boolean; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
+  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand>; primaryInputMode: 'controller' | 'hand' }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; __spinDriveGeneration?: number; __captureIdleSway?: boolean; __captureShadowFrame?: { cx: number; cz: number; yaw: number; w: number; d: number; topY: number }; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
   // Vite HMR re-evaluates this module without cancelling requestAnimationFrame callbacks created by
   // the previous copy. Give the newest driver sole ownership so an old closure cannot keep writing
   // a parked pose over a fresh test after a source edit.
@@ -224,7 +224,7 @@ export function installDriver() {
     if (!atRest) { life.fidget[side] = null; life.next[side] = Math.max(life.next[side], now + 900); }
     if (amt < 0.002) return out;
     sway.set(0.01 * Math.sin(t * 1.45 + ph), 0.007 * Math.sin(t * 1.95 + ph * 0.6), 0.008 * Math.sin(t * 1.07 + ph * 1.3)).add(life.shift[side]);
-    out.curl = 0.08 + 0.08 * (0.5 + 0.5 * Math.sin(t * 0.83 + ph * 2.1));
+    out.curl = 0.2 + 0.1 * (0.5 + 0.5 * Math.sin(t * 0.83 + ph * 2.1));
     out.rx = 0.1 * Math.sin(t * 0.61 + ph);
     out.ry = 0.08 * Math.sin(t * 0.47 + ph * 0.7);
     out.rz = 0.14 * Math.sin(t * 0.71 + ph * 1.9);
@@ -237,9 +237,9 @@ export function installDriver() {
     }
     if (f) {
       const k = Math.min(1, (now - f.at) / f.dur), bump = Math.sin(k * Math.PI);
-      if (f.kind === 'tap') { out.curl += 0.22 * bump; sway.y -= 0.018 * bump; out.rx += 0.2 * bump; }
+      if (f.kind === 'tap') { out.curl += 0.15 * bump; sway.y -= 0.01 * bump; out.rx += 0.2 * bump; }
       else if (f.kind === 'lift') { sway.addScaledVector(toArena, 0.05 * bump); sway.y += 0.045 * bump; out.rx -= 0.25 * bump; out.rz += (side === 'left' ? 0.2 : -0.2) * bump; }
-      else if (f.kind === 'curl') out.curl += 0.16 * bump;
+      else if (f.kind === 'curl') out.curl += 0.14 * bump;
       if (k >= 1) { life.fidget[side] = null; life.next[side] = now + 1400 + lifeRand(side) * 2400; }
     }
     if (amt < 1) {
@@ -338,7 +338,7 @@ export function installDriver() {
       const l = handLife(side, now, toArena);
       v.add(sway);
       life.offset[side].copy(sway);
-      if (pinchOut < 0.05) pinchOut += Math.min(0.32, l.curl);
+      if (pinchOut < 0.05) pinchOut += Math.min(0.45, l.curl);
       // Rotate only while resting, from the orientation the hand had when it came to rest, and hand
       // that exact orientation back as the rest fades, so moves always run on IWER's own pose.
       const q = hand.quaternion;
@@ -526,6 +526,20 @@ export function installDriver() {
     const g = game();
     // Rest below the near table edge, like hands in the player's lap, so clips show only
     // deliberate reaches instead of two open hands hovering beside the arena.
+    // Captures rest the hands over the desk in front of the arena instead (pedestal top + 3 cm, about
+    // 11 cm over the table: above the 5 cm slap/press band, outside the rim and the outer ring).
+    if (w.__captureIdleSway) {
+      const p = g.root.localToWorld(new Vector3(g.arena.radius * (side === 'left' ? -1.6 : 1.6), 0.03, g.arena.radius * 1.35));
+      // Kept over the capture desk (its outline from shot.mjs), 11 cm above its top.
+      const f = w.__captureShadowFrame;
+      if (f) {
+        const dx = p.x - f.cx, dz = p.z - f.cz, c = Math.cos(f.yaw), sn = Math.sin(f.yaw);
+        const lx = Math.max(-f.w / 2 + 0.12, Math.min(f.w / 2 - 0.12, dx * c - dz * sn));
+        const lz = Math.max(-f.d / 2 + 0.1, Math.min(f.d / 2 - 0.1, dx * sn + dz * c));
+        p.set(f.cx + lx * c + lz * sn, f.topY + 0.11, f.cz - lx * sn + lz * c);
+      }
+      return p;
+    }
     const x = g.arena.radius * (side === 'left' ? -1.3 : 1.3);
     return g.root.localToWorld(new Vector3(x, -0.11, g.arena.radius * 1.7));
   };
