@@ -106,7 +106,7 @@ has been tested across real networks and headsets.
 
 The one sentence the video must show: *The arena is the weapon: squeeze it and throw the rival off
 your desk.* Built from three research passes (Meta competition winners' videos, mixed-reality
-trailers, trailer craft) and two review passes (a judge, 8.0, 8.5, 8.5, 8.8 and 8.9/10 over five rounds, and a
+trailers, trailer craft) and two review passes (a judge, 8.0, 8.5, 8.5, 8.8, 8.9 and a final 9.0/10 over six rounds; the judge puts the emulator-only ceiling at about 9.1, and a
 trailer editor): the name in the first seconds, one title per shot, one move per full frame, real
 gameplay only, the energy rising to the brawl, an end card with the call to action.
 
