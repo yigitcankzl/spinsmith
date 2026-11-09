@@ -63,20 +63,20 @@ PRE="crop=iw*0.4:ih*0.4:iw*0.3:ih*0.06" seg 03b-board "$M/hub-map.mp4" 5.1 1.5 "
 MUSIC+=("$(at 0):2")
 seg 04-squeeze "$S/close-squeeze.mp4" 0.4 2.5 "$(title 'SQUEEZE THE BOWL' 'Two hands bend the live arena')"
 seg 05-flick "$S/flick.mp4" 0.2 1.8 "$(title 'FLICK' 'Your fingertip is part of the physics')"
-seg 06-guard "$S/close-crossguard.mp4" 0.0 1.8 "$(title 'CROSSGUARD' 'Two still palms make a rail')"
+PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.08" seg 06-guard "$S/close-crossguard2.mp4" 0.2 1.8 "$(title 'CROSSGUARD' 'Two still palms make a rail')"
 seg 07-rub "$S/close-rub.mp4" 0.6 2.0 "$(title 'SPIN RUB' 'A fingertip spins your top back up')"
 seg 08-stamp "$S/seal-stamp.mp4" 0.5 3.0 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, press it in')"
 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.28" seg 09-forge "$S/forge.mp4" 9.4 2.5 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
 seg 10-workshop "$S/workshop.mp4" 7.4 2.5 "$(title 'BUILD YOUR OWN ARENA')"
 # 5. Every other move, about a second each, from the moment it acts (file, in-point, length, name).
-# Slap the Table keeps the whole frame and runs at 0.75x: the palm lands, then the strike bursts.
+# Slap the Table (slap2: a higher camera) runs at 0.75x: the palm lands beside the arena, then the strike bursts.
 MUSIC+=("$(at 0):3")
 i=0
 while read -r f s d n; do
   i=$((i + 1))
   head=""; [ $i -le 2 ] && head="$(title 'EVERY MOVE BY HAND' 'No controllers'),"
   crop="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.18"; sp=1
-  [ "$f" = slap ] && { crop="crop=iw*0.94:ih*0.94:0:ih*0.06"; sp=0.75; n="$n  (0.75x)"; }
+  [ "$f" = slap2 ] && { crop="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.2"; sp=0.75; n="$n  (0.75x)"; }
   SPEED=$sp PRE=$crop seg "12-m$(printf %02d $i)" "$M/$f.mp4" "$s" "$d" "$head$(label "$n     $i / 16")"
 done <<'EOF'
 ramp 0.6 1.0 RAMP
@@ -89,7 +89,7 @@ wheel 2.9 1.0 FORGE WHEEL
 outer-ring 4.1 1.6 PALM CATCH
 forge-twist 2.3 1.0 TWIST
 forge-stretch 2.4 1.0 STRETCH
-slap 3.0 2.6 SLAP THE TABLE
+slap2 4.3 1.8 SLAP THE TABLE
 seal-rush 6.8 1.0 RUSH
 seal-magnet 4.9 1.0 MAGNET
 seal-tilt 5.0 1.0 TILT
