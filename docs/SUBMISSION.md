@@ -108,7 +108,7 @@ The one sentence the video must show: *The arena is the weapon: squeeze it and t
 your desk.* Built from three research passes (Meta competition winners' videos, mixed-reality
 trailers, trailer craft) and review rounds. A judge and a trailer editor who followed every round
 scored 8.0 to 9.0/10 (emulator-only ceiling about 9.1). Two independent reviewers who saw none of
-that (Gemini and a fresh Claude agent) scored the 1:25 cut 6.5/10, then 6.8 and 7.0 after the hand
+that (Gemini and a fresh Claude agent) scored the 1:25 cut 6.5/10 (later rounds: 6.8-7.0, plateaued; what is left is real passthrough footage and real hands), then 6.8 and 7.0 after the hand
 re-records; this 1:12 cut answers their next round (a 12-tile grid instead of a one-second strip,
 the table and hands in the boss shots, real-time first match, a second DESK KO take at the end). The capture room then gained an ordinary work desk (monitor, keyboard, mug, notebook, plant, a window) and parked emulator hands now breathe a few millimetres instead of freezing; every desk-visible shot was re-recorded with it (old files in before-desk-props/).
 

@@ -120,7 +120,7 @@ MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
 B="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.2"  # the table, its legs and both hands in frame
 PRE=$B seg 13-boss1 "$T/boss.mp4" 27.3 6.3 "$(title 'A BOSS TILTS YOUR ARENA' 'Answer with both hands' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
 B2=$B
-PRE=$B2 seg 16-crown "$T/boss.mp4" 188.8 3.0 "$(label 'BEAT ALL THREE BOSSES')"
+PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.06" seg 16-crown "$T/boss.mp4" 188.8 3.0 "$(label 'BEAT ALL THREE BOSSES')"
 # 7. A four-top brawl on the opened-out arena.
 PRE="crop=iw*0.9:ih*0.9:iw*0.05:0" seg 17-brawl "$T/brawl2.mp4" 57.4 6.0 "$(title 'FOUR-TOP BRAWLS' 'Last top spinning wins')"
 # 8. Real matches on three of the arenas, ending on your point.
