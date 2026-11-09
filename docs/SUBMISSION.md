@@ -102,29 +102,29 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:35, cut 2026-11-09, game sound and a synthesized music bed)
+## Competition video (1:33, cut 2026-11-09, game sound and a synthesized music bed)
 
 The one sentence the video must show: *The arena is the weapon: squeeze it and throw the rival off
 your desk.* Built from three research passes (Meta competition winners' videos, mixed-reality
-trailers, trailer craft) and two review passes (a judge, 8.0 then 8.5/10 before the last fixes, and a
+trailers, trailer craft) and two review passes (a judge, 8.0, 8.5 and 8.5/10 over three rounds, and a
 trailer editor): the name in the first seconds, one title per shot, one move per full frame, real
 gameplay only, the energy rising to the brawl, an end card with the call to action.
 
 | Time | Shot | Point proved |
 |---|---|---|
-| 0:00-0:03 | SPINSMITH logo and name; both hands squeeze the bowl on the table's corner; the rival goes over the real edge: DESK KO | The one beat that needs your desk, first |
-| 0:03-0:06 | YOUR DESK IS THE RING-OUT: the same squeeze from low at the desk; the rival lands on the floor | The desk edge, seen from the side |
-| 0:06-0:15 | FIRST MATCH, UNCUT at 3x (labelled, the clock in real seconds): ghost-hand rip, first ramp, the first knockout at about 27 s | Hands only; the game teaches by showing |
-| 0:15-0:18 | ONE NEW MOVE EVERY MATCH (the match-won card names the next move), then the streak and Circuit Map board (demo save) | Why play match 2, and tomorrow |
-| 0:18-0:31 | Squeeze, flick, Crossguard, Spin Rub, stamp an ultimate, full frame | The core hands |
-| 0:31-0:37 | Forge a part onto the top; reshape an arena in the workshop | Depth |
-| 0:37-0:54 | EVERY MOVE BY HAND, about a second each from the moment it acts: ramp, rim spring, forge gust, cup and sling, finger groove, ember rivet, forge wheel, palm catch (outer ring), twist, stretch, slap the table (0.5x), and the ultimates Rush, Magnet, Tilt, Hammer, Ward | No move skipped |
-| 0:54-1:09 | THREE BOSSES: Iron Keep's tilt; Sawtooth's Hammer; Bastion's Anvil Strike; BEAT ALL THREE (5-0, THE CROWN IS YOURS) | The rival fights back with your own seals |
-| 1:09-1:22 | FOUR-TOP BRAWLS: launch, your top knocks rivals out | Crowded play, the energy peak |
-| 1:22-1:28 | 20 ARENAS: real matches on three of them, ending on your point | Every arena plays its own way |
-| 1:28-1:35 | The low-angle DESK KO at half speed with its sound (labelled 0.5x), then the end card over it: logo, SPINSMITH, Your desk is the ring-out, play it in the Quest Browser, link on the Devpost page | The line to remember, and what to do next |
+| 0:00-0:04 | SPINSMITH logo and name; both hands squeeze the bowl on the table's corner; the frame holds as the rival leaves the real edge (boxed: OFF THE REAL DESK), then DESK KO | The one beat that needs your desk, first |
+| 0:04-0:07 | YOUR DESK IS THE RING-OUT: the same squeeze from low at the desk; the rival lands on the floor | The desk edge, seen from the side |
+| 0:07-0:16 | FIRST MATCH, UNCUT at 3x (labelled, the clock in real seconds): ghost-hand rip, first ramp, the first knockout at about 27 s | Hands only; the game teaches by showing |
+| 0:16-0:19 | ONE NEW MOVE EVERY MATCH (the match-won card names the next move), then the streak and Circuit Map board (demo save) | Why play match 2, and tomorrow |
+| 0:19-0:30 | Squeeze, flick, Crossguard, Spin Rub, stamp an ultimate, full frame | The core hands |
+| 0:30-0:35 | Forge a part onto the top; reshape an arena in the workshop | Depth |
+| 0:35-0:53 | EVERY MOVE BY HAND, counted 1/16 to 16/16, about a second each from the moment it acts: ramp, rim spring, forge gust, cup and sling, finger groove, ember rivet, forge wheel, palm catch (outer ring), twist, stretch, slap the table (0.75x, the palm then the strike), and the ultimates Rush, Magnet, Tilt, Hammer, Ward | No move skipped |
+| 0:53-1:08 | THREE BOSSES: Iron Keep's tilt; Sawtooth's Hammer; Bastion's Anvil Strike; BEAT ALL THREE (5-0, THE CROWN IS YOURS) | The rival fights back with your own seals |
+| 1:08-1:21 | FOUR-TOP BRAWLS: launch, your top knocks rivals out | Crowded play, the energy peak |
+| 1:21-1:26 | 20 ARENAS: real matches on three of them, ending on your point | Every arena plays its own way |
+| 1:26-1:33 | The low-angle DESK KO at half speed with its sound (labelled 0.5x), then the end card over it: logo, SPINSMITH, Your desk is the ring-out, play it in the Quest Browser, link on the Devpost page | The line to remember, and what to do next |
 
-Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v4-1080p60.mp4` (1:35, 1080p60, about
+Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v4-1080p60.mp4` (1:33, 1080p60, about
 -14 LUFS). Every frame says `IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE`: the capture layer
 (`scripts/capture/prepare-room.sh`) draws a plain 3D room and a table matched to the emulator's
 synthesised table plane, and skinned hands. `scripts/reel-v4.sh` cuts it; the music is synthesized on
