@@ -116,9 +116,9 @@ gameplay only, the energy rising to the brawl, an end card with the call to acti
 | 0:04-0:07 | YOUR DESK IS THE RING-OUT: the same squeeze from low at the desk; the rival lands on the floor | The desk edge, seen from the side |
 | 0:07-0:16 | FIRST KNOCKOUT, UNCUT at 3x (labelled, the clock in real seconds from the home screen): ghost-hand rip, first ramp, the first knockout at about 27 s | Hands only; the game teaches by showing |
 | 0:16-0:19 | ONE NEW MOVE EVERY MATCH (the match-won card names the next move), then the streak and Circuit Map board (demo save) | Why play match 2, and tomorrow |
-| 0:19-0:28 | Squeeze, flick, Crossguard (from above; the rail forms between the palms at 0.5x), Spin Rub, stamp an ultimate, full frame | The core hands |
+| 0:19-0:28 | Squeeze, flick (the fingertip in frame), Crossguard (from above; the rail forms between the palms at 0.5x), Spin Rub (the fingertip in frame), stamp an ultimate, full frame | The core hands |
 | 0:28-0:33 | Forge a part onto the top; reshape an arena in the workshop | Depth |
-| 0:33-0:50 | EVERY MOVE BY HAND, counted 1/16 to 16/16, about a second each from the moment it acts: ramp, rim spring, forge gust, cup and sling, finger groove, ember rivet, forge wheel, palm catch (outer ring), twist, stretch, slap the table (0.75x, the palm then the strike), and the ultimates Rush, Magnet, Tilt, Hammer, Ward | No move skipped |
+| 0:33-0:50 | EVERY MOVE BY HAND, counted 1/16 to 16/16: palm catch, twist, ember rivet and slap the table (slowed) held long enough to see the hand and then the effect; then + 12 MORE MOVES as a quick strip: ramp, rim spring, forge gust, cup and sling, finger groove, forge wheel, stretch, and the ultimates Rush, Magnet, Tilt, Hammer, Ward (each cast by a palm on the table or a stamp) | No move skipped, and the hand is on screen |
 | 0:50-1:05 | THREE BOSSES: Iron Keep's tilt; Sawtooth's Hammer; Bastion's Anvil Strike; BEAT ALL THREE (5-0, THE CROWN IS YOURS) | The rival fights back with your own seals |
 | 1:05-1:14 | FOUR-TOP BRAWLS: launch, your top knocks rivals out | Crowded play, the energy peak |
 | 1:14-1:19 | 20 ARENAS: real matches on three of them, ending on your point | Every arena plays its own way |

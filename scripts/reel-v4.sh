@@ -62,42 +62,45 @@ PRE="crop=iw*0.4:ih*0.4:iw*0.3:ih*0.06" seg 03b-board "$M/hub-map.mp4" 5.1 1.5 "
 # 4. Five hero moves, full frame, then the forge and workshop.
 MUSIC+=("$(at 0):2")
 seg 04-squeeze "$S/close-squeeze.mp4" 1.9 1.6 "$(title 'SQUEEZE THE BOWL' 'Two hands bend the live arena')"
-seg 05-flick "$S/flick.mp4" 0.2 1.45 "$(title 'FLICK' 'Your fingertip is part of the physics')"
+PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 05-flick "$S/flick2.mp4" 0.6 1.7 "$(title 'FLICK' 'Your fingertip is part of the physics')"
 # Crossguard: the rail forms at half speed (labelled), then the hit at full speed.
 G="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.08"
 SPEED=0.5 PRE=$G seg 06-guard "$S/close-crossguard2.mp4" 0.30 1.2 "$(title 'CROSSGUARD' 'Two still palms make a rail  (half speed)')"
 PRE=$G seg 06b-guard "$S/close-crossguard2.mp4" 0.90 0.7
-seg 07-rub "$S/close-rub.mp4" 1.0 1.6 "$(title 'SPIN RUB' 'A fingertip spins your top back up')"
+PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 07-rub "$S/close-rub2.mp4" 0.6 1.6 "$(title 'SPIN RUB' 'A fingertip spins your top back up')"
 seg 08-stamp "$S/seal-stamp.mp4" 0.5 2.5 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, stamp it down')"
 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.28" seg 09-forge "$S/forge.mp4" 9.4 2.5 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
 seg 10-workshop "$S/workshop.mp4" 7.9 2.0 "eq=brightness=0.25:enable='lt(t,0.05)',$(title 'BUILD YOUR OWN ARENA')"
-# 5. Every other move, about a second each, from the moment it acts (file, in-point, length, name).
-# Slap the Table (slap2: a higher camera) runs at 0.75x: the palm lands beside the arena, then the strike bursts.
+# 5. Every move by hand: four held long enough to read (the hand, then what it does), then the other
+# twelve as a quick strip, all counted (file, in-point, length, speed, crop, name). Crops: n = the
+# fight view, w = the higher hand-in-frame camera of the 2026-11-09 re-records.
 MUSIC+=("$(at 0):3")
 i=0
-while read -r f s d n; do
-  i=$((i + 1))
-  head=""; [ $i = 1 ] && head="eq=brightness=0.25:enable='lt(t,0.05)',"; [ $i -le 2 ] && head+="$(title 'EVERY MOVE BY HAND' 'No controllers'),"
-  crop="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.18"; sp=1
-  [ "$f" = slap2 ] && { crop="crop=iw*0.5:ih*0.5:iw*0.29:ih*0.3"; sp=0.75; n="$n  (slowed)"; }
+while read -r f s d sp c n; do
+  i=$((i + 1)); head=""
+  [ $i = 1 ] && head="eq=brightness=0.25:enable='lt(t,0.05)',$(title 'EVERY MOVE BY HAND' 'No controllers'),"
+  [ $i = 5 ] && head="$(title '+ 12 MORE MOVES'),"
+  crop="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.18"; [ "$c" = w ] && crop="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15"
+  [ "$f" = slap2 ] && crop="crop=iw*0.5:ih*0.5:iw*0.29:ih*0.3"
+  [ "$sp" = 1 ] || n="$n  (slowed)"
   SPEED=$sp PRE=$crop seg "12-m$(printf %02d $i)" "$M/$f.mp4" "$s" "$d" "$head$(label "$n     $i / 16")"
 done <<'EOF'
-ramp 0.6 1.0 RAMP
-rim-spring 2.4 1.0 RIM SPRING
-gust 1.95 1.0 FORGE GUST
-cup-sling 0.3 0.7 CUP AND SLING
-groove 1.65 1.0 FINGER GROOVE
-ember 8.2 1.2 EMBER RIVET
-wheel 2.9 1.0 FORGE WHEEL
-outer-ring 4.1 1.6 PALM CATCH
-forge-twist 2.3 1.0 TWIST
-forge-stretch 2.4 1.0 STRETCH
-slap2 4.3 1.8 SLAP THE TABLE
-seal-rush 6.8 1.0 RUSH
-seal-magnet 4.9 1.0 MAGNET
-seal-tilt 5.0 1.0 TILT
-seal-hammer 2.0 1.0 HAMMER
-seal-ward 4.8 1.0 WARD
+outer-ring 3.9 2.2 1 n PALM CATCH
+forge-twist 1.4 2.2 1 n TWIST
+ember 7.4 2.0 1 n EMBER RIVET
+slap2 4.3 1.8 0.75 w SLAP THE TABLE
+ramp 0.6 0.7 1 n RAMP
+rim-spring 2.4 0.7 1 n RIM SPRING
+gust 1.95 0.7 1 n FORGE GUST
+cup-sling 0.3 0.7 1 n CUP AND SLING
+groove 1.65 0.7 1 n FINGER GROOVE
+wheel 2.9 0.7 1 n FORGE WHEEL
+forge-stretch 2.1 0.7 1 n STRETCH
+seal-rush2 4.75 0.8 1 w RUSH
+seal-magnet2 4.85 0.8 1 w MAGNET
+seal-tilt2 6.9 0.8 1 w TILT
+seal-hammer2 2.2 0.8 1 w HAMMER
+seal-ward2 2.0 0.8 1 w WARD
 EOF
 # 6. The bosses cast your ultimates back; a short break into them.
 MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
