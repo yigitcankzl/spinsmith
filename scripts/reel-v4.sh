@@ -59,7 +59,7 @@ MUSIC+=("$(at 3.5):x" "hit:$(at 4.0)" "$(at 4.0):1")
 PRE=$F1 seg 01c-hint "$T/first.mp4" 28.0 5.0 "$(title 'THEN IT TEACHES THE SQUEEZE' 'Both hands, and off the desk')"
 # 3. One new move every match.
 won=$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 1.7))")
-PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" seg 03-won "$S/match-won-cards.mp4" "$won" 1.2 "$PUSH,$(title 'WON 4-0. NEW MOVE UNLOCKED')"
+PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" seg 03-won "$S/match-won-cards.mp4" "$won" 1.2 "$PUSH,$(title 'A LATER MATCH: WON 4-0' 'Every win unlocks a new move')"
 # 4. Five hero moves, full frame, then the forge and workshop.
 MUSIC+=("$(at 0):2")
 seg 04-squeeze "$S/close-squeeze.mp4" 1.9 1.6 "$(title 'YOUR HANDS RESHAPE THE ARENA' 'Squeeze the live bowl')"
@@ -133,7 +133,7 @@ PRE=$B seg 13-boss1 "$T/boss.mp4" 44.0 4.5 "$(title 'THEN IT CASTS YOUR MOVES' '
 MUSIC+=("$(at 0.3):x")
 PRE=$B seg 14-lost "$T/boss.mp4" 63.6 2.2 "$(title 'LOST 3-4')"
 MUSIC+=("$(at 0.8):b" "hit:$(at 2.3)" "$(at 2.3):3")
-PRE=$B seg 15-bastion "$T/boss.mp4" 132.8 4.2 "$(title 'FINAL BOSS: BASTION' 'It casts Anvil Strike, your ramp answers')"
+PRE=$B seg 15-bastion "$T/boss.mp4" 132.8 4.2 "$(title 'TWO BOUTS LATER: THE FINAL BOSS' 'Bastion casts Anvil Strike, your ramp answers')"
 # 9. Bastion falls 4-0 (the end of the arc), the end card over it.
 MUSIC+=("$(at 2.6):b")
 PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.06" seg 21-end "$T/boss.mp4" 145.7 6.4 "$(label 'THE FINAL BOSS FALLS, 4-0' | sed "s/boxborderw=12/boxborderw=12:enable='lt(t,2.6)'/"),split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,2.6)',$(logo 180 '(W-w)/2' 210 'gte(t,2.6)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,2.6)',drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,2.6)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,2.6)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,2.6)'"

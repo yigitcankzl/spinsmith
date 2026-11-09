@@ -116,12 +116,12 @@ the table and hands in the boss shots, real-time first match, a second DESK KO t
 |---|---|---|
 | 0:00-0:04 | Cold open: SPINSMITH; both hands squeeze the bowl on the desk's corner; the frame holds and punches in 2x as the rival leaves the edge (OFF THE DESK EDGE), DESK KO | What makes it distinct, first |
 | 0:04-0:14 | A level-1 player's first match in real time: the game shows the launch (pinch, pull back, release), the rival scores (DOWN 0-1), then the game teaches the squeeze and the rival goes off the desk | Onboarding by showing, a stake, a first win |
-| 0:14-0:15 | WON 4-0. NEW MOVE UNLOCKED | Why play match 2 |
+| 0:14-0:15 | A LATER MATCH: WON 4-0 (every win unlocks a new move; the card is from another first-match take, captioned so) | Why play match 2 |
 | 0:15-0:25 | The moves earned: squeeze, flick, Crossguard (half speed), Spin Rub, stamp an ultimate | The core hands |
 | 0:25-0:29 | Forge a part onto the top; reshape an arena | Depth |
 | 0:29-0:41 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held, then a named 4x3 grid) | No move skipped |
 | 0:41-0:51 | FOUR-TOP BRAWLS; 20 ARENAS (three real matches) | Breadth |
-| 0:51-1:07 | The boss arc: BOSS ONE: IRON KEEP goes off the desk (unstaged, half speed), THEN IT CASTS YOUR MOVES (its tilt throws you), LOST 3-4; FINAL BOSS: Bastion casts Anvil Strike, the ramp answers | A setback and a comeback |
+| 0:51-1:07 | The boss arc: BOSS ONE: IRON KEEP goes off the desk (unstaged, half speed), THEN IT CASTS YOUR MOVES (its tilt throws you), LOST 3-4; TWO BOUTS LATER: THE FINAL BOSS, Bastion casts Anvil Strike, the ramp answers | A setback and a comeback |
 | 1:07-1:14 | THE FINAL BOSS FALLS, 4-0, then the end card over it: Squeeze the arena. Throw them off your desk. | The payoff and the line to remember |
 
 Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v4-1080p60.mp4` (1:14, 1080p60, about
