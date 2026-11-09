@@ -61,10 +61,13 @@ PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" seg 03-won "$S/match-won-cards.mp4" "
 PRE="crop=iw*0.4:ih*0.4:iw*0.3:ih*0.06" seg 03b-board "$M/hub-map.mp4" 5.1 1.5 "$PUSH,$(title 'A REASON TO COME BACK' 'Daily order, streak, map  (demo save)')"
 # 4. Five hero moves, full frame, then the forge and workshop.
 MUSIC+=("$(at 0):2")
-seg 04-squeeze "$S/close-squeeze.mp4" 0.8 2.1 "$(title 'SQUEEZE THE BOWL' 'Two hands bend the live arena')"
+seg 04-squeeze "$S/close-squeeze.mp4" 1.3 1.6 "$(title 'SQUEEZE THE BOWL' 'Two hands bend the live arena')"
 seg 05-flick "$S/flick.mp4" 0.2 1.45 "$(title 'FLICK' 'Your fingertip is part of the physics')"
-PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.08" seg 06-guard "$S/close-crossguard2.mp4" 0.45 1.5 "$(title 'CROSSGUARD' 'Two still palms make a rail')"
-seg 07-rub "$S/close-rub.mp4" 0.6 2.0 "$(title 'SPIN RUB' 'A fingertip spins your top back up')"
+# Crossguard: the rail forms at half speed (labelled), then the hit at full speed.
+G="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.08"
+SPEED=0.5 PRE=$G seg 06-guard "$S/close-crossguard2.mp4" 0.30 1.2 "$(title 'CROSSGUARD' 'Two still palms make a rail  (0.5x)')"
+PRE=$G seg 06b-guard "$S/close-crossguard2.mp4" 0.90 0.7
+seg 07-rub "$S/close-rub.mp4" 1.0 1.6 "$(title 'SPIN RUB' 'A fingertip spins your top back up')"
 seg 08-stamp "$S/seal-stamp.mp4" 0.5 2.5 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, press it in')"
 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.28" seg 09-forge "$S/forge.mp4" 9.4 2.5 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
 seg 10-workshop "$S/workshop.mp4" 7.9 2.0 "eq=brightness=0.25:enable='lt(t,0.05)',$(title 'BUILD YOUR OWN ARENA')"
@@ -99,7 +102,7 @@ EOF
 # 6. The bosses cast your ultimates back; a short break into them.
 MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
 B="crop=iw*0.55:ih*0.55:iw*0.2:ih*0.15"
-PRE=$B seg 13-boss1 "$T/boss.mp4" 9.4 3.5 "$(title 'THREE BOSSES' 'Each casts your own ultimate back')"
+PRE=$B seg 13-boss1 "$T/boss.mp4" 9.9 3.5 "$(title 'THREE BOSSES' 'Each casts your own ultimate back')"
 PRE=$B seg 14-boss2 "$T/boss.mp4" 96.6 3.7 "$(title 'SAWTOOTH CASTS HAMMER')"
 B2="crop=iw*0.7:ih*0.7:iw*0.14:ih*0.06"
 PRE=$B2 seg 15-boss3 "$T/boss.mp4" 190.3 4.5 "$(title 'BASTION CASTS ANVIL STRIKE')"
