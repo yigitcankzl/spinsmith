@@ -11,7 +11,7 @@
  * asked. Pinching uses the emulator's pinch value (which also blends the fingers closed).
  * Coordinates: world metres, or arena-local {x, z} where an option says so.
  */
-import { Vector3 } from '@iwsdk/core';
+import { Euler, Quaternion, Vector3 } from '@iwsdk/core';
 import { rimRadius, type ArenaLayout } from './game/layout.js';
 import { forgeGrips } from './game/reach.js';
 
@@ -27,6 +27,7 @@ interface EmuVec {
 }
 interface EmuHand {
   position: EmuVec;
+  quaternion?: { x: number; y: number; z: number; w: number; set(x: number, y: number, z: number, w: number): unknown };
   poseId: string;
   updatePinchValue(v: number): void;
   setPinchValueImmediate?(v: number): void;
@@ -186,6 +187,71 @@ export function installDriver() {
   // Parked in the lap after a move; only then may the capture layer add an idle sway.
   const resting: Record<Side, boolean> = { left: false, right: false };
   const sway = new Vector3();
+  // Capture-only hand life (scripts/capture/shot.mjs sets __captureIdleSway): parked hands breathe,
+  // curl and uncurl their fingers, roll their wrists and now and then fidget (tap, lift toward the
+  // arena, curl, shift), each hand on its own rhythm. It fades out within a quarter second when a
+  // move starts and never touches a moving or holding hand, so gestures read exactly as without it.
+  type Fidget = { kind: 'tap' | 'lift' | 'curl' | 'shift'; at: number; dur: number };
+  const life = {
+    base: { left: null as Quaternion | null, right: null as Quaternion | null },
+    fidget: { left: null as Fidget | null, right: null as Fidget | null },
+    next: { left: 0, right: 0 },
+    shift: { left: new Vector3(), right: new Vector3() },
+    seed: { left: 11, right: 29 },
+    amt: { left: 0, right: 0 },
+    last: { left: 0, right: 0 },
+    since: { left: 0, right: 0 },
+    offset: { left: new Vector3(), right: new Vector3() },
+  };
+  const lifeRand = (side: Side) => ((life.seed[side] = (life.seed[side] * 16807) % 2147483647) / 2147483647);
+  const lifeQ = new Quaternion();
+  const lifeE = new Euler();
+  /** Position offset (world), extra finger curl (0..0.3) and wrist rotation (radians) for this frame. */
+  const handLife = (side: Side, now: number, toArena: Vector3) => {
+    const t = now / 1000, ph = side === 'left' ? 0 : 1.7;
+    const out = { curl: 0, rx: 0, ry: 0, rz: 0 };
+    sway.set(0, 0, 0);
+    // Life starts only after 0.6 s at rest (a park followed at once by a strike stays exact), fades in,
+    // and stops the instant a move begins; the move's path starts from where the hand visibly is.
+    const parked = resting[side] && !goals[side];
+    if (!parked) life.since[side] = 0;
+    else if (!life.since[side]) life.since[side] = now;
+    const atRest = parked && now - life.since[side] > 600;
+    const dt = Math.min(0.1, Math.max(0, (now - life.last[side]) / 1000));
+    life.last[side] = now;
+    life.amt[side] = atRest ? life.amt[side] + (1 - life.amt[side]) * Math.min(1, dt * 3) : 0;
+    const amt = life.amt[side];
+    if (!atRest) { life.fidget[side] = null; life.next[side] = Math.max(life.next[side], now + 900); }
+    if (amt < 0.002) return out;
+    sway.set(0.01 * Math.sin(t * 1.45 + ph), 0.007 * Math.sin(t * 1.95 + ph * 0.6), 0.008 * Math.sin(t * 1.07 + ph * 1.3)).add(life.shift[side]);
+    out.curl = 0.08 + 0.08 * (0.5 + 0.5 * Math.sin(t * 0.83 + ph * 2.1));
+    out.rx = 0.1 * Math.sin(t * 0.61 + ph);
+    out.ry = 0.08 * Math.sin(t * 0.47 + ph * 0.7);
+    out.rz = 0.14 * Math.sin(t * 0.71 + ph * 1.9);
+    let f = life.fidget[side];
+    if (!f && atRest && now >= life.next[side]) {
+      const r = lifeRand(side);
+      const kind = r < 0.3 ? 'tap' : r < 0.55 ? 'lift' : r < 0.8 ? 'curl' : 'shift';
+      f = life.fidget[side] = { kind, at: now, dur: kind === 'tap' ? 450 : kind === 'lift' ? 1300 : kind === 'curl' ? 900 : 700 };
+      if (kind === 'shift') life.shift[side].set((lifeRand(side) - 0.5) * 0.04, 0, (lifeRand(side) - 0.5) * 0.03);
+    }
+    if (f) {
+      const k = Math.min(1, (now - f.at) / f.dur), bump = Math.sin(k * Math.PI);
+      if (f.kind === 'tap') { out.curl += 0.22 * bump; sway.y -= 0.018 * bump; out.rx += 0.2 * bump; }
+      else if (f.kind === 'lift') { sway.addScaledVector(toArena, 0.05 * bump); sway.y += 0.045 * bump; out.rx -= 0.25 * bump; out.rz += (side === 'left' ? 0.2 : -0.2) * bump; }
+      else if (f.kind === 'curl') out.curl += 0.16 * bump;
+      if (k >= 1) { life.fidget[side] = null; life.next[side] = now + 1400 + lifeRand(side) * 2400; }
+    }
+    if (amt < 1) {
+      sway.multiplyScalar(amt);
+      out.curl *= amt;
+      out.rx *= amt;
+      out.ry *= amt;
+      out.rz *= amt;
+    }
+    return out;
+  };
+  const toArena = new Vector3();
   const pinchNow: Record<Side, number> = { left: 0, right: 0 };
   const lastRoot: Record<Side, Vector3> = { left: new Vector3(), right: new Vector3() };
   const lastPinch: Record<Side, number> = { left: 0, right: 0 };
@@ -262,16 +328,35 @@ export function installDriver() {
       root.copy(a.at).sub(offset);
     }
     lastPinch[side] = pinchNow[side];
-    if (hand.setPinchValueImmediate) hand.setPinchValueImmediate(pinchNow[side]);
-    else hand.updatePinchValue(pinchNow[side]);
     lastRoot[side].copy(root);
     v.copy(root);
-    // Capture only (set by scripts/capture/shot.mjs): a parked hand breathes a few millimetres
-    // instead of freezing like a mannequin. Never while a move holds a hand still.
-    if (w.__captureIdleSway && resting[side] && !goals[side]) {
-      const t = now / 1000, ph = side === 'left' ? 0 : 1.7;
-      v.add(sway.set(0.006 * Math.sin(t * 1.45 + ph), 0.004 * Math.sin(t * 1.95 + ph * 0.6), 0.005 * Math.sin(t * 1.07 + ph * 1.3)));
+    let pinchOut = pinchNow[side];
+    if (w.__captureIdleSway) {
+      const g0 = game();
+      toArena.copy(g0.root.localToWorld(sway.set(0, 0, 0))).sub(root).setY(0);
+      if (toArena.lengthSq() > 1e-6) toArena.normalize();
+      const l = handLife(side, now, toArena);
+      v.add(sway);
+      life.offset[side].copy(sway);
+      if (pinchOut < 0.05) pinchOut += Math.min(0.32, l.curl);
+      // Rotate only while resting, from the orientation the hand had when it came to rest, and hand
+      // that exact orientation back as the rest fades, so moves always run on IWER's own pose.
+      const q = hand.quaternion;
+      if (q) {
+        const amt = life.amt[side];
+        if (amt > 0.002) {
+          const base = life.base[side] ?? (life.base[side] = new Quaternion(q.x, q.y, q.z, q.w));
+          lifeQ.setFromEuler(lifeE.set(l.rx, l.ry, l.rz)).premultiply(base);
+          q.set(lifeQ.x, lifeQ.y, lifeQ.z, lifeQ.w);
+        } else if (life.base[side]) {
+          const base = life.base[side]!;
+          q.set(base.x, base.y, base.z, base.w);
+          life.base[side] = null;
+        }
+      }
     }
+    if (hand.setPinchValueImmediate) hand.setPinchValueImmediate(pinchOut);
+    else hand.updatePinchValue(pinchOut);
     const local = game().player.worldToLocal(v);
     hand.position.set(local.x, local.y, local.z);
     // `position` is only IWER's public input value; its XRSpace matrix is normally copied in
@@ -377,7 +462,8 @@ export function installDriver() {
     return new Promise<void>((done) => {
       pinchNow[side] = pinch;
       const a = aim[side];
-      const from = a && a.point === point ? a.at.clone() : measured(side, point, new Vector3());
+      const from = a && a.point === point ? a.at.clone().add(life.offset[side]) : measured(side, point, new Vector3());
+      life.offset[side].set(0, 0, 0);
       const target = typeof to === 'function' ? to() : to;
       const lift = curve === 'natural' && pinch < 0.15 && intent !== 'grip'
         ? Math.min(0.018, Math.max(0.004, from.distanceTo(target) * 0.08))
