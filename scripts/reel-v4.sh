@@ -49,10 +49,6 @@ logo() { echo "null[m];movie=$LOGO,scale=$1:$1[lg];[m][lg]overlay=$2:$3${4:+:ena
 # 1. The hook: name and logo, both hands squeeze, the rival goes off the desk corner (KO at 2.2 s).
 MUSIC+=("0:1" "$(at 1.3):x" "hit:$(at 1.8)" "$(at 2.3):2")
 PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.08" seg 00-hook "$S/hook-ko-close.mp4" 1.7 3.5 "$(freeze)$(logo 132 48 40 'lt(t,1.8)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=110:x=200:y=42:box=1:boxcolor=0x111419@0.78:boxborderw=14:enable='lt(t,1.8)',drawtext=fontfile=$FONT:text='A hands-only mixed-reality top battler':fontcolor=white:fontsize=44:x=52:y=196:box=1:boxcolor=0x111419@0.66:boxborderw=10:enable='lt(t,1.8)'"
-# 2. The same squeeze from low at the desk: the rival lands on the floor.
-MUSIC+=("$(at 1.5):x" "hit:$(at 2.0)" "$(at 2.0):2")
-SIDE="crop=iw*0.9:ih*0.9:iw*0.1:ih*0.08"
-PRE=$SIDE seg 01-side "$S/desk-ko-first-side.mp4" 2.0 3.0 "eq=brightness=0.3:enable='between(t,2.0,2.05)',$(title 'YOUR DESK IS THE RING-OUT')"
 # 3. One new move every match.
 MUSIC+=("$(at 0):1")
 won=$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 1.7))")
@@ -67,7 +63,7 @@ SPEED=0.5 PRE=$G seg 06-guard "$S/close-crossguard2.mp4" 0.30 1.2 "$(title 'CROS
 PRE=$G seg 06b-guard "$S/close-crossguard2.mp4" 0.90 0.7
 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 07-rub "$S/close-rub2.mp4" 0.6 1.6 "$(title 'SPIN RUB' 'A fingertip spins your top back up')"
 seg 08-stamp "$S/seal-stamp.mp4" 0.5 2.5 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, stamp it down')"
-PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.28" seg 09-forge "$S/forge.mp4" 9.4 2.5 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
+PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.28" seg 09-forge "$S/forge.mp4" 7.5 2.5 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
 seg 10-workshop "$S/workshop.mp4" 7.9 2.0 "eq=brightness=0.25:enable='lt(t,0.05)',$(title 'BUILD YOUR OWN ARENA')"
 # 5. Every move by hand: four held long enough to read (the hand, then what it does), then the other
 # twelve as a quick strip, all counted (file, in-point, length, speed, crop, name). Crops: n = the
