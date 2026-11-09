@@ -24,8 +24,8 @@ enc=(-c:v libx264 -crf 15 -preset medium -tune animation -pix_fmt yuv420p -c:a a
 segs=(); NOW=0; MUSIC=()
 at() { python3 -c "print(round($NOW + $1, 3))"; } # reel time of an offset into the next segment
 title() { # one title (+ optional short subtitle) for 2 s
-  local t="drawtext=fontfile=$FONT:text='$1':fontcolor=0xffa24a:fontsize=76:x=48:y=40:box=1:boxcolor=0x111419@0.78:boxborderw=16:enable='lt(t,2)'"
-  [ -z "${2:-}" ] || t+=",drawtext=fontfile=$FONT:text='$2':fontcolor=white:fontsize=50:x=52:y=146:box=1:boxcolor=0x111419@0.66:boxborderw=10:enable='lt(t,2)'"
+  local t="drawtext=fontfile=$FONT:text='$1':fontcolor=0xffa24a:fontsize=76:x=48:y=h-250:box=1:boxcolor=0x111419@0.78:boxborderw=16:enable='lt(t,2)'"
+  [ -z "${2:-}" ] || t+=",drawtext=fontfile=$FONT:text='$2':fontcolor=white:fontsize=50:x=52:y=h-140:box=1:boxcolor=0x111419@0.66:boxborderw=10:enable='lt(t,2)'"
   echo "$t"
 }
 label() { echo "drawtext=fontfile=$FONT:text='$1':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=h-text_h-90:box=1:boxcolor=0x111419@0.8:boxborderw=12"; }
@@ -59,7 +59,7 @@ MUSIC+=("$(at 3.5):x" "hit:$(at 4.0)" "$(at 4.0):1")
 PRE=$F1 seg 01c-hint "$T/first.mp4" 28.0 5.0 "$(title 'THEN IT TEACHES THE SQUEEZE' 'Both hands, and off the desk')"
 # 3. One new move every match.
 won=$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 1.7))")
-PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" seg 03-won "$S/match-won-cards.mp4" "$won" 1.2 "$PUSH,$(title 'WON. NEW MOVE UNLOCKED')"
+PRE="crop=iw*0.55:ih*0.55:iw*0.225:ih*0.1" seg 03-won "$S/match-won-cards.mp4" "$won" 1.2 "$PUSH,$(title 'WON 4-0. NEW MOVE UNLOCKED')"
 # 4. Five hero moves, full frame, then the forge and workshop.
 MUSIC+=("$(at 0):2")
 seg 04-squeeze "$S/close-squeeze.mp4" 1.9 1.6 "$(title 'YOUR HANDS RESHAPE THE ARENA' 'Squeeze the live bowl')"
@@ -83,7 +83,7 @@ while read -r f s d sp c n; do
   crop="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.18"; [ "$c" = w ] && crop="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15"
   [ "$f" = slap2 ] && crop="crop=iw*0.5:ih*0.5:iw*0.29:ih*0.3"
   [ "$sp" = 1 ] || n="$n  (slowed)"
-  SPEED=$sp PRE=$crop seg "12-m$(printf %02d $i)" "$M/$f.mp4" "$s" "$d" "$head$(label "$n     $i / 16")"
+  SPEED=$sp PRE=$crop seg "12-m$(printf %02d $i)" "$M/$f.mp4" "$s" "$d" "$head$(label "$n     $i / 16" | sed "s/boxborderw=12/boxborderw=12${head:+:enable='gte(t,2)'}/")"
 done <<'EOF'
 outer-ring 3.9 2.2 1 n PALM CATCH
 forge-twist 1.4 2.2 1 n TWIST
@@ -124,20 +124,19 @@ PRE="crop=iw*0.9:ih*0.9:iw*0.05:0" seg 17-brawl "$T/brawl2.mp4" 57.4 6.0 "$(titl
 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.15" seg 18-ar15 "$S/arenas/15.mp4" 0.25 1.2 "$(title '20 ARENAS' 'Each one plays differently')"
 seg 19-ar12 "$S/arenas/12.mp4" 0.9 2.0
 seg 20-ar06 "$S/arenas/06.mp4" 1.0 2.0
-# 6. The boss arc: bosses cast your own moves (Iron Keep's tilt throws you), you lose 3-4, then the
-# final boss Bastion casts Anvil Strike, your ramp answers, and Bastion falls 4-0.
+# 6. The boss arc: Iron Keep goes off the desk (half speed), then casts your own tilt and throws you, you
+# lose 3-4; the final boss Bastion casts Anvil Strike, your ramp answers, and Bastion falls 4-0 (section 9).
 B="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.2"  # the table, its legs and both hands in frame
-MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
-PRE=$B seg 13-boss1 "$T/boss.mp4" 44.0 4.5 "$(title 'BOSSES CAST YOUR OWN MOVES' 'Iron Keep tilts the arena' | sed "s/lt(t,2)/between(t,0.5,2.5)/g")"
+MUSIC+=("$(at 0):b" "$(at 2.2):x" "hit:$(at 2.7)" "$(at 2.7):3")
+SPEED=0.5 PRE="crop=iw*0.8:ih*0.8:iw*0.02:ih*0.14" seg 12z-ironkeep "$T/boss.mp4" 24.9 4.4 "$(title 'BOSS ONE: IRON KEEP' 'Off the desk  (half speed)')"
+PRE=$B seg 13-boss1 "$T/boss.mp4" 44.0 4.5 "$(title 'THEN IT CASTS YOUR MOVES' 'Its tilt throws you')"
 MUSIC+=("$(at 0.3):x")
 PRE=$B seg 14-lost "$T/boss.mp4" 63.6 2.2 "$(title 'LOST 3-4')"
 MUSIC+=("$(at 0.8):b" "hit:$(at 2.3)" "$(at 2.3):3")
 PRE=$B seg 15-bastion "$T/boss.mp4" 132.8 4.2 "$(title 'FINAL BOSS: BASTION' 'It casts Anvil Strike, your ramp answers')"
-PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.06" seg 16-crown "$T/boss.mp4" 145.7 2.8 "$(label 'THE FINAL BOSS FALLS, 4-0')"
-# 9. An unstaged DESK KO from the Iron Keep bout (an edge run off the desk) at half speed, a reprise of the hook
-# with its sound, the end card over it.
-MUSIC+=("$(at 2.2):x" "hit:$(at 2.7)" "$(at 2.7):b")
-SPEED=0.5 PRE="crop=iw*0.8:ih*0.8:iw*0.02:ih*0.14" seg 21-end "$T/boss.mp4" 24.9 6.8 "drawtext=fontfile=$FONT:text='HALF SPEED':fontcolor=white:fontsize=40:x=40:y=h-90:box=1:boxcolor=0x111419@0.7:boxborderw=8:enable='lt(t,4.0)',split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,4.0)',$(logo 180 '(W-w)/2' 210 'gte(t,4.0)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,4.0)',drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,4.0)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,4.0)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,4.0)'"
+# 9. Bastion falls 4-0 (the end of the arc), the end card over it.
+MUSIC+=("$(at 2.6):b")
+PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.06" seg 21-end "$T/boss.mp4" 145.7 6.4 "$(label 'THE FINAL BOSS FALLS, 4-0' | sed "s/boxborderw=12/boxborderw=12:enable='lt(t,2.6)'/"),split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,2.6)',$(logo 180 '(W-w)/2' 210 'gte(t,2.6)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,2.6)',drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,2.6)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,2.6)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,2.6)'"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/joined.mp4"
