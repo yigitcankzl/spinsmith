@@ -7,8 +7,10 @@ export default async function run({ page, frame }) {
       const g = window.__game;
       const { COMFORT } = await import('/src/game/comfort.ts');
       const { TableTouch } = await import('/src/game/table-touch.ts');
+      const { STRIKE_RELEASE } = await import('/src/game/progress.ts');
       COMFORT.gentle = true;
-      g.progress.matches = Math.max(3, g.progress.matches);
+      // The strike (and its table press) is taught from match STRIKE_RELEASE on; read it, never hard-code it.
+      g.progress.matches = Math.max(STRIKE_RELEASE, g.progress.matches);
       g.everyVerb = true;
       g.progress.guide = 'done';
       if (g.arena.layout.name !== 'Forge Bowl') g.setArena(g.arenas.find((arena) => arena.name === 'Forge Bowl'));
