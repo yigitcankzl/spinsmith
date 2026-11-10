@@ -3058,6 +3058,8 @@ export class Stamp {
   pin: Vector3 | null = null;
   /** Whose moment the stamp is (the last show): in a fight it hangs over that top. */
   side: 'mine' | 'rival' | 'neutral' = 'mine';
+  /** Dev capture: when set, a stamp it refuses never shows (the quiet capture, see MatchSystem.quiet). */
+  static filter: ((word: string, side: 'mine' | 'rival' | 'neutral') => boolean) | null = null;
 
   /** Ends what shows now at once (a skipped replay's plate); what waits shows next. */
   cut() {
@@ -3097,6 +3099,7 @@ export class Stamp {
 
   /** Stamps `word` (and a small line under it) for `hold` seconds; side picks the colors; size weighs it (1.5 for a decided match, a level). */
   show(word: string, sub = '', side: 'mine' | 'rival' | 'neutral' = 'mine', hold = 1, weight = 1) {
+    if (Stamp.filter && !Stamp.filter(word, side)) return;
     this.size = weight;
     this.pin = null;
     this.side = side;

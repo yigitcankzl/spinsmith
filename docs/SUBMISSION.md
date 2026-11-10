@@ -102,24 +102,27 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:37, v6: v5 re-cut after a second-by-second review on 2026-11-10, game sound and a synthesized music bed)
+## Competition video (1:30, v7: v6 simplified after a clarity review on 2026-11-10, game sound and a synthesized music bed)
 
-`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v6-1080p60.mp4`, cut by `scripts/reel-v6.sh`
-(earlier cuts: `scripts/reel-v5.sh`, `scripts/reel-v4.sh`, `scripts/reel-v3.sh`). Every frame says `IWER
-EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE`; every retimed clip carries one speed badge
-(`0.5x SPEED`, `2x SPEED`) for its whole length. The cut reports any held picture over 0.3 s: two in
-this cut, both the game's own text holds (DESK KO! 0.33 s at 0:15, LEVEL 9! 0.45 s at 1:29).
+`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v7-1080p60.mp4`, cut by `scripts/reel-v7.sh`
+(earlier cuts: `scripts/reel-v6.sh` … `scripts/reel-v3.sh`). Every frame, the end card included, says
+`IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE` (bottom right), with the speed written into
+it on every retimed clip. One caption at a time, bottom left, no subtitles. The short clips are the
+quiet capture (dev-only `MatchSystem.quiet`: the rival's words, call cards, cue words, gauge names
+and buttons hidden; the player's own move words, hands and hand rings kept), so a caption is the
+only text naming a move; the first match, brawl and boss takes are the normal game. The cut reports
+any held picture over 0.3 s: one, the game's own LEVEL 9! text hold (0.45 s at 1:22).
 
 | Time | Shot |
 |---|---|
-| 0:00-0:04 | SPINSMITH; both hands squeeze the bowl on the desk corner, the throw off the edge at half speed (YOUR REAL DESK IS THE RING-OUT), DESK KO |
-| 0:04-0:15 | Level 1, real time: the game shows the launch; you pinch a ramp into the slag pit, UP 1-0; it teaches the squeeze, the rival goes off the desk |
-| 0:15-0:27 | EVERY WIN UNLOCKS A MOVE; squeeze, flick, Crossguard (half speed), Spin Rub, stamp an ultimate |
-| 0:27-0:36 | Forge a part on by hand, the stat dials change; build an arena (the four placements, 2x) |
-| 0:36-1:00 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held; the five seal ultimates, each from the slap or stamp to the burst; the other seven in a named grid) |
-| 1:00-1:12 | FOUR-TOP BRAWLS (both hands, two knockouts); 20 ARENAS: Glacier Steps, Clockwork Spire, Neon Speedway, Titan Crater |
-| 1:12-1:25 | Bosses cast your own moves: Iron Keep casts TILT, both hands answer; LOST 0-4; two bouts later, the final boss Bastion casts Anvil Strike |
-| 1:25-1:37 | The finishing blow at half speed; THE FINAL BOSS FALLS, 5-0 (LEVEL 9, THE CROWN IS YOURS), then the end card: Squeeze the arena. Throw them off your desk. |
+| 0:00-0:04 | SQUEEZE THE ARENA. Both hands squeeze the bowl on the desk corner; THROW THEM OFF YOUR DESK. (the throw at half speed); DESK KO |
+| 0:04-0:12 | YOUR FIRST MATCH: a ramp into the slag pit; GRAB THE RIM. SQUEEZE. and the rival goes off the desk |
+| 0:12-0:17 | THE BASICS (not among the 16, not counted): flick, Crossguard (half speed), Spin Rub |
+| 0:17-0:48 | 16 MOVES, NO CONTROLLERS, one at a time, full frame, counted 1/16 to 16/16; the last five as ONE STAMP, FIVE ULTIMATES (Rush, Magnet, Tilt, Hammer, Ward) |
+| 0:48-0:56 | FORGE YOUR TOP (drag a part on, the dials change); BUILD YOUR ARENA (2x) |
+| 0:56-1:05 | FOUR-TOP BRAWLS (both hands, two knockouts); 20 ARENAS (three of them) |
+| 1:05-1:18 | BOSSES CAST YOUR MOVES (Iron Keep casts TILT); LOST 0-4; THE FINAL BOSS (Bastion casts Anvil Strike) |
+| 1:18-1:30 | The finishing blow at half speed; THE FINAL BOSS FALLS (the HUD shows 5-0: a finishing blow can be worth 2), LEVEL 9, THE CROWN IS YOURS, then the end card |
 
 Capture: the presentation room (`scripts/capture/shot.mjs`) is walls, a window and a stand-in table
 matched to the emulator's detected table plane; parked driver hands breathe, curl and fidget and

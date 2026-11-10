@@ -775,6 +775,27 @@ export class MatchSystem extends createSystem({
   private forgeNext = '';
   /** Dev: photo mode for store art (see update). */
   photo = false;
+  /**
+   * Dev: the quiet capture for the reel. The player's own move words, the tops, hands and hand rings
+   * stay; the rival's words, tips and call cards, cue words (ULTIMATE READY, STRIKE WINDOW), the
+   * gauge's names, the plate and the buttons are hidden, so a clip's caption is the only text that
+   * names a move. Kept across reloads in localStorage (spinsmith.quiet = 1).
+   */
+  quiet = import.meta.env.DEV && typeof localStorage !== 'undefined' && localStorage.getItem('spinsmith.quiet') === '1';
+  private quietHeld = false;
+  /**
+   * Dev: the quiet capture holds the card, the plate (in a fight) and the buttons hidden whatever
+   * else sets them this frame: their `visible` reads false while quiet is on.
+   */
+  private holdQuiet() {
+    this.quietHeld = true;
+    const hold = (o: { visible: boolean }, hidden: () => boolean) => {
+      let v = o.visible;
+      Object.defineProperty(o, 'visible', { configurable: true, get: () => v && !(this.quiet && hidden()), set: (x: boolean) => { v = x; } });
+    };
+    for (const o of [this.label.mesh, this.printLabel.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, ...this.deckButtons.map((b) => b.mesh)]) hold(o, () => true);
+    hold(this.bar.mesh, () => this.phase === 'fight' || this.phase === 'pulling');
+  }
   /** A quench in progress (a breath of steam before the forge closes). */
   private quenching: { t: number; build: TopBuild } | null = null;
   /** This match's rival intro (portal, VS) has played: a drawn 0-0 round does not repeat it. */
@@ -1656,6 +1677,12 @@ export class MatchSystem extends createSystem({
     // On the result the stamp takes the card's place, so the card steps away entirely.
     this.label.update(Math.min(delta, 0.1), this.stamp.mesh.visible && (this.phase === 'result' || this.phase === 'hub' || this.phase === 'ready' || this.phase === 'fight'), this.phase === 'result' || this.phase === 'fight' || this.phase === 'ready' ? 0 : 0.2);
     this.printLabel.update(Math.min(delta, 0.1));
+    // Dev quiet capture (see quiet).
+    if (import.meta.env.DEV) {
+      Stamp.filter = this.quiet ? quietStamp : null;
+      if (this.quiet && !this.quietHeld) this.holdQuiet();
+      this.rimGauge.showLabels(!this.quiet);
+    }
     // Dev photo mode (store art): only the arena, the tops and the room; every card and button hidden.
     if (this.photo) {
       for (const o of [this.label.mesh, this.printLabel.mesh, this.bar.mesh, this.menuButton.mesh, this.rematchButton.mesh, this.passButton.mesh, this.stamp.mesh, this.slapMark, this.reticle, ...this.pinchRings, ...this.handMarks, ...this.handContactRings]) o.visible = false;
@@ -1962,7 +1989,7 @@ export class MatchSystem extends createSystem({
         show: this.phase === 'result',
       }, this.extras.length ? this.brawlBarField() : null, gauge);
       this.bar.animate(this.mine.alive ? this.mine.spin : 0, this.theirs.alive ? this.theirs.spin : 0, dt);
-      if (gauge && this.bar.mesh.visible) {
+      if (gauge && (this.bar.mesh.visible || (import.meta.env.DEV && this.quiet))) {
         const L = this.arena.layout;
         const r = rimRadius(L, -Math.PI / 2);
         this.rimGauge.fit(r, this.arena.height(0, -r * 0.97) + WALL_HEIGHT[L.wall] + 0.002, this.stage.rotation.y, MATCH_HEAT);
@@ -8441,4 +8468,10 @@ function once(hint: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** The quiet capture's stamps: the player's own move words only (no rival words, no cue words). */
+const QUIET_CUES = new Set(['ULTIMATE READY', 'STRIKE WINDOW', 'RIVAL READ', 'NO CONTACT', 'NO CATCH', 'WRONG WAY', 'PULL', 'CHARGE', 'MATCH POINT', 'CRACKED!', 'HEAD-ON', 'SIDE HIT', 'RIP!', 'NEW BEST RIP!']);
+function quietStamp(word: string, side: 'mine' | 'rival' | 'neutral') {
+  return side !== 'rival' && !QUIET_CUES.has(word);
 }

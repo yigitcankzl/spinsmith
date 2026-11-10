@@ -393,6 +393,11 @@ export class RimGauge {
     }
   }
 
+  /** Shows or hides the bands' names (the quiet capture keeps only the bands). */
+  showLabels(on: boolean) {
+    for (const m of this.labels) m.visible = on;
+  }
+
   /** Names the bands (YOU and the rival) and says how many points win. */
   setLabels(rival: string, toWin: number) {
     const key = `${rival}|${toWin}`;
