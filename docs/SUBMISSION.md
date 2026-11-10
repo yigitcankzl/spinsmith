@@ -102,24 +102,24 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:43, cut and re-recorded 2026-11-10 after the game audio fix, game sound and a synthesized music bed)
+## Competition video (1:37, v6: v5 re-cut after a second-by-second review on 2026-11-10, game sound and a synthesized music bed)
 
-`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v5-1080p60.mp4`, cut by `scripts/reel-v5.sh`
-(earlier cuts: `scripts/reel-v4.sh`, `scripts/reel-v3.sh`). Every frame says `IWER EMULATOR / SYNTHETIC
-ROOM / NOT HEADSET FOOTAGE`; speed changes are labelled on screen. The cut fails nothing silently: it
-reports any held picture over 0.3 s (none in this cut).
+`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v6-1080p60.mp4`, cut by `scripts/reel-v6.sh`
+(earlier cuts: `scripts/reel-v5.sh`, `scripts/reel-v4.sh`, `scripts/reel-v3.sh`). Every frame says `IWER
+EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE`; every retimed clip carries one speed badge
+(`0.5x SPEED`, `2x SPEED`) for its whole length. The cut reports any held picture over 0.3 s: two in
+this cut, both the game's own text holds (DESK KO! 0.33 s at 0:15, LEVEL 9! 0.45 s at 1:29).
 
 | Time | Shot |
 |---|---|
-| 0:00-0:04 | SPINSMITH; both hands squeeze the bowl on the desk corner, the rival goes off the edge: DESK KO (slow push-in) |
-| 0:04-0:16 | Level 1, real time: the game shows the launch; you go UP 1-0; it teaches the squeeze, and the rival goes off the desk |
-| 0:16-0:18 | EVERY WIN UNLOCKS A MOVE |
-| 0:18-0:31 | Squeeze, flick, Crossguard (half speed), Spin Rub, stamp an ultimate |
-| 0:31-0:42 | Forge a part on by hand (one continuous drag); build an arena (the four placements, 1.5x) |
-| 0:42-1:08 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held; the five seal ultimates, each from the slap or stamp to the burst; the other seven in a named grid) |
-| 1:08-1:20 | FOUR-TOP BRAWLS; 20 ARENAS (three real matches) |
-| 1:20-1:35 | Bosses cast your own moves: Iron Keep tilts the arena, both hands answer; LOST 0-4; two bouts later, the final boss Bastion casts Anvil Strike |
-| 1:35-1:43 | THE FINAL BOSS FALLS, 5-0 (LEVEL 9, THE CROWN IS YOURS), then the end card: Squeeze the arena. Throw them off your desk. |
+| 0:00-0:04 | SPINSMITH; both hands squeeze the bowl on the desk corner, the throw off the edge at half speed (YOUR REAL DESK IS THE RING-OUT), DESK KO |
+| 0:04-0:15 | Level 1, real time: the game shows the launch; you pinch a ramp into the slag pit, UP 1-0; it teaches the squeeze, the rival goes off the desk |
+| 0:15-0:27 | EVERY WIN UNLOCKS A MOVE; squeeze, flick, Crossguard (half speed), Spin Rub, stamp an ultimate |
+| 0:27-0:36 | Forge a part on by hand, the stat dials change; build an arena (the four placements, 2x) |
+| 0:36-1:00 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held; the five seal ultimates, each from the slap or stamp to the burst; the other seven in a named grid) |
+| 1:00-1:12 | FOUR-TOP BRAWLS (both hands, two knockouts); 20 ARENAS: Glacier Steps, Clockwork Spire, Neon Speedway, Titan Crater |
+| 1:12-1:25 | Bosses cast your own moves: Iron Keep casts TILT, both hands answer; LOST 0-4; two bouts later, the final boss Bastion casts Anvil Strike |
+| 1:25-1:37 | The finishing blow at half speed; THE FINAL BOSS FALLS, 5-0 (LEVEL 9, THE CROWN IS YOURS), then the end card: Squeeze the arena. Throw them off your desk. |
 
 Capture: the presentation room (`scripts/capture/shot.mjs`) is walls, a window and a stand-in table
 matched to the emulator's detected table plane; parked driver hands breathe, curl and fidget and
