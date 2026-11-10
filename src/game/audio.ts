@@ -483,12 +483,12 @@ function clash(strength: number, ringA?: string, ringB?: string) {
   // Hit strength is brightness: a graze is dull, a slam opens the whole spectrum.
   const lp = a.createBiquadFilter();
   lp.type = 'lowpass';
-  lp.frequency.value = 1800 + 10000 * s * s;
+  lp.frequency.value = 1500 + 5000 * s * s;
   lp.Q.value = 0.5;
   lp.connect(out());
   vary(0.03, () => {
     // Transient (the crack), body (the mass, 300-900 Hz), then each top's own ring.
-    crack(0.55 * s, 0.003 + 0.005 * s, 1500 + 5000 * s);
+    crack(0.3 * s, 0.003 + 0.005 * s, 1200 + 2500 * s);
     hiss(0.28 * s, 0.05 + 0.04 * s, 650, 420, 1.2);
     for (const id of [ringA, ringB]) ring(steel(id), 0.25 * s, 0.97 + Math.random() * 0.06, Math.random() * 0.004, s < 0.3 ? 0.04 : 0, lp);
     // A graze scrapes more than it rings.
@@ -499,7 +499,7 @@ function clash(strength: number, ringA?: string, ringB?: string) {
       const tail = a.createGain();
       tail.gain.value = 1.6;
       lp.connect(tail).connect(verbIn!);
-      for (let i = 0; i < 3; i++) tone(3500 + Math.random() * 3000, 0.02, 0.05, 'sine', 0.06 + i * 0.05 + Math.random() * 0.04);
+      for (let i = 0; i < 3; i++) tone(3500 + Math.random() * 3000, 0.008, 0.05, 'sine', 0.06 + i * 0.05 + Math.random() * 0.04);
     }
   });
 }
@@ -838,7 +838,8 @@ export class SpinHum {
     const f = this.base * 7.3 * (0.35 + 0.75 * spin) * waver;
     this.w1!.frequency.setTargetAtTime(f, t, 0.05);
     this.w2!.frequency.setTargetAtTime(f * 1.47 + 0.7, t, 0.05);
-    this.whine!.gain.setTargetAtTime(on ? 0.008 + 0.02 * spin : 0, t, 0.08);
+    // Quiet: two steady sines under a whole fight (two tops, four tones) tire the ear fast.
+    this.whine!.gain.setTargetAtTime(on ? 0.002 + 0.005 * spin : 0, t, 0.08);
     if (arenaFrame && this.place) {
       // In the room: the HRTF panner carries direction, so the stereo pan stays centred.
       worldOf(x, z, spot);
@@ -850,8 +851,9 @@ export class SpinHum {
     if (!this.grind || !this.rot || !this.grindBand || !this.rattle || !this.rattleBand) return;
     // The grind follows the rotation, with a little jitter so it never sounds like a tremolo.
     this.rot.frequency.setTargetAtTime((6 + 40 * spin) * (0.93 + 0.14 * Math.random()), t, 0.05);
-    this.grindBand.frequency.setTargetAtTime(300 + 600 * spin, t, 0.05);
-    this.grind.gain.setTargetAtTime(on ? 0.12 + 0.12 * spin + 0.2 * Math.min(1, speed) : 0, t, 0.08);
+    // A low rumble well under the clashes: it runs for the whole fight, once per top.
+    this.grindBand.frequency.setTargetAtTime(250 + 350 * spin, t, 0.05);
+    this.grind.gain.setTargetAtTime(on ? 0.05 + 0.05 * spin + 0.1 * Math.min(1, speed) : 0, t, 0.08);
     // The rattle: a wobbling or dying top clatters, louder and slower as it goes.
     const shake = on ? Math.max(wobble, spin < 0.3 ? ((0.3 - spin) / 0.3) * 0.7 : 0) : 0;
     if (shake > 0.12 && t >= this.nextClick) {
@@ -920,11 +922,14 @@ export class CordTone {
     }
     const moved = this.last < 0 ? 0 : Math.abs(power - this.last);
     this.last = power;
+    // Only a moving cord sounds: a hand holding still mid-pull made a steady drone (gear tone and
+    // friction hiss) for as long as it held.
+    const motion = Math.min(1, moved * 60);
     this.gear.frequency.setTargetAtTime(180 + 520 * power, t, 0.03);
-    this.gearGain!.gain.setTargetAtTime(0.012 + 0.02 * power, t, 0.03);
+    this.gearGain!.gain.setTargetAtTime((0.006 + 0.014 * power) * motion, t, 0.06);
     if (!this.fric || !this.band || !this.click || !this.clickBand) return;
     this.band.frequency.setTargetAtTime(500 + 2000 * power, t, 0.03);
-    this.fric.gain.setTargetAtTime(0.03 + 0.06 * power + Math.min(0.25, moved * 12), t, 0.03);
+    this.fric.gain.setTargetAtTime((0.02 + 0.05 * power) * motion + Math.min(0.25, moved * 12), t, 0.06);
     if ((this.pulled += moved) > 0.04) {
       this.pulled = 0;
       const g = this.click.gain;
@@ -1225,7 +1230,7 @@ export class ForgeLoop {
       this.startBed(a);
       this.next = a.currentTime + 0.1;
     }
-    const level = state === 'quiet' ? 0 : state === 'home' ? 0.55 : state === 'ready' ? 0.5 : 0.45;
+    const level = state === 'quiet' ? 0 : state === 'home' ? 0.55 : state === 'ready' ? 0.5 : 0.32;
     this.bus.gain.setTargetAtTime(level, a.currentTime, 0.5);
     this.bed?.gain.setTargetAtTime(state === 'home' ? 1 : 0, a.currentTime, 1);
     // Sixteenth notes at 96 bpm, scheduled 0.2 s ahead.
@@ -1313,20 +1318,22 @@ export class ForgeLoop {
     const st = this.state;
     if (st === 'quiet') return;
     const bar = i % 16;
-    // The anvil: a ring on beats 1 and 3, a ghost tap before 4.
-    if (bar === 0 || bar === 8) this.metal(a, anvil(), t, 0.07 * (0.85 + Math.random() * 0.3), 1.47 * (0.995 + Math.random() * 0.01), 0.35);
-    else if (bar === 14) this.metal(a, anvil(), t, 0.025, 1.47, 0.05);
+    // The anvil: a ring on beats 1 and 3, a ghost tap before 4; not under a fight (a clang every
+    // 1.25 s for minutes, on top of the clashes, wears).
+    const anvilOn = st !== 'fight';
+    if (anvilOn && (bar === 0 || bar === 8)) this.metal(a, anvil(), t, 0.07 * (0.85 + Math.random() * 0.3), 1.47 * (0.995 + Math.random() * 0.01), 0.35);
+    else if (anvilOn && bar === 14) this.metal(a, anvil(), t, 0.025, 1.47, 0.05);
     // The forge crackles now and then at home.
     if (st === 'home' && Math.random() < 0.08) this.hat(a, t + Math.random() * 0.1, 0.008 + Math.random() * 0.02, 2500, 0.006);
     // Every four bars at home, the motif rung softly an octave down.
     if (st === 'home' && i === 48) MOTIF.forEach((f, k) => this.metal(a, bellVoice(), t + k * 0.22, 0.05, f / 2 / BELL_BASE));
     // Bass: eighths on D (B-flat in bar 3), from getting ready on.
-    if (st !== 'home' && i % 2 === 0) this.voice(a, t, i >= 32 && i < 48 ? 58.27 : 73.42, st === 'fight' ? 0.11 : 0.07, 0.18, 'sawtooth');
+    if (st !== 'home' && i % 2 === 0) this.voice(a, t, i >= 32 && i < 48 ? 58.27 : 73.42, st === 'fight' ? 0.08 : 0.06, 0.18, 'triangle');
     // Fight: toms on 1, the and of 2, and 4.
     if (st === 'fight' && (bar === 0 || bar === 6 || bar === 12)) this.voice(a, t, bar === 6 ? 150 : 120, 0.22, 0.22, 'sine', 55);
     // Tension: hats in sixteenths and the motif up high, a note a beat.
     if (st === 'fight' && this.tension > 0.5) {
-      this.hat(a, t, i % 4 === 0 ? 0.05 : 0.025);
+      this.hat(a, t, i % 4 === 0 ? 0.016 : 0.008);
       if (i % 4 === 0) this.metal(a, bellVoice(), t, 0.04, (MOTIF[(i / 4) % 4] * 2) / BELL_BASE);
     }
   }
