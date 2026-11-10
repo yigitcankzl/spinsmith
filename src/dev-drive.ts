@@ -489,6 +489,7 @@ export function installDriver() {
     pinch = pinchNow[side],
     curve: Goal['curve'] = 'natural',
     intent?: Goal['intent'],
+    liftOverride?: number,
   ) => {
     await prime(side);
     resting[side] = false;
@@ -498,9 +499,9 @@ export function installDriver() {
       const from = a && a.point === point ? a.at.clone().add(life.offset[side]) : measured(side, point, new Vector3());
       life.offset[side].set(0, 0, 0);
       const target = typeof to === 'function' ? to() : to;
-      const lift = curve === 'natural' && pinch < 0.15 && intent !== 'grip'
+      const lift = liftOverride ?? (curve === 'natural' && pinch < 0.15 && intent !== 'grip'
         ? Math.min(0.018, Math.max(0.004, from.distanceTo(target) * 0.08))
-        : 0;
+        : 0);
       const arc = curve === 'natural' && (intent === 'reach' || intent === 'release')
         ? (side === 'left' ? -1 : 1) * Math.min(0.012, Math.max(0.003, from.distanceTo(target) * 0.045))
         : 0;
@@ -704,9 +705,8 @@ export function installDriver() {
       await glide(side, 'pinch', above(a, 0.05), 0.35, 0);
       await glide(side, 'pinch', a, 0.2, 0);
       await setPinch(side, true);
-      await glide(side, 'pinch', above(a, 0.08), 0.3);
-      await glide(side, 'pinch', above(b, 0.06), 0.6);
-      await glide(side, 'pinch', b, 0.25);
+      // One continuous arc (lift, carry, set down): three separate tweens stop dead at each joint.
+      await glide(side, 'pinch', b, 1.1, 1, 'natural', undefined, 0.07);
       await setPinch(side, false);
       await glide(side, 'pinch', above(b, 0.1), 0.25, 0);
       await park(side);

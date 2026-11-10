@@ -73,17 +73,22 @@ PRE=$C75 seg 05-flick "$S/flick2.mp4" ${FLICK_AT:-0.4} 2.4 "$SHARP,$(title 'FLIC
 SPEED=0.5 seg 06-guard "$S/close-crossguard2.mp4" 0.30 1.4 "$(title 'CROSSGUARD' 'Two still palms make a rail  (half speed)')"
 seg 06b-guard "$S/close-crossguard2.mp4" 1.0 0.9
 PRE=$C75 seg 07-rub "$S/close-rub2.mp4" ${RUB_AT:-0.8} 2.4 "$SHARP,$(title 'SPIN RUB' 'A fingertip spins your top back up')"
-seg 08-stamp "$S/seal-stamp.mp4" 1.0 2.8 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, stamp it down')"
+seg 08-stamp "$S/seal-stamp.mp4" ${STAMP_AT:-0.4} 3.2 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, stamp it down')"
 # 4. Forge a part on by hand; build an arena: pieces already down, the last ones going in.
 MUSIC+=("$(at 0):1")
-seg 09-forge "$S/forge3.mp4" ${FORGE_AT:-4.4} 5.0 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
+# The forge take without the second the game holds the top on the off-screen palm (a still bench).
+FORGE_KEEP="${FORGE_KEEP:-4.2-5.8 7.2-10.6}"
+sel=$(for r in $FORGE_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
+ffmpeg -nostdin -y -loglevel error -i "$S/forge3.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/forge-active.mp4"
+seg 09-forge "$TMP/forge-active.mp4" 0 5.0 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
 # The workshop take, with the moments the hand is off at the tray (out of frame) left out: the four
 # placements back to back (bumpers, slag pit, boost pad, pillar), then at 1.5x.
 WS_KEEP="${WS_KEEP:-37.92-40.53 41.53-44.02 45.08-47.52 48.52-50.5}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/workshop2.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/ws-active.mp4"
 SPEED=1.5 PRE=$C9 seg 10-workshop "$TMP/ws-active.mp4" 0 6.0 "$(title 'BUILD YOUR OWN ARENA' 'Every piece placed by hand  (1.5x)')"
-# 5. Every move by hand: four held, then the other twelve together (all 16 named and counted).
+# 5. Every move by hand: four held, the five ultimates from the slap to the burst, then the other
+# seven together (all 16 named and counted).
 MUSIC+=("$(at 0):3")
 i=0
 while read -r f s d sp c n; do
@@ -97,21 +102,28 @@ outer-ring ${OUTER_AT:-3.2} 2.4 1 n PALM CATCH
 forge-twist 1.0 2.4 1 n TWIST
 ember 5.8 2.0 1 n EMBER RIVET
 slap2 ${SLAP_AT:-3.5} 2.4 0.75 w SLAP THE TABLE = STRIKE
+seal-rush2 ${RUSH_AT:-3.9} 2.4 1 w RUSH ULTIMATE
+seal-magnet2 ${MAGNET_AT:-3.8} 2.5 1 w MAGNET ULTIMATE
+seal-tilt2 ${TILT_AT:-3.6} 2.4 1 w TILT ULTIMATE
+seal-hammer2 ${HAMMER_AT:-0.8} 2.6 1 w HAMMER ULTIMATE
+seal-ward2 ${WARD_AT:-3.6} 2.4 1 w WARD ULTIMATE
 EOF
-grid12() {
+# The seven other moves in a 4x2 grid; the eighth cell holds the caption, so it never covers a move.
+grid() {
   local dur=5.0 inputs=() f="" lay="" k=0
   while read -r src st name; do
-    local cr=$C9; case $src in seal-*) cr=$C75;; esac
     inputs+=(-ss "$st" -t "$dur" -i "$M/$src.mp4")
-    f+="[$k:v]$cr,scale=480:360:force_original_aspect_ratio=increase:flags=lanczos,crop=480:360,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$name':fontcolor=white:fontsize=34:x=(w-text_w)/2:y=h-text_h-14:box=1:boxcolor=0x111419@0.8:boxborderw=8[t$k];"
-    lay+="$(( (k % 4) * 480 ))_$(( (k / 4) * 360 ))|"; k=$((k + 1))
+    f+="[$k:v]$C9,scale=480:540:force_original_aspect_ratio=increase:flags=lanczos,crop=480:540,fps=$FPS,$LOOK,drawtext=fontfile=$FONT:text='$name':fontcolor=white:fontsize=34:x=(w-text_w)/2:y=h-text_h-18:box=1:boxcolor=0x111419@0.8:boxborderw=8[t$k];"
+    lay+="$(( (k % 4) * 480 ))_$(( (k / 4) * 540 ))|"; k=$((k + 1))
   done
+  f+="color=c=0x111419:s=480x540:r=$FPS:d=$dur,drawtext=fontfile=$FONT:text='+ 7 MORE':fontcolor=0xffa24a:fontsize=64:x=(w-text_w)/2:y=h/2-80,drawtext=fontfile=$FONT:text='MOVES':fontcolor=0xffa24a:fontsize=64:x=(w-text_w)/2:y=h/2-10,drawtext=fontfile=$FONT:text='10-16 of 16':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h/2+70[t$k];"
+  lay+="$(( (k % 4) * 480 ))_$(( (k / 4) * 540 ))"
   ffmpeg -nostdin -y -loglevel error "${inputs[@]}" -f lavfi -t "$dur" -i anullsrc=r=48000:cl=stereo -filter_complex \
-    "$f$(for n in $(seq 0 11); do printf '[t%d]' "$n"; done)xstack=inputs=12:layout=${lay%|},drawtext=fontfile=$FONT:text='+ 12 MORE MOVES  (5-16 of 16)':fontcolor=0xffa24a:fontsize=70:x=(w-text_w)/2:y=(h-text_h)/2:box=1:boxcolor=0x111419@0.85:boxborderw=16:enable='lt(t,1.8)',$TAG[v]" \
-    -map "[v]" -map 12:a -t "$dur" "${enc[@]}" "$TMP/12-grid.mp4"
+    "$f$(for n in $(seq 0 $k); do printf '[t%d]' "$n"; done)xstack=inputs=$((k + 1)):layout=$lay,$TAG[v]" \
+    -map "[v]" -map $k:a -t "$dur" "${enc[@]}" "$TMP/12-grid.mp4"
   segs+=(12-grid); NOW=$(python3 -c "print(round($NOW + $dur, 3))")
 }
-grid12 <<EOF
+grid <<EOF
 ramp 0.6 RAMP
 rim-spring 2.0 RIM SPRING
 gust 1.6 FORGE GUST
@@ -119,11 +131,6 @@ cup-sling 0.3 CUP AND SLING
 groove 1.2 FINGER GROOVE
 wheel 2.5 FORGE WHEEL
 forge-stretch 2.1 STRETCH
-seal-rush2 ${RUSH_AT:-3.4} RUSH
-seal-magnet2 ${MAGNET_AT:-3.2} MAGNET
-seal-tilt2 ${TILT_AT:-3.0} TILT
-seal-hammer2 ${HAMMER_AT:-0.9} HAMMER
-seal-ward2 ${WARD_AT:-2.6} WARD
 EOF
 # 6. Breadth: a four-top brawl, then three arenas.
 MUSIC+=("$(at 0):2")
