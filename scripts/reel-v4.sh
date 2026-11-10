@@ -24,8 +24,8 @@ enc=(-c:v libx264 -crf 15 -preset medium -tune animation -pix_fmt yuv420p -c:a a
 segs=(); NOW=0; MUSIC=()
 at() { python3 -c "print(round($NOW + $1, 3))"; } # reel time of an offset into the next segment
 title() { # one title (+ optional short subtitle) for 2 s
-  local t="drawtext=fontfile=$FONT:text='$1':fontcolor=0xffa24a:fontsize=76:x=48:y=h-250:box=1:boxcolor=0x111419@0.78:boxborderw=16:enable='lt(t,2)'"
-  [ -z "${2:-}" ] || t+=",drawtext=fontfile=$FONT:text='$2':fontcolor=white:fontsize=50:x=52:y=h-140:box=1:boxcolor=0x111419@0.66:boxborderw=10:enable='lt(t,2)'"
+  local t="drawtext=fontfile=$FONT:text='$1':fontcolor=0xffa24a:fontsize=76:x=48:y=h-250:box=1:boxcolor=0x111419@0.78:boxborderw=16:enable='between(t,0.2,2.8)'"
+  [ -z "${2:-}" ] || t+=",drawtext=fontfile=$FONT:text='$2':fontcolor=white:fontsize=50:x=52:y=h-140:box=1:boxcolor=0x111419@0.66:boxborderw=10:enable='between(t,0.4,2.8)'"
   echo "$t"
 }
 label() { echo "drawtext=fontfile=$FONT:text='$1':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=h-text_h-90:box=1:boxcolor=0x111419@0.8:boxborderw=12"; }
@@ -36,6 +36,8 @@ seg() {
   [ -s "$src" ] || { echo "missing $src" >&2; exit 1; }
   [ "$sp" = 1 ] || af="atempo=$sp"
   ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$src" </dev/null | grep -q . || { a=1; af=anull; }
+  # Takes recorded before the game's spin-grind fix (2026-11-10) carry its broadband hiss: soften it.
+  [ "$a" = 0 ] && [ "$(stat -c %Y "$src")" -lt "${AUDIO_FIX_EPOCH:-1794268800}" ] && af="$af,afftdn=nf=-28,lowpass=f=7500"
   ffmpeg -nostdin -y -loglevel error -ss "$start" -t "$(python3 -c "print($dur * $sp)")" -i "$src" -f lavfi -t "$dur" -i anullsrc=r=48000:cl=stereo -filter_complex \
     "[0:v]setpts=PTS/$sp,${PRE:+$PRE,}scale=$W:$H:force_original_aspect_ratio=increase:flags=lanczos,crop=$W:$H,fps=$FPS,$LOOK${vf:+,$vf},$TAG[v];[$a:a]$af,apad[a]" \
     -map "[v]" -map "[a]" -t "$dur" "${enc[@]}" "$TMP/$name.mp4"
@@ -44,6 +46,9 @@ seg() {
 # The hook's KO: hold the frame where the rival leaves the desk edge, punch in 2x on it, flash once.
 freeze() { echo "loop=loop=30:size=1:start=108,setpts=N/$FPS/TB,split[h1][h2];[h2]crop=iw/2:ih/2:iw*${KO_X:-0.62}-iw/4:ih*${KO_Y:-0.44}-ih/4,scale=$W:$H:flags=lanczos[hz];[h1][hz]overlay=enable='between(t,1.8,2.3)',drawtext=fontfile=$FONT:text='OFF THE DESK EDGE':fontcolor=0xffa24a:fontsize=96:x=(w-text_w)/2:y=h*0.12:box=1:boxcolor=0x111419@0.8:boxborderw=14:enable='between(t,1.8,2.3)',eq=brightness=0.3:enable='between(t,1.8,1.85)',"; }
 PUSH="zoompan=z='1+0.0015*on':d=1:x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':s=${W}x${H}:fps=$FPS"
+# A slow push-in toward (cx, cy) (0..1 of the frame) from 1x to `z` over `d` s, eased in and out,
+# drawn from a 2x frame so the zoom never shows soft upscaling.
+ease() { echo "scale=$((W*2)):$((H*2)):flags=lanczos,zoompan=z='1+(${1:-1.15}-1)*(1-cos(PI*min(1,on/($FPS*${2:-3}))))/2':d=1:x='(iw-iw/zoom)*${3:-0.5}':y='(ih-ih/zoom)*${4:-0.5}':s=${W}x${H}:fps=$FPS"; }
 logo() { echo "null[m];movie=$LOGO,scale=$1:$1[lg];[m][lg]overlay=$2:$3${4:+:enable='$4'}"; }
 
 # 1. The hook: name and logo, both hands squeeze, the rival goes off the desk corner (KO at 2.2 s).

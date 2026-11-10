@@ -102,36 +102,29 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:14, cut 2026-11-09, game sound and a synthesized music bed)
+## Competition video (1:30, cut 2026-11-10, game sound and a synthesized music bed)
 
-The one sentence the video must show: *The arena is the weapon: squeeze it and throw the rival off
-your desk.* Built from three research passes (Meta competition winners' videos, mixed-reality
-trailers, trailer craft) and review rounds. A judge and a trailer editor who followed every round
-scored 8.0 to 9.0/10 (emulator-only ceiling about 9.1). Two independent reviewers who saw none of
-that (Gemini and a fresh Claude agent) scored the 1:25 cut 6.5/10 (later rounds: 6.8-7.0, plateaued; what is left is real passthrough footage and real hands), then 6.8 and 7.0 after the hand
-re-records; this 1:12 cut answers their next round (a 12-tile grid instead of a one-second strip,
-the table and hands in the boss shots, real-time first match, a second DESK KO take at the end). The capture room then gained an ordinary work desk (monitor, keyboard, mug, notebook, plant, a window) and parked emulator hands now come alive (after 0.6 s at rest: breathing sway, wrist roll, finger curl, and now and then a tap, a lift toward the arena, a curl or a shift; stopped the instant a move starts), rest on the desk instead of below it, and cast a soft contact shadow on the desk or floor, and hold a relaxed curled-finger rest pose (IWER only ships an open hand and a pinch); every desk-visible shot was re-recorded with it (old files in before-desk-props/).
+`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v5-1080p60.mp4`, cut by `scripts/reel-v5.sh`
+(earlier cuts: `scripts/reel-v4.sh`, `scripts/reel-v3.sh`). Every frame says `IWER EMULATOR / SYNTHETIC
+ROOM / NOT HEADSET FOOTAGE`; speed changes are labelled on screen. The cut fails nothing silently: it
+reports any held picture over 0.3 s (none in this cut).
 
-| Time | Shot | Point proved |
-|---|---|---|
-| 0:00-0:04 | Cold open: SPINSMITH; both hands squeeze the bowl on the desk's corner; the frame holds and punches in 2x as the rival leaves the edge (OFF THE DESK EDGE), DESK KO | What makes it distinct, first |
-| 0:04-0:14 | A level-1 player's first match in real time: the game shows the launch (pinch, pull back, release), the rival scores (DOWN 0-1), then the game teaches the squeeze and the rival goes off the desk | Onboarding by showing, a stake, a first win |
-| 0:14-0:15 | A LATER MATCH: WON 4-0 (every win unlocks a new move; the card is from another first-match take, captioned so) | Why play match 2 |
-| 0:15-0:25 | The moves earned: squeeze, flick, Crossguard (half speed), Spin Rub, stamp an ultimate | The core hands |
-| 0:25-0:29 | Forge a part onto the top; reshape an arena | Depth |
-| 0:29-0:41 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held, then a named 4x3 grid). The 16 shots are the README's hand moves plus the arena-forge variants (twist, stretch) and each ultimate seal (Rush, Magnet, Tilt, Hammer, Ward) as its own shot | No move skipped |
-| 0:41-0:51 | FOUR-TOP BRAWLS; 20 ARENAS (three real matches) | Breadth |
-| 0:51-1:07 | The boss arc: BOSS ONE: IRON KEEP goes off the desk (unstaged, half speed), THEN IT CASTS YOUR MOVES (its tilt throws you), LOST 3-4; TWO BOUTS LATER: THE FINAL BOSS, Bastion casts Anvil Strike, the ramp answers | A setback and a comeback |
-| 1:07-1:14 | THE FINAL BOSS FALLS, 4-0, then the end card over it: Squeeze the arena. Throw them off your desk. | The payoff and the line to remember |
+| Time | Shot |
+|---|---|
+| 0:00-0:04 | SPINSMITH; both hands squeeze the bowl on the desk corner, the rival goes off the edge: DESK KO (slow push-in) |
+| 0:04-0:16 | Level 1, real time: the game shows the launch; DOWN 0-1; it teaches the squeeze, and the rival goes off the desk |
+| 0:16-0:18 | EVERY WIN UNLOCKS A MOVE |
+| 0:18-0:31 | Squeeze, flick, Crossguard (half speed), Spin Rub, stamp an ultimate |
+| 0:31-0:42 | Forge a part on by hand; build an arena (the four placements, 1.5x) |
+| 0:42-0:56 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held, then a named 4x3 grid) |
+| 0:56-1:08 | FOUR-TOP BRAWLS; 20 ARENAS (three real matches) |
+| 1:08-1:22 | Bosses cast your own moves: Iron Keep tilts the arena, both hands answer; LOST 0-4; two bouts later, the final boss Bastion casts Anvil Strike |
+| 1:22-1:30 | THE FINAL BOSS FALLS, 6-0 (THE CROWN IS YOURS), then the end card: Squeeze the arena. Throw them off your desk. |
 
-Cut: `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v4-1080p60.mp4` (1:14, 1080p60, about
--14 LUFS). Every frame says `IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE`: the capture layer
-(`scripts/capture/prepare-room.sh`) draws a plain 3D room and a table matched to the emulator's
-synthesised table plane, and skinned hands. `scripts/reel-v4.sh` cuts it; the music is synthesized on
-the reel's own clock by `scripts/capture/music.py` (no samples or third-party audio), so cuts land on
-the beat and the music stops for each KO and returns with a hit; the mix fades out over the last 1.5 s. The streak and level 8 come from the
-`?demo` save. The earlier 2:31 cut (`scripts/reel-v3.sh`, with the scripted arena swap) is kept for
-reference, not for submission. Still to do: real-headset footage if any Quest becomes available.
+Capture: the presentation room (`scripts/capture/shot.mjs`) is walls, a window and a stand-in table
+matched to the emulator's detected table plane; parked driver hands breathe, curl and fidget and
+cast a soft shadow (capture only). The music is synthesized on the cut's clock
+(`scripts/capture/music.py`, no samples), with no noise hats or crashes.
 
 ## How it was tested (card for the Devpost gallery)
 

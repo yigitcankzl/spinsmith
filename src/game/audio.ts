@@ -800,6 +800,12 @@ export class SpinHum {
     const hp = a.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.value = 250;
+    // A bandpass alone (Q 1.2) falls only 6 dB an octave: white noise through it still hissed up to
+    // 20 kHz under every fight, and two tops doubled it. The lowpass keeps the grind a low rumble.
+    const lp = a.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1100;
+    lp.Q.value = 0.7;
     this.rot = a.createOscillator();
     const depth = a.createGain();
     depth.gain.value = 0.45;
@@ -808,7 +814,7 @@ export class SpinHum {
     this.rot.connect(depth).connect(am.gain);
     this.grind = a.createGain();
     this.grind.gain.value = 0;
-    src.connect(this.grindBand).connect(hp).connect(am).connect(this.grind).connect(this.pan);
+    src.connect(this.grindBand).connect(hp).connect(lp).connect(am).connect(this.grind).connect(this.pan);
     // The rattle: a narrow metallic band of the same noise, opened by short clicks.
     this.rattleBand = a.createBiquadFilter();
     this.rattleBand.type = 'bandpass';
@@ -845,13 +851,13 @@ export class SpinHum {
     // The grind follows the rotation, with a little jitter so it never sounds like a tremolo.
     this.rot.frequency.setTargetAtTime((6 + 40 * spin) * (0.93 + 0.14 * Math.random()), t, 0.05);
     this.grindBand.frequency.setTargetAtTime(300 + 600 * spin, t, 0.05);
-    this.grind.gain.setTargetAtTime(on ? 0.25 + 0.2 * spin + 0.35 * Math.min(1, speed) : 0, t, 0.08);
+    this.grind.gain.setTargetAtTime(on ? 0.12 + 0.12 * spin + 0.2 * Math.min(1, speed) : 0, t, 0.08);
     // The rattle: a wobbling or dying top clatters, louder and slower as it goes.
     const shake = on ? Math.max(wobble, spin < 0.3 ? ((0.3 - spin) / 0.3) * 0.7 : 0) : 0;
     if (shake > 0.12 && t >= this.nextClick) {
       const g = this.rattle.gain;
       g.cancelScheduledValues(t);
-      g.setValueAtTime(2.5 * shake * shake, t);
+      g.setValueAtTime(1.4 * shake * shake, t);
       g.setTargetAtTime(0, t + 0.002, 0.008);
       this.rattleBand.frequency.setValueAtTime(2000 + 1500 * Math.random(), t);
       this.nextClick = t + (0.7 + 0.6 * Math.random()) / (5 + 35 * spin);

@@ -3,8 +3,8 @@
 
   python3 scripts/capture/music.py out.wav LENGTH [t:level ...] [hit:t ...]
 
-level 0 kick pulse, 1 + hats, 2 + snare and bass, 3 + arpeggio, b = break (pad only),
-x = stop (silence). hit:t drops a crash and a low hit at t seconds (a cut on the beat).
+level 0 kick pulse, 1 + ticks, 2 + snare and bass, 3 + arpeggio, b = break (pad only),
+x = stop (silence). hit:t drops a low boom and a chord at t seconds (a cut on the beat).
 """
 import sys
 import wave
@@ -35,6 +35,16 @@ def noise(dur, decay, high=True):
     if high:
         n = np.diff(n, prepend=0)
     return n * env(len(n), decay)
+
+
+def dark(sig, k=0.08):
+    """A one-pole lowpass: noise without the hiss (the game already has every high detail)."""
+    out = np.empty_like(sig)
+    v = 0.0
+    for i, x in enumerate(sig):
+        v += k * (x - v)
+        out[i] = v
+    return out / (np.abs(out).max() or 1)
 
 
 def tone(freq, dur, harmonics=(1,), decay=None):
@@ -89,17 +99,17 @@ def main():
         if step % 4 == 0:
             add(buf, t, k, 0.9)
         if n >= 1 and step % 4 == 2:
-            add(buf, t, noise(0.06, 0.02), 0.10)
+            add(buf, t, tone(1760, 0.05, (1,), 0.012), 0.035)  # a soft tick, not a noise hat
         if n >= 2 and step in (4, 12):
-            add(buf, t, noise(0.2, 0.07, False) + tone(185, 0.2, (1,), 0.05), 0.28)
+            add(buf, t, 0.5 * dark(noise(0.2, 0.05, False)) + tone(185, 0.2, (1, 2), 0.06), 0.24)
         if n >= 2 and step % 2 == 0:
             add(buf, t, tone(ROOTS[bar] * (2 if step % 4 == 2 else 1), BEAT / 2, (1, 2, 3, 4), 0.12), 0.30)
         if n >= 3:
             f = CHORDS[bar][(i // 1) % 3] * (2 if step % 8 >= 4 else 1)
             add(buf, t, tone(f, BEAT / 4, (1, 3, 5), 0.05), 0.07)
     for t in hits:
-        add(buf, t, noise(1.6, 0.5), 0.35)
         add(buf, t, kick(), 1.2)
+        add(buf, t, tone(41.2, 1.2, (1, 2), 0.35), 0.35)  # a low boom instead of a noise crash
         for f in CHORDS[0]:
             add(buf, t, tone(f / 4, 1.6, (1, 2), 0.6), 0.12)
     buf = buf[: int(length * SR)]

@@ -309,7 +309,7 @@ export default async function run({ page, frame, cdp }) {
       scene.add(table);
       game.__captureTable = table;
 
-      // An ordinary work desk at the end away from the arena (monitor, keyboard, mug, notebook,
+      // Opt-in (deskProps: true): an ordinary work desk at the end away from the arena (monitor, keyboard, mug, notebook,
       // plant), so a wide shot reads as "your desk" and not a bare plank. Presentation only.
       window.__captureIdleSway = p.idleSway !== false;
       // Soft contact shadows under both hands, on the desk top inside it and on the floor outside,
@@ -385,7 +385,7 @@ export default async function run({ page, frame, cdp }) {
           };
         }
       }
-      if (p.deskProps !== false) {
+      if (p.deskProps === true) {
         let CylinderConstructor = null;
         scene.traverse((object) => { if (!CylinderConstructor && object.geometry?.type === 'CylinderGeometry') CylinderConstructor = object.geometry.constructor; });
         const V3 = game.root.position.constructor;

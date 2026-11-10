@@ -8,8 +8,8 @@ The capture setup mutes game audio only for that automated IWER session. It does
 player's saved comfort mode or disable sound in production.
 
 The capture always labels itself as emulator footage. The presentation room is real 3D geometry
-(walls, a window, a work desk with monitor, keyboard, mug, notebook and plant at the end away from
-the arena; `deskProps: false` turns the props off; parked driver hands come alive after 0.6 s at rest: sway, wrist roll, finger curl and occasional fidgets, stopped the instant a move starts, resting over the desk 11 cm above its top, above the 5 cm slap band; `idleSway: false` turns that off; both hands cast a soft contact shadow on the desk or floor, `handShadows: false` turns it off)
+(walls, a window; `deskProps: true` adds a work desk's monitor, keyboard, mug, notebook and plant at
+the end away from the arena; parked driver hands come alive after 0.6 s at rest: sway, wrist roll, finger curl and occasional fidgets, stopped the instant a move starts, resting over the desk 11 cm above its top, above the 5 cm slap band; `idleSway: false` turns that off; both hands cast a soft contact shadow on the desk or floor, `handShadows: false` turns it off)
 drawn by `shot.mjs`: floor, walls, trim and rug share the XR camera, scale and perspective with the
 table. No photographed room or second set of furniture is composited behind it.
 
