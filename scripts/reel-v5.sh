@@ -76,7 +76,7 @@ PRE=$C75 seg 07-rub "$S/close-rub2.mp4" ${RUB_AT:-0.8} 2.4 "$SHARP,$(title 'SPIN
 seg 08-stamp "$S/seal-stamp.mp4" 1.0 2.8 "$(title 'STAMP AN ULTIMATE' 'Pinch the seal, stamp it down')"
 # 4. Forge a part on by hand; build an arena: pieces already down, the last ones going in.
 MUSIC+=("$(at 0):1")
-PRE=$C9 seg 09-forge "$S/forge2.mp4" ${FORGE_AT:-3.8} 5.0 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
+seg 09-forge "$S/forge3.mp4" ${FORGE_AT:-4.4} 5.0 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
 # The workshop take, with the moments the hand is off at the tray (out of frame) left out: the four
 # placements back to back (bumpers, slag pit, boost pad, pillar), then at 1.5x.
 WS_KEEP="${WS_KEEP:-37.92-40.53 41.53-44.02 45.08-47.52 48.52-50.5}"
