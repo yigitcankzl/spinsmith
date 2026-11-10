@@ -3,7 +3,7 @@
 # from the shots and takes re-recorded on 2026-11-10 (no desk props, the game's spin hiss fixed,
 # nearer cameras so no shot is cropped past 1.25x): the DESK KO hook with a slow push-in, a level-1
 # first match, the moves earned, forge and workshop, every move by hand, brawl and arenas, then the
-# boss arc (Iron Keep casts your tilt, you lose 0-4; Bastion falls 6-0, THE CROWN IS YOURS).
+# boss arc (Iron Keep casts your tilt, you lose 0-4; Bastion falls 5-0, THE CROWN IS YOURS).
 # One title per shot, held about 2.5 s. Music: scripts/capture/music.py on the cut's clock.
 #
 #   scripts/reel-v5.sh [reel-dir] [out-file]
@@ -57,13 +57,13 @@ SHARP="unsharp=5:5:0.5"
 # 1. The hook: SPINSMITH, both hands squeeze, the rival goes off the desk corner, with a slow push-in.
 MUSIC+=("0:1" "$(at 2.3):x" "hit:$(at 2.8)" "$(at 2.8):2")
 seg 00-hook "$S/hook-ko-close.mp4" ${HOOK_AT:-1.0} 3.8 "$(ease 1.12 3.8 0.6 0.4),$(logo 132 48 40 'lt(t,2.4)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=110:x=200:y=42:box=1:boxcolor=0x111419@0.78:boxborderw=14:enable='lt(t,2.4)',drawtext=fontfile=$FONT:text='A hands-only mixed-reality top battler':fontcolor=white:fontsize=44:x=52:y=196:box=1:boxcolor=0x111419@0.66:boxborderw=10:enable='lt(t,2.4)'"
-# 2. A level-1 player's first match in real time: the launch shown, the rival scores, the squeeze
+# 2. A level-1 player's first match in real time: the launch shown, you score first, the squeeze
 # taught, and the rival goes off the desk.
 MUSIC+=("$(at 0):1")
-PRE=$C9 seg 01a-level1 "$T/first.mp4" 3.5 4.0 "$(title 'LEVEL 1. YOUR FIRST MATCH' 'The game shows the launch')"
-PRE=$C9 seg 01b-down "$T/first.mp4" 17.0 3.0 "$(title 'DOWN 0-1')"
+PRE=$C9 seg 01a-level1 "$T/first.mp4" ${L1_AT:-1.5} 4.0 "$(title 'LEVEL 1. YOUR FIRST MATCH' 'The game shows the launch')"
+PRE=$C9 seg 01b-up "$T/first.mp4" ${UP_AT:-16.5} 3.0 "$(title 'UP 1-0')"
 MUSIC+=("$(at 4.1):x" "hit:$(at 4.6)" "$(at 4.6):1")
-PRE=$C9 seg 01c-hint "$T/first.mp4" 28.5 5.3 "$(title 'THEN IT TEACHES THE SQUEEZE' 'Both hands, and off the desk')"
+PRE=$C9 seg 01c-hint "$T/first.mp4" ${HINT_AT:-28.9} 5.3 "$(title 'THEN IT TEACHES THE SQUEEZE' 'Both hands, and off the desk')"
 won=$(python3 -c "print(max(0, $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$S/match-won-cards.mp4") - 2.2))")
 PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.12" seg 03-won "$S/match-won-cards.mp4" "$won" 2.0 "$(ease 1.08 2),$(title 'EVERY WIN UNLOCKS A MOVE')"
 # 3. The core moves, each held long enough to see the hand, then what it does.
@@ -77,13 +77,13 @@ seg 08-stamp "$S/seal-stamp.mp4" ${STAMP_AT:-0.4} 3.2 "$(title 'STAMP AN ULTIMAT
 # 4. Forge a part on by hand; build an arena: pieces already down, the last ones going in.
 MUSIC+=("$(at 0):1")
 # The forge take without the second the game holds the top on the off-screen palm (a still bench).
-FORGE_KEEP="${FORGE_KEEP:-4.2-5.8 7.2-10.6}"
+FORGE_KEEP="${FORGE_KEEP:-3.4-5.4 6.9-10.0}"
 sel=$(for r in $FORGE_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/forge3.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/forge-active.mp4"
 seg 09-forge "$TMP/forge-active.mp4" 0 5.0 "$(title 'FORGE IT BY HAND' 'Drag a part on, it fights differently')"
 # The workshop take, with the moments the hand is off at the tray (out of frame) left out: the four
 # placements back to back (bumpers, slag pit, boost pad, pillar), then at 1.5x.
-WS_KEEP="${WS_KEEP:-37.92-40.53 41.53-44.02 45.08-47.52 48.52-50.5}"
+WS_KEEP="${WS_KEEP:-34.05-36.4 41.0-43.3 44.45-46.85 47.97-50.33}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/workshop2.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/ws-active.mp4"
 SPEED=1.5 PRE=$C9 seg 10-workshop "$TMP/ws-active.mp4" 0 6.0 "$(title 'BUILD YOUR OWN ARENA' 'Every piece placed by hand  (1.5x)')"
@@ -140,14 +140,14 @@ PRE=$C85 seg 19-ar12 "$S/arenas/12.mp4" 0.7 2.2
 PRE=$C85 seg 20-ar06 "$S/arenas/06.mp4" 0.8 2.2
 # 7. The boss arc: Iron Keep casts your own tilt and both hands answer; it throws you, you lose 0-4.
 MUSIC+=("$(at 0):b" "hit:$(at 1.5)" "$(at 1.5):3")
-seg 13-boss1 "$T/boss-ironkeep.mp4" 87.5 6.0 "$(title 'BOSSES CAST YOUR OWN MOVES' 'Iron Keep tilts the arena, both hands answer')"
+seg 13-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-87.8} 6.0 "$(title 'BOSSES CAST YOUR OWN MOVES' 'Iron Keep tilts the arena, both hands answer')"
 MUSIC+=("$(at 0.4):x")
-seg 14-lost "$T/boss-ironkeep.mp4" 127.6 2.9 "$(title 'LOST 0-4')"
+seg 14-lost "$T/boss-ironkeep.mp4" ${LOST_AT:-116.3} 2.9 "$(title 'LOST 0-4')"
 MUSIC+=("$(at 0.8):b" "hit:$(at 2.3)" "$(at 2.3):3")
-seg 15-bastion "$T/boss-bastion1.mp4" ${BASTION_AT:-87.5} 5.0 "$(title 'TWO BOUTS LATER: THE FINAL BOSS' 'Bastion casts Anvil Strike')"
-# 8. Bastion falls 6-0, THE CROWN IS YOURS, then the end card over it.
+seg 15-bastion "$T/boss-bastion1.mp4" ${BASTION_AT:-88.0} 5.0 "$(title 'TWO BOUTS LATER, THE FINAL BOSS' 'Bastion casts Anvil Strike')"
+# 8. Bastion falls 5-0, THE CROWN IS YOURS, then the end card over it.
 MUSIC+=("$(at 3.4):b")
-seg 21-end "$T/boss-bastion1.mp4" ${CROWN_AT:-132} 8.0 "$(label 'THE FINAL BOSS FALLS, 6-0' | sed "s/boxborderw=12/boxborderw=12:enable='lt(t,4.4)'/"),split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,4.8)',$(logo 180 '(W-w)/2' 210 'gte(t,4.8)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,4.8)',drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,4.8)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,4.8)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,4.8)'"
+seg 21-end "$T/boss-bastion1.mp4" ${CROWN_AT:-117.6} 8.0 "$(label 'THE FINAL BOSS FALLS, 5-0' | sed "s/boxborderw=12/boxborderw=12:enable='lt(t,4.4)'/"),split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6[sbb];[sa][sbb]overlay=enable='gte(t,4.8)',$(logo 180 '(W-w)/2' 210 'gte(t,4.8)'),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410:enable='gte(t,4.8)',drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570:enable='gte(t,4.8)',drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680:enable='gte(t,4.8)',drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760:enable='gte(t,4.8)'"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/joined.mp4"

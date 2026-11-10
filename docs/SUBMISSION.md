@@ -102,7 +102,7 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:43, cut 2026-11-10, game sound and a synthesized music bed)
+## Competition video (1:43, cut and re-recorded 2026-11-10 after the game audio fix, game sound and a synthesized music bed)
 
 `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v5-1080p60.mp4`, cut by `scripts/reel-v5.sh`
 (earlier cuts: `scripts/reel-v4.sh`, `scripts/reel-v3.sh`). Every frame says `IWER EMULATOR / SYNTHETIC
@@ -112,14 +112,14 @@ reports any held picture over 0.3 s (none in this cut).
 | Time | Shot |
 |---|---|
 | 0:00-0:04 | SPINSMITH; both hands squeeze the bowl on the desk corner, the rival goes off the edge: DESK KO (slow push-in) |
-| 0:04-0:16 | Level 1, real time: the game shows the launch; DOWN 0-1; it teaches the squeeze, and the rival goes off the desk |
+| 0:04-0:16 | Level 1, real time: the game shows the launch; you go UP 1-0; it teaches the squeeze, and the rival goes off the desk |
 | 0:16-0:18 | EVERY WIN UNLOCKS A MOVE |
 | 0:18-0:31 | Squeeze, flick, Crossguard (half speed), Spin Rub, stamp an ultimate |
 | 0:31-0:42 | Forge a part on by hand (one continuous drag); build an arena (the four placements, 1.5x) |
 | 0:42-1:08 | EVERY MOVE BY HAND, counted 1/16 to 16/16 (four held; the five seal ultimates, each from the slap or stamp to the burst; the other seven in a named grid) |
 | 1:08-1:20 | FOUR-TOP BRAWLS; 20 ARENAS (three real matches) |
 | 1:20-1:35 | Bosses cast your own moves: Iron Keep tilts the arena, both hands answer; LOST 0-4; two bouts later, the final boss Bastion casts Anvil Strike |
-| 1:35-1:43 | THE FINAL BOSS FALLS, 6-0 (THE CROWN IS YOURS), then the end card: Squeeze the arena. Throw them off your desk. |
+| 1:35-1:43 | THE FINAL BOSS FALLS, 5-0 (LEVEL 9, THE CROWN IS YOURS), then the end card: Squeeze the arena. Throw them off your desk. |
 
 Capture: the presentation room (`scripts/capture/shot.mjs`) is walls, a window and a stand-in table
 matched to the emulator's detected table plane; parked driver hands breathe, curl and fidget and
