@@ -158,17 +158,17 @@ MUSIC+=("$(at 0):x")
 seg 34-finish "$T/boss-bastion1.mp4" ${FINISH_AT:-117.6} 1.0
 MUSIC+=("hit:$(at 0.3)" "$(at 0.5):3")
 AGAIN=0.4 seg 35-blow "$T/boss-bastion1.mp4" 118.6 1.0
-AGAIN=0.5 seg 36-crown "$T/boss-bastion1.mp4" ${CROWN_AT:-120.3} 3.5 "$(TB=2.0 title 'THE FINAL BOSS FALLS')"
+AGAIN=0.5 seg 36-crown "$T/boss-bastion1.mp4" ${CROWN_AT:-120.8} 3.0 "$(TB=1.5 title 'THE FINAL BOSS FALLS')"
 # Money montage: the biggest hits from the long takes, all by hand (none used elsewhere).
 MUSIC+=("hit:$(at 0)")
 MT="$(title 'HANDS ONLY. NO CONTROLLERS.')"
 PRE="crop=iw*0.75:ih*0.75:iw*0.125:ih*0.1" seg 41-m1 "$T/boss-bastion1.mp4" 98.45 1.0 "$PUNCH,$FLASH,$MT"
 AGAIN=0.7 PRE=$C9 seg 42-m2 "$T/boss.mp4" 56.0 0.5 "$FLASH,$MT"
 PRE="crop=iw*0.85:ih*0.85:iw*0.075:0" seg 43-m3 "$T/boss-bastion3.mp4" 110.85 1.0 "$FLASH,$MT"
-seg 45-m5 "$S/hero-ko.mp4" 4.15 1.0 "$FLASH,$MT"
+seg 45-m5 "$S/hero-ko.mp4" 4.3 0.5 "$FLASH,$MT"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
-ENDD=${END_DUR:-3.0}
+ENDD=${END_DUR:-4.0}
 AGAIN=0 seg 50-end "$T/boss-bastion1.mp4" ${CARD_AT:-123.7} $ENDD "split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6,format=yuva420p[sbb];[sa][sbb]overlay,format=yuv420p,$(logo 180 '(W-w)/2' 210),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=130:x=(w-text_w)/2:y=410,drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=60:x=(w-text_w)/2:y=570,drawtext=fontfile=$FONT:text='Play it in the Quest Browser  /  Meta Quest 3 and 3S  /  hands only':fontcolor=0xe7edf4:fontsize=50:x=(w-text_w)/2:y=680,drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffa24a:fontsize=50:x=(w-text_w)/2:y=760,fade=t=out:st=$(python3 -c "print($ENDD - 0.4)"):d=0.4"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
