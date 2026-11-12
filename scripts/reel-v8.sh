@@ -182,7 +182,7 @@ echo "video $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$TMP/j
 # the music up front, ducking gently under the game; then about -14 LUFS, peaks under -1.5 dBTP.
 ffmpeg -y -loglevel error -i "$TMP/joined.mp4" -i "$TMP/game.wav" -i "$TMP/music.wav" -filter_complex \
   "[1:a]dynaudnorm=f=250:g=25:m=4:p=0.7,equalizer=f=110:t=q:w=1:g=-3,volume='$GAPX':eval=frame,asplit[g][sc];[2:a]volume=${MUSIC_GAIN:-0.55},highpass=f=35[m];[m][sc]sidechaincompress=threshold=0.12:ratio=3:attack=10:release=200[md];[g][md]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.8:LRA=11,alimiter=limit=0.8:level=false[a]" \
-  -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 256k -ar 48000 -movflags +faststart "$FINAL"
+  -map 0:v -map "[a]" -t "$NOW" -c:v copy -c:a aac -b:a 256k -ar 48000 -movflags +faststart "$FINAL"
 echo "$FINAL ($(ffprobe -v error -show_entries format=duration -of csv=p=0 "$FINAL") s)"
 t=0; for s in "${segs[@]}"; do printf "%6.2f %s\n" "$t" "$s"; t=$(python3 -c "print($t + $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$TMP/$s.mp4"))"); done
 # Freeze check: any held picture over 0.3 s before the end card.
