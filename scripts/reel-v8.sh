@@ -164,7 +164,7 @@ MUSIC+=("hit:$(at 0)")
 MT="$(title 'HANDS ONLY. NO CONTROLLERS.')"
 PRE="crop=iw*0.75:ih*0.75:iw*0.125:ih*0.1" seg 41-m1 "$T/boss-bastion1.mp4" 98.45 1.0 "$PUNCH,$FLASH,$MT"
 AGAIN=0.7 PRE=$C9 seg 42-m2 "$T/boss.mp4" 56.0 0.5 "$FLASH,$MT"
-PRE="crop=iw*0.85:ih*0.85:iw*0.075:0" seg 43-m3 "$T/boss-bastion3.mp4" 110.4 1.0 "$FLASH,$MT"
+PRE="crop=iw*0.85:ih*0.85:iw*0.075:0" seg 43-m3 "$T/boss-bastion3.mp4" 110.85 1.0 "$FLASH,$MT"
 seg 45-m5 "$S/hero-ko.mp4" 4.15 1.0 "$FLASH,$MT"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
