@@ -83,7 +83,7 @@ PRESS_KEEP="${PRESS_KEEP:-3.8-4.87 5.19-6.65}"
 sel=$(for r in $PRESS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/press-place.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/press-active.mp4"
 PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.18" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" 0 2.5 "$(title 'FINDS YOUR REAL TABLE')"
-AGAIN=0.7 seg 01b-rip "$S/rip-launch.mp4" ${RIP_AT:-1.5} 3.0 "$(title 'PINCH. PULL. RIP.')"
+AGAIN=0.7 seg 01b-rip "$S/rip-launch.mp4" ${RIP_AT:-1.0} 3.0 "$(title 'PINCH. PULL. RIP.')"
 MUSIC+=("$(at 0):2")
 AGAIN=1.5 PRE=$C9 seg 01c-pit "$T/first.mp4" ${UP_AT:-16.6} 3.0 "$(title 'YOUR FIRST MATCH')"
 MUSIC+=("$(at 3.2):x" "hit:$(at 3.5)" "$(at 3.5):2"); GAPS+=("$(at 3.5)")
@@ -158,14 +158,14 @@ MUSIC+=("$(at 0):x")
 seg 34-finish "$T/boss-bastion1.mp4" ${FINISH_AT:-117.6} 1.0
 MUSIC+=("hit:$(at 0.3)" "$(at 0.5):3")
 AGAIN=0.4 seg 35-blow "$T/boss-bastion1.mp4" 118.6 1.0
-AGAIN=0.5 seg 36-crown "$T/boss-bastion1.mp4" ${CROWN_AT:-119.6} 4.5 "$(TB=3.0 title 'THE FINAL BOSS FALLS')"
+AGAIN=0.5 seg 36-crown "$T/boss-bastion1.mp4" ${CROWN_AT:-120.3} 3.5 "$(TB=2.0 title 'THE FINAL BOSS FALLS')"
 # Money montage: the biggest hits from the long takes, all by hand (none used elsewhere).
 MUSIC+=("hit:$(at 0)")
 MT="$(title 'HANDS ONLY. NO CONTROLLERS.')"
 PRE="crop=iw*0.75:ih*0.75:iw*0.125:ih*0.1" seg 41-m1 "$T/boss-bastion1.mp4" 98.45 1.0 "$PUNCH,$FLASH,$MT"
 AGAIN=0.7 PRE=$C9 seg 42-m2 "$T/boss.mp4" 56.0 0.5 "$FLASH,$MT"
-PRE="crop=iw*0.85:ih*0.85:iw*0.075:0" seg 43-m3 "$T/boss-bastion3.mp4" 111.0 1.0 "$FLASH,$MT"
-AGAIN=0.7 PRE=$C85 seg 45-m5 "$T/boss-bastion2.mp4" 4.3 0.5 "$FLASH,$MT"
+PRE="crop=iw*0.85:ih*0.85:iw*0.075:0" seg 43-m3 "$T/boss-bastion3.mp4" 110.4 1.0 "$FLASH,$MT"
+seg 45-m5 "$S/hero-ko.mp4" 4.15 1.0 "$FLASH,$MT"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.0}

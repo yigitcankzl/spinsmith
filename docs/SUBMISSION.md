@@ -102,7 +102,7 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:26, v8: v7 made punchier after a trailer, sound, judging and benchmark review on 2026-11-12, game sound and a synthesized music bed)
+## Competition video (1:25, v8: v7 made punchier after a trailer, sound, judging and benchmark review on 2026-11-12, game sound and a synthesized music bed)
 
 `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v8-1080p60.mp4`, cut by `scripts/reel-v8.sh`
 (earlier cuts: `scripts/reel-v7.sh` … `scripts/reel-v3.sh`). Every frame, the end card included, says
@@ -121,8 +121,8 @@ takes are the normal game. Held pictures over 0.3 s: the game's own LEVEL 9! and
 | 0:17-0:22 | THE BASICS (not among the 16, not counted): flick, Crossguard (half speed), Spin Rub |
 | 0:22-0:46 | 16 MOVES, NO CONTROLLERS, one at a time, counted 1/16 to 16/16; the last five as ONE STAMP, FIVE ULTIMATES (the stamp once, then each payoff) |
 | 0:46-1:01 | FORGE YOUR TOP; BUILD YOUR ARENA (2x); 20 ARENAS (three); FOUR-TOP BRAWLS |
-| 1:01-1:20 | BOSSES CAST YOUR MOVES (Iron Keep casts TILT); IRON KEEP WINS. FORGE ON. (0-4); THE FINAL BOSS (Bastion); the finishing blow; THE FINAL BOSS FALLS (5-0 on the HUD), LEVEL 9, THE CROWN IS YOURS |
-| 1:20-1:26 | HANDS ONLY. NO CONTROLLERS.: Anvil Strike, a crack, a slag win, a boss slam; the end card |
+| 1:01-1:19 | BOSSES CAST YOUR MOVES (Iron Keep casts TILT); IRON KEEP WINS. FORGE ON. (0-4); THE FINAL BOSS (Bastion); the finishing blow; THE FINAL BOSS FALLS (5-0 on the HUD), LEVEL 9, THE CROWN IS YOURS |
+| 1:19-1:25 | HANDS ONLY. NO CONTROLLERS.: Anvil Strike, a crack, a hand strike into a slag win, a desk KO; the end card |
 
 Capture: the presentation room (`scripts/capture/shot.mjs`) is walls, a window and a stand-in table
 matched to the emulator's detected table plane; parked driver hands breathe, curl and fidget and
