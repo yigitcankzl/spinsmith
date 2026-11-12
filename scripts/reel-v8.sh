@@ -83,7 +83,7 @@ PRESS_KEEP="${PRESS_KEEP:-3.8-4.87 5.19-6.65}"
 sel=$(for r in $PRESS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/press-place.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/press-active.mp4"
 PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.18" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" 0 2.5 "$(title 'FINDS YOUR REAL TABLE')"
-AGAIN=0.7 seg 01b-rip "$S/rip-launch.mp4" ${RIP_AT:-1.0} 3.0 "$(title 'PINCH. PULL. RIP.')"
+AGAIN=0.7 PRE="crop=iw*0.55:ih*0.55:iw*0.22:ih*0.06" seg 01b-rip "$S/rip-launch.mp4" ${RIP_AT:-0.3} 3.0 "$(title 'PINCH. PULL. RIP.')"
 MUSIC+=("$(at 0):2")
 AGAIN=1.5 PRE=$C9 seg 01c-pit "$T/first.mp4" ${UP_AT:-16.6} 3.0 "$(title 'YOUR FIRST MATCH')"
 MUSIC+=("$(at 3.2):x" "hit:$(at 3.5)" "$(at 3.5):2"); GAPS+=("$(at 3.5)")
