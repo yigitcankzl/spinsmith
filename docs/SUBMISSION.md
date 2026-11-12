@@ -102,27 +102,27 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:30, v7: v6 simplified after a clarity review on 2026-11-10, game sound and a synthesized music bed)
+## Competition video (1:30, v8: v7 made punchier after a trailer, sound, judging and benchmark review on 2026-11-12, game sound and a synthesized music bed)
 
-`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v7-1080p60.mp4`, cut by `scripts/reel-v7.sh`
-(earlier cuts: `scripts/reel-v6.sh` … `scripts/reel-v3.sh`). Every frame, the end card included, says
+`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v8-1080p60.mp4`, cut by `scripts/reel-v8.sh`
+(earlier cuts: `scripts/reel-v7.sh` … `scripts/reel-v3.sh`). Every frame, the end card included, says
 `IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE` (bottom right), with the speed written into
-it on every retimed clip. One caption at a time, bottom left, no subtitles. The short clips are the
-quiet capture (dev-only `MatchSystem.quiet`: the rival's words, call cards, cue words, gauge names
-and buttons hidden; the player's own move words, hands and hand rings kept), so a caption is the
-only text naming a move; the first match, brawl and boss takes are the normal game. The cut reports
-any held picture over 0.3 s: one, the game's own LEVEL 9! text hold (0.45 s at 1:22).
+it on every retimed clip. One caption at a time, bottom left. Every segment is a multiple of 0.5 s,
+so every cut lands on the music's beat (120 BPM); the music (`scripts/capture/music.py`, synthesized,
+no samples) rises into the KOs, drops on them, stops for the loss and the finishing blow, and ends on
+a sting. The short clips are the dev-only quiet capture (`MatchSystem.quiet`); the first match,
+brawl and boss takes are the normal game. Held pictures over 0.3 s: the game's own DESK KO, LEVEL 9!
+and THE CROWN IS YOURS holds.
 
 | Time | Shot |
 |---|---|
-| 0:00-0:04 | SQUEEZE THE ARENA. Both hands squeeze the bowl on the desk corner; THROW THEM OFF YOUR DESK. (the throw at half speed); DESK KO |
-| 0:04-0:12 | YOUR FIRST MATCH: a ramp into the slag pit; GRAB THE RIM. SQUEEZE. and the rival goes off the desk |
-| 0:12-0:17 | THE BASICS (not among the 16, not counted): flick, Crossguard (half speed), Spin Rub |
-| 0:17-0:48 | 16 MOVES, NO CONTROLLERS, one at a time, full frame, counted 1/16 to 16/16; the last five as ONE STAMP, FIVE ULTIMATES (Rush, Magnet, Tilt, Hammer, Ward) |
-| 0:48-0:56 | FORGE YOUR TOP (drag a part on, the dials change); BUILD YOUR ARENA (2x) |
-| 0:56-1:05 | FOUR-TOP BRAWLS (both hands, two knockouts); 20 ARENAS (three of them) |
-| 1:05-1:18 | BOSSES CAST YOUR MOVES (Iron Keep casts TILT); LOST 0-4; THE FINAL BOSS (Bastion casts Anvil Strike) |
-| 1:18-1:30 | The finishing blow at half speed; THE FINAL BOSS FALLS (the HUD shows 5-0: a finishing blow can be worth 2), LEVEL 9, THE CROWN IS YOURS, then the end card |
+| 0:00-0:05 | Cold open: META QUEST 3 / HANDS ONLY / QUEST BROWSER; SQUEEZE THE ARENA.; THROW THEM OFF YOUR DESK. (half speed); DESK KO, Anvil Strike, Shatter, a side-on DESK KO, each with a flash |
+| 0:05-0:17 | FINDS YOUR REAL TABLE (a palm pressed on the detected desk places the arena); PINCH. PULL. RIP. (the launch); YOUR FIRST MATCH; BOTH HANDS, TRACKED. SQUEEZE. and the rival goes off the desk |
+| 0:17-0:22 | THE BASICS (not among the 16, not counted): flick, Crossguard (half speed), Spin Rub |
+| 0:22-0:47 | 16 MOVES, NO CONTROLLERS, one at a time, counted 1/16 to 16/16; the last five as ONE STAMP, FIVE ULTIMATES |
+| 0:47-1:02 | FORGE YOUR TOP; BUILD YOUR ARENA (2x); 20 ARENAS (three); FOUR-TOP BRAWLS |
+| 1:02-1:21 | BOSSES CAST YOUR MOVES (Iron Keep casts TILT); LOST 0-4; THE FINAL BOSS (Bastion); the finishing blow at half speed in silence; THE FINAL BOSS FALLS (5-0 on the HUD), LEVEL 9, THE CROWN IS YOURS |
+| 1:21-1:30 | HANDS ONLY. NO CONTROLLERS.: Anvil Strike, a crack, a slag win, a boss slam, a desk KO; the end card |
 
 Capture: the presentation room (`scripts/capture/shot.mjs`) is walls, a window and a stand-in table
 matched to the emulator's detected table plane; parked driver hands breathe, curl and fidget and
