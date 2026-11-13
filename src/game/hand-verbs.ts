@@ -249,7 +249,7 @@ export class HandVerbs {
             this.emberPostUntil = this.m.elapsed + EMBER_POST_TIME;
             this.m.recordIntervention();
             this.m.lastShape = { t: this.m.elapsed, kind: 'ramp' };
-            this.m.stamp.show('RIVET PLANTED!', 'A HOT POST FOR 3 S: IT KICKS THEIRS OUT', 'mine', 0.72, 1.05);
+            this.m.stamp.show('EMBER RIVET!', 'A HOT POST FOR 3 S: IT KICKS THEIRS OUT', 'mine', 0.72, 1.05);
             this.m.sparks.embers(this.emberBumperAt.x, floor, this.emberBumperAt.z, 8, 0.08, 0.08, 1);
             playThock();
             return;

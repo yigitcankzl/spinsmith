@@ -2056,7 +2056,10 @@ export class MatchSystem extends createSystem({
     // An online guest sees the host's arena turned half round (tilts stay in the arena's own frame).
     const guestTurn = this.online?.role === 'guest' && this.online.peer ? Math.PI : 0;
     this.stage.rotation.order = guestTurn ? 'YXZ' : 'XYZ';
-    this.stage.rotation.set(this.arena.tiltX, this.turn + this.arenaMorphTwist + guestTurn, this.arena.tiltZ + this.arenaMorph.tilt);
+    // On a level arena every tilt is a shove (the Tilt seal, a forge tilt): shown 1.8x so the bowl visibly tips.
+    // ponytail: view-only, the sim's slope is unchanged; tilting arenas keep 1x so their resting lean stays true.
+    const tk = this.arena.layout.tilt > 0 ? 1 : 1.8;
+    this.stage.rotation.set(this.arena.tiltX * tk, this.turn + this.arenaMorphTwist + guestTurn, this.arena.tiltZ * tk + this.arenaMorph.tilt);
     this.stage.scale.set(this.viewK * this.arenaMorph.scaleX, this.viewK, this.viewK * this.arenaMorph.scaleZ);
     this.desk.updateDeskEdge(this.stage.rotation.y);
     // The bowl changes shape, not the physical tops. Their positions follow the forged floor but
@@ -5151,7 +5154,7 @@ export class MatchSystem extends createSystem({
       this.arenaMorphHold = 0;
       this.arenaView.charge = 1;
       // Match 1's card and ghost hands teach the squeeze; later matches name all four actions.
-      if (!this.quietFirst) this.stamp.show('TWO-HAND FORGE', 'SQUEEZE · STRETCH · TILT · TWIST', 'mine', 0.7);
+      if (!this.quietFirst) this.stamp.show('BOTH HANDS ON THE RIM', 'SQUEEZE · STRETCH · TILT · TWIST', 'mine', 0.7);
       playTick();
     }
 
@@ -5922,7 +5925,7 @@ export class MatchSystem extends createSystem({
       this.recordIntervention();
       this.lastShape = { t: this.elapsed, kind: 'ramp' };
       this.rootEntity?.setValue(FirstFiveState, 'forgeWheelTurn', signedTurn);
-      this.stamp.show(direction > 0 ? 'CURRENT: RIGHT!' : 'CURRENT: LEFT!', 'YOUR HAND TURNED THE WHOLE BOWL', 'mine', 0.75, 1.05);
+      this.stamp.show('FORGE WHEEL!', direction > 0 ? 'THE BOWL FLOWS RIGHT' : 'THE BOWL FLOWS LEFT', 'mine', 0.75, 1.05);
       this.label.set('THE FLOOR CURRENT FOLLOWS YOUR WHEEL');
       this.labelTimer = 1.3;
       this.roomLight.hit();
@@ -7349,7 +7352,7 @@ export class MatchSystem extends createSystem({
     this.progress.advance('match');
     this.impacts.shock(ex, this.arena.height(ex, ez), ez, 0.5, 0xffc066);
     this.sparks.embers(ex, this.arena.height(ex, ez) + 0.004, ez, 6, 0.4, 0.04, 1);
-    this.stamp.show('GROOVE CUT!', 'FIRST TOP ACROSS RIDES IT', 'mine', 0.55);
+    this.stamp.show('FINGER GROOVE!', 'FIRST TOP ACROSS RIDES IT', 'mine', 0.55);
     playThock(ex, ez);
     if (import.meta.env.DEV) console.log(`[GROOVE] ${side} ${sx.toFixed(3)},${sz.toFixed(3)} -> ${ex.toFixed(3)},${ez.toFixed(3)}`);
     return shape;

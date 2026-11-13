@@ -3034,7 +3034,7 @@ const STAMP_TINT: Record<string, number> = {
   'FLICK!': VERB_TINT.flick,
   'CROSSGUARD!': VERB_TINT.crossguard,
   'SPIN RUB!': VERB_TINT.rub,
-  'RIVET PLANTED!': VERB_TINT.rivet,
+  'EMBER RIVET!': VERB_TINT.rivet,
   'RIVET KICK!': VERB_TINT.rivet,
   'RIM SPRING!': VERB_TINT.spring,
   'FORGE GUST!': VERB_TINT.gust,
