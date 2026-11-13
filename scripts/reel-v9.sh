@@ -114,7 +114,7 @@ MUSIC+=("$(at 0):2")
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
 v9/flick ${FLICK_AT:-3.58} 1.0 1 m - BASIC_/_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - BASIC_/_CROSSGUARD
-v9/rub ${RUB_AT:-2.4} 1.5 1 s - BASIC_/_SPIN_RUB
+v9/rub ${RUB_AT:-2.5} 1.5 1 s - BASIC_/_SPIN_RUB
 EOF
 # Palm Catch: one continuous take (shots/v9/palm28, the capture-only slow park keeps the hand in frame).
 # Cup and Sling: the catch (cut as the hand leaves) and the sling, a hard cut between them.
@@ -132,7 +132,7 @@ v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
 v9/palm28 ${OUTER_AT:-1.7} 2.0 1 n - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
-v9/ember ${EMBER_AT:-4.9} 1.5 1 n - EMBER_RIVET
+v9/ember30 ${EMBER_AT:-4.55} 1.5 1 s - EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
 v9/seal-rush27 ${RUSH_AT:-1.7} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.9} 1.0 1 m - MAGNET
