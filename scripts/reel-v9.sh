@@ -73,7 +73,7 @@ CWHEEL="crop=iw*0.48:ih*0.48:iw*0.2:ih*0.27" # v9 wheel camera: the Forge Wheel 
 
 # COLD OPEN (0-3.5): squeeze, the throw, DESK KO. One KO, no flashes, tight on the arena.
 HOOKC="crop=iw*0.62:ih*0.62:iw*0.17:ih*0.36"
-PLATFORM="drawtext=fontfile=$FONT:text='META QUEST 3  /  HANDS ONLY  /  NO CONTROLLERS':fontcolor=white:fontsize=40:x=48:y=40:box=1:boxcolor=0x111419@0.75:boxborderw=10"
+PLATFORM="drawtext=fontfile=$FONT:text='META QUEST 3  /  HANDS ONLY  /  NO CONTROLLERS':fontcolor=white:fontsize=40:x=w-text_w-40:y=36:box=1:boxcolor=0x111419@0.75:boxborderw=10"
 BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=100:x=186:y=44:box=1:boxcolor=0x111419@0.78:boxborderw=14"
 MUSIC+=("0:x" "rise:0.3-1.8" "hit:1.8" "1.8:3")
 PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.6} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
