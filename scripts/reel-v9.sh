@@ -112,7 +112,7 @@ moves() {
 MUSIC+=("$(at 0):2")
 # The basics are not among the 16 (they need no unlock): named, not counted. They live in shots/.
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
-v9/flick ${FLICK_AT:-3.45} 1.0 1 m - BASIC_/_FLICK
+v9/flick ${FLICK_AT:-3.75} 1.0 1 m - BASIC_/_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - BASIC_/_CROSSGUARD
 v9/rub ${RUB_AT:-2.4} 1.5 1 s - BASIC_/_SPIN_RUB
 EOF
@@ -169,7 +169,7 @@ AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(titl
 MUSIC+=("$(at 0):x")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.245" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.0} 1.5 "$(TA=0 title 'THE FINAL BOSS FALLS')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.245" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.0} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.0}
