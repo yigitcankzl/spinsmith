@@ -146,8 +146,8 @@ EOF
 
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
 MUSIC+=("whoosh:$(at 0)" "$(at 0):2")
-# The forge: one continuous piece of the take (the part pick), no splice.
-AGAIN=3 PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.155" seg 21-forge "$S/forge3.mp4" ${FORGE_AT:-4.05} 1.5 "$(title 'FORGE YOUR TOP')"
+# The forge: one continuous piece of the take, the part swap (HALO to ANVIL) as the hand comes in.
+AGAIN=3 PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.155" seg 21-forge "$S/forge3.mp4" ${FORGE_AT:-7.9} 1.5 "$(title 'FORGE YOUR TOP')"
 WS_KEEP="${WS_KEEP:-34.05-36.4 41.0-43.3 44.45-46.85 47.97-50.33}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/workshop2.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/ws-active.mp4"
