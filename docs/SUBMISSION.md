@@ -102,7 +102,7 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (0:44, v9: v8 after a frame-by-frame review, 2026-11-13: fourteen rounds of Claude reviewers and Gemini, each followed by fixes)
+## Competition video (0:42, v9: v8 after a frame-by-frame review, 2026-11-13: twenty-two rounds of Claude reviewers, first-watch judge passes and Gemini, each followed by fixes)
 
 `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v9-1080p60.mp4`, cut by `scripts/reel-v9.sh`
 (earlier cuts: `scripts/reel-v8.sh` … `scripts/reel-v3.sh`). Every frame, the end card included, says
@@ -114,17 +114,17 @@ just before each hit, and it ends on a sting. Each segment's game sound is joine
 No flash frames, no repeated shots, no held picture over 0.3 s (checked on every render). The moves
 were re-shot for v9 as continuous takes (`scripts/capture/long.sh`, so no capture stalls inside a
 gesture) from mid, steep, close and high cameras that keep the acting hand in frame
-(`shots/v9/`, quiet capture); the first-match, brawl and boss takes are the normal game.
+(`shots/v9/`, quiet capture); the brawl and boss takes are the normal game.
 
 | Time | Shot |
 |---|---|
-| 0:00-0:03 | Cold open: BUILT FOR META QUEST 3 / HANDS ONLY; SQUEEZE THE ARENA.; THROW THEM OFF YOUR DESK. and DESK KO, with the SPINSMITH brand |
-| 0:03-0:05 | FINDS YOUR REAL TABLE (a palm on the detected desk places the arena); PINCH. PULL. RIP. (the launch) |
-| 0:05-0:08 | THE BASICS (not among the 16, not counted): flick, Crossguard (half speed), Spin Rub |
-| 0:08-0:30 | 16 MOVES, NO CONTROLLERS, one at a time, counted 1/16 to 16/16: the two-hand twist and stretch, the Forge Wheel turned by hand, ramp, rim spring, gust, Palm Catch (catch and return), Finger Groove, Cup and Sling (the catch, then the sling), Ember Rivet, the desk slap (half speed), then 1 STAMP, 5 ULTIMATES (Rush, Magnet, Tilt, Hammer, Ward) |
+| 0:00-0:03 | Cold open: META QUEST 3 / HANDS ONLY / NO CONTROLLERS; SQUEEZE THE ARENA.; THROW THEM OFF YOUR DESK. and DESK KO, with the SPINSMITH brand |
+| 0:03-0:05 | FINDS YOUR REAL TABLE (a palm on the detected desk); PINCH. PULL. RIP. (the launch) |
+| 0:05-0:08 | BASIC / FLICK, BASIC / CROSSGUARD (half speed), BASIC / SPIN RUB (not among the 16, not counted) |
+| 0:08-0:30 | 16 MOVES, NO CONTROLLERS, counted 1/16 to 16/16: the two-hand twist and stretch, the Forge Wheel turned by hand (2x), ramp, rim spring, gust, Palm Catch (catch and return), Finger Groove, Cup and Sling (the catch, then the sling), Ember Rivet, the desk slap (half speed), then 1 STAMP, 5 ULTIMATES (Rush, Magnet, Tilt, Hammer, Ward) |
 | 0:30-0:35 | FORGE YOUR TOP; BUILD YOUR ARENA; 20 ARENAS (three); FOUR-TOP BRAWLS |
-| 0:35-0:40 | BOSSES CAST YOUR MOVES (Iron Keep casts TILT); IRON KEEP WINS. FORGE ON. (0-4); THE FINAL BOSS: BASTION; RIVAL AT THE RIM. STAMP! (the strike, half speed); THE FINAL BOSS FALLS (SLAG!, Bastion goes at the rim, half speed) |
-| 0:40-0:44 | The end card |
+| 0:35-0:39 | BOSSES CAST YOUR MOVES (Iron Keep casts TILT); BASTION AT THE RIM. STAMP! (the final boss; the stamp at half speed); THE FINAL BOSS FALLS (SLAG!, Bastion goes at the rim in sparks, half speed) |
+| 0:39-0:42 | The end card |
 
 Capture: the presentation room (`scripts/capture/shot.mjs`) is walls, a window and a stand-in table
 matched to the emulator's detected table plane; parked driver hands breathe, curl and fidget and
