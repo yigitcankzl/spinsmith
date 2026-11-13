@@ -79,7 +79,7 @@ BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff
 MUSIC+=("0:x" "rise:0.3-1.8" "hit:1.8" "1.8:3")
 PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.6} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
 # The take has a capture jump at 3.05: the second shot starts past it, the throw-off and DESK KO! in one piece.
-PRE="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2" AGAIN=2 seg 00c-ko "$S/hook-ko-close.mp4" ${KO_AT:-3.1} 2.0 "$BRAND,$(TB=0.9 title 'THROW THEM OFF YOUR DESK.')"
+PRE="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2" AGAIN=2 seg 00c-ko "$S/hook-ko-close.mp4" ${KO_AT:-3.1} 1.5 "$BRAND,$(TB=0.9 title 'THROW THEM OFF YOUR DESK.')"
 
 # ACT 1. How it works: the detected table, the rip, a first match, the two-hand squeeze.
 MUSIC+=("$(at 0):1")
