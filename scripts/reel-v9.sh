@@ -68,6 +68,7 @@ CSLAP="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.05"   # v9 slap retake: the arena and the 
 CHIGH="crop=iw*0.75:ih*0.75:iw*0.22:ih*0.1"   # v9 high camera: the arena and the right hand beside it
 CSLAPR="crop=iw*0.6:ih*0.6:iw*0.35:ih*0.28"  # v9 slap: the right half of the arena and the striking hand
 CCLOSE="crop=iw*0.66:ih*0.66:iw*0.17:ih*0.02"  # v9 close camera: the arena and both resting hands
+CPALM="crop=iw*0.8:ih*0.8:iw*0.17:ih*0.15"  # Palm Catch: the arena and the catching hand at the right
 CSTEEP="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06"    # v9 steep camera
 CWHEEL="crop=iw*0.48:ih*0.48:iw*0.2:ih*0.27" # v9 wheel camera: the Forge Wheel and the arena
 
@@ -100,7 +101,7 @@ moves() {
   local i=0 k=0
   while read -r f s d sp c head n; do
     k=$((k + 1)); local crop=$C9 sharp="" text="" num=""
-    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; h) crop=$CHIGH ;; r) crop=$CSLAPR ;; k) crop=$CCLOSE ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
+    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; h) crop=$CHIGH ;; r) crop=$CSLAPR ;; k) crop=$CCLOSE ;; q) crop=$CPALM ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
     [ "${COUNT:-1}" = 1 ] && { i=$((i + 1)); num="   $i/16"; }
     n=${n//_/ }; head=${head//_/ }
     if [ "$head" = - ]; then text="$(move "$n$num")"
@@ -129,7 +130,7 @@ v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.75} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.98} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
-v9/palm28 ${OUTER_AT:-1.7} 2.0 1 n - PALM_CATCH
+v9/palm28 ${OUTER_AT:-1.7} 2.0 1 q - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
 v9/ember30 ${EMBER_AT:-4.55} 1.5 1 s - EMBER_RIVET
@@ -166,7 +167,7 @@ AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(titl
 MUSIC+=("$(at 0):x")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.0} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.08} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.0}
