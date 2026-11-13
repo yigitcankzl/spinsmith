@@ -85,8 +85,8 @@ CWHEEL="crop=iw*0.48:ih*0.48:iw*0.2:ih*0.27" # v9 wheel camera: the Forge Wheel 
 HOOKC="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2"
 PLATFORM="drawtext=fontfile=$FONT:text='META QUEST 3  /  HANDS ONLY  /  NO CONTROLLERS':fontcolor=white:fontsize=40:x=w-text_w-40:y=36:box=1:boxcolor=0x111419@0.75:boxborderw=10"
 BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=100:x=186:y=44:box=1:boxcolor=0x111419@0.78:boxborderw=14"
-MUSIC+=("0:x" "rise:0.5-2.8" "hit:2.8" "2.8:3")
-SLOWDUP=1 SPEED=0.5 PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.6} 2.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
+MUSIC+=("0:x" "rise:0.3-1.8" "hit:1.8" "1.8:3")
+PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.6} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
 # The take has a capture jump at 3.05: the second shot starts past it, the throw-off and DESK KO! in one piece.
 PRE="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2" AGAIN=2 seg 00c-ko "$S/hook-ko-close.mp4" ${KO_AT:-3.1} 1.5 "$BRAND,$(TB=0.9 title 'THROW THEM OFF YOUR DESK.')"
 
@@ -132,21 +132,21 @@ EOF
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup36.mp4" -i "$S/v9/cup7.mp4" -filter_complex "[0:v]trim=${CUP_A:-4.85}:${CUP_A2:-5.95},setpts=PTS-STARTPTS,crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06,scale=1920:1080,setsar=1,fps=60[a];[1:v]trim=${CUP_B:-4.7}:${CUP_B2:-6.1},setpts=PTS-STARTPTS,crop=iw*0.66:ih*0.66:iw*0.17:ih*0.02,scale=1920:1080,setsar=1,fps=60[b];[a][b]concat=n=2:v=1:a=0[v];[0:a]atrim=${CUP_A:-4.85}:${CUP_A2:-5.95},asetpts=PTS-STARTPTS[x];[1:a]atrim=${CUP_B:-4.7}:${CUP_B2:-6.1},asetpts=PTS-STARTPTS[y];[x][y]concat=n=2:v=0:a=1[au]" -map "[v]" -map "[au]" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 # Three groups, each opened by a card; the count runs on across them.
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3")
-card 12-card1 "$S/v9/twist.mp4" 0.5 'SHAPE THE ARENA' 'MOVES 1 TO 4  /  HANDS ON THE RIM'
+card 12-card1 "$S/v9/twist10.mp4" 0.5 'SHAPE THE ARENA' 'MOVES 1 TO 4  /  HANDS ON THE RIM'
 HTB=1.0 moves 12-moveA <<EOF
-v9/twist ${TWIST_AT:-2.0} 1.5 1 n - BOTH_HANDS_TWIST_THE_RIM TWIST
-v9/stretch ${STRETCH_AT:-3.2} 1.5 1 n - PULL_THE_RIM_APART STRETCH
-v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.0} 2.5 1 ${WHEEL_CROP:-l} - TURN_THE_NEAR_WHEEL FORGE_WHEEL
-v9/ramp ${RAMP_AT:-1.85} 1.5 0.5 s - PINCH_THE_FLOOR,_DRAG_A_RAMP RAMP
+v9/twist10 ${TWIST_AT:-2.7} 3.0 1 n - BOTH_HANDS_TWIST_THE_RIM TWIST
+v9/stretch10 ${STRETCH_AT:-2.4} 2.5 1 n - PULL_THE_RIM_APART STRETCH
+v9/${WHEEL_TAKE:-wheel10} ${WHEEL_AT:-1.6} 2.5 1 ${WHEEL_CROP:-l} - TURN_THE_NEAR_WHEEL FORGE_WHEEL
+v9/ramp ${RAMP_AT:-1.85} 2.0 0.5 s - PINCH_THE_FLOOR,_DRAG_A_RAMP RAMP
 EOF
 card 13-card2 "$S/v9/spring.mp4" 2.5 'WORK YOUR TOP' 'MOVES 5 TO 11  /  ONE HAND'
 FIRST=5 HTB=1.0 moves 13-moveB <<EOF
-v9/spring ${SPRING_AT:-3.2} 2.0 1 m - PINCH_THE_RIM,_PULL,_LET_GO RIM_SPRING
-v9/gust ${GUST_AT:-2.0} 1.5 1 s - SWEEP_YOUR_PALM FORGE_GUST
+v9/spring ${SPRING_AT:-3.2} 2.5 1 m - PINCH_THE_RIM,_PULL,_LET_GO RIM_SPRING
+v9/gust ${GUST_AT:-2.0} 2.0 1 s - SWEEP_YOUR_PALM FORGE_GUST
 v9/palm28 ${OUTER_AT:-1.4} 2.5 1 q - CATCH_YOUR_TOP,_PUT_IT_BACK PALM_CATCH
 v9/groove7 ${GROOVE_AT:-3.7} 2.5 1 k - SLIDE_A_FINGERTIP,_LIFT FINGER_GROOVE
 $TMP/cup-active 0 2.5 1 f - CUP_IT,_THEN_SLING_IT CUP_AND_SLING
-v9/ember30 ${EMBER_AT:-4.2} 2.0 1 s - PINCH_A_HOT_RIVET,_PLANT_IT EMBER_RIVET
+v9/ember10 ${EMBER_AT:-4.1} 3.0 1 s - PINCH_A_HOT_RIVET,_PLANT_IT EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 2.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK ANVIL_STRIKE
 EOF
 MUSIC+=("rise:$(at -2.0)-$(at -0.25)" "$(at -0.25):x" "hit:$(at 0)" "$(at 0):3"); GAPS+=("$(at 0)")
@@ -154,8 +154,8 @@ card 14-card3 "$S/v9/seal-rush27.mp4" 1.5 'STAMP THE SEAL' 'MOVES 12 TO 16  /  5
 FIRST=12 HTB=1.0 moves 14-moveC <<EOF
 v9/seal-rush27 ${RUSH_AT:-1.9} 2.5 1 m - STAMP,_YOUR_TOP_CHARGES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.1} 2.0 1 m - STAMP,_A_WELL_PULLS_THEM_IN MAGNET
-v9/seal-tilt ${TILT_AT:-2.45} 2.0 1 m - STAMP,_THE_ARENA_TILTS TILT
-v9/seal-hammer27 ${HAMMER_AT:-2.0} 2.0 1 m - STAMP,_THE_HAMMER_FALLS HAMMER
+v9/seal-tilt10 ${TILT_AT:-2.0} 2.5 1 n - STAMP,_THE_ARENA_TILTS TILT
+v9/seal-hammer10 ${HAMMER_AT:-2.3} 3.0 1 s - STAMP,_THE_HAMMER_FALLS HAMMER
 v9/seal-ward27 ${WARD_AT:-2.1} 2.0 1 m - STAMP,_A_RING_WALL_GUARDS_YOU WARD
 EOF
 
@@ -176,18 +176,18 @@ AGAIN=0.7 PRE=$C9 seg 26-brawl "$T/brawl2.mp4" ${BRAWL_AT:-27.15} 1.0 "$(title '
 MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.45)" "$(at 0.45):x" "hit:$(at 0.5)" "$(at 0.5):3"); GAPS+=("$(at 0.5)")
 seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 1.0 "$(title 'BOSSES CAST YOUR MOVES')"
 # The Iron Keep loss (32-lost) is gone: first-watch judges read a loss right before the finale as a wince.
-MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.5)")
-AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
+MUSIC+=("rise:$(at -0.4)-$(at 0)")
+# (33-bastion is gone: first-watch judges saw nothing happen in it; the strike opens earlier instead.)
 # The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
 # over the rim; the win drops in on SLAG! The result screen is cropped past its buttons and score.
 # The strike window (the rival at the rim, the ultimate armed): the hand stamps the seal, at half speed, cut (and held) before the result screen, then SLAG! at half speed as Bastion goes in a burst of sparks at the rim.
 MUSIC+=("$(at 0):x")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,1.38)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-110.75} 1.5 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.9} 1.0 "unsharp=7:7:0.9,$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
-ENDD=${END_DUR:-3.0}
+ENDD=${END_DUR:-2.5}
 AGAIN=0 POST="fade=t=in:st=0:d=0.15,fade=t=out:st=$(python3 -c "print($ENDD - 0.4)"):d=0.4" seg 50-end "$T/boss-bastion1.mp4" ${CARD_AT:-123.7} $ENDD "split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6,format=yuva420p[sbb];[sa][sbb]overlay,format=yuv420p,$(logo 240 '(W-w)/2' 120),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=190:x=(w-text_w)/2:y=370,drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=76:x=(w-text_w)/2:y=600,drawtext=fontfile=$FONT:text='Meta Quest 3 and 3S  /  Quest Browser  /  hands only':fontcolor=0xe7edf4:fontsize=74:x=(w-text_w)/2:y=720,drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffc58a:fontsize=84:x=(w-text_w)/2:y=830"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
