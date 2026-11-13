@@ -85,8 +85,8 @@ MUSIC+=("$(at 0):1")
 PRESS_KEEP="${PRESS_KEEP:-3.8-4.87 5.19-6.65}"
 sel=$(for r in $PRESS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/press-place.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/press-active.mp4"
-PRE="crop=iw*0.55:ih*0.55:iw*0.22:ih*0.2" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.85} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
-AGAIN=0.7 seg 01b-rip "$V/${RIP_TAKE:-rip2}.mp4" ${RIP_AT:-2.4} 1.5 "$(title 'PINCH. PULL. RIP.')"
+PRE="crop=iw*0.5:ih*0.5:iw*0.25:ih*0.16" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.85} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
+AGAIN=0.7 seg 01b-rip "$V/${RIP_TAKE:-rip2}.mp4" ${RIP_AT:-2.5} 1.5 "$(title 'PINCH. PULL. RIP.')"
 MUSIC+=("$(at 0):2")
 # 01c (the first match) is gone: its only usable window showed a palm sunk under the arena floor.
 # The squeeze lesson (01d) is gone: the cold open already shows squeeze -> DESK KO with the same banner.
@@ -104,35 +104,38 @@ moves() {
     n=${n//_/ }; head=${head//_/ }
     if [ "$head" = - ]; then text="$(move "$n$num")"
     else text="$(TB=${HTB:-0.8} title "$head"),$(TA=${HTB:-0.8} move "$n$num")"; fi
-    local src=$M/$f.mp4; [[ $f == */* ]] && src=$S/$f.mp4
+    local src=$M/$f.mp4; [[ $f == */* ]] && src=$S/$f.mp4; [[ $f == /* ]] && src=$f.mp4
     SLOWDUP=1 SPEED=$sp PRE=$crop seg "$1-$(printf %02d $k)" "$src" "$s" "$d" "$sharp$text"
   done
 }
 MUSIC+=("$(at 0):2")
 # The basics are not among the 16 (they need no unlock): named, not counted. They live in shots/.
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
-v9/flick ${FLICK_AT:-3.67} 1.0 1 m - THE_BASICS:_FLICK
+v9/flick ${FLICK_AT:-3.77} 1.0 1 m - THE_BASICS:_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - CROSSGUARD
-v9/rub ${RUB_AT:-2.45} 1.0 1 s - SPIN_RUB
+v9/rub ${RUB_AT:-2.15} 1.0 1 s - SPIN_RUB
 EOF
+CUP_KEEP="${CUP_KEEP:-2.9-3.4 4.4-5.9}"
+sel=$(for r in $CUP_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
+ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 13.5)-$(at 15.25)" "$(at 15.25):x" "hit:$(at 15.5)" "$(at 15.5):3"); GAPS+=("$(at 15.5)")
-HTB=0.7 moves 12-move <<EOF
+HTB=0.85 moves 12-move <<EOF
 v9/twist ${TWIST_AT:-1.8} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
 v9/stretch ${STRETCH_AT:-4.0} 1.0 1 n - STRETCH
 v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-1.6} 1.0 1 ${WHEEL_CROP:-l} - FORGE_WHEEL
-v9/ramp ${RAMP_AT:-2.0} 1.0 1 s - RAMP
+v9/ramp ${RAMP_AT:-2.05} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.7} 1.0 1 s - FORGE_GUST
-v9/palm7 ${OUTER_AT:-2.1} 1.5 1 k - PALM_CATCH
+v9/palm7 ${OUTER_AT:-1.7} 1.5 1 k - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-3.9} 1.5 1 k - FINGER_GROOVE
-v9/cup7 ${CUP_AT:-3.75} 2.0 1 k - CUP_AND_SLING
+$TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
 v9/ember ${EMBER_AT:-4.6} 1.5 1 n - EMBER_RIVET
-v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.55} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
-v9/seal-rush ${RUSH_AT:-3.15} 1.5 1 m ONE_STAMP,_5_ULTIMATES RUSH
+v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
+v9/seal-rush ${RUSH_AT:-2.6} 2.0 1 m ONE_STAMP,_5_ULTIMATES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.8} 1.0 1 m - MAGNET
 v9/seal-tilt ${TILT_AT:-3.15} 1.0 1 m - TILT
 v9/seal-hammer ${HAMMER_AT:-2.6} 1.0 1 m - HAMMER
-v9/seal-ward ${WARD_AT:-2.95} 1.0 1 m - WARD
+v9/seal-ward ${WARD_AT:-2.6} 1.0 1 m - WARD
 EOF
 
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
@@ -150,21 +153,20 @@ AGAIN=2 PRE=$C85 seg 23-ar12 "$S/arenas/12.mp4" 1.65 0.5 "$AR"
 AGAIN=2 PRE="crop=iw*0.75:ih*0.75:iw*0.125:ih*0.1" seg 24-ar07 "$S/arenas/07.mp4" 0.5 0.5 "$AR"
 PRE=$C85 seg 25-ar10 "$S/arenas/10.mp4" 0.52 0.5 "$AR"
 MUSIC+=("$(at 0):3")
-AGAIN=0.7 PRE=$C9 seg 26-brawl "$T/brawl2.mp4" ${BRAWL_AT:-28.0} 1.5 "$(title 'FOUR-TOP BRAWLS')"
+AGAIN=0.7 PRE=$C9 seg 26-brawl "$T/brawl2.mp4" ${BRAWL_AT:-27.6} 1.0 "$(title 'FOUR-TOP BRAWLS')"
 MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.45)" "$(at 0.45):x" "hit:$(at 0.5)" "$(at 0.5):3"); GAPS+=("$(at 0.5)")
 seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 1.0 "$(title 'BOSSES CAST YOUR MOVES')"
 MUSIC+=("$(at 0):x")
 AGAIN=0.4 seg 32-lost "$T/boss-ironkeep.mp4" ${LOST_AT:-117.52} 1.0 "$(title 'IRON KEEP WINS. FORGE ON.')"
 MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.5)")
-PRE=$C9 seg 33-bastion "$T/boss-bastion1.mp4" ${BASTION_AT:-88.85} 0.5 "$(title 'THE FINAL BOSS')"
+PRE=$C9 seg 33-bastion "$T/boss-bastion1.mp4" ${BASTION_AT:-88.95} 0.5 "$(title 'THE FINAL BOSS')"
 # The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
 # over the rim; the win drops in on SLAG! The result screen is cropped past its buttons and score.
-# The strike window and the strike, then SLAG! (the caption waits until Bastion is gone); the game's win camera jumps for one frame at 111.45, which falls between the two.
+# The strike at half speed (the win camera's one-frame jump at 111.45 dropped), then SLAG! at full speed.
 MUSIC+=("$(at 0):x")
-AGAIN=0.5 seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-110.7} 0.5 "$(title 'THE FINAL BOSS')"
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 seg 35a2-strike "$T/boss-bastion3.mp4" 111.2 0.5 "$(title 'THE FINAL BOSS')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='not(between(t,0.89,0.95))'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'THE FINAL BOSS')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-AGAIN=0.5 seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.47} 1.5 "$(TA=0.7 title 'THE FINAL BOSS FALLS')"
+AGAIN=0.5 seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.5} 1.0 "$(TA=0.1 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-4.0}
