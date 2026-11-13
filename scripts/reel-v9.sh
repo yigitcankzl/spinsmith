@@ -112,12 +112,12 @@ moves() {
 MUSIC+=("$(at 0):2")
 # The basics are not among the 16 (they need no unlock): named, not counted. They live in shots/.
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
-v9/flick ${FLICK_AT:-3.5} 1.0 1 m - THE_BASICS_/_FLICK
+v9/flick ${FLICK_AT:-3.7} 1.0 1 m - THE_BASICS_/_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - CROSSGUARD
-v9/rub ${RUB_AT:-2.05} 1.0 1 s - SPIN_RUB
+v9/rub ${RUB_AT:-2.05} 1.5 1 s - SPIN_RUB
 EOF
 # Palm Catch without the frames where the hand blinks out between the catch and the return.
-PALM_KEEP="${PALM_KEEP:-2.4-2.85 3.05-4.6}"
+PALM_KEEP="${PALM_KEEP:-2.25-2.85 3.05-4.45}"
 sel=$(for r in $PALM_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/palm7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/palm-active.mp4"
 # Cup and Sling: the catch (cut as the hand leaves) and the sling, a hard cut between them.
@@ -141,7 +141,7 @@ v9/seal-rush ${RUSH_AT:-2.85} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.9} 1.0 1 m - MAGNET
 v9/seal-tilt ${TILT_AT:-3.25} 1.0 1 m - TILT
 v9/seal-hammer ${HAMMER_AT:-2.7} 1.0 1 m - HAMMER
-v9/seal-ward ${WARD_AT:-2.23} 1.0 1 m - WARD
+v9/seal-ward ${WARD_AT:-2.75} 1.0 1 m - WARD
 EOF
 
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
