@@ -110,7 +110,7 @@ moves() {
   local i=$(( ${FIRST:-1} - 1 )) k=0
   while read -r f s d sp c head hw n; do
     k=$((k + 1)); local crop=$C9 sharp="" text="" num=""
-    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; h) crop=$CHIGH ;; r) crop=$CSLAPR ;; k) crop=$CCLOSE ;; f) crop="crop=iw:ih:0:0" ;; q) crop=$CPALM ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
+    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; h) crop=$CHIGH ;; r) crop=$CSLAPR ;; k) crop=$CCLOSE ;; f) crop="crop=iw:ih:0:0" ;; t) crop="crop=iw*0.55:ih*0.55:iw*0.2:ih*0.25" ;; q) crop=$CPALM ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
     [ "${COUNT:-1}" = 1 ] && { i=$((i + 1)); num="   $i/16"; }
     n=${n//_/ }; head=${head//_/ }; hw=${hw//_/ }
     if [ "$head" = - ]; then text="$(move "$n$num")${hw:+,$(how "$hw")}"
@@ -134,9 +134,9 @@ ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup36.mp4" -i "$S/v9/cup7.mp4" -fil
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3")
 card 12-card1 "$S/v9/twist10.mp4" 0.5 'SHAPE THE ARENA' 'MOVES 1 TO 4  /  HANDS ON THE RIM'
 HTB=1.0 moves 12-moveA <<EOF
-v9/twist10 ${TWIST_AT:-2.7} 3.0 1 n - BOTH_HANDS_TWIST_THE_RIM TWIST
-v9/stretch10 ${STRETCH_AT:-2.4} 2.5 1 n - PULL_THE_RIM_APART STRETCH
-v9/${WHEEL_TAKE:-wheel10} ${WHEEL_AT:-1.6} 2.5 1 ${WHEEL_CROP:-l} - TURN_THE_NEAR_WHEEL FORGE_WHEEL
+v9/twist10 ${TWIST_AT:-3.4} 2.5 1 n - BOTH_HANDS_TWIST_THE_RIM TWIST
+v9/stretch10 ${STRETCH_AT:-3.1} 2.0 1 n - PULL_THE_RIM_APART,_THE_BOWL_WIDENS STRETCH
+v9/${WHEEL_TAKE:-wheel10} ${WHEEL_AT:-2.4} 2.0 1 ${WHEEL_CROP:-l} - TURN_THE_WHEEL,_THE_BOWL_FLOWS FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.85} 2.0 0.5 s - PINCH_THE_FLOOR,_DRAG_A_RAMP RAMP
 EOF
 card 13-card2 "$S/v9/spring.mp4" 2.5 'WORK YOUR TOP' 'MOVES 5 TO 11  /  ONE HAND'
@@ -144,17 +144,17 @@ FIRST=5 HTB=1.0 moves 13-moveB <<EOF
 v9/spring ${SPRING_AT:-3.2} 2.5 1 m - PINCH_THE_RIM,_PULL,_LET_GO RIM_SPRING
 v9/gust ${GUST_AT:-2.0} 2.0 1 s - SWEEP_YOUR_PALM FORGE_GUST
 v9/palm28 ${OUTER_AT:-1.4} 2.5 1 q - CATCH_YOUR_TOP,_PUT_IT_BACK PALM_CATCH
-v9/groove7 ${GROOVE_AT:-3.7} 2.5 1 k - SLIDE_A_FINGERTIP,_LIFT FINGER_GROOVE
+v9/groove7 ${GROOVE_AT:-3.7} 2.5 1 k - SLIDE_A_FINGERTIP,_CUT_A_GROOVE FINGER_GROOVE
 $TMP/cup-active 0 2.5 1 f - CUP_IT,_THEN_SLING_IT CUP_AND_SLING
 v9/ember10 ${EMBER_AT:-4.1} 3.0 1 s - PINCH_A_HOT_RIVET,_PLANT_IT EMBER_RIVET
-v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 2.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK ANVIL_STRIKE
+v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.95} 2.0 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK ANVIL_STRIKE
 EOF
 MUSIC+=("rise:$(at -2.0)-$(at -0.25)" "$(at -0.25):x" "hit:$(at 0)" "$(at 0):3"); GAPS+=("$(at 0)")
 card 14-card3 "$S/v9/seal-rush27.mp4" 1.5 'STAMP THE SEAL' 'MOVES 12 TO 16  /  5 ULTIMATES'
 FIRST=12 HTB=1.0 moves 14-moveC <<EOF
-v9/seal-rush27 ${RUSH_AT:-1.9} 2.5 1 m - STAMP,_YOUR_TOP_CHARGES RUSH
-v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.1} 2.0 1 m - STAMP,_A_WELL_PULLS_THEM_IN MAGNET
-v9/seal-tilt10 ${TILT_AT:-2.0} 2.5 1 n - STAMP,_THE_ARENA_TILTS TILT
+v9/seal-rush27 ${RUSH_AT:-1.9} 3.0 1 m - STAMP,_YOUR_TOP_CHARGES RUSH
+v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.1} 2.5 1 m - STAMP,_A_WELL_PULLS_THEM_IN MAGNET
+v9/seal-tilt10 ${TILT_AT:-2.0} 2.5 1 t - STAMP,_THE_ARENA_TILTS TILT
 v9/seal-hammer10 ${HAMMER_AT:-2.3} 3.0 1 s - STAMP,_THE_HAMMER_FALLS HAMMER
 v9/seal-ward27 ${WARD_AT:-2.1} 2.0 1 m - STAMP,_A_RING_WALL_GUARDS_YOU WARD
 EOF
