@@ -120,7 +120,7 @@ EOF
 # Palm Catch: one continuous take (shots/v9/palm28, the capture-only slow park keeps the hand in frame).
 # Cup and Sling: the catch from cup36 (the palm over the top as CUP CAUGHT lands, steep camera), then the
 # sling from cup7 (SLUNG!), each framed on its own; a straight cut between the two takes.
-ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup36.mp4" -i "$S/v9/cup7.mp4" -filter_complex "[0:v]trim=${CUP_A:-4.95}:${CUP_A2:-5.95},setpts=PTS-STARTPTS,crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06,scale=1920:1080,setsar=1,fps=60[a];[1:v]trim=${CUP_B:-4.75}:${CUP_B2:-5.75},setpts=PTS-STARTPTS,crop=iw*0.66:ih*0.66:iw*0.17:ih*0.02,scale=1920:1080,setsar=1,fps=60[b];[a][b]concat=n=2:v=1:a=0[v];[0:a]atrim=${CUP_A:-4.95}:${CUP_A2:-5.95},asetpts=PTS-STARTPTS[x];[1:a]atrim=${CUP_B:-4.75}:${CUP_B2:-5.75},asetpts=PTS-STARTPTS[y];[x][y]concat=n=2:v=0:a=1[au]" -map "[v]" -map "[au]" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
+ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup36.mp4" -i "$S/v9/cup7.mp4" -filter_complex "[0:v]trim=${CUP_A:-5.05}:${CUP_A2:-5.95},setpts=PTS-STARTPTS,crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06,scale=1920:1080,setsar=1,fps=60[a];[1:v]trim=${CUP_B:-4.95}:${CUP_B2:-6.05},setpts=PTS-STARTPTS,crop=iw*0.66:ih*0.66:iw*0.17:ih*0.02,scale=1920:1080,setsar=1,fps=60[b];[a][b]concat=n=2:v=1:a=0[v];[0:a]atrim=${CUP_A:-5.05}:${CUP_A2:-5.95},asetpts=PTS-STARTPTS[x];[1:a]atrim=${CUP_B:-4.95}:${CUP_B2:-6.05},asetpts=PTS-STARTPTS[y];[x][y]concat=n=2:v=0:a=1[au]" -map "[v]" -map "[au]" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 13.0)-$(at 14.75)" "$(at 14.75):x" "hit:$(at 15.0)" "$(at 15.0):3"); GAPS+=("$(at 15.0)")
 HTB=1.0 moves 12-move <<EOF
 v9/twist ${TWIST_AT:-1.5} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
@@ -129,7 +129,7 @@ v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.75} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.98} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
-v9/palm28 ${OUTER_AT:-2.0} 1.0 1 q - PALM_CATCH
+v9/palm28 ${OUTER_AT:-2.15} 1.0 1 q - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 f - CUP_AND_SLING
 v9/ember30 ${EMBER_AT:-4.55} 1.5 1 s - EMBER_RIVET
