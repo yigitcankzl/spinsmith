@@ -112,9 +112,9 @@ moves() {
 MUSIC+=("$(at 0):2")
 # The basics are not among the 16 (they need no unlock): named, not counted. They live in shots/.
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
-v9/flick ${FLICK_AT:-3.45} 1.0 1 m - THE_BASICS_/_FLICK
-v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - CROSSGUARD
-v9/rub ${RUB_AT:-2.05} 1.5 1 s - SPIN_RUB
+v9/flick ${FLICK_AT:-3.45} 1.0 1 m - BASIC_/_FLICK
+v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - BASIC_/_CROSSGUARD
+v9/rub ${RUB_AT:-2.05} 1.5 1 s - BASIC_/_SPIN_RUB
 EOF
 # Palm Catch without the frames where the hand blinks out between the catch and the return.
 PALM_KEEP="${PALM_KEEP:-2.25-2.85 3.05-4.45}"
@@ -128,14 +128,14 @@ MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 14.0)-$(at 15.75)" "$(at 15.75):
 HTB=1.0 moves 12-move <<EOF
 v9/twist ${TWIST_AT:-2.0} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
 v9/stretch ${STRETCH_AT:-4.0} 1.0 1 n - STRETCH
-v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.25} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
+v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.75} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.98} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
 $TMP/palm-active 0 2.0 1 n - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
-v9/ember ${EMBER_AT:-4.65} 1.5 1 n - EMBER_RIVET
+v9/ember ${EMBER_AT:-5.0} 1.5 1 n - EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
 v9/seal-rush ${RUSH_AT:-2.85} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.9} 1.0 1 m - MAGNET
@@ -146,9 +146,8 @@ EOF
 
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
 MUSIC+=("whoosh:$(at 0)" "$(at 0):2")
-FORGE_KEEP="${FORGE_KEEP:-4.25-4.9 8.25-9.1}"
-sel=$(for r in $FORGE_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
-ffmpeg -nostdin -y -loglevel error -i "$S/forge3.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/forge-active.mp4"
+# The forge: a part pick, then the swap; the two pieces of the take join with a 0.1 s dissolve.
+ffmpeg -nostdin -y -loglevel error -i "$S/forge3.mp4" -filter_complex "[0:v]trim=4.25:4.95,setpts=PTS-STARTPTS[a];[0:v]trim=8.2:9.1,setpts=PTS-STARTPTS[b];[a][b]xfade=transition=fade:duration=0.1:offset=0.6,fps=60[v];[0:a]atrim=4.25:4.95,asetpts=PTS-STARTPTS[x];[0:a]atrim=8.2:9.1,asetpts=PTS-STARTPTS[y];[x][y]acrossfade=d=0.1[au]" -map "[v]" -map "[au]" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/forge-active.mp4"
 AGAIN=3 PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.155" seg 21-forge "$TMP/forge-active.mp4" 0 1.5 "$(title 'FORGE YOUR TOP')"
 WS_KEEP="${WS_KEEP:-34.05-36.4 41.0-43.3 44.45-46.85 47.97-50.33}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
