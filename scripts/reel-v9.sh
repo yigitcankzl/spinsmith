@@ -116,10 +116,7 @@ v9/flick ${FLICK_AT:-3.58} 1.0 1 m - BASIC_/_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - BASIC_/_CROSSGUARD
 v9/rub ${RUB_AT:-2.4} 1.5 1 s - BASIC_/_SPIN_RUB
 EOF
-# Palm Catch without the frames where the hand blinks out between the catch and the return.
-PALM_KEEP="${PALM_KEEP:-2.25-2.85 3.05-4.45}"
-sel=$(for r in $PALM_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
-ffmpeg -nostdin -y -loglevel error -i "$S/v9/palm7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/palm-active.mp4"
+# Palm Catch: one continuous take (shots/v9/palm28, the capture-only slow park keeps the hand in frame).
 # Cup and Sling: the catch (cut as the hand leaves) and the sling, a hard cut between them.
 CUP_KEEP="${CUP_KEEP:-2.75-3.7 4.95-6.0}"
 sel=$(for r in $CUP_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
@@ -132,7 +129,7 @@ v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.75} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.98} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
-$TMP/palm-active 0 2.0 1 n - PALM_CATCH
+v9/palm28 ${OUTER_AT:-1.7} 2.0 1 n - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
 v9/ember ${EMBER_AT:-4.9} 1.5 1 n - EMBER_RIVET
@@ -169,7 +166,7 @@ AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(titl
 MUSIC+=("$(at 0):x")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.245" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.0} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.0} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.0}
