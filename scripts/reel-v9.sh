@@ -112,7 +112,7 @@ moves() {
 MUSIC+=("$(at 0):2")
 # The basics are not among the 16 (they need no unlock): named, not counted. They live in shots/.
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
-v9/flick ${FLICK_AT:-3.75} 1.0 1 m - BASIC_/_FLICK
+v9/flick ${FLICK_AT:-3.58} 1.0 1 m - BASIC_/_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - BASIC_/_CROSSGUARD
 v9/rub ${RUB_AT:-2.4} 1.5 1 s - BASIC_/_SPIN_RUB
 EOF
