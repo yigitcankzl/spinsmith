@@ -121,7 +121,7 @@ PALM_KEEP="${PALM_KEEP:-2.25-2.85 3.05-4.45}"
 sel=$(for r in $PALM_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/palm7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/palm-active.mp4"
 # Cup and Sling: the catch (cut as the hand leaves) and the sling, a hard cut between them.
-CUP_KEEP="${CUP_KEEP:-2.75-3.85 4.95-5.85}"
+CUP_KEEP="${CUP_KEEP:-2.75-3.7 4.95-6.0}"
 sel=$(for r in $CUP_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 14.0)-$(at 15.75)" "$(at 15.75):x" "hit:$(at 16.0)" "$(at 16.0):3"); GAPS+=("$(at 16.0)")
@@ -146,9 +146,8 @@ EOF
 
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
 MUSIC+=("whoosh:$(at 0)" "$(at 0):2")
-# The forge: a part pick, then the swap; the two pieces of the take join with a 0.1 s dissolve.
-ffmpeg -nostdin -y -loglevel error -i "$S/forge3.mp4" -filter_complex "[0:v]trim=4.25:4.95,setpts=PTS-STARTPTS[a];[0:v]trim=8.2:9.1,setpts=PTS-STARTPTS[b];[a][b]xfade=transition=fade:duration=0.1:offset=0.6,fps=60[v];[0:a]atrim=4.25:4.95,asetpts=PTS-STARTPTS[x];[0:a]atrim=8.2:9.1,asetpts=PTS-STARTPTS[y];[x][y]acrossfade=d=0.1[au]" -map "[v]" -map "[au]" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/forge-active.mp4"
-AGAIN=3 PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.155" seg 21-forge "$TMP/forge-active.mp4" 0 1.5 "$(title 'FORGE YOUR TOP')"
+# The forge: one continuous piece of the take (the part pick), no splice.
+AGAIN=3 PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.155" seg 21-forge "$S/forge3.mp4" ${FORGE_AT:-4.05} 1.5 "$(title 'FORGE YOUR TOP')"
 WS_KEEP="${WS_KEEP:-34.05-36.4 41.0-43.3 44.45-46.85 47.97-50.33}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/workshop2.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/ws-active.mp4"
@@ -162,15 +161,15 @@ AGAIN=0.7 PRE=$C9 seg 26-brawl "$T/brawl2.mp4" ${BRAWL_AT:-27.15} 1.0 "$(title '
 MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.45)" "$(at 0.45):x" "hit:$(at 0.5)" "$(at 0.5):3"); GAPS+=("$(at 0.5)")
 seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 1.0 "$(title 'BOSSES CAST YOUR MOVES')"
 # The Iron Keep loss (32-lost) is gone: first-watch judges read a loss right before the finale as a wince.
-MUSIC+=("$(at 0):b" "rise:$(at 0.2)-$(at 1.0)")
-AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.1} 1.0 "$(title 'BASTION, THE FINAL BOSS')"
+MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.5)")
+AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(title 'BASTION AT THE RIM. STAMP!')"
 # The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
 # over the rim; the win drops in on SLAG! The result screen is cropped past its buttons and score.
 # The strike window (the rival at the rim, the ultimate armed): the hand stamps the seal, at half speed, cut (and held) before the result screen, then SLAG! at half speed as Bastion goes in a burst of sparks at the rim.
 MUSIC+=("$(at 0):x")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'RIVAL AT THE RIM. STAMP!')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.245" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.7} 1.5 "$(TA=0 title 'THE FINAL BOSS FALLS')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.245" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.0} 1.5 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.0}
