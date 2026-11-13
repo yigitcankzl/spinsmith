@@ -73,7 +73,7 @@ CWHEEL="crop=iw*0.48:ih*0.48:iw*0.2:ih*0.27" # v9 wheel camera: the Forge Wheel 
 
 # COLD OPEN (0-3.5): squeeze, the throw, DESK KO. One KO, no flashes, tight on the arena.
 HOOKC="crop=iw*0.62:ih*0.62:iw*0.17:ih*0.36"
-PLATFORM="drawtext=fontfile=$FONT:text='BUILT FOR META QUEST 3  /  HANDS ONLY':fontcolor=white:fontsize=40:x=48:y=40:box=1:boxcolor=0x111419@0.75:boxborderw=10"
+PLATFORM="drawtext=fontfile=$FONT:text='META QUEST 3  /  HANDS ONLY  /  NO CONTROLLERS':fontcolor=white:fontsize=40:x=48:y=40:box=1:boxcolor=0x111419@0.75:boxborderw=10"
 BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=100:x=186:y=44:box=1:boxcolor=0x111419@0.78:boxborderw=14"
 MUSIC+=("0:x" "rise:0.3-1.8" "hit:1.8" "1.8:3")
 PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.6} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
@@ -112,7 +112,7 @@ moves() {
 MUSIC+=("$(at 0):2")
 # The basics are not among the 16 (they need no unlock): named, not counted. They live in shots/.
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
-v9/flick ${FLICK_AT:-3.7} 1.0 1 m - THE_BASICS_/_FLICK
+v9/flick ${FLICK_AT:-3.45} 1.0 1 m - THE_BASICS_/_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - CROSSGUARD
 v9/rub ${RUB_AT:-2.05} 1.5 1 s - SPIN_RUB
 EOF
@@ -128,7 +128,7 @@ MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 14.0)-$(at 15.75)" "$(at 15.75):
 HTB=1.0 moves 12-move <<EOF
 v9/twist ${TWIST_AT:-2.0} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
 v9/stretch ${STRETCH_AT:-4.0} 1.0 1 n - STRETCH
-v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-1.75} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
+v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.25} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.98} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
@@ -175,7 +175,7 @@ MUSIC+=("hit:$(at 0)" "$(at 0):3")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.7:ih*0.7:iw*0.3:ih*0.29" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.7} 1.5 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
-ENDD=${END_DUR:-4.0}
+ENDD=${END_DUR:-3.0}
 AGAIN=0 POST="fade=t=in:st=0:d=0.15,fade=t=out:st=$(python3 -c "print($ENDD - 0.4)"):d=0.4" seg 50-end "$T/boss-bastion1.mp4" ${CARD_AT:-123.7} $ENDD "split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6,format=yuva420p[sbb];[sa][sbb]overlay,format=yuv420p,$(logo 240 '(W-w)/2' 120),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=190:x=(w-text_w)/2:y=370,drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=76:x=(w-text_w)/2:y=600,drawtext=fontfile=$FONT:text='Meta Quest 3 and 3S  /  Quest Browser  /  hands only':fontcolor=0xe7edf4:fontsize=74:x=(w-text_w)/2:y=720,drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffc58a:fontsize=84:x=(w-text_w)/2:y=830"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
