@@ -173,7 +173,7 @@ const PEDESTAL = 0.08;
 const ARENA_SCALE = 2.4;
 
 export function installDriver() {
-  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand>; primaryInputMode: 'controller' | 'hand' }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; __spinDriveGeneration?: number; __captureIdleSway?: boolean; __captureShadowFrame?: { cx: number; cz: number; yaw: number; w: number; d: number; topY: number }; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
+  const w = window as unknown as { IWER_DEVICE?: { hands: Record<Side, EmuHand>; primaryInputMode: 'controller' | 'hand' }; transformHandles?: Map<string, EmuHandle>; __game?: Game; drive?: unknown; __spinDriveGeneration?: number; __captureIdleSway?: boolean; __captureParkSeconds?: number; __captureShadowFrame?: { cx: number; cz: number; yaw: number; w: number; d: number; topY: number }; spinsmithDiagnostics?: () => Record<string, string | number | boolean> };
   // Vite HMR re-evaluates this module without cancelling requestAnimationFrame callbacks created by
   // the previous copy. Give the newest driver sole ownership so an old closure cannot keep writing
   // a parked pose over a fresh test after a source edit.
@@ -578,7 +578,8 @@ export function installDriver() {
     return g.root.localToWorld(new Vector3(x, -0.11, g.arena.radius * 1.7));
   };
   const park = async (side: Side) => {
-    await glide(side, 'pinch', idlePoint(side), 0.42, 0, 'natural', 'release');
+    // Capture-only: a slower return lets a filmed hand leave the frame instead of blinking out.
+    await glide(side, 'pinch', idlePoint(side), w.__captureParkSeconds ?? 0.42, 0, 'natural', 'release');
     resting[side] = true;
   };
 
