@@ -86,7 +86,7 @@ MUSIC+=("$(at 0):1")
 PRESS_KEEP="${PRESS_KEEP:-3.8-4.87 5.19-6.65}"
 sel=$(for r in $PRESS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/press-place.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/press-active.mp4"
-PRE="crop=iw*0.45:ih*0.45:iw*0.27:ih*0.27" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.2} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
+PRE="crop=iw*0.45:ih*0.45:iw*0.27:ih*0.27" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.05} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
 AGAIN=0.7 seg 01b-rip "$V/${RIP_TAKE:-rip2}.mp4" ${RIP_AT:-2.55} 1.0 "$(title 'PINCH. PULL. RIP.')"
 MUSIC+=("$(at 0):2")
 # 01c (the first match) is gone: its only usable window showed a palm sunk under the arena floor.
@@ -117,17 +117,19 @@ v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - CROSSGUARD
 v9/rub ${RUB_AT:-2.4} 1.0 1 s - SPIN_RUB
 EOF
 # Palm Catch without the frames where the hand blinks out between the catch and the return.
-PALM_KEEP="${PALM_KEEP:-2.05-2.85 3.05-4.25}"
+PALM_KEEP="${PALM_KEEP:-2.4-2.85 3.05-4.6}"
 sel=$(for r in $PALM_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/palm7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/palm-active.mp4"
-# Cup and Sling: the catch (to its banner's fade) and the sling, joined with a 0.1 s dissolve.
-ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup7.mp4" -filter_complex "[0:v]trim=2.75:3.8,setpts=PTS-STARTPTS[a];[0:v]trim=4.95:6.0,setpts=PTS-STARTPTS[b];[a][b]xfade=transition=fade:duration=0.1:offset=0.95,fps=60[v];[0:a]atrim=2.75:3.8,asetpts=PTS-STARTPTS[x];[0:a]atrim=4.95:6.0,asetpts=PTS-STARTPTS[y];[x][y]acrossfade=d=0.1[au]" -map "[v]" -map "[au]" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
+# Cup and Sling: the catch (cut as the hand leaves) and the sling, a hard cut between them.
+CUP_KEEP="${CUP_KEEP:-2.75-3.5 4.7-5.95}"
+sel=$(for r in $CUP_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
+ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 14.0)-$(at 15.75)" "$(at 15.75):x" "hit:$(at 16.0)" "$(at 16.0):3"); GAPS+=("$(at 16.0)")
 HTB=1.0 moves 12-move <<EOF
 v9/twist ${TWIST_AT:-2.0} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
 v9/stretch ${STRETCH_AT:-4.0} 1.0 1 n - STRETCH
 v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-1.75} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
-v9/ramp ${RAMP_AT:-1.72} 1.0 1 s - RAMP
+v9/ramp ${RAMP_AT:-1.98} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
 $TMP/palm-active 0 2.0 1 n - PALM_CATCH
@@ -170,7 +172,7 @@ AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.1} 1.0 "$(titl
 MUSIC+=("$(at 0):x")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'RIVAL AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.7:ih*0.7:iw*0.3:ih*0.25" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.7} 1.5 "$(TA=0 title 'THE FINAL BOSS FALLS')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.7:ih*0.7:iw*0.3:ih*0.29" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.7} 1.5 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-4.0}
