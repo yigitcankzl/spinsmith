@@ -115,7 +115,7 @@ MUSIC+=("$(at 0):2")
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
 v9/flick ${FLICK_AT:-3.58} 1.0 1 m - BASIC_/_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - BASIC_/_CROSSGUARD
-v9/rub ${RUB_AT:-2.5} 1.5 1 s - BASIC_/_SPIN_RUB
+v9/rub ${RUB_AT:-2.55} 1.5 1 s - BASIC_/_SPIN_RUB
 EOF
 # Palm Catch: one continuous take (shots/v9/palm28, the capture-only slow park keeps the hand in frame).
 # Cup and Sling: the catch from cup36 (the palm over the top as CUP CAUGHT lands, steep camera), then the
@@ -159,12 +159,12 @@ MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.45)" "$(at 0.45):x" "hit:$(at 0.5)" "
 seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 1.0 "$(title 'BOSSES CAST YOUR MOVES')"
 # The Iron Keep loss (32-lost) is gone: first-watch judges read a loss right before the finale as a wince.
 MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.5)")
-AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(title 'BASTION AT THE RIM. STAMP!')"
+AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
 # The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
 # over the rim; the win drops in on SLAG! The result screen is cropped past its buttons and score.
 # The strike window (the rival at the rim, the ultimate armed): the hand stamps the seal, at half speed, cut (and held) before the result screen, then SLAG! at half speed as Bastion goes in a burst of sparks at the rim.
 MUSIC+=("$(at 0):x")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'BASTION AT THE RIM. STAMP!')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.08} 1.0 "unsharp=7:7:0.9,$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
