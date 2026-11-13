@@ -85,7 +85,7 @@ MUSIC+=("$(at 0):1")
 PRESS_KEEP="${PRESS_KEEP:-3.8-4.87 5.19-6.65}"
 sel=$(for r in $PRESS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/press-place.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/press-active.mp4"
-PRE="crop=iw*0.45:ih*0.45:iw*0.27:ih*0.27" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.85} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
+PRE="crop=iw*0.45:ih*0.45:iw*0.27:ih*0.27" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.45} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
 AGAIN=0.7 seg 01b-rip "$V/${RIP_TAKE:-rip2}.mp4" ${RIP_AT:-2.55} 1.0 "$(title 'PINCH. PULL. RIP.')"
 MUSIC+=("$(at 0):2")
 # 01c (the first match) is gone: its only usable window showed a palm sunk under the arena floor.
@@ -115,27 +115,27 @@ v9/flick ${FLICK_AT:-3.77} 1.0 1 m - THE_BASICS:_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - CROSSGUARD
 v9/rub ${RUB_AT:-2.6} 1.0 1 s - SPIN_RUB
 EOF
-CUP_KEEP="${CUP_KEEP:-2.5-3.25 4.55-5.8}"
+CUP_KEEP="${CUP_KEEP:-2.5-3.6 4.9-5.8}"
 sel=$(for r in $CUP_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 14.0)-$(at 15.75)" "$(at 15.75):x" "hit:$(at 16.0)" "$(at 16.0):3"); GAPS+=("$(at 16.0)")
-HTB=1.0 HTY=h-280 moves 12-move <<EOF
-v9/twist ${TWIST_AT:-1.5} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
+HTB=1.0 moves 12-move <<EOF
+v9/twist ${TWIST_AT:-1.8} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
 v9/stretch ${STRETCH_AT:-4.0} 1.0 1 n - STRETCH
 v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-1.6} 1.0 1 ${WHEEL_CROP:-l} - FORGE_WHEEL
-v9/ramp ${RAMP_AT:-1.65} 1.0 1 s - RAMP
+v9/ramp ${RAMP_AT:-1.95} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.7} 1.0 1 s - FORGE_GUST
-v9/palm7 ${OUTER_AT:-1.95} 1.5 1 n - PALM_CATCH
+v9/palm7 ${OUTER_AT:-1.95} 2.0 1 n - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
-v9/ember ${EMBER_AT:-4.65} 2.0 1 n - EMBER_RIVET
+v9/ember ${EMBER_AT:-4.65} 1.5 1 n - EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
 v9/seal-rush ${RUSH_AT:-2.6} 2.0 1 m ONE_STAMP,_5_ULTIMATES RUSH
-v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-3.1} 1.0 1 m - MAGNET
-v9/seal-tilt ${TILT_AT:-3.3} 1.0 1 m - TILT
-v9/seal-hammer ${HAMMER_AT:-2.75} 1.0 1 m - HAMMER
-v9/seal-ward ${WARD_AT:-2.9} 1.0 1 m - WARD
+v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-3.05} 1.0 1 m - MAGNET
+v9/seal-tilt ${TILT_AT:-3.25} 1.0 1 m - TILT
+v9/seal-hammer ${HAMMER_AT:-2.7} 1.0 1 m - HAMMER
+v9/seal-ward ${WARD_AT:-2.85} 1.0 1 m - WARD
 EOF
 
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
@@ -158,15 +158,15 @@ MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.45)" "$(at 0.45):x" "hit:$(at 0.5)" "
 seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 1.0 "$(title 'BOSSES CAST YOUR MOVES')"
 MUSIC+=("$(at 0):x")
 AGAIN=0.4 seg 32-lost "$T/boss-ironkeep.mp4" ${LOST_AT:-117.52} 1.0 "$(title 'IRON KEEP WINS. FORGE ON.')"
-MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.5)")
-AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(title 'THE FINAL BOSS')"
+MUSIC+=("$(at 0):b" "rise:$(at 0.2)-$(at 1.0)")
+AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.0} 1.0 "$(title 'THE FINAL BOSS')"
 # The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
 # over the rim; the win drops in on SLAG! The result screen is cropped past its buttons and score.
-# The strike window (the rival at the rim, the ultimate armed): the hand stamps the seal, at half speed, cut (and held) before the result screen, then SLAG! once the hand has lifted.
+# The strike window (the rival at the rim, the ultimate armed): the hand stamps the seal, at half speed, cut (and held) before the result screen, then SLAG! at half speed as Bastion goes in a burst of sparks at the rim.
 MUSIC+=("$(at 0):x")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'RIVAL AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-AGAIN=0.5 seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.15} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-112.0} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-4.0}
