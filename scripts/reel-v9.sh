@@ -134,7 +134,7 @@ v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
 v9/ember ${EMBER_AT:-4.9} 1.5 1 n - EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
-v9/seal-rush27 ${RUSH_AT:-2.1} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
+v9/seal-rush27 ${RUSH_AT:-1.7} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.9} 1.0 1 m - MAGNET
 v9/seal-tilt ${TILT_AT:-3.25} 1.0 1 m - TILT
 v9/seal-hammer27 ${HAMMER_AT:-2.5} 1.0 1 m - HAMMER
