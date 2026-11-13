@@ -46,7 +46,7 @@ seg() {
   [ -s "$src" ] || { echo "missing $src" >&2; exit 1; }
   python3 -c "import sys; sys.exit(0 if abs($dur * 2 - round($dur * 2)) < 1e-6 else 1)" || echo "warning: $name $dur s is off the beat grid" >&2
   [ "$sp" = 1 ] || af="atempo=$sp"
-  python3 -c "import sys; sys.exit(0 if $sp < 1 else 1)" && { pre="mpdecimate=hi=200:lo=100:frac=0.5,"; post="framerate=fps=$FPS${SCENE:+:scene=$SCENE}"; }
+  python3 -c "import sys; sys.exit(0 if $sp < 1 else 1)" && { pre="mpdecimate=hi=200:lo=100:frac=0.5,"; post="framerate=fps=$FPS${SCENE:+:scene=$SCENE}"; [ -n "${SLOWDUP:-}" ] && { pre=""; post="fps=$FPS"; }; }
   ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$src" </dev/null | grep -q . || { a=1; af=anull; }
   # Takes recorded before the game's spin-grind fix (2026-11-10) carry its broadband hiss: soften it.
   [ "$a" = 0 ] && [ "$(stat -c %Y "$src")" -lt "${AUDIO_FIX_EPOCH:-1794268800}" ] && af="$af,afftdn=nf=-28,lowpass=f=7500"
@@ -63,6 +63,7 @@ C75="crop=iw*0.75:ih*0.75:iw*0.125:ih*0.15"
 SHARP="unsharp=5:5:0.5"
 CMID="crop=iw*0.56:ih*0.56:iw*0.22:ih*0.16"   # v9 mid camera: the arena and the reaching hand
 CMIDLOW="crop=iw*0.62:ih*0.62:iw*0.19:ih*0.3" # v9 mid camera, low: a hand coming in from the near side
+CSLAP="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.05"   # v9 slap retake: the arena and the striking hand below it
 CSTEEP="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06"    # v9 steep camera
 CWHEEL="crop=iw*0.66:ih*0.66:iw*0.08:ih*0.12" # v9 wheel camera: the Forge Wheel and the arena
 
@@ -73,7 +74,7 @@ BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff
 MUSIC+=("0:x" "rise:1.0-2.5" "hit:2.5" "2.5:3")
 PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.4} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
 PRE=$HOOKC AGAIN=2 seg 00b-throw "$S/hook-ko-close.mp4" ${THROW_AT:-2.4} 1.5 "$PLATFORM,$(title 'THROW THEM OFF YOUR DESK.')"
-PRE=$HOOKC seg 00c-ko "$S/hook-ko-close.mp4" ${KO_AT:-3.9} 1.0 "$PUNCH,$BRAND"
+PRE="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2" seg 00c-ko "$S/hook-ko-close.mp4" ${KO_AT:-3.9} 1.0 "$PUNCH,$BRAND"
 
 # ACT 1. How it works: the detected table, the rip, a first match, the two-hand squeeze.
 MUSIC+=("$(at 0):1")
@@ -81,12 +82,12 @@ MUSIC+=("$(at 0):1")
 PRESS_KEEP="${PRESS_KEEP:-3.8-4.87 5.19-6.65}"
 sel=$(for r in $PRESS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/press-place.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/press-active.mp4"
-PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.18" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.45} 1.5 "$(title 'FINDS YOUR REAL TABLE')"
-AGAIN=0.7 PRE="crop=iw*0.8:ih*0.8:iw*0.1:ih*0.12" seg 01b-rip "$V/rip.mp4" ${RIP_AT:-2.2} 2.0 "$(title 'PINCH. PULL. RIP.')"
+PRE="crop=iw*0.7:ih*0.7:iw*0.15:ih*0.18" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.65} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
+AGAIN=0.7 PRE=$C9 seg 01b-rip "$V/${RIP_TAKE:-rip2}.mp4" ${RIP_AT:-1.5} 2.0 "$(title 'PINCH. PULL. RIP.')"
 MUSIC+=("$(at 0):2")
-AGAIN=1.5 PRE=$C9 seg 01c-pit "$T/first.mp4" ${UP_AT:-16.95} 2.0 "$(title 'YOUR FIRST MATCH')"
-MUSIC+=("$(at 2.45):x" "hit:$(at 2.75)" "$(at 2.75):2"); GAPS+=("$(at 2.75)")
-seg 01d-squeeze "$T/first.mp4" ${HINT_AT:-31.25} 3.0 "$(TB=2.75 title 'BOTH HANDS, TRACKED. SQUEEZE.')"
+AGAIN=1.5 PRE=$C9 seg 01c-pit "$T/first.mp4" ${UP_AT:-16.95} 1.5 "$(title 'YOUR FIRST MATCH')"
+MUSIC+=("$(at 0.55):x" "hit:$(at 0.85)" "$(at 0.85):2"); GAPS+=("$(at 0.85)")
+seg 01d-squeeze "$T/first.mp4" ${HINT_AT:-33.15} 1.5 "$(TB=0.85 title 'BOTH HANDS, TRACKED. SQUEEZE.')"
 
 # ACT 2. The basics, then the 16 moves, each full frame and counted; the five ultimates are one
 # gesture (stamp a seal) with five results, so they run as one group.
@@ -96,71 +97,68 @@ moves() {
   local i=0 k=0
   while read -r f s d sp c head n; do
     k=$((k + 1)); local crop=$C9 sharp="" text="" num=""
-    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
+    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
     [ "${COUNT:-1}" = 1 ] && { i=$((i + 1)); num="   $i/16"; }
     n=${n//_/ }; head=${head//_/ }
     if [ "$head" = - ]; then text="$(move "$n$num")"
     else text="$(TB=${HTB:-0.8} title "$head"),$(TA=${HTB:-0.8} move "$n$num")"; fi
     local src=$M/$f.mp4; [[ $f == */* ]] && src=$S/$f.mp4
-    SPEED=$sp PRE=$crop seg "$1-$(printf %02d $k)" "$src" "$s" "$d" "$sharp$text"
+    SLOWDUP=1 SPEED=$sp PRE=$crop seg "$1-$(printf %02d $k)" "$src" "$s" "$d" "$sharp$text"
   done
 }
 MUSIC+=("$(at 0):2")
 # The basics are not among the 16 (they need no unlock): named, not counted. They live in shots/.
 M=$S COUNT=0 moves 11-basic <<EOF
-v9/flick ${FLICK_AT:-3.0} 1.5 1 m THE_BASICS FLICK
+v9/flick ${FLICK_AT:-3.35} 1.5 1 m THE_BASICS FLICK
 v9/guard ${GUARD_AT:-2.1} 2.0 0.5 n - CROSSGUARD
-v9/rub ${RUB_AT:-2.1} 1.5 1 s - SPIN_RUB
+v9/rub ${RUB_AT:-2.45} 1.5 1 s - SPIN_RUB
 EOF
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 16.0)-$(at 17.75)" "$(at 17.75):x" "hit:$(at 18.0)" "$(at 18.0):3"); GAPS+=("$(at 18.0)")
 moves 12-move <<EOF
 v9/twist ${TWIST_AT:-2.0} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
-v9/stretch ${STRETCH_AT:-3.0} 1.5 1 n - STRETCH
-v9/wheel ${WHEEL_AT:-1.8} 1.5 1 l - FORGE_WHEEL
+v9/stretch ${STRETCH_AT:-3.7} 1.5 1 n - STRETCH
+v9/${WHEEL_TAKE:-wheel} ${WHEEL_AT:-3.0} 1.5 1 ${WHEEL_CROP:-l} - FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.8} 1.5 1 s - RAMP
 v9/spring ${SPRING_AT:-3.4} 1.5 1 m - RIM_SPRING
-v9/gust ${GUST_AT:-2.0} 1.5 1 s - FORGE_GUST
-v9/palm ${OUTER_AT:-1.5} 2.0 1 s - PALM_CATCH
+v9/gust ${GUST_AT:-2.5} 1.5 1 s - FORGE_GUST
+v9/palm ${OUTER_AT:-1.5} 2.0 1 n - PALM_CATCH
 v9/groove ${GROOVE_AT:-3.9} 2.0 1 s - FINGER_GROOVE
 v9/cup ${CUP_AT:-2.4} 1.5 1 s - CUP_AND_SLING
 v9/ember ${EMBER_AT:-4.6} 1.5 1 n - EMBER_RIVET
-v9/mid/slap ${SLAP_AT:-4.25} 1.5 1 b - SLAP_=_ANVIL_STRIKE
+v9/${SLAP_TAKE:-slap2} ${SLAP_AT:-4.5} 1.5 1 ${SLAP_CROP:-a} - SLAP_=_ANVIL_STRIKE
 v9/seal-rush ${RUSH_AT:-2.6} 2.0 1 m ONE_STAMP,_FIVE_ULTIMATES RUSH
-v9/seal-magnet ${MAGNET_AT:-5.65} 1.0 1 m - MAGNET
-v9/seal-tilt ${TILT_AT:-2.7} 1.0 1 m - TILT
-v9/seal-hammer ${HAMMER_AT:-2.4} 1.0 1 m - HAMMER
-v9/seal-ward ${WARD_AT:-2.4} 1.0 1 m - WARD
+v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.6} 1.0 1 m - MAGNET
+v9/seal-tilt ${TILT_AT:-3.0} 1.0 1 m - TILT
+v9/seal-hammer ${HAMMER_AT:-2.7} 1.0 1 m - HAMMER
+v9/seal-ward ${WARD_AT:-2.7} 1.0 1 m - WARD
 EOF
 
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
 MUSIC+=("whoosh:$(at 0)" "$(at 0):2")
-FORGE_KEEP="${FORGE_KEEP:-4.0-5.35 8.25-9.4}"
+FORGE_KEEP="${FORGE_KEEP:-4.05-5.4 8.25-9.4}"
 sel=$(for r in $FORGE_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/forge3.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/forge-active.mp4"
 AGAIN=3 PRE="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.14" seg 21-forge "$TMP/forge-active.mp4" 0 2.5 "$(title 'FORGE YOUR TOP')"
 WS_KEEP="${WS_KEEP:-34.05-36.4 41.0-43.3 44.45-46.85 47.97-50.33}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/workshop2.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/ws-active.mp4"
-SPEED=2 AGAIN=3 PRE="crop=iw*0.72:ih*0.66:iw*0.14:ih*0.06" seg 22-workshop "$TMP/ws-active.mp4" ${WS_AT:-0.8} 2.0 "$(title 'BUILD YOUR ARENA')"
+SPEED=2 AGAIN=3 PRE="crop=iw*0.72:ih*0.66:iw*0.14:ih*0.06" seg 22-workshop "$TMP/ws-active.mp4" ${WS_AT:-0.8} 1.0 "$(title 'BUILD YOUR ARENA')"
 AR="$(title '20 ARENAS')"
 AGAIN=2 PRE=$C85 seg 23-ar12 "$S/arenas/12.mp4" 1.65 1.0 "$AR"
-AGAIN=2 PRE="crop=iw*0.66:ih*0.66:iw*0.26:ih*0.12" seg 24-ar03 "$S/arenas/03.mp4" 0.5 1.0 "$AR"
+AGAIN=2 PRE="crop=iw*0.75:ih*0.75:iw*0.125:ih*0.1" seg 24-ar07 "$S/arenas/07.mp4" 0.5 1.0 "$AR"
 PRE=$C85 seg 25-ar10 "$S/arenas/10.mp4" 0.52 0.5 "$AR"
 MUSIC+=("$(at 0):3")
-AGAIN=0.7 PRE=$C9 seg 26-brawl "$T/brawl2.mp4" ${BRAWL_AT:-28.25} 2.0 "$(title 'FOUR-TOP BRAWLS')"
+AGAIN=0.7 PRE=$C9 seg 26-brawl "$T/brawl2.mp4" ${BRAWL_AT:-28.7} 2.0 "$(title 'FOUR-TOP BRAWLS')"
 MUSIC+=("$(at 0):b" "rise:$(at 0.25)-$(at 0.75)" "$(at 0.75):x" "hit:$(at 1.0)" "$(at 1.0):3"); GAPS+=("$(at 1.0)")
 seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 2.5 "$(title 'BOSSES CAST YOUR MOVES')"
 MUSIC+=("$(at 0):x")
-AGAIN=0.4 seg 32-lost "$T/boss-ironkeep.mp4" ${LOST_AT:-117.47} 1.5 "$(title 'IRON KEEP WINS. FORGE ON.')"
-MUSIC+=("$(at 0):b" "rise:$(at 1.0)-$(at 3.0)" "hit:$(at 3.0)" "$(at 3.0):3")
-seg 33-bastion "$T/boss-bastion1.mp4" ${BASTION_AT:-88.1} 3.0 "$(title 'THE FINAL BOSS')"
+AGAIN=0.4 seg 32-lost "$T/boss-ironkeep.mp4" ${LOST_AT:-117.52} 1.0 "$(title 'IRON KEEP WINS. FORGE ON.')"
+MUSIC+=("$(at 0):b" "rise:$(at 0.5)-$(at 1.5)" "hit:$(at 1.5)" "$(at 1.5):3")
+PRE=$C9 seg 33-bastion "$T/boss-bastion1.mp4" ${BASTION_AT:-88.85} 1.5 "$(title 'THE FINAL BOSS')"
 # The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
 # over the rim; the win drops in on SLAG! The result screen is cropped past its buttons and score.
-MUSIC+=("$(at 0):x")
-seg 34-finish "$T/boss-bastion3.mp4" ${FINISH_AT:-109.85} 0.5
-MUSIC+=("hit:$(at 0.5)" "$(at 0.5):3")
-AGAIN=0.5 seg 35-blow "$T/boss-bastion3.mp4" ${BLOW_AT:-111.0} 1.0
-AGAIN=0.5 PRE="crop=iw*0.7:ih*0.6:iw*0.15:ih*0.13" seg 36-crown "$T/boss-bastion3.mp4" ${CROWN_AT:-112.0} 1.5 "$(title 'THE FINAL BOSS FALLS')"
+MUSIC+=("$(at 0):x" "hit:$(at 1.0)" "$(at 1.0):3")
+AGAIN=0.5 seg 35-blow "$T/boss-bastion3.mp4" ${BLOW_AT:-110.5} 2.5 "$(TA=1.0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-4.0}
