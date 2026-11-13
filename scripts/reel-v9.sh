@@ -101,7 +101,7 @@ moves() {
   local i=0 k=0
   while read -r f s d sp c head n; do
     k=$((k + 1)); local crop=$C9 sharp="" text="" num=""
-    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; h) crop=$CHIGH ;; r) crop=$CSLAPR ;; k) crop=$CCLOSE ;; q) crop=$CPALM ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
+    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; h) crop=$CHIGH ;; r) crop=$CSLAPR ;; k) crop=$CCLOSE ;; f) crop="crop=iw:ih:0:0" ;; q) crop=$CPALM ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
     [ "${COUNT:-1}" = 1 ] && { i=$((i + 1)); num="   $i/16"; }
     n=${n//_/ }; head=${head//_/ }
     if [ "$head" = - ]; then text="$(move "$n$num")"
@@ -118,10 +118,9 @@ v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - BASIC_/_CROSSGUARD
 v9/rub ${RUB_AT:-2.5} 1.5 1 s - BASIC_/_SPIN_RUB
 EOF
 # Palm Catch: one continuous take (shots/v9/palm28, the capture-only slow park keeps the hand in frame).
-# Cup and Sling: the catch (cut as the hand leaves) and the sling, a hard cut between them.
-CUP_KEEP="${CUP_KEEP:-2.75-3.7 4.95-6.0}"
-sel=$(for r in $CUP_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
-ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
+# Cup and Sling: the catch from cup36 (the palm over the top as CUP CAUGHT lands, steep camera), then the
+# sling from cup7 (SLUNG!), each framed on its own; a straight cut between the two takes.
+ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup36.mp4" -i "$S/v9/cup7.mp4" -filter_complex "[0:v]trim=${CUP_A:-4.95}:${CUP_A2:-5.95},setpts=PTS-STARTPTS,crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06,scale=1920:1080,setsar=1,fps=60[a];[1:v]trim=${CUP_B:-4.75}:${CUP_B2:-5.75},setpts=PTS-STARTPTS,crop=iw*0.66:ih*0.66:iw*0.17:ih*0.02,scale=1920:1080,setsar=1,fps=60[b];[a][b]concat=n=2:v=1:a=0[v];[0:a]atrim=${CUP_A:-4.95}:${CUP_A2:-5.95},asetpts=PTS-STARTPTS[x];[1:a]atrim=${CUP_B:-4.75}:${CUP_B2:-5.75},asetpts=PTS-STARTPTS[y];[x][y]concat=n=2:v=0:a=1[au]" -map "[v]" -map "[au]" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 13.0)-$(at 14.75)" "$(at 14.75):x" "hit:$(at 15.0)" "$(at 15.0):3"); GAPS+=("$(at 15.0)")
 HTB=1.0 moves 12-move <<EOF
 v9/twist ${TWIST_AT:-1.5} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
@@ -132,7 +131,7 @@ v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
 v9/palm28 ${OUTER_AT:-2.0} 1.0 1 q - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
-$TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
+$TMP/cup-active 0 2.0 1 f - CUP_AND_SLING
 v9/ember30 ${EMBER_AT:-4.55} 1.5 1 s - EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
 v9/seal-rush27 ${RUSH_AT:-2.28} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
