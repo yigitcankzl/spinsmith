@@ -149,7 +149,7 @@ MUSIC+=("whoosh:$(at 0)" "$(at 0):2")
 FORGE_KEEP="${FORGE_KEEP:-4.25-4.9 8.25-9.1}"
 sel=$(for r in $FORGE_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/forge3.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/forge-active.mp4"
-AGAIN=3 PRE="crop=iw*0.72:ih*0.72:iw*0.14:ih*0.2" seg 21-forge "$TMP/forge-active.mp4" 0 1.5 "$(title 'FORGE YOUR TOP')"
+AGAIN=3 PRE="crop=iw*0.7:ih*0.7:iw*0.12:ih*0.155" seg 21-forge "$TMP/forge-active.mp4" 0 1.5 "$(title 'FORGE YOUR TOP')"
 WS_KEEP="${WS_KEEP:-34.05-36.4 41.0-43.3 44.45-46.85 47.97-50.33}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/workshop2.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/ws-active.mp4"
