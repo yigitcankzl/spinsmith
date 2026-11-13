@@ -72,7 +72,7 @@ CSTEEP="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06"    # v9 steep camera
 CWHEEL="crop=iw*0.48:ih*0.48:iw*0.2:ih*0.27" # v9 wheel camera: the Forge Wheel and the arena
 
 # COLD OPEN (0-3.5): squeeze, the throw, DESK KO. One KO, no flashes, tight on the arena.
-HOOKC="crop=iw*0.62:ih*0.62:iw*0.17:ih*0.36"
+HOOKC="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2"
 PLATFORM="drawtext=fontfile=$FONT:text='META QUEST 3  /  HANDS ONLY  /  NO CONTROLLERS':fontcolor=white:fontsize=40:x=w-text_w-40:y=36:box=1:boxcolor=0x111419@0.75:boxborderw=10"
 BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=100:x=186:y=44:box=1:boxcolor=0x111419@0.78:boxborderw=14"
 MUSIC+=("0:x" "rise:0.3-1.8" "hit:1.8" "1.8:3")
@@ -134,7 +134,7 @@ v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
 v9/ember30 ${EMBER_AT:-4.55} 1.5 1 s - EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
-v9/seal-rush27 ${RUSH_AT:-1.7} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
+v9/seal-rush27 ${RUSH_AT:-2.28} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.9} 1.0 1 m - MAGNET
 v9/seal-tilt ${TILT_AT:-3.25} 1.0 1 m - TILT
 v9/seal-hammer27 ${HAMMER_AT:-2.5} 1.0 1 m - HAMMER
