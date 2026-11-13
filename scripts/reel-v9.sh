@@ -124,7 +124,7 @@ sel=$(for r in $CUP_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; don
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 14.0)-$(at 15.75)" "$(at 15.75):x" "hit:$(at 16.0)" "$(at 16.0):3"); GAPS+=("$(at 16.0)")
 HTB=1.0 moves 12-move <<EOF
-v9/twist ${TWIST_AT:-2.0} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
+v9/twist ${TWIST_AT:-1.5} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
 v9/stretch ${STRETCH_AT:-4.0} 1.0 1 n - STRETCH
 v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.75} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.98} 1.0 1 s - RAMP
