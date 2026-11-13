@@ -116,7 +116,7 @@ v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - CROSSGUARD
 v9/rub ${RUB_AT:-2.45} 1.0 1 s - SPIN_RUB
 EOF
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 13.5)-$(at 15.25)" "$(at 15.25):x" "hit:$(at 15.5)" "$(at 15.5):3"); GAPS+=("$(at 15.5)")
-moves 12-move <<EOF
+HTB=0.7 moves 12-move <<EOF
 v9/twist ${TWIST_AT:-1.8} 2.0 1 n 16_MOVES,_NO_CONTROLLERS TWIST
 v9/stretch ${STRETCH_AT:-4.0} 1.0 1 n - STRETCH
 v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-1.6} 1.0 1 ${WHEEL_CROP:-l} - FORGE_WHEEL
@@ -127,8 +127,8 @@ v9/palm7 ${OUTER_AT:-2.1} 1.5 1 k - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-3.9} 1.5 1 k - FINGER_GROOVE
 v9/cup7 ${CUP_AT:-3.75} 2.0 1 k - CUP_AND_SLING
 v9/ember ${EMBER_AT:-4.6} 1.5 1 n - EMBER_RIVET
-v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.6} 1.5 0.5 ${SLAP_CROP:-r} - SLAP_=_ANVIL_STRIKE
-v9/seal-rush ${RUSH_AT:-3.1} 1.5 1 m ONE_STAMP,_5_ULTIMATES RUSH
+v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.55} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
+v9/seal-rush ${RUSH_AT:-3.15} 1.5 1 m ONE_STAMP,_5_ULTIMATES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.8} 1.0 1 m - MAGNET
 v9/seal-tilt ${TILT_AT:-3.15} 1.0 1 m - TILT
 v9/seal-hammer ${HAMMER_AT:-2.6} 1.0 1 m - HAMMER
@@ -140,7 +140,7 @@ MUSIC+=("whoosh:$(at 0)" "$(at 0):2")
 FORGE_KEEP="${FORGE_KEEP:-4.25-4.9 8.25-9.1}"
 sel=$(for r in $FORGE_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/forge3.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/forge-active.mp4"
-AGAIN=3 PRE="crop=iw*0.72:ih*0.72:iw*0.14:ih*0.12" seg 21-forge "$TMP/forge-active.mp4" 0 1.5 "$(title 'FORGE YOUR TOP')"
+AGAIN=3 PRE="crop=iw*0.72:ih*0.72:iw*0.14:ih*0.2" seg 21-forge "$TMP/forge-active.mp4" 0 1.5 "$(title 'FORGE YOUR TOP')"
 WS_KEEP="${WS_KEEP:-34.05-36.4 41.0-43.3 44.45-46.85 47.97-50.33}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/workshop2.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/ws-active.mp4"
