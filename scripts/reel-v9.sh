@@ -114,7 +114,7 @@ MUSIC+=("$(at 0):2")
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
 v9/flick ${FLICK_AT:-3.45} 1.0 1 m - BASIC_/_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - BASIC_/_CROSSGUARD
-v9/rub ${RUB_AT:-2.05} 1.5 1 s - BASIC_/_SPIN_RUB
+v9/rub ${RUB_AT:-2.4} 1.5 1 s - BASIC_/_SPIN_RUB
 EOF
 # Palm Catch without the frames where the hand blinks out between the catch and the return.
 PALM_KEEP="${PALM_KEEP:-2.25-2.85 3.05-4.45}"
@@ -135,7 +135,7 @@ v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
 $TMP/palm-active 0 2.0 1 n - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
-v9/ember ${EMBER_AT:-5.0} 1.5 1 n - EMBER_RIVET
+v9/ember ${EMBER_AT:-4.9} 1.5 1 n - EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
 v9/seal-rush ${RUSH_AT:-2.85} 2.0 1 m 1_STAMP,_5_ULTIMATES RUSH
 v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.9} 1.0 1 m - MAGNET
@@ -161,8 +161,7 @@ MUSIC+=("$(at 0):3")
 AGAIN=0.7 PRE=$C9 seg 26-brawl "$T/brawl2.mp4" ${BRAWL_AT:-27.15} 1.0 "$(title 'FOUR-TOP BRAWLS')"
 MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.45)" "$(at 0.45):x" "hit:$(at 0.5)" "$(at 0.5):3"); GAPS+=("$(at 0.5)")
 seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 1.0 "$(title 'BOSSES CAST YOUR MOVES')"
-MUSIC+=("$(at 0):x")
-AGAIN=0.4 seg 32-lost "$T/boss-ironkeep.mp4" ${LOST_AT:-117.52} 1.0 "$(title 'IRON KEEP WINS. FORGE ON.')"
+# The Iron Keep loss (32-lost) is gone: first-watch judges read a loss right before the finale as a wince.
 MUSIC+=("$(at 0):b" "rise:$(at 0.2)-$(at 1.0)")
 AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.1} 1.0 "$(title 'BASTION, THE FINAL BOSS')"
 # The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
@@ -171,7 +170,7 @@ AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.1} 1.0 "$(titl
 MUSIC+=("$(at 0):x")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,0.88)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'RIVAL AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.7:ih*0.7:iw*0.3:ih*0.29" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.7} 1.5 "$(TA=0 title 'THE FINAL BOSS FALLS')"
+SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.245" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.7} 1.5 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.0}
