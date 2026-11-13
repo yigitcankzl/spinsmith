@@ -74,10 +74,10 @@ CWHEEL="crop=iw*0.48:ih*0.48:iw*0.2:ih*0.27" # v9 wheel camera: the Forge Wheel 
 HOOKC="crop=iw*0.62:ih*0.62:iw*0.17:ih*0.36"
 PLATFORM="drawtext=fontfile=$FONT:text='BUILT FOR META QUEST 3  /  HANDS ONLY':fontcolor=white:fontsize=40:x=48:y=40:box=1:boxcolor=0x111419@0.75:boxborderw=10"
 BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=100:x=186:y=44:box=1:boxcolor=0x111419@0.78:boxborderw=14"
-MUSIC+=("0:x" "rise:0.5-2.5" "hit:2.5" "2.5:3")
-PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.4} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
-PRE=$HOOKC AGAIN=2 seg 00b-throw "$S/hook-ko-close.mp4" ${THROW_AT:-2.4} 1.0 "$PLATFORM,$(title 'THROW THEM OFF YOUR DESK.')"
-PRE="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2" seg 00c-ko "$S/hook-ko-close.mp4" ${KO_AT:-3.4} 1.0 "$BRAND"
+MUSIC+=("0:x" "rise:0.5-2.3" "hit:2.3" "2.3:3")
+PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.5} 1.5 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
+# The take has a capture jump at 3.05: the second shot starts past it, the throw-off and DESK KO! in one piece.
+PRE="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2" AGAIN=2 seg 00c-ko "$S/hook-ko-close.mp4" ${KO_AT:-3.1} 1.5 "$BRAND,$(TB=0.8 title 'THROW THEM OFF YOUR DESK.')"
 
 # ACT 1. How it works: the detected table, the rip, a first match, the two-hand squeeze.
 MUSIC+=("$(at 0):1")
@@ -85,8 +85,8 @@ MUSIC+=("$(at 0):1")
 PRESS_KEEP="${PRESS_KEEP:-3.8-4.87 5.19-6.65}"
 sel=$(for r in $PRESS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/press-place.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/press-active.mp4"
-PRE="crop=iw*0.5:ih*0.5:iw*0.25:ih*0.2" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.85} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
-AGAIN=0.7 seg 01b-rip "$V/${RIP_TAKE:-rip2}.mp4" ${RIP_AT:-2.5} 1.5 "$(title 'PINCH. PULL. RIP.')"
+PRE="crop=iw*0.5:ih*0.5:iw*0.25:ih*0.1" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.85} 1.0 "$(title 'FINDS YOUR REAL TABLE')"
+AGAIN=0.7 seg 01b-rip "$V/${RIP_TAKE:-rip2}.mp4" ${RIP_AT:-2.45} 1.5 "$(title 'PINCH. PULL. RIP.')"
 MUSIC+=("$(at 0):2")
 # 01c (the first match) is gone: its only usable window showed a palm sunk under the arena floor.
 # The squeeze lesson (01d) is gone: the cold open already shows squeeze -> DESK KO with the same banner.
@@ -115,7 +115,7 @@ v9/flick ${FLICK_AT:-3.77} 1.0 1 m - THE_BASICS:_FLICK
 v9/guard ${GUARD_AT:-2.58} 1.0 0.5 n - CROSSGUARD
 v9/rub ${RUB_AT:-2.45} 1.0 1 s - SPIN_RUB
 EOF
-CUP_KEEP="${CUP_KEEP:-2.9-3.8 4.7-5.8}"
+CUP_KEEP="${CUP_KEEP:-2.9-3.45 4.55-6.0}"
 sel=$(for r in $CUP_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup7.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3" "rise:$(at 14.0)-$(at 15.75)" "$(at 15.75):x" "hit:$(at 16.0)" "$(at 16.0):3"); GAPS+=("$(at 16.0)")
@@ -127,15 +127,15 @@ v9/ramp ${RAMP_AT:-1.8} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.7} 1.0 1 s - FORGE_GUST
 v9/palm7 ${OUTER_AT:-1.7} 1.5 1 n - PALM_CATCH
-v9/groove7 ${GROOVE_AT:-3.9} 1.5 1 k - FINGER_GROOVE
+v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 k - CUP_AND_SLING
 v9/ember ${EMBER_AT:-4.65} 2.0 1 n - EMBER_RIVET
 v9/${SLAP_TAKE:-slap3} ${SLAP_AT:-7.75} 1.5 0.5 ${SLAP_CROP:-h} - SLAP_THE_DESK_=_ANVIL_STRIKE
 v9/seal-rush ${RUSH_AT:-2.6} 2.0 1 m ONE_STAMP,_5_ULTIMATES RUSH
-v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.8} 1.0 1 m - MAGNET
+v9/${MAGNET_TAKE:-seal-magnet2} ${MAGNET_AT:-2.95} 1.0 1 m - MAGNET
 v9/seal-tilt ${TILT_AT:-3.15} 1.0 1 m - TILT
 v9/seal-hammer ${HAMMER_AT:-2.6} 1.0 1 m - HAMMER
-v9/seal-ward ${WARD_AT:-2.6} 1.0 1 m - WARD
+v9/seal-ward ${WARD_AT:-2.75} 1.0 1 m - WARD
 EOF
 
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
@@ -159,14 +159,14 @@ seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 1.0 "$(title 'BOSSES CAST Y
 MUSIC+=("$(at 0):x")
 AGAIN=0.4 seg 32-lost "$T/boss-ironkeep.mp4" ${LOST_AT:-117.52} 1.0 "$(title 'IRON KEEP WINS. FORGE ON.')"
 MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.5)")
-PRE=$C9 seg 33-bastion "$T/boss-bastion1.mp4" ${BASTION_AT:-88.95} 0.5 "$(title 'THE FINAL BOSS')"
+AGAIN=0.5 seg 33-bastion "$T/boss-bastion3.mp4" ${BASTION_AT:-110.5} 0.5 "$(title 'THE FINAL BOSS')"
 # The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
 # over the rim; the win drops in on SLAG! The result screen is cropped past its buttons and score.
 # The strike at half speed (the win camera's one-frame jump at 111.45 dropped), then SLAG! at full speed.
 MUSIC+=("$(at 0):x")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='not(between(t,0.89,0.95))'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-111.0} 1.0 "$(title 'THE FINAL BOSS')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
-AGAIN=0.5 seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.5} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
+AGAIN=0.5 seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.85} 1.0 "$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-4.0}
