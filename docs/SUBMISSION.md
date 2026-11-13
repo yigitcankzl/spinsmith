@@ -102,7 +102,7 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (0:40, v9: v8 after a frame-by-frame review, 2026-11-13: thirty-three rounds of Claude reviewers, first-watch judge passes and Gemini, each followed by fixes)
+## Competition video (0:40, v9: v8 after a frame-by-frame review, 2026-11-13: thirty-eight rounds of Claude reviewers, first-watch judge passes and Gemini, each followed by fixes)
 
 `~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v9-1080p60.mp4`, cut by `scripts/reel-v9.sh`
 (earlier cuts: `scripts/reel-v8.sh` … `scripts/reel-v3.sh`). Every frame, the end card included, says
