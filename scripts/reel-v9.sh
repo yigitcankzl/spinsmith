@@ -129,7 +129,7 @@ v9/${WHEEL_TAKE:-wheel2} ${WHEEL_AT:-2.75} 1.0 2 ${WHEEL_CROP:-l} - FORGE_WHEEL
 v9/ramp ${RAMP_AT:-1.98} 1.0 1 s - RAMP
 v9/spring ${SPRING_AT:-3.5} 1.5 1 m - RIM_SPRING
 v9/gust ${GUST_AT:-2.5} 1.0 1 s - FORGE_GUST
-v9/palm28 ${OUTER_AT:-2.15} 1.0 1 q - PALM_CATCH
+v9/palm28 ${OUTER_AT:-2.4} 1.0 1 q - PALM_CATCH
 v9/groove7 ${GROOVE_AT:-4.2} 1.5 1 k - FINGER_GROOVE
 $TMP/cup-active 0 2.0 1 f - CUP_AND_SLING
 v9/ember30 ${EMBER_AT:-4.55} 1.5 1 s - EMBER_RIVET
