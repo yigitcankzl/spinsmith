@@ -85,14 +85,14 @@ CWHEEL="crop=iw*0.48:ih*0.48:iw*0.2:ih*0.27" # v9 wheel camera: the Forge Wheel 
 HOOKC="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2"
 PLATFORM="drawtext=fontfile=$FONT:text='FOR META QUEST 3  /  HANDS ONLY  /  NO CONTROLLERS':fontcolor=white:fontsize=40:x=w-text_w-40:y=36:box=1:boxcolor=0x111419@0.75:boxborderw=10"
 BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=100:x=186:y=44:box=1:boxcolor=0x111419@0.78:boxborderw=14"
-# v11: the hook is one DESK KO from across the desk (shots/v12/koFarB, judge report 2026-11-16; the
-# player-side take had the hands covering the throw): the squeezed arena flexes and glows, the rival
-# skids across the desk, off its edge and onto the floor. The flat
+# v11: the hook is one DESK KO through the player's eyes (shots/v12/povB2, continuous take; judge report
+# 2026-11-16): both hands on the rim squeeze, the rival flies off the real desk edge onto the floor, the
+# desk edge and the floor in frame. (Side-on and across-the-desk takes read as a spectator, not a player.) The flat
 # "FINDS YOUR REAL TABLE" press shot is gone; the open is still 4 s.
-KOC="crop=iw*0.9:ih*0.9:iw*0.05:ih*0.05"
-MUSIC+=("0:x" "rise:0.3-1.5" "hit:1.5" "1.5:3")
-PRE=$KOC seg 00a-squeeze "$S/v12/koFarB.mp4" ${HOOK_AT:-2.5} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
-SLOWDUP=1 SPEED=0.55 PRE=$KOC AGAIN=2 seg 00c-ko "$S/v12/koFarB.mp4" ${KO_AT:-3.5} 3.0 "$BRAND,$(TB=0.9 title 'THROW THEM OFF YOUR DESK.')"
+KOC="crop=iw*0.86:ih*0.86:iw*0.1:ih*0.04"
+MUSIC+=("0:x" "rise:0.3-1.8" "hit:1.8" "1.8:3")
+PRE=$KOC seg 00a-squeeze "$S/v12/povB2.mp4" ${HOOK_AT:-2.5} 1.5 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
+SLOWDUP=1 SPEED=0.6 PRE=$KOC AGAIN=2 seg 00c-ko "$S/v12/povB2.mp4" ${KO_AT:-4.0} 2.5 "$BRAND,$(TB=0.9 title 'THROW THEM OFF YOUR DESK.')"
 
 # ACT 1. How it works: the rip.
 MUSIC+=("$(at 0):1")
