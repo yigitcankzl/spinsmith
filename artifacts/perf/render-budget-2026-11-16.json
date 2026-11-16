@@ -1,0 +1,203 @@
+{
+  "environment": "desktop IWER emulator; comparative only, not Quest performance",
+  "budgetCallsPerEye": 150,
+  "views": 2,
+  "multiview": false,
+  "phases": {
+    "hub": {
+      "calls": {
+        "min": 186,
+        "median": 186,
+        "max": 186
+      },
+      "callsPerEye": {
+        "min": 93,
+        "median": 93,
+        "max": 93
+      },
+      "triangles": {
+        "min": 162364,
+        "median": 162364,
+        "max": 162364
+      },
+      "visibleMeshes": {
+        "wholeGame": {
+          "meshes": 83,
+          "instances": 0
+        },
+        "arena": {
+          "meshes": 27,
+          "instances": 0
+        },
+        "hub": {
+          "meshes": 54,
+          "instances": 0
+        },
+        "roomMemory": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "impacts": {
+          "meshes": 0,
+          "instances": 0
+        }
+      }
+    },
+    "forge": {
+      "calls": {
+        "min": 110,
+        "median": 214,
+        "max": 214
+      },
+      "callsPerEye": {
+        "min": 55,
+        "median": 107,
+        "max": 107
+      },
+      "triangles": {
+        "min": 82892,
+        "median": 280696,
+        "max": 280696
+      },
+      "visibleMeshes": {
+        "wholeGame": {
+          "meshes": 97,
+          "instances": 28
+        },
+        "arena": {
+          "meshes": 17,
+          "instances": 0
+        },
+        "hub": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "roomMemory": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "impacts": {
+          "meshes": 0,
+          "instances": 0
+        }
+      }
+    },
+    "workshop": {
+      "calls": {
+        "min": 126,
+        "median": 126,
+        "max": 126
+      },
+      "callsPerEye": {
+        "min": 63,
+        "median": 63,
+        "max": 63
+      },
+      "triangles": {
+        "min": 59152,
+        "median": 59152,
+        "max": 59152
+      },
+      "visibleMeshes": {
+        "wholeGame": {
+          "meshes": 52,
+          "instances": 0
+        },
+        "arena": {
+          "meshes": 17,
+          "instances": 0
+        },
+        "hub": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "roomMemory": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "impacts": {
+          "meshes": 0,
+          "instances": 0
+        }
+      }
+    },
+    "fight": {
+      "calls": {
+        "min": 262,
+        "median": 262,
+        "max": 266
+      },
+      "callsPerEye": {
+        "min": 131,
+        "median": 131,
+        "max": 133
+      },
+      "triangles": {
+        "min": 111980,
+        "median": 111980,
+        "max": 112188
+      },
+      "visibleMeshes": {
+        "wholeGame": {
+          "meshes": 93,
+          "instances": 136
+        },
+        "arena": {
+          "meshes": 89,
+          "instances": 136
+        },
+        "hub": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "roomMemory": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "impacts": {
+          "meshes": 0,
+          "instances": 0
+        }
+      }
+    },
+    "brawl": {
+      "calls": {
+        "min": 270,
+        "median": 274,
+        "max": 278
+      },
+      "callsPerEye": {
+        "min": 135,
+        "median": 137,
+        "max": 139
+      },
+      "triangles": {
+        "min": 167196,
+        "median": 167328,
+        "max": 167584
+      },
+      "visibleMeshes": {
+        "wholeGame": {
+          "meshes": 100,
+          "instances": 128
+        },
+        "arena": {
+          "meshes": 97,
+          "instances": 128
+        },
+        "hub": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "roomMemory": {
+          "meshes": 0,
+          "instances": 0
+        },
+        "impacts": {
+          "meshes": 0,
+          "instances": 0
+        }
+      }
+    }
+  }
+}

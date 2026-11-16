@@ -8,9 +8,9 @@ A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with
 
 ## The opening, measured
 
-From a scripted first session in IWER on 2026-11-07 (a bot that reads each card for 0.8 s; game time from XR entry, including emulated room placement):
+From a scripted first session in IWER on 2026-11-16 (`artifacts/first-five/run-2026-11-16.json`; a bot that reads each card for 0.8 s; game time from XR entry, including emulated room placement):
 
-| 34 s | 42 s | 46 s | 48 s | 59–65 s | 108 s |
+| 34 s | 41 s | 46 s | 47 s | 58–64 s | 113 s |
 |---|---|---|---|---|---|
 | PUT YOUR TOP IN | rip (ghost hand shows it) | PINCH + DRAG: RAMP | first knockout | WRENCH IT OFF YOUR DESK → DESK KO | match won |
 
@@ -18,7 +18,7 @@ From a scripted first session in IWER on 2026-11-07 (a bot that reads each card 
 1. Sit at a table with a Meta Quest 3 or 3S, no controllers, and open the hosted URL in the Quest Browser.
 2. Press **ENTER** and allow spatial data. The arena rises on your real table (a labelled table or desk, or any flat unlabelled surface at desk height); with none it stands on a floating tray and says so.
 3. Pinch your top, pinch near it, pull back and let go: the rip launches it.
-4. The first match teaches only the signature loop: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — on a detected table the rival is steered to your real desk edge and flies off it (**DESK KO**; on the tray it is a normal ring-out). Strike and direct-touch Flick stay out of this opening and appear after the first match.
+4. The first match teaches only the signature loop: **round 1** pinch the floor for a ramp; **round 2** grab the rim with both hands and squeeze — on a detected table the rival is steered to your real desk edge and flies off it (**DESK KO**; on the tray it is a normal ring-out). Strike and direct-touch Flick are not taught in this opening (a fingertip swing already flicks from match 1); their lessons come after the first match.
 5. Each later match adds one hand move with its own card (Rim Spring, Forge Gust, cup and sling, Ember Rivet, Spin Rub, Crossguard, Finger Groove, Forge Wheel); the last card names the next move or bout, the day streak and that a fresh Smith Order arrives tomorrow. From day 2 of a streak, the day's first finished match pays 25 XP per streak day (up to 7).
 6. `?fresh` starts as a new player; `?demo` opens a level-8 smith with the first chapter cleared and the second up to its boss (PLAY is Sawtooth, who casts Hammer).
 7. On a headset, `?fps` puts a frame-rate readout beside MENU (fps, lowest, draw calls, quality level) and `?diagnostics` shows a copyable report (per-phase fps, quality steps) on the start page after you leave XR; together they measure what the emulator could not.
@@ -60,7 +60,7 @@ Each later match teaches one move: Rim Spring, Forge Gust, Cup/Sling, Strike, Fl
 
 ## Measured performance (IWER on a desktop GPU, not a Quest)
 
-**In short:** up to 136 draw calls per eye (a 4-top brawl; hub 99, forge 99, a normal fight up to 118) in the 2026-11-07 matrix, 47–117 in the 2026-10-23 saved states (budget 150), the game's own update 0.4–1.4 ms per frame (p50, unthrottled, 2026-10-23; up to 2.0 ms in a slower 11-05 session), GPU time 0.86 ms per frame (p50) on the timed capture-room scene (95 draws per eye). Under a 4x CPU throttle the page drops to 24–35 fps, and the GPU timer shows why: of a ~37 ms frame, game update plus GPU are about 5 ms and the rest is CPU-side draw submission and the emulator. Nothing here is a Quest measurement.
+**In short:** up to 139 draw calls per eye (a 4-top brawl; hub 93, forge 107, workshop 63, a normal fight up to 133) in the 2026-11-16 matrix (`artifacts/perf/render-budget-2026-11-16.json`), 47–117 in the 2026-10-23 saved states (budget 150), the game's own update 0.4–1.4 ms per frame (p50, unthrottled, 2026-10-23; up to 2.0 ms in a slower 11-05 session), GPU time 0.86 ms per frame (p50) on the timed capture-room scene (95 draws per eye). Under a 4x CPU throttle the page drops to 24–35 fps, and the GPU timer shows why: of a ~37 ms frame, game update plus GPU are about 5 ms and the rest is CPU-side draw submission and the emulator. Nothing here is a Quest measurement.
 
 `npm run report:runtime-performance` reports the active renderer and fails when a phase goes over 150 draw calls per eye. IWER renders each eye as its own camera without multiview, so the script divides the renderer's count by the number of views. Saved runs from 2026-10-23 are in `artifacts/perf/`.
 
@@ -79,9 +79,9 @@ A 4-top brawl at 4x CPU throttle (next round's ready phase) reads 86 draws per e
 
 CPU-throttled proxy (`PERF_THROTTLE=4` / `6`, DevTools CPU emulation, ready phase, `artifacts/perf/ready-cpu*x-2026-10-23.json`): the game's own update per frame goes from 0.4 / 0.6 ms (p50 / p95) unthrottled to 1.9 / 2.5 ms at 4x and 3.0 / 4.6 ms at 6x, inside a 72 Hz frame (13.9 ms). These throttled runs caught a heavier scene than the table above (117 draws per eye, 168 k triangles, the capture room's planes and edge arcs up). The page's lowest fps falls to 35 at 4x and 21 at 6x. With the game's update that small (2.5 ms p95 at 4x), the rest of the frame is three.js submitting two eye passes without multiview plus the emulator itself (IWER runs in the same JavaScript thread and draws the 360 backdrop); since then the script also times the GPU (EXT_disjoint_timer_query_webgl2 around each render): on the capture-room ready scene (95 draws per eye) GPU time is 0.86 ms p50 unthrottled and 2.4 ms p50 at 4x, so of the ~37 ms frame at 4x (27 fps) the game update and the GPU take about 5 ms and the rest is CPU-side draw submission and the emulator (`ready-room-gpu*-2026-10-23.json`). The GPU figure rises under CPU throttle because the timer spans begin to end on the GPU timeline, which includes the GPU waiting on slower command submission; it is an upper bound on GPU work. How much of that CPU cost carries over to a Quest is not known; this is not a Quest prediction.
 
-The quality guard is off under the emulator by design (a desktop frame rate says nothing about a headset); `PERF_GUARD=1 PERF_THROTTLE=6` turns it on for the run and fails if it does not step down. Saved run (`artifacts/perf/guard-cpu6x-2026-10-23.json`): at 24 fps it went full → lite after 3 s, then lite → lite+foveation after 3 more. That run's game update peaked at 15.3 ms (p95 6.7 ms), one spike over a 72 Hz frame at 6x throttle.
+The quality guard is off under the emulator by design (a desktop frame rate says nothing about a headset); `PERF_GUARD=1 PERF_THROTTLE=6` turns it on for the run and fails if it does not step down. Saved run (`artifacts/perf/guard-cpu6x-2026-10-23.json`): at 24 fps it went full → lite after 3 s, then lite → lite+foveation after 3 more (that run predates the hard-occlusion stage now between them; the step-down rules themselves are covered by `check:sim`). That run's game update peaked at 15.3 ms (p95 6.7 ms), one spike over a 72 Hz frame at 6x throttle.
 
-The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rate on Quest has not been measured, because the game has not run on a headset yet. There, `?fps` shows the frame rate and lowest frame rate. When frames run long, a quality guard first turns off room dimming, then sets full fixed foveation (src/game/quality.ts).
+The budget is 150 draws per eye, with no bloom and no shadow maps. The frame rate on Quest has not been measured, because the game has not run on a headset yet. There, `?fps` shows the frame rate and lowest frame rate. When frames run long, a quality guard steps down in three stages: it turns off room dimming, then switches depth occlusion to its cheaper hard edge, then sets full fixed foveation (src/game/quality.ts).
 
 ## Accessibility (seated, hands only)
 
@@ -91,7 +91,7 @@ One brass dial on the home table (its plate, src/game/hub.ts:622, shows unasked 
 2. **Large text**: cards, stamps, match bar and gauge labels 1.3x
 3. **One hand**: hold one rim grip to forge; the far rim mirrors it
 4. **Assist**: fights run at 80% speed
-5. **Quiet**: sound off (every gameplay sound has a visual twin: a stamp or the card)
+5. **Quiet**: sound off (knockouts, refused moves and lessons also show as a stamp or on the card)
 6. **No flashes**
 7. **Press to strike**: press and hold instead of a slap
 8. **High contrast**: wide, solid team rings
@@ -128,13 +128,13 @@ The toggles combine and are saved. `npm run check:sim` covers the dial, Large te
 | Mode | How to reach it |
 |---|---|
 | **Circuit Map campaign:** 15 bouts, 3 chapters, 3 medals a bout; each chapter's boss casts one of your ultimates back at you (Iron Keep Tilt, Sawtooth Hammer, Bastion Anvil Strike) after a 1.4 s telegraph your own strike can interrupt (any seal but Ward); rival moves and boss seals start from your fourth match | Automatic after the first match: PLAY starts the next bout. Pinch the level plate to see the map. |
-| **Brawl:** 3 or 4 tops in three rule sets: last one spinning, first credited pocket, or Crucible (first 3-heat pocket); the arena opens out 20% per top past two | Pinch the brass pegs beside the level plate (each pinch steps duel → last spinning 3, 4 → pocket 3 → Crucible 4), then PLAY. |
+| **Brawl:** 3 or 4 tops in three rule sets: last one spinning, first credited pocket, or Crucible (first 3-heat pocket); the arena opens out 20% per top past two, up to a size cap | Pinch the brass pegs beside the level plate (each pinch steps duel → last spinning 3, 4 → pocket 3 → Crucible 4), then PLAY. |
 | **Pass and play** on one headset | After a duel, pinch PASS: the next person fights that top and its recorded hands. |
 | **Daily Smith Order** | Point at the board over the arena and pinch. About every other day it chases a medal you left on the map, and playing it counts for that bout. |
 | **Echo duel** with a friend's top and hands | Open `?vs=CODE` (the code is on the board's back). |
 | **Online duel (beta)**, tested in two browser windows | Keep pinching the pegs past the Crucible brawl (all pegs turn white-hot) or open `?online=host`: the card shows a five-letter room code; the friend opens `?online=CODE` (both after the first session). |
 | **Forge** your top / **build** an arena | Pinch the small anvil / the blueprint on the near rim. |
-| **Comfort and accessibility** | Independent toggles that combine (left-handed and high contrast and quiet at once): Quiet (sound off), No flashes, Press to strike, Assist (80% speed), One hand (forge with one hand), High contrast, Left-handed, Colour-safe (blue/orange/yellow warnings; your rings are round, the rival's hexagons) and Large text (the card, stamps and match bar 1.3x), plus the presets Calm (no flashes + press to strike) and Standard (all off but the hand). Hands only: pinch the brass dial to pick a setting, then pinch the plate in front of it, which shows ON/OFF, to toggle it. Each toggle is kept; an old single-mode save becomes its matching toggles. Every gameplay sound has a visual twin (a stamp or the card), so Quiet loses no information. Left-handed swaps the near-rim stations to the other side; `?lefty` once still holds it on, `?lefty=0` undoes. |
+| **Comfort and accessibility** | Independent toggles that combine (left-handed and high contrast and quiet at once): Quiet (sound off), No flashes, Press to strike, Assist (80% speed), One hand (forge with one hand), High contrast, Left-handed, Colour-safe (blue/orange/yellow warnings; your rings are round, the rival's hexagons) and Large text (the card, stamps and match bar 1.3x), plus the presets Calm (no flashes + press to strike) and Standard (all off but the hand). Hands only: pinch the brass dial to pick a setting, then pinch the plate in front of it, which shows ON/OFF, to toggle it. Each toggle is kept; an old single-mode save becomes its matching toggles. Knockouts, refused moves and lessons also show as a stamp or on the card, so Quiet keeps the fight readable. Left-handed swaps the near-rim stations to the other side; `?lefty` once still holds it on, `?lefty=0` undoes. |
 
 All interactions are pinches, palm presses or grabs. Nothing needs a controller, and every one-hand
 gesture (rip, ramp, cup, strike) works with either hand (left-hand rip and ramp checked in IWER).
@@ -191,7 +191,7 @@ own rays rarely line up with what you are looking at.
 
 ### Testing in the emulator (IWSDK CLI)
 
-**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human; 2026-11-07): first knockout at 48.2 s, first DESK KO at 64.5 s and match over at 107.7 s from XR entry, including placement. The match showed 10 distinct prompts / 43 words, and the probe fails on missing carry, rip, ramp or Arena Forge actions, driver errors, strike/Flick teaching, more than 10 prompts / 45 words, no match end, or a first KO after 90 s. Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes). `check:desk-ko-first` and `check:room-matrix` expect the arena on the emulator's desk: a page loaded while the emulated head stood (IWER's default y = 1.6) puts it on the tray, so both scripts first seat the head (`scripts/emu.sh enter`) and re-place it (`scripts/capture/place.mjs`); other probes can also leave the arena away from the desk edge.
+**Measured first session** (`npm run check:first-five`: IWER, office_small room, a scripted newcomer that reads each card for 0.8 s; a bot, not a human; 2026-11-16, `artifacts/first-five/run-2026-11-16.json`): first knockout at 47.3 s, first DESK KO at 63.6 s and match over at 113.3 s from XR entry, including placement. The match showed 10 distinct prompts / 43 words, and the probe fails on missing carry, rip, ramp or Arena Forge actions, driver errors, strike/Flick teaching, more than 10 prompts / 45 words, no match end, or a first KO after 90 s. Other IWER suites: `check:hands` (every hand verb), `check:desk-ko-first`, `check:desk-ko`, `check:desk-guard`, `check:combat-readability`, `check:room-matrix` (10 room cases, synthesised planes). `check:desk-ko-first` and `check:room-matrix` expect the arena on the emulator's desk: a page loaded while the emulated head stood (IWER's default y = 1.6) puts it on the tray, so both scripts first seat the head (`scripts/emu.sh enter`) and re-place it (`scripts/capture/place.mjs`); other probes can also leave the arena away from the desk edge.
 
 **Hand driver** (`src/dev-drive.ts`, dev builds only): `window.drive` plays real hand motions on
 the emulated hands (tap, drag, rip, ramp, cup, sling, palm slap), so the game's own gesture

@@ -27,10 +27,11 @@ edges, where the rim becomes lower from the second match onward. The room theref
 best angle of attack instead of merely decorating the background. Local progress, daily orders,
 champion tops and battle scars survive a browser reload.
 
-The first match teaches only carry, rip, ramp and the two-hand arena forge. Later matches reveal
-one move at a time with a performed ghost-hand lesson: Rim Spring, Forge Gust, Cup and Sling,
-Anvil Strike, Flick, Ember Rivet, Spin Rub, Crossguard, Finger Groove and Forge Wheel. The smith
-board remembers the latest move when you return.
+The first match teaches only carry, rip, ramp and the two-hand arena forge, each performed first
+by a ghost hand. Later matches reveal one move at a time with its own NEW MOVE card: Rim Spring,
+Forge Gust, Cup and Sling, Anvil Strike, Flick, Ember Rivet, Spin Rub, Crossguard, Finger Groove
+and Forge Wheel (the ghost hand returns for Anvil Strike and Flick). The smith board remembers the
+latest move when you return.
 
 Build a top at the anvil by combining rings, cores and tips that alter its physics. Climb fifteen
 authored Circuit bouts across three chapters, earn medals, challenge bosses that cast your own
@@ -45,6 +46,24 @@ SpinSmith is built with the Immersive Web SDK for the Quest browser. A determini
 simulation drives every fight. Honest limit: every submitted image and clip is from IWSDK's
 browser-based XR emulator (IWER), clearly labelled; the game has not yet run on physical Quest
 hardware.
+
+## Testing instructions (for the judges)
+
+- **URL:** _PLACEHOLDER: hosted URL_ (HTTPS, opens in the Meta Quest Browser; nothing to install).
+- **Headset:** Meta Quest 3 or 3S, seated at a table. Put the controllers down: SpinSmith is hands
+  only. Turn on hand tracking (Settings → Movement tracking → Hand and body tracking).
+- **Table:** label your desk as a table in Space Setup (Settings → Physical space → Space setup)
+  for the DESK KO. Without one the arena uses a flat surface at desk height, or a floating tray
+  that says so.
+- **Start:** open the URL, press ENTER, allow spatial data. Pinch your top into the arena, then
+  pinch near it, pull back and let go to rip.
+- **What to expect:** the first match is guided and teaches carry, rip, ramp and the two-hand
+  squeeze. In our scripted emulator run the first knockout came at 47 s, the first DESK KO at
+  64 s and the match ended at 113 s from ENTER (2026-11-16); a real first-timer will be slower.
+- **Shortcuts:** `?demo` opens a level-8 smith with most moves unlocked (PLAY is the boss
+  Sawtooth); `?fresh` starts as a new player; `?fps` shows the frame rate beside MENU.
+- **No headset:** the game needs the Quest Browser; the video shows every move (emulator footage,
+  labelled). The repository README explains how to run it in Meta's IWER emulator.
 
 ## Inspiration
 
@@ -72,9 +91,10 @@ has been tested across real networks and headsets.
 
 ## Hands-first interaction
 
-- **No controllers, no menu screens.** Every action is a pinch, a pull or a press on an object: the
-  part in the drawer, the top in its dock, the floor of the arena. The hand ray is only a reach
-  extender: for a ramp on the arena's far side and the small Menu button. The arena, the forge and
+- **No controllers, no flat menus.** Every action is a pinch, a pull or a press on an object: the
+  part in the drawer, the top in its dock, the floor of the arena; the one button, a small MENU
+  plate on the rim, is pinched like the rest. The hand ray is only a reach extender: for a ramp on
+  the arena's far side and that MENU plate. The arena, the forge and
   the score are one machine on the table: direct touch first, the ray only for what is out of reach.
 - **Pinch and pull to launch:** the rip is the motion of pulling a cord, with arrows showing the
   direction the first time.
@@ -130,6 +150,10 @@ Forge Wheel, Ember Rivet, Tilt, Hammer) were re-shot for v10 with the banners th
 
 Known limits of the footage (emulator hands): the Anvil Strike slap is hard to see, the hand sits
 over the Magnet well and the Hammer crater for a moment, and the Spin Rub hand runs near the centre.
+The dev server (used for every emulator shot and test) is more forgiving in two places than the
+shipped build: the Outer Ring palm catch reaches 1.8x as far (src/game/desk-play.ts) and the forge
+picks up a top from 14 cm instead of 9 cm (src/game/forge.ts), because emulated hands cannot aim as
+finely as real ones. The shipped thresholds are untested on real hands.
 
 Capture: the presentation room (`scripts/capture/shot.mjs`) is walls, a window and a stand-in table
 matched to the emulator's detected table plane; parked driver hands breathe, curl and fidget and
@@ -149,10 +173,10 @@ cast a soft shadow (capture only). The music is synthesized on the cut's clock
 - **In the emulator, with emulated hands:** the first match's rip, ramp and two-hand forge;
   campaign bouts and medals; four-top brawls; PASS; the one-hand forge; online pairing, rounds,
   scores and live hands.
-- **Render budget (desktop IWER, per eye, 2026-11-07):** the automated matrix measures hub 99,
-  forge 99, workshop 85, a normal fight up to 118 and a 4-top brawl up to 136 draw calls per eye
-  (budget 150; the script fails above it); the
-  game's update 0.4-1.4 ms median; GPU 0.86 ms median on the timed scene. Under a 4x CPU throttle
+- **Render budget (desktop IWER, per eye, 2026-11-16, `artifacts/perf/render-budget-2026-11-16.json`):**
+  the automated matrix measures hub 93, forge 107, workshop 63, a normal fight up to 133 and a
+  4-top brawl up to 139 draw calls per eye (budget 150; the script fails above it); the
+  game's update 0.4-1.4 ms median and GPU 0.86 ms median (saved 2026-10-23 runs). Under a 4x CPU throttle
   the page drops to 24-35 fps and the GPU timer shows that frame is CPU-side submission and the
   emulator; the quality guard steps down when frames run long (tested under throttle). Real Quest
   frame rate is not yet measured.

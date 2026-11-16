@@ -102,7 +102,7 @@ loadFonts()
       try {
         const ar = await navigator.xr?.isSessionSupported('immersive-ar').catch(() => false);
         if (!ar) {
-          failLaunch('Open this page in the Meta Quest Browser to enter mixed reality.');
+          failLaunch('Open this page in the Meta Quest Browser to enter mixed reality. No headset? The video on the Devpost page shows every move.');
           return;
         }
         // The click is the browser-approved gesture for WebAudio; do this before XR takes focus.
