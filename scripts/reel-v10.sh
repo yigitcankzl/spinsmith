@@ -128,6 +128,8 @@ EOF
 # Cup and Sling: the catch from cup36 (the palm over the top as CUP CAUGHT lands, steep camera), then the
 # sling from cup7 (SLUNG!), each framed on its own; a straight cut between the two takes.
 ffmpeg -nostdin -y -loglevel error -i "$S/v9/cup36.mp4" -i "$S/v9/cup7.mp4" -filter_complex "[0:v]trim=${CUP_A:-4.85}:${CUP_A2:-5.95},setpts=PTS-STARTPTS,crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06,scale=1920:1080,setsar=1,fps=60[a];[1:v]trim=${CUP_B:-4.7}:${CUP_B2:-6.1},setpts=PTS-STARTPTS,crop=iw*0.66:ih*0.66:iw*0.17:ih*0.02,scale=1920:1080,setsar=1,fps=60[b];[a][b]concat=n=2:v=1:a=0[v];[0:a]atrim=${CUP_A:-4.85}:${CUP_A2:-5.95},asetpts=PTS-STARTPTS[x];[1:a]atrim=${CUP_B:-4.7}:${CUP_B2:-6.1},asetpts=PTS-STARTPTS[y];[x][y]concat=n=2:v=0:a=1[au]" -map "[v]" -map "[au]" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/cup-active.mp4"
+# The journey in one beat (judge report 2026-11-16): a won match names the next match's new move.
+SPEED=1.5 AGAIN=1 PRE="crop=iw*0.44:ih*0.44:iw*0.28:ih*0.13" seg 11-journey "$S/match-won-cards.mp4" ${JOURNEY_AT:-5.4} 2.0 "unsharp=5:5:0.6,$(title 'ONE NEW MOVE PER MATCH'),$(how 'WIN, AND THE NEXT MATCH TEACHES IT')"
 # Three groups, each opened by a card; the count runs on across them.
 MUSIC+=("whoosh:$(at 0)" "$(at 0):3")
 card 12-card1 "$S/v9/twist10.mp4" 0.5 'SHAPE THE ARENA' 'MOVES 1 TO 4  /  HANDS ON THE RIM'

@@ -14,12 +14,12 @@ import sys
 reel, voice, out = sys.argv[1:4]
 
 # Phrase numbers follow the script, as the take splits it (43 phrases). Times are v11 moments (v10c plus a
-# 2 s DESK KO before the end card) read off
+# 2 s journey beat at 12.5 and a 2 s DESK KO before the end card) read off
 # 4 fps sheets: each verb lands as the hand does it, just before the game's banner (not on the cut).
-CUES = {2: 0.15, 3: 1.0, 4: 2.55, 5: 4.3, 9: 6.7, 10: 8.5, 11: 10.45, 12: 12.4, 13: 14.3, 14: 16.4,
-        15: 18.0, 16: 20.0, 17: 22.0, 18: 23.3, 19: 25.9, 20: 27.6, 21: 29.0, 22: 30.0, 23: 32.8, 24: 33.8,
-        25: 35.4, 26: 37.7, 27: 40.0, 29: 42.2, 30: 44.8, 31: 47.5, 32: 49.4, 33: 52.3, 34: 54.3, 35: 57.9,
-        36: 60.5, 38: 61.9, 39: 64.15, 40: 65.9, 41: 68.6}
+CUES = {2: 0.15, 3: 1.0, 4: 2.55, 5: 4.3, 9: 6.7, 10: 8.5, 11: 10.45, 12: 14.4, 13: 16.3, 14: 18.4,
+        15: 20.0, 16: 22.0, 17: 24.0, 18: 25.3, 19: 27.9, 20: 29.6, 21: 31.0, 22: 32.0, 23: 34.8,
+        24: 35.8, 25: 37.4, 26: 39.7, 27: 42.0, 29: 44.2, 30: 46.8, 31: 49.5, 32: 51.4, 33: 54.3,
+        34: 56.3, 35: 59.9, 36: 62.5, 38: 63.9, 39: 66.15, 40: 67.9, 41: 70.6}
 # Dropped to keep the voice on its pictures (the captions already say them): 1 "Grab the arena." (the
 # open starts on "Squeeze..."), 8 "No controllers, just your hands.", 37 "Four-top brawls.".
 # 39 "Catch the final boss at the rim" stays: without it the "stamp." after it stands alone.
