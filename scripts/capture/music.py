@@ -169,10 +169,12 @@ def main():
     for t in hits:
         add(buf, t, crash(2.0), 0.35)
     for t in stings:
-        add(buf, t, kick(), 1.3); add(buf, t, crash(3.5), 0.3)
-        add(buf, t, tone(41.2, 3.0, (1, 2), 1.0), 0.4)
+        # A warm resolving chord (few harmonics, slow decay), not a buzzy saw stab.
+        add(buf, t, kick(), 1.2); add(buf, t, crash(3.5), 0.16)
+        add(buf, t, tone(41.2, 3.0, (1, 2), 1.0), 0.35)
         for f in CHORDS[0] + (440.0,):
-            add(mus, t, saw(f, 4.0, 1.4, 10), 0.16)
+            add(mus, t, tone(f, 4.0, (1, 2, 3), 1.8), 0.2)
+            add(mus, t, tone(f / 2, 4.0, (1, 2), 2.2), 0.12)
     buf = buf + mus * pump
     buf = np.tanh(1.8 * buf / np.abs(buf).max())  # glue: lifts density, rounds peaks
     buf = buf[: int(length * SR)]

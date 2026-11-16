@@ -110,7 +110,7 @@ moves() {
   local i=$(( ${FIRST:-1} - 1 )) k=0
   while read -r f s d sp c head hw n; do
     k=$((k + 1)); local crop=$C9 sharp="" text="" num=""
-    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; h) crop=$CHIGH ;; r) crop=$CSLAPR ;; k) crop=$CCLOSE ;; f) crop="crop=iw:ih:0:0" ;; t) crop="crop=iw*0.55:ih*0.55:iw*0.2:ih*0.25" ;; q) crop=$CPALM ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
+    case $c in w) crop=$C75; sharp="$SHARP," ;; m) crop=$CMID ;; b) crop=$CMIDLOW ;; a) crop=$CSLAP ;; h) crop=$CHIGH ;; r) crop=$CSLAPR ;; k) crop=$CCLOSE ;; f) crop="crop=iw:ih:0:0" ;; t) crop="crop=iw*0.55:ih*0.55:iw*0.2:ih*0.25" ;; q) crop=$CPALM ;; p) crop="crop=iw*0.64:ih*0.64:iw*0.2:ih*0.14" ;; g) crop="crop=iw*0.5:ih*0.5:iw*0.25:ih*0.17" ;; s) crop=$CSTEEP ;; l) crop=$CWHEEL ;; esac
     [ "${COUNT:-1}" = 1 ] && { i=$((i + 1)); num="   $i/16"; }
     n=${n//_/ }; head=${head//_/ }; hw=${hw//_/ }
     if [ "$head" = - ]; then text="$(move "$n$num")${hw:+,$(how "$hw")}"
@@ -141,8 +141,8 @@ v9/ramp ${RAMP_AT:-1.85} 2.0 0.5 s - PINCH_THE_FLOOR,_DRAG_A_RAMP RAMP
 EOF
 card 13-card2 "$S/v9/spring.mp4" 2.5 'WORK YOUR TOP' 'MOVES 5 TO 11  /  ONE HAND'
 FIRST=5 HTB=1.0 moves 13-moveB <<EOF
-v9/spring ${SPRING_AT:-3.2} 2.5 1 m - PINCH_THE_RIM,_PULL,_LET_GO RIM_SPRING
-v9/gust ${GUST_AT:-2.0} 2.0 1 s - SWEEP_YOUR_PALM FORGE_GUST
+v9/spring11 ${SPRING_AT:-2.0} 2.5 1 p - PINCH_THE_RIM,_PULL,_LET_GO,_IT_SPRINGS RIM_SPRING
+v9/gust11b ${GUST_AT:-2.4} 2.0 0.75 g - SWEEP_YOUR_PALM_ACROSS,_A_GUST_HITS FORGE_GUST
 v9/palm28 ${OUTER_AT:-1.4} 2.5 1 q - CATCH_YOUR_TOP,_PUT_IT_BACK PALM_CATCH
 v9/groove7 ${GROOVE_AT:-3.7} 2.5 1 k - SLIDE_A_FINGERTIP,_CUT_A_GROOVE FINGER_GROOVE
 $TMP/cup-active 0 2.5 1 f - CUP_IT,_THEN_SLING_IT CUP_AND_SLING
@@ -173,22 +173,22 @@ AGAIN=2 PRE="crop=iw*0.75:ih*0.75:iw*0.125:ih*0.1" seg 24-ar07 "$S/arenas/07.mp4
 PRE=$C85 seg 25-ar10 "$S/arenas/10.mp4" 0.52 0.5 "$AR"
 MUSIC+=("$(at 0):3")
 AGAIN=0.7 PRE=$C9 seg 26-brawl "$T/brawl2.mp4" ${BRAWL_AT:-27.15} 1.0 "$(title 'FOUR-TOP BRAWLS')"
-MUSIC+=("$(at 0):b" "rise:$(at 0.1)-$(at 0.45)" "$(at 0.45):x" "hit:$(at 0.5)" "$(at 0.5):3"); GAPS+=("$(at 0.5)")
+# The finale builds without a break (first watchers found the stop-start ending choppy).
+MUSIC+=("$(at 0):3")
 seg 31-boss1 "$T/boss-ironkeep.mp4" ${IRON_AT:-90.9} 1.0 "$(title 'BOSSES CAST YOUR MOVES')"
 # The Iron Keep loss (32-lost) is gone: first-watch judges read a loss right before the finale as a wince.
-MUSIC+=("rise:$(at -0.4)-$(at 0)")
 # (33-bastion is gone: first-watch judges saw nothing happen in it; the strike opens earlier instead.)
-# The finishing blow in silence: the clash throws Bastion to the rim, the hand strikes, Bastion goes
+# The finishing blow under a riser: the clash throws Bastion to the rim, the hand strikes, Bastion goes
 # over the rim; the win drops in on SLAG! The result screen is cropped past its buttons and score.
 # The strike window (the rival at the rim, the ultimate armed): the hand stamps the seal, at half speed, cut (and held) before the result screen, then SLAG! at half speed as Bastion goes in a burst of sparks at the rim.
-MUSIC+=("$(at 0):x")
+MUSIC+=("rise:$(at 0)-$(at 1.5)")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,1.38)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-110.75} 1.5 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.9} 1.0 "unsharp=7:7:0.9,$(TA=0 title 'THE FINAL BOSS FALLS')"
 # The end card over the crown take, blurred; the sting on its first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
-ENDD=${END_DUR:-2.5}
-AGAIN=0 POST="fade=t=in:st=0:d=0.15,fade=t=out:st=$(python3 -c "print($ENDD - 0.4)"):d=0.4" seg 50-end "$T/boss-bastion1.mp4" ${CARD_AT:-123.7} $ENDD "split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6,format=yuva420p[sbb];[sa][sbb]overlay,format=yuv420p,$(logo 240 '(W-w)/2' 120),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=190:x=(w-text_w)/2:y=370,drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=76:x=(w-text_w)/2:y=600,drawtext=fontfile=$FONT:text='Meta Quest 3 and 3S  /  Quest Browser  /  hands only':fontcolor=0xe7edf4:fontsize=74:x=(w-text_w)/2:y=720,drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffc58a:fontsize=84:x=(w-text_w)/2:y=830"
+ENDD=${END_DUR:-3.5}
+AGAIN=0 POST="fade=t=in:st=0:d=0.15,fade=t=out:st=$(python3 -c "print($ENDD - 1.0)"):d=1.0" seg 50-end "$T/boss-bastion1.mp4" ${CARD_AT:-123.7} $ENDD "split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6,format=yuva420p[sbb];[sa][sbb]overlay,format=yuv420p,$(logo 240 '(W-w)/2' 120),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=190:x=(w-text_w)/2:y=370,drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=76:x=(w-text_w)/2:y=600,drawtext=fontfile=$FONT:text='Meta Quest 3 and 3S  /  Quest Browser  /  hands only':fontcolor=0xe7edf4:fontsize=74:x=(w-text_w)/2:y=720,drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffc58a:fontsize=84:x=(w-text_w)/2:y=830"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/joined.mp4"
@@ -197,10 +197,10 @@ ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/alist.txt" -c copy "$TMP/ga
 python3 scripts/capture/music.py "$TMP/music.wav" "$NOW" "${MUSIC[@]}"
 GAPX=$(python3 -c "import sys; print('1-0.8*min(1,' + '+'.join(f'between(t,{float(a)-0.3:.3f},{float(a):.3f})' for a in sys.argv[1:]) + ')')" "${GAPS[@]}")
 echo "video $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$TMP/joined.mp4") game $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$TMP/game.wav") cut $NOW"
-# The game levelled on its own (so the music's silences survive), its 110 Hz dipped for the kick;
-# the music up front, ducking gently under the game; then about -14 LUFS, peaks under -1.5 dBTP.
+# The game compressed and held low (its spin hum stays under the music, its hits still read), its lows
+# cut for the kick; the music up front; then about -14 LUFS, peaks under -1.5 dBTP.
 ffmpeg -y -loglevel error -i "$TMP/joined.mp4" -i "$TMP/game.wav" -i "$TMP/music.wav" -filter_complex \
-  "[1:a]dynaudnorm=f=250:g=25:m=4:p=0.7,equalizer=f=110:t=q:w=1:g=-3,volume='$GAPX':eval=frame,asplit[g][sc];[2:a]volume=${MUSIC_GAIN:-0.55},highpass=f=35[m];[m][sc]sidechaincompress=threshold=0.12:ratio=3:attack=10:release=200[md];[g][md]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.8:LRA=11,alimiter=limit=0.72:level=false[a]" \
+  "[1:a]highpass=f=150,equalizer=f=110:t=q:w=1:g=-3,acompressor=threshold=0.1:ratio=4:attack=5:release=120,volume=${GAME_GAIN:-0.45},volume='$GAPX':eval=frame[g];[2:a]volume=${MUSIC_GAIN:-1.0},highpass=f=35[md];[g][md]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.8:LRA=11,alimiter=limit=0.72:level=false[a]" \
   -map 0:v -map "[a]" -t "$NOW" -c:v copy -c:a aac -b:a 256k -ar 48000 -movflags +faststart "$FINAL"
 echo "$FINAL ($(ffprobe -v error -show_entries format=duration -of csv=p=0 "$FINAL") s)"
 t=0; for s in "${segs[@]}"; do printf "%6.2f %s\n" "$t" "$s"; t=$(python3 -c "print($t + $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$TMP/$s.mp4"))"); done
