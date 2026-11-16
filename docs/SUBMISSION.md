@@ -128,9 +128,9 @@ has been tested across real networks and headsets.
 (picture and music) and `scripts/capture/vo-mix.py` (voice-over laid phrase by phrase on its shot, the
 reel's mix ducking under it, about -14 LUFS). Earlier cuts: `scripts/reel-v9.sh` (0:40) …
 `scripts/reel-v3.sh`. Each move gets its lead-in, the gesture and its result (2-3 s), with a line in
-orange that says what the hand does; each of the three groups opens with a card. v11 opens and closes
-on one legible DESK KO shot side-on at desk height (`shots/v12/`): both hands squeeze, the rival
-skids off the real desk edge and lands on the floor. Every frame, the end card included, says
+orange that says what the hand does; each of the three groups opens with a card. v11 opens on one legible DESK KO
+through the player's eyes and closes on the same KO side-on (`shots/v12/`): both hands squeeze,
+the rival flies off the real desk edge and lands on the floor. Every frame, the end card included, says
 `IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE` (bottom right), with the speed written into it
 on every retimed clip. Cuts land on the music's beat (120 BPM, synthesized by
 `scripts/capture/music.py`, no samples). The voice is an AI text-to-speech read of
@@ -138,7 +138,7 @@ on every retimed clip. Cuts land on the music's beat (120 BPM, synthesized by
 
 | Time | Shot |
 |---|---|
-| 0:00-0:04 | Cold open: FOR META QUEST 3 / HANDS ONLY / NO CONTROLLERS; SQUEEZE THE ARENA.; THROW THEM OFF YOUR DESK. and DESK KO side-on (0.6x), with the SPINSMITH brand |
+| 0:00-0:04 | Cold open: FOR META QUEST 3 / HANDS ONLY / NO CONTROLLERS; SQUEEZE THE ARENA.; THROW THEM OFF YOUR DESK. and DESK KO through the player's eyes (0.6x), with the SPINSMITH brand |
 | 0:04-0:06.5 | PINCH. PULL. RIP. (the launch) |
 | 0:06.5-0:12.5 | EXTRA / FLICK, EXTRA / CROSSGUARD (half speed), EXTRA / SPIN RUB (outside the 16, not counted) |
 | 0:12.5-0:14.5 | ONE NEW MOVE PER MATCH: a won match's NEW MOVE card, then WON 4-0 · COME BACK naming the next move (1.5x) |
