@@ -162,11 +162,13 @@ EOF
 # ACT 3. Make it yours, then everyone else: forge, build, arenas, a brawl, the bosses.
 MUSIC+=("whoosh:$(at 0)" "$(at 0):2")
 # The forge: one continuous piece of the take, the part swap (HALO to ANVIL) as the hand comes in.
-AGAIN=3 PRE="crop=iw*0.8:ih*0.8:iw*0.07:ih*0.2" seg 21-forge "$S/forge3.mp4" ${FORGE_AT:-7.6} 1.5 "$(title 'FORGE YOUR TOP')"
+# One whole part swap (first watchers could not read a 1.5 s glimpse): the hand pinches a ring from the
+# tray, the old ring flies off, the new one lands and the stat board renames the top.
+AGAIN=3 PRE="crop=iw*0.62:ih*0.62:iw*0.15:ih*0.16" seg 21-forge "$S/forge3.mp4" ${FORGE_AT:-8.4} 3.5 "$(title 'FORGE YOUR TOP'),$(how 'PINCH A NEW RING, YOUR TOP REBUILDS')"
 WS_KEEP="${WS_KEEP:-34.05-36.4 41.0-43.3 44.45-46.85 47.97-50.33}"
 sel=$(for r in $WS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
 ffmpeg -nostdin -y -loglevel error -i "$S/workshop2.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/ws-active.mp4"
-AGAIN=3 PRE="crop=iw*0.72:ih*0.66:iw*0.14:ih*0.02" seg 22-workshop "$TMP/ws-active.mp4" ${WS_AT:-1.05} 1.0 "$(title 'BUILD YOUR ARENA')"
+AGAIN=3 PRE="crop=iw*0.6:ih*0.6:iw*0.2:ih*0.26" seg 22-workshop "$TMP/ws-active.mp4" ${WS_AT:-0.0} 3.0 "$(title 'BUILD YOUR ARENA'),$(how 'PINCH A PIECE, DROP IT IN THE BOWL')"
 AR="$(title '20 ARENAS')"
 AGAIN=2 PRE=$C85 seg 23-ar12 "$S/arenas/12.mp4" 1.65 0.5 "$AR"
 AGAIN=2 PRE="crop=iw*0.75:ih*0.75:iw*0.125:ih*0.1" seg 24-ar07 "$S/arenas/07.mp4" 0.5 0.5 "$AR"
@@ -185,10 +187,18 @@ MUSIC+=("rise:$(at 0)-$(at 1.5)")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,1.38)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-110.75} 1.5 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.9} 1.0 "unsharp=7:7:0.9,$(TA=0 title 'THE FINAL BOSS FALLS')"
-# The end card over the crown take, blurred; the sting on its first frame.
+# The sting on the end card's first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.5}
-AGAIN=0 POST="fade=t=in:st=0:d=0.15,fade=t=out:st=$(python3 -c "print($ENDD - 1.0)"):d=1.0" seg 50-end "$T/boss-bastion1.mp4" ${CARD_AT:-123.7} $ENDD "split[sa][sb];[sb]gblur=sigma=24,eq=brightness=-0.55:saturation=0.6,format=yuva420p[sbb];[sa][sbb]overlay,format=yuv420p,$(logo 240 '(W-w)/2' 120),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=190:x=(w-text_w)/2:y=370,drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=76:x=(w-text_w)/2:y=600,drawtext=fontfile=$FONT:text='Meta Quest 3 and 3S  /  Quest Browser  /  hands only':fontcolor=0xe7edf4:fontsize=74:x=(w-text_w)/2:y=720,drawtext=fontfile=$FONT:text='Link on the Devpost page':fontcolor=0xffc58a:fontsize=84:x=(w-text_w)/2:y=830"
+# The end card: live tops spinning behind (soft, darkened toward the left), the wordmark left-aligned
+# and sliding in on the sting, one orange rule, one line, then where to play. No icon tile, no centred stack.
+EC="gblur=sigma=5,geq=lum='lum(X,Y)*(0.16+0.55*X/W)':cb='128+(cb(X,Y)-128)*(0.25+0.6*X/W)':cr='128+(cr(X,Y)-128)*(0.25+0.6*X/W)'"
+EC+=",drawtext=fontfile=$FONT:text='HANDS ONLY  /  NO CONTROLLERS':fontcolor=0xff8a2a:fontsize=42:x=156:y=300:alpha='min(1,t/0.2)'"
+EC+=",drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=white:fontsize=250:x='150-60*max(0,1-t/0.22)':y=370:alpha='min(1,t/0.12)'"
+EC+=",drawbox=x=156:y=618:w='560*min(1,max(0,(t-0.15)/0.3))':h=8:color=0xff8a2a@1:t=fill"
+EC+=",drawtext=fontfile=$FONT:text='Squeeze the arena. Throw them off your desk.':fontcolor=0xe7edf4:fontsize=66:x=152:y=652:alpha='min(1,max(0,(t-0.35)/0.25))'"
+EC+=",drawtext=fontfile=$FONT:text='PLAY FREE IN THE QUEST BROWSER':fontcolor=0xffc58a:fontsize=46:x=152:y=760:alpha='min(1,max(0,(t-0.7)/0.25))'"
+AGAIN=0 POST="fade=t=out:st=$(python3 -c "print($ENDD - 1.0)"):d=1.0" PRE="crop=iw*0.42:ih*0.42:iw*0.3:ih*0.3" seg 50-end "$T/brawl2.mp4" ${CARD_AT:-32.0} $ENDD "$EC"
 
 printf "file '%s.mp4'\n" "${segs[@]/#/$TMP/}" > "$TMP/list.txt"
 ffmpeg -y -loglevel error -f concat -safe 0 -i "$TMP/list.txt" -c copy "$TMP/joined.mp4"
