@@ -81,22 +81,20 @@ CPALM="crop=iw*0.8:ih*0.8:iw*0.17:ih*0.15"  # Palm Catch: the arena and the catc
 CSTEEP="crop=iw*0.76:ih*0.76:iw*0.12:ih*0.06"    # v9 steep camera
 CWHEEL="crop=iw*0.48:ih*0.48:iw*0.2:ih*0.27" # v9 wheel camera: the Forge Wheel and the arena
 
-# COLD OPEN (0-3.5): squeeze, the throw, DESK KO. One KO, no flashes, tight on the arena.
+# COLD OPEN (0-4): squeeze, the throw, DESK KO. One KO, no flashes.
 HOOKC="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2"
-PLATFORM="drawtext=fontfile=$FONT:text='META QUEST 3  /  HANDS ONLY  /  NO CONTROLLERS':fontcolor=white:fontsize=40:x=w-text_w-40:y=36:box=1:boxcolor=0x111419@0.75:boxborderw=10"
+PLATFORM="drawtext=fontfile=$FONT:text='FOR META QUEST 3  /  HANDS ONLY  /  NO CONTROLLERS':fontcolor=white:fontsize=40:x=w-text_w-40:y=36:box=1:boxcolor=0x111419@0.75:boxborderw=10"
 BRAND="$(logo 120 48 40),drawtext=fontfile=$FONT:text='SPINSMITH':fontcolor=0xff8a2a:fontsize=100:x=186:y=44:box=1:boxcolor=0x111419@0.78:boxborderw=14"
-MUSIC+=("0:x" "rise:0.3-1.8" "hit:1.8" "1.8:3")
-PRE=$HOOKC seg 00a-squeeze "$S/hook-ko-close.mp4" ${HOOK_AT:-1.6} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
-# The take has a capture jump at 3.05: the second shot starts past it, the throw-off and DESK KO! in one piece.
-PRE="crop=iw*0.66:ih*0.66:iw*0.15:ih*0.2" AGAIN=2 seg 00c-ko "$S/hook-ko-close.mp4" ${KO_AT:-3.1} 1.5 "$BRAND,$(TB=0.9 title 'THROW THEM OFF YOUR DESK.')"
+# v11: the hook is one side-on DESK KO (shots/v12/koSideC, judge report 2026-11-16): both hands squeeze,
+# the rival skids off the real desk edge and lands on the floor, the desk edge in frame. The flat
+# "FINDS YOUR REAL TABLE" press shot is gone; the open is still 4 s.
+KOC="crop=iw*0.92:ih*0.92:iw*0.04:ih*0.04"
+MUSIC+=("0:x" "rise:0.3-2.3" "hit:2.3" "2.3:3")
+PRE=$KOC seg 00a-squeeze "$S/v12/koSideC.mp4" ${HOOK_AT:-2.0} 1.0 "$PLATFORM,$(title 'SQUEEZE THE ARENA.')"
+SLOWDUP=1 SPEED=0.6 PRE=$KOC AGAIN=2 seg 00c-ko "$S/v12/koSideC.mp4" ${KO_AT:-3.0} 3.0 "$BRAND,$(TB=0.9 title 'THROW THEM OFF YOUR DESK.')"
 
-# ACT 1. How it works: the detected table, the rip, a first match, the two-hand squeeze.
+# ACT 1. How it works: the rip.
 MUSIC+=("$(at 0):1")
-# The press take without the game's 0.3 s hitch as the arena forms.
-PRESS_KEEP="${PRESS_KEEP:-3.8-4.87 5.19-6.65}"
-sel=$(for r in $PRESS_KEEP; do printf "between(t,%s,%s)+" "${r%-*}" "${r#*-}"; done); sel=${sel%+}
-ffmpeg -nostdin -y -loglevel error -i "$S/press-place.mp4" -vf "select='$sel',setpts=N/FRAME_RATE/TB" -af "aselect='$sel',asetpts=N/SR/TB" -c:v libx264 -crf 12 -preset fast -c:a aac -b:a 256k "$TMP/press-active.mp4"
-PRE="crop=iw*0.45:ih*0.45:iw*0.27:ih*0.27" AGAIN=1.5 seg 01a-press "$TMP/press-active.mp4" ${PRESS_AT:-0.05} 1.5 "$(title 'FINDS YOUR REAL TABLE')"
 AGAIN=0.7 seg 01b-rip "$V/${RIP_TAKE:-rip2}.mp4" ${RIP_AT:-1.9} 2.5 "$(title 'PINCH. PULL. RIP.')"
 MUSIC+=("$(at 0):2")
 # 01c (the first match) is gone: its only usable window showed a palm sunk under the arena floor.
@@ -120,11 +118,11 @@ moves() {
   done
 }
 MUSIC+=("$(at 0):2")
-# The basics are not among the 16 (they need no unlock): named, not counted. They live in shots/.
+# Three extra moves outside the 16: named, not counted. They live in shots/.
 M=$S COUNT=0 HTB=0.4 moves 11-basic <<EOF
-v9/flick ${FLICK_AT:-2.7} 2.0 1 m - SWING_A_FINGERTIP_THROUGH_A_TOP BASIC_/_FLICK
-v9/guard ${GUARD_AT:-2.3} 2.0 0.5 n - TWO_PALMS_ON_THE_RIM BASIC_/_CROSSGUARD
-v9/rub ${RUB_AT:-2.55} 2.0 1 s - FINGERTIP_ALONG_YOUR_RIM BASIC_/_SPIN_RUB
+v9/flick ${FLICK_AT:-2.7} 2.0 1 m - SWING_A_FINGERTIP_THROUGH_A_TOP EXTRA_/_FLICK
+v9/guard ${GUARD_AT:-2.3} 2.0 0.5 n - TWO_PALMS_ON_THE_RIM EXTRA_/_CROSSGUARD
+v9/rub ${RUB_AT:-2.55} 2.0 1 s - FINGERTIP_ALONG_YOUR_RIM EXTRA_/_SPIN_RUB
 EOF
 # Palm Catch: one continuous take (shots/v9/palm28, the capture-only slow park keeps the hand in frame).
 # Cup and Sling: the catch from cup36 (the palm over the top as CUP CAUGHT lands, steep camera), then the
@@ -187,6 +185,8 @@ MUSIC+=("rise:$(at 0)-$(at 1.5)")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,1.38)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-110.75} 1.5 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.9} 1.0 "unsharp=7:7:0.9,$(TA=0 title 'THE FINAL BOSS FALLS')"
+# The idea once more before the end card: the whole desk from the side, the rival off its edge and on the floor.
+SLOWDUP=1 SPEED=0.75 AGAIN=1.5 PRE="crop=iw*0.76:ih*0.76:iw*0.08:ih*0.14" seg 36-desk "$S/v12/koSide.mp4" ${DESK_AT:-3.05} 2.0 "$(title 'YOUR DESK IS THE RING-OUT')"
 # The sting on the end card's first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.5}

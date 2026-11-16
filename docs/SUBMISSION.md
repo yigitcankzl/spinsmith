@@ -122,31 +122,32 @@ has been tested across real networks and headsets.
 - **Together, still hands-first:** the brass pegs (a pinch) set brawls or open an online room;
   PASS hands the headset over; online, each smith's two pinch points show live on the other table.
 
-## Competition video (1:05, v10: re-timed for a first watch, 2026-11-13)
+## Competition video (1:12, v11 with voice-over, 2026-11-16)
 
-`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v10-1080p60.mp4`, cut by `scripts/reel-v10.sh`
-(earlier cuts: `scripts/reel-v9.sh` (0:40, forty-two review rounds) … `scripts/reel-v3.sh`). v9 showed
-every move but too fast for a first watch, so v10 gives each move its lead-in, the gesture and its
-result (2-3 s), a line in orange over its name that says what the hand does and what happens, and
-opens each of the three groups with a card. Every frame, the end card included, says
-`IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE` (bottom right), with the speed written into
-it on every retimed clip. Every segment is a multiple of 0.5 s, so every cut lands on the music's
-beat (120 BPM); the music (`scripts/capture/music.py`, synthesized, no samples) rises into the KOs,
-the game sound steps back just before each hit, and it ends on a sting. Six moves (Twist, Stretch,
-Forge Wheel, Ember Rivet, Tilt, Hammer) were re-shot for v10 with the banners that name the move
-(`shots/v9/*10.mp4`). Voice-over script, transcript and upload text: `docs/VIDEO-SCRIPT.md`.
+`~/Desktop/spinsmith-videos/reel-2026-11-05/spinsmith-reel-v11-vo-1080p60.mp4`, cut by `scripts/reel-v10.sh`
+(picture and music) and `scripts/capture/vo-mix.py` (voice-over laid phrase by phrase on its shot, the
+reel's mix ducking under it, about -14 LUFS). Earlier cuts: `scripts/reel-v9.sh` (0:40) …
+`scripts/reel-v3.sh`. Each move gets its lead-in, the gesture and its result (2-3 s), with a line in
+orange that says what the hand does; each of the three groups opens with a card. v11 opens and closes
+on one legible DESK KO shot side-on at desk height (`shots/v12/`): both hands squeeze, the rival
+skids off the real desk edge and lands on the floor. Every frame, the end card included, says
+`IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE` (bottom right), with the speed written into it
+on every retimed clip. Cuts land on the music's beat (120 BPM, synthesized by
+`scripts/capture/music.py`, no samples). The voice is an AI text-to-speech read of
+`docs/VIDEO-SCRIPT.md`.
 
 | Time | Shot |
 |---|---|
-| 0:00-0:04 | Cold open: META QUEST 3 / HANDS ONLY / NO CONTROLLERS; SQUEEZE THE ARENA.; THROW THEM OFF YOUR DESK. and DESK KO, with the SPINSMITH brand; FINDS YOUR REAL TABLE |
+| 0:00-0:04 | Cold open: FOR META QUEST 3 / HANDS ONLY / NO CONTROLLERS; SQUEEZE THE ARENA.; THROW THEM OFF YOUR DESK. and DESK KO side-on (0.6x), with the SPINSMITH brand |
 | 0:04-0:06.5 | PINCH. PULL. RIP. (the launch) |
-| 0:06.5-0:12.5 | BASIC / FLICK, BASIC / CROSSGUARD (half speed), BASIC / SPIN RUB (not among the 16, not counted) |
-| 0:12.5-0:22 | Card SHAPE THE ARENA, then 1-4: Twist, Stretch, Forge Wheel, Ramp (half speed) |
-| 0:22-0:40 | Card WORK YOUR TOP, then 5-11: Rim Spring, Forge Gust, Palm Catch, Finger Groove, Cup and Sling, Ember Rivet, Anvil Strike (half speed) |
+| 0:06.5-0:12.5 | EXTRA / FLICK, EXTRA / CROSSGUARD (half speed), EXTRA / SPIN RUB (outside the 16, not counted) |
+| 0:12.5-0:22 | Card SHAPE THE ARENA, then 1-4: Twist, Stretch, Forge Wheel, Ramp |
+| 0:22-0:40 | Card WORK YOUR TOP, then 5-11: Rim Spring, Forge Gust, Palm Catch, Finger Groove, Cup and Sling, Ember Rivet, Anvil Strike |
 | 0:40-0:54 | Card STAMP THE SEAL, then 12-16: Rush, Magnet, Tilt, Hammer, Ward |
-| 0:54-1:00 | FORGE YOUR TOP; BUILD YOUR ARENA; 20 ARENAS (three); FOUR-TOP BRAWLS; BOSSES CAST YOUR MOVES |
-| 1:00-1:02.5 | BASTION AT THE RIM. STAMP! (half speed); THE FINAL BOSS FALLS (SLAG!, half speed) |
-| 1:02.5-1:05 | The end card |
+| 0:54-1:02 | FORGE YOUR TOP (a whole part swap); BUILD YOUR ARENA (a placed piece); 20 ARENAS; FOUR-TOP BRAWLS |
+| 1:02-1:06.5 | BOSSES CAST YOUR MOVES; BASTION AT THE RIM. STAMP!; THE FINAL BOSS FALLS (half speed) |
+| 1:06.5-1:08.5 | YOUR DESK IS THE RING-OUT: the whole desk from the side, the rival off its edge (0.75x) |
+| 1:08.5-1:12 | The end card |
 
 Known limits of the footage (emulator hands): the Anvil Strike slap is hard to see, the hand sits
 over the Magnet well and the Hammer crater for a moment, and the Spin Rub hand runs near the centre.
