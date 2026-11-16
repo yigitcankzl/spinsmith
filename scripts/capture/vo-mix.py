@@ -13,16 +13,18 @@ import sys
 
 reel, voice, out = sys.argv[1:4]
 
-# Phrase numbers follow the script, as the take splits it (43 phrases); times are v10c shot starts.
-CUES = {1: 0.0, 3: 1.0, 4: 2.5, 5: 4.0, 9: 6.5, 10: 8.5, 11: 10.5, 12: 12.4, 13: 13.5, 14: 16.0,
-        15: 18.0, 16: 20.0, 17: 22.0, 18: 23.0, 19: 25.5, 20: 27.5, 22: 30.0, 23: 32.5, 25: 35.0,
-        26: 38.0, 27: 40.0, 29: 41.3, 30: 44.0, 31: 46.5, 32: 49.0, 33: 52.0, 34: 54.0, 35: 57.5,
-        36: 60.5, 38: 62.0, 40: 65.0, 41: 66.6}
-# Dropped to keep the voice on its pictures (the captions already say them): 8 "No controllers, just
-# your hands.", 37 "Four-top brawls.", 39 "Catch the final boss at the rim".
-DROP = {8, 37, 39}
+# Phrase numbers follow the script, as the take splits it (43 phrases). Times are v10c moments read off
+# 4 fps sheets: each verb lands as the hand does it, just before the game's banner (not on the cut).
+CUES = {2: 0.15, 3: 1.0, 4: 2.55, 5: 4.3, 9: 6.7, 10: 8.5, 11: 10.45, 12: 12.4, 13: 14.3, 14: 16.4,
+        15: 18.0, 16: 20.0, 17: 22.0, 18: 23.3, 19: 25.9, 20: 27.6, 21: 29.0, 22: 30.0, 23: 32.8, 24: 33.8,
+        25: 35.4, 26: 37.7, 27: 40.0, 29: 42.2, 30: 44.8, 31: 47.5, 32: 49.4, 33: 52.3, 34: 54.3, 35: 57.9,
+        36: 60.5, 38: 62.2, 40: 65.1, 41: 66.6}
+# Dropped to keep the voice on its pictures (the captions already say them): 1 "Grab the arena." (the
+# open starts on "Squeeze..."), 8 "No controllers, just your hands.", 37 "Four-top brawls.",
+# 39 "Catch the final boss at the rim".
+DROP = {1, 8, 37, 39}
 # The cold open is 6.5 s of picture: its phrases run 1.15x with tight gaps.
-TEMPO = {i: 1.15 for i in range(1, 8)}
+TEMPO = {i: 1.15 for i in range(2, 8)}
 GAP = 0.12
 
 log = subprocess.run(["ffmpeg", "-nostdin", "-i", voice, "-af", "silencedetect=n=-35dB:d=0.18", "-f", "null", "-"],
