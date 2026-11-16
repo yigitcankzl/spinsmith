@@ -129,7 +129,7 @@ has been tested across real networks and headsets.
 reel's mix ducking under it, about -14 LUFS). Earlier cuts: `scripts/reel-v9.sh` (0:40) …
 `scripts/reel-v3.sh`. Each move gets its lead-in, the gesture and its result (2-3 s), with a line in
 orange that says what the hand does; each of the three groups opens with a card. v11 opens on one legible DESK KO
-through the player's eyes and closes on the same KO side-on (`shots/v12/`): both hands squeeze,
+through the player's eyes and closes on a closer one (`shots/v12/`): both hands squeeze,
 the rival flies off the real desk edge and lands on the floor. Every frame, the end card included, says
 `IWER EMULATOR / SYNTHETIC ROOM / NOT HEADSET FOOTAGE` (bottom right), with the speed written into it
 on every retimed clip. Cuts land on the music's beat (120 BPM, synthesized by
@@ -147,7 +147,7 @@ on every retimed clip. Cuts land on the music's beat (120 BPM, synthesized by
 | 0:42-0:56 | Card STAMP THE SEAL, then 12-16: Rush, Magnet, Tilt, Hammer, Ward |
 | 0:56-1:04 | FORGE YOUR TOP (a whole part swap); BUILD YOUR ARENA (a placed piece); 20 ARENAS; FOUR-TOP BRAWLS |
 | 1:04-1:08.5 | BOSSES CAST YOUR MOVES; BASTION AT THE RIM. STAMP!; THE FINAL BOSS FALLS (half speed) |
-| 1:08.5-1:10.5 | YOUR DESK IS THE RING-OUT: the whole desk from the side, the rival off its edge (0.75x) |
+| 1:08.5-1:10.5 | YOUR DESK IS THE RING-OUT: a closer first-person DESK KO (0.75x) |
 | 1:10.5-1:14 | The end card |
 
 Known limits of the footage (emulator hands): the Anvil Strike slap is hard to see, the hand sits

@@ -188,8 +188,8 @@ MUSIC+=("rise:$(at 0)-$(at 1.5)")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="select='lt(t,1.38)'" seg 35a-strike "$T/boss-bastion3.mp4" ${STRIKE_AT:-110.75} 1.5 "$(TY=40 title 'BASTION AT THE RIM. STAMP!')"
 MUSIC+=("hit:$(at 0)" "$(at 0):3")
 SLOWDUP=1 SPEED=0.5 AGAIN=0.5 PRE="crop=iw*0.4:ih*0.4:iw*0.42:ih*0.26" seg 35b-slag "$T/boss-bastion3.mp4" ${SLAG_AT:-111.9} 1.0 "unsharp=7:7:0.9,$(TA=0 title 'THE FINAL BOSS FALLS')"
-# The idea once more before the end card: the whole desk from the side, the rival off its edge and on the floor.
-SLOWDUP=1 SPEED=0.75 AGAIN=1.5 PRE="crop=iw*0.76:ih*0.76:iw*0.08:ih*0.14" seg 36-desk "$S/v12/koSide.mp4" ${DESK_AT:-3.05} 2.0 "$(title 'YOUR DESK IS THE RING-OUT')"
+# The idea once more before the end card, closer and again through the player's eyes (shots/v12/povD).
+SLOWDUP=1 SPEED=0.75 AGAIN=1.5 PRE="crop=iw*0.9:ih*0.9:iw*0.1:ih*0.02" seg 36-desk "$S/v12/povD.mp4" ${DESK_AT:-3.6} 2.0 "$(title 'YOUR DESK IS THE RING-OUT')"
 # The sting on the end card's first frame.
 MUSIC+=("$(at -0.25):x" "sting:$(at 0)"); GAPS+=("$NOW")
 ENDD=${END_DUR:-3.5}
