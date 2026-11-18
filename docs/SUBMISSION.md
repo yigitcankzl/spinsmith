@@ -49,7 +49,7 @@ hardware.
 
 ## Testing instructions (for the judges)
 
-- **URL:** _PLACEHOLDER: hosted URL_ (HTTPS, opens in the Meta Quest Browser; nothing to install).
+- **URL:** https://yigitcankzl.github.io/spinsmith/ (HTTPS, opens in the Meta Quest Browser; nothing to install).
 - **Headset:** Meta Quest 3 or 3S, seated at a table. Put the controllers down: SpinSmith is hands
   only. Turn on hand tracking (Settings → Movement tracking → Hand and body tracking).
 - **Table:** label your desk as a table in Space Setup (Settings → Physical space → Space setup)

@@ -4,7 +4,7 @@
 
 A hands-first mixed reality spinning-top battler for Meta Quest 3/3S, built with the Immersive Web SDK (IWSDK). Entry for the Meta VR Start Developer Competition 2026 (Gaming, New Experience).
 
-**Status:** tested only in IWSDK's Quest emulator (IWER), headless simulations and browser windows; not yet run on a headset. **Hosted URL:** _PLACEHOLDER: hosted URL goes here_
+**Status:** tested only in IWSDK's Quest emulator (IWER), headless simulations and browser windows; not yet run on a headset. **Hosted URL:** https://yigitcankzl.github.io/spinsmith/ · **Video:** https://youtu.be/_jJKYVTOwuU
 
 ## The opening, measured
 
