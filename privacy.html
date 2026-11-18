@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SpinSmith: privacy</title>
+    <style>
+      body { margin: 0; padding: 48px 24px; background: #16191e; color: #e8e6e1; font: 18px/1.6 system-ui, sans-serif; }
+      main { max-width: 640px; margin: 0 auto; }
+      h1 { color: #ff8a2a; letter-spacing: 2px; }
+      a { color: #ffb347; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>SPINSMITH: PRIVACY</h1>
+      <p>SpinSmith has no accounts, analytics or ads. Solo play makes no game-service network calls after the app loads.</p>
+      <p><strong>Your progress</strong> (smith level, unlocked parts, your top, your arenas, settings) is saved only in your browser's local storage on your headset. Clearing the site's data, or adding <code>?fresh</code> to the address, removes it.</p>
+      <p><strong>Hand tracking and your room.</strong> The game asks the browser for hand tracking and detected planes (the table it stands on). Camera images, room planes and raw hand-joint data are used live on the headset and are never stored or sent.</p>
+      <p><strong>Online Duel (beta).</strong> This optional mode uses a Nostr relay to find the other player, public STUN services to establish a WebRTC peer-to-peer connection, and then sends the duel state, game actions and approximate pinch points to that player. SpinSmith has no multiplayer server and does not store this data, but the connection services and the other player can receive normal connection metadata such as your IP address.</p>
+      <p><strong>Fonts:</strong> Rajdhani by Indian Type Foundry, under the SIL Open Font License 1.1. All sounds and visuals are made by the game's code.</p>
+      <p><a href="./">Back to SpinSmith</a></p>
+    </main>
+  </body>
+</html>
